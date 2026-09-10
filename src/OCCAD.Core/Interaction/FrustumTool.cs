@@ -31,28 +31,7 @@ public sealed class FrustumTool : CadDrawingTool, ICadPointInputTool
     };
 
     public override CadToolPanelDescriptor ParameterPanel =>
-        new(
-            "Frustum",
-            [
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "BaseRadius",
-                    "Base Radius",
-                    _baseRadiusParameter,
-                    1e-9,
-                    double.MaxValue),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "Height",
-                    "Height",
-                    _heightParameter,
-                    1e-9,
-                    double.MaxValue),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "TopRadius",
-                    "Top Radius",
-                    _topRadiusParameter,
-                    1e-9,
-                    double.MaxValue)
-            ]);
+        new("Frustum", BuildParameters());
 
     protected override bool CanStepBackCore => Stage > 0;
 
@@ -101,12 +80,12 @@ public sealed class FrustumTool : CadDrawingTool, ICadPointInputTool
     {
         if (id.Equals("BaseRadius", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalPositive(value, out _baseRadiusParameter))
+            if (Stage > 1 || !TryOptionalPositive(value, out _baseRadiusParameter))
                 return false;
         }
         else if (id.Equals("Height", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalPositive(value, out _heightParameter))
+            if (Stage > 2 || !TryOptionalPositive(value, out _heightParameter))
                 return false;
         }
         else if (id.Equals("TopRadius", StringComparison.OrdinalIgnoreCase))
@@ -175,6 +154,36 @@ public sealed class FrustumTool : CadDrawingTool, ICadPointInputTool
     }
 
     protected override void OnCanceled() => ResetState();
+
+    private IReadOnlyList<CadToolParameterDescriptor> BuildParameters()
+    {
+        var parameters = new List<CadToolParameterDescriptor>(3);
+        if (Stage <= 1)
+        {
+            parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+                "BaseRadius",
+                "Base Radius",
+                _baseRadiusParameter,
+                1e-9,
+                double.MaxValue));
+        }
+        if (Stage <= 2)
+        {
+            parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+                "Height",
+                "Height",
+                _heightParameter,
+                1e-9,
+                double.MaxValue));
+        }
+        parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+            "TopRadius",
+            "Top Radius",
+            _topRadiusParameter,
+            1e-9,
+            double.MaxValue));
+        return parameters;
+    }
 
     private bool AcceptPoint(OcctPoint3d point)
     {

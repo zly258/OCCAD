@@ -26,22 +26,7 @@ public sealed class ConeTool : CadDrawingTool, ICadPointInputTool
     };
 
     public override CadToolPanelDescriptor ParameterPanel =>
-        new(
-            "Cone",
-            [
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "BaseRadius",
-                    "Base Radius",
-                    _radiusParameter,
-                    1e-9,
-                    double.MaxValue),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "Height",
-                    "Height",
-                    _heightParameter,
-                    1e-9,
-                    double.MaxValue)
-            ]);
+        new("Cone", BuildParameters());
 
     protected override bool CanStepBackCore => Stage > 0;
 
@@ -93,7 +78,7 @@ public sealed class ConeTool : CadDrawingTool, ICadPointInputTool
     {
         if (id.Equals("BaseRadius", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalPositive(value, out _radiusParameter))
+            if (Stage > 1 || !TryOptionalPositive(value, out _radiusParameter))
                 return false;
         }
         else if (id.Equals("Height", StringComparison.OrdinalIgnoreCase))
@@ -153,6 +138,27 @@ public sealed class ConeTool : CadDrawingTool, ICadPointInputTool
     }
 
     protected override void OnCanceled() => ResetState();
+
+    private IReadOnlyList<CadToolParameterDescriptor> BuildParameters()
+    {
+        var parameters = new List<CadToolParameterDescriptor>(2);
+        if (Stage <= 1)
+        {
+            parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+                "BaseRadius",
+                "Base Radius",
+                _radiusParameter,
+                1e-9,
+                double.MaxValue));
+        }
+        parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+            "Height",
+            "Height",
+            _heightParameter,
+            1e-9,
+            double.MaxValue));
+        return parameters;
+    }
 
     private bool AcceptPoint(OcctPoint3d point)
     {

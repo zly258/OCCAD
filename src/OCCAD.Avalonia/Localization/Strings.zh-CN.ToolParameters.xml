@@ -51,6 +51,24 @@
     <sys:String x:Key="Cad.Precision.torus.1.Length">主半径</sys:String>
     <sys:String x:Key="Cad.Precision.torus.2.Length">管半径</sys:String>
 
+    <!-- Ellipsoid -->
+    <sys:String x:Key="Cad.Parameter.ellipsoid.XRadius">X 半轴</sys:String>
+    <sys:String x:Key="Cad.Parameter.ellipsoid.YRadius">Y 半轴</sys:String>
+    <sys:String x:Key="Cad.Parameter.ellipsoid.ZRadius">Z 半轴</sys:String>
+    <sys:String x:Key="Cad.Parameter.ellipsoid.Angle">方向角</sys:String>
+    <sys:String x:Key="Cad.Precision.ellipsoid.1.Length">X 半轴</sys:String>
+    <sys:String x:Key="Cad.Precision.ellipsoid.1.Angle">方向角</sys:String>
+    <sys:String x:Key="Cad.Precision.ellipsoid.2.Length">Y 半轴</sys:String>
+    <sys:String x:Key="Cad.Precision.ellipsoid.3.Length">Z 半轴</sys:String>
+
+    <!-- Helix -->
+    <sys:String x:Key="Cad.Parameter.helix.Radius">半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.helix.StartAngle">起始角度</sys:String>
+    <sys:String x:Key="Cad.Parameter.helix.Pitch">螺距</sys:String>
+    <sys:String x:Key="Cad.Parameter.helix.Turns">圈数</sys:String>
+    <sys:String x:Key="Cad.Precision.helix.1.Length">半径</sys:String>
+    <sys:String x:Key="Cad.Precision.helix.1.Angle">起始角度</sys:String>
+
     <!-- Arc prompts used by the multi-method tool -->
     <sys:String x:Key="Cad.Prompt.Arc.Center">圆弧：指定圆心 [Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.Arc.Start">圆弧：指定起点 [Backspace 返回，Esc 取消]</sys:String>

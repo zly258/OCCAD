@@ -25,22 +25,7 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
         : "Major Radius";
 
     public override CadToolPanelDescriptor ParameterPanel =>
-        new(
-            "Torus",
-            [
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "MajorRadius",
-                    "Major Radius",
-                    _majorRadiusParameter,
-                    1e-9,
-                    double.MaxValue),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "TubeRadius",
-                    "Tube Radius",
-                    _tubeRadiusParameter,
-                    1e-9,
-                    double.MaxValue)
-            ]);
+        new("Torus", BuildParameters());
 
     protected override bool CanStepBackCore => Stage > 0;
 
@@ -104,7 +89,8 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
     {
         if (id.Equals("MajorRadius", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalPositive(value, out var major) ||
+            if (Stage > 1 ||
+                !TryOptionalPositive(value, out var major) ||
                 !CompatibleRadii(major, _tubeRadiusParameter))
                 return false;
             _majorRadiusParameter = major;
@@ -168,6 +154,27 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
     }
 
     protected override void OnCanceled() => Reset();
+
+    private IReadOnlyList<CadToolParameterDescriptor> BuildParameters()
+    {
+        var parameters = new List<CadToolParameterDescriptor>(2);
+        if (Stage <= 1)
+        {
+            parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+                "MajorRadius",
+                "Major Radius",
+                _majorRadiusParameter,
+                1e-9,
+                double.MaxValue));
+        }
+        parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+            "TubeRadius",
+            "Tube Radius",
+            _tubeRadiusParameter,
+            1e-9,
+            double.MaxValue));
+        return parameters;
+    }
 
     private bool AcceptPoint(OcctPoint3d point)
     {

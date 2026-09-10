@@ -31,34 +31,7 @@ public sealed class EllipsoidTool : CadDrawingTool, ICadPointInputTool
         : base.PrecisionAngleLabel;
 
     public override CadToolPanelDescriptor ParameterPanel =>
-        new(
-            "Ellipsoid",
-            [
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "XRadius",
-                    "X Semi-axis",
-                    _rxParameter,
-                    1e-9,
-                    double.MaxValue),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "YRadius",
-                    "Y Semi-axis",
-                    _ryParameter,
-                    1e-9,
-                    double.MaxValue),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "ZRadius",
-                    "Z Semi-axis",
-                    _rzParameter,
-                    1e-9,
-                    double.MaxValue),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "Angle",
-                    "Orientation",
-                    _angleDegrees,
-                    -360000.0,
-                    360000.0)
-            ]);
+        new("Ellipsoid", BuildParameters());
 
     protected override bool CanStepBackCore => Stage > 0;
 
@@ -108,12 +81,12 @@ public sealed class EllipsoidTool : CadDrawingTool, ICadPointInputTool
     {
         if (id.Equals("XRadius", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalPositive(value, out _rxParameter))
+            if (Stage > 1 || !TryOptionalPositive(value, out _rxParameter))
                 return false;
         }
         else if (id.Equals("YRadius", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalPositive(value, out _ryParameter))
+            if (Stage > 2 || !TryOptionalPositive(value, out _ryParameter))
                 return false;
         }
         else if (id.Equals("ZRadius", StringComparison.OrdinalIgnoreCase))
@@ -123,7 +96,7 @@ public sealed class EllipsoidTool : CadDrawingTool, ICadPointInputTool
         }
         else if (id.Equals("Angle", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalFinite(value, out _angleDegrees))
+            if (Stage > 1 || !TryOptionalFinite(value, out _angleDegrees))
                 return false;
         }
         else
@@ -186,6 +159,44 @@ public sealed class EllipsoidTool : CadDrawingTool, ICadPointInputTool
     }
 
     protected override void OnCanceled() => ResetState();
+
+    private IReadOnlyList<CadToolParameterDescriptor> BuildParameters()
+    {
+        var parameters = new List<CadToolParameterDescriptor>(4);
+        if (Stage <= 1)
+        {
+            parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+                "XRadius",
+                "X Semi-axis",
+                _rxParameter,
+                1e-9,
+                double.MaxValue));
+            parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+                "Angle",
+                "Orientation",
+                _angleDegrees,
+                -360000.0,
+                360000.0));
+        }
+
+        if (Stage <= 2)
+        {
+            parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+                "YRadius",
+                "Y Semi-axis",
+                _ryParameter,
+                1e-9,
+                double.MaxValue));
+        }
+
+        parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+            "ZRadius",
+            "Z Semi-axis",
+            _rzParameter,
+            1e-9,
+            double.MaxValue));
+        return parameters;
+    }
 
     private OcctPoint3d? Reference() => Stage > 0 ? _center : null;
 

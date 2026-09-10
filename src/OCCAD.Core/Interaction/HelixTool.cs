@@ -17,6 +17,8 @@ public sealed class HelixTool : CadDrawingTool, ICadPointInputTool
 
     public override string Id => "helix";
     public override string DisplayName => "Helix";
+    public override CadToolInputKind InputKind =>
+        Stage == 2 ? CadToolInputKind.Confirmation : CadToolInputKind.Point;
     public override string PrecisionLengthLabel => Stage == 1
         ? "Radius"
         : base.PrecisionLengthLabel;
@@ -42,34 +44,7 @@ public sealed class HelixTool : CadDrawingTool, ICadPointInputTool
     }
 
     public override CadToolPanelDescriptor ParameterPanel =>
-        new(
-            "Helix",
-            [
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "Radius",
-                    "Radius",
-                    _radiusParameter,
-                    1e-9,
-                    1e12),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "StartAngle",
-                    "Start Angle",
-                    _startAngleDegrees,
-                    -360000.0,
-                    360000.0),
-                new CadDoubleToolParameterDescriptor(
-                    "Pitch",
-                    "Pitch",
-                    _pitch,
-                    -1000000,
-                    1000000),
-                new CadDoubleToolParameterDescriptor(
-                    "Turns",
-                    "Turns",
-                    _turns,
-                    0.01,
-                    10000)
-            ]);
+        new("Helix", BuildParameters());
 
     protected override void OnActivated()
     {
@@ -124,12 +99,12 @@ public sealed class HelixTool : CadDrawingTool, ICadPointInputTool
     {
         if (id.Equals("Radius", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalPositive(value, out _radiusParameter))
+            if (Stage > 1 || !TryOptionalPositive(value, out _radiusParameter))
                 return false;
         }
         else if (id.Equals("StartAngle", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalFinite(value, out _startAngleDegrees))
+            if (Stage > 1 || !TryOptionalFinite(value, out _startAngleDegrees))
                 return false;
         }
         else
@@ -210,6 +185,40 @@ public sealed class HelixTool : CadDrawingTool, ICadPointInputTool
     }
 
     protected override void OnCanceled() => ResetState();
+
+    private IReadOnlyList<CadToolParameterDescriptor> BuildParameters()
+    {
+        var parameters = new List<CadToolParameterDescriptor>(4);
+        if (Stage <= 1)
+        {
+            parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+                "Radius",
+                "Radius",
+                _radiusParameter,
+                1e-9,
+                1e12));
+            parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+                "StartAngle",
+                "Start Angle",
+                _startAngleDegrees,
+                -360000.0,
+                360000.0));
+        }
+
+        parameters.Add(new CadDoubleToolParameterDescriptor(
+            "Pitch",
+            "Pitch",
+            _pitch,
+            -1000000,
+            1000000));
+        parameters.Add(new CadDoubleToolParameterDescriptor(
+            "Turns",
+            "Turns",
+            _turns,
+            0.01,
+            10000));
+        return parameters;
+    }
 
     private bool Accept(OcctPoint3d point)
     {

@@ -378,9 +378,13 @@ public sealed class CadGripManager
             styles[_grips[index].Kind]);
     }
 
-    private static byte[] CreateMarker(CadGripKind kind, int size, Color color)
+    private static byte[] CreateMarker(
+        CadGripKind kind,
+        int size,
+        Color color)
     {
-        var pixels = new byte[checked(size * size * 4)];
+        var pixels =
+            new byte[checked(size * size * 4)];
         var center = size / 2;
         var radius = Math.Max(2, center - 2);
 
@@ -390,12 +394,58 @@ public sealed class CadGripManager
             {
                 var dx = x - center;
                 var dy = y - center;
-                var fill = kind == CadGripKind.Center
-                    ? dx * dx + dy * dy <= radius * radius
-                    : Math.Abs(dx) <= radius && Math.Abs(dy) <= radius;
-                if (!fill) continue;
+                var adx = Math.Abs(dx);
+                var ady = Math.Abs(dy);
 
-                var offset = (y * size + x) * 4;
+                var draw = kind switch
+                {
+                    CadGripKind.Control =>
+                        Math.Max(adx, ady) == radius,
+
+                    CadGripKind.Vertex =>
+                        Math.Abs(
+                            adx + ady - radius) <= 1,
+
+                    CadGripKind.Midpoint =>
+                        IsTriangleOutline(
+                            dx,
+                            dy,
+                            radius),
+
+                    CadGripKind.Center =>
+                        IsCircleOutline(
+                            dx,
+                            dy,
+                            radius),
+
+                    CadGripKind.Radius =>
+                        Math.Abs(
+                            adx + ady - radius) <= 1 &&
+                        !(adx <= 1 && ady <= 1),
+
+                    CadGripKind.Axis =>
+                        (adx <= 1 && ady >= 2 && ady <= radius) ||
+                        (ady <= 1 && adx >= 2 && adx <= radius),
+
+                    CadGripKind.Height =>
+                        (adx == radius / 2 &&
+                         ady <= radius) ||
+                        (ady == radius &&
+                         adx <= radius / 2),
+
+                    _ =>
+                        Math.Max(adx, ady) == radius
+                };
+
+                // Always keep the snap point itself visible through the grip.
+                if (adx <= 1 && ady <= 1)
+                    draw = false;
+
+                if (!draw)
+                    continue;
+
+                var offset =
+                    (y * size + x) * 4;
                 pixels[offset] = color.B;
                 pixels[offset + 1] = color.G;
                 pixels[offset + 2] = color.R;
@@ -405,4 +455,44 @@ public sealed class CadGripManager
 
         return pixels;
     }
+
+    private static bool IsCircleOutline(
+        int dx,
+        int dy,
+        int radius)
+    {
+        var distanceSquared =
+            dx * dx + dy * dy;
+        var outer =
+            radius * radius;
+        var inner =
+            Math.Max(1, radius - 2);
+        return distanceSquared <= outer &&
+               distanceSquared >= inner * inner;
+    }
+
+    private static bool IsTriangleOutline(
+        int dx,
+        int dy,
+        int radius)
+    {
+        // Upward hollow triangle centered on the grip point.
+        var topY = -radius;
+        var bottomY = radius;
+        if (dy < topY || dy > bottomY)
+            return false;
+
+        if (dy >= bottomY - 1)
+            return Math.Abs(dx) <= radius;
+
+        var progress =
+            (double)(dy - topY) /
+            Math.Max(1, bottomY - topY);
+        var edgeX =
+            (int)Math.Round(progress * radius);
+        return Math.Abs(
+                   Math.Abs(dx) -
+                   edgeX) <= 1;
+    }
+
 }

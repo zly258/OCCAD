@@ -1146,57 +1146,102 @@ public sealed class CadSnapManager
         not StackOverflowException and
         not AccessViolationException;
 
-    private static byte[] CreateMarkerPixels(CadSnapType type)
+    private static byte[] CreateMarkerPixels(
+        CadSnapType type)
     {
-        var pixels = new byte[MarkerSize * MarkerSize * 4];
-        var color = Color.FromArgb(238, 220, 45, 45);
+        var pixels =
+            new byte[MarkerSize * MarkerSize * 4];
+        var color =
+            Color.FromArgb(238, 220, 45, 45);
         var center = MarkerSize / 2;
+        const int radius = 4;
 
-        for (var y = 0; y < MarkerSize; y++)
+        for (var y = 0;
+             y < MarkerSize;
+             y++)
         {
-            for (var x = 0; x < MarkerSize; x++)
+            for (var x = 0;
+                 x < MarkerSize;
+                 x++)
             {
                 var dx = x - center;
                 var dy = y - center;
-                var fill = type switch
+                var adx = Math.Abs(dx);
+                var ady = Math.Abs(dy);
+
+                var draw = type switch
                 {
                     CadSnapType.Endpoint =>
-                        Math.Abs(dx) <= 3 &&
-                        Math.Abs(dy) <= 3,
+                        Math.Max(adx, ady) ==
+                        radius,
+
                     CadSnapType.Midpoint =>
-                        dy >= -4 &&
-                        dy <= 4 &&
-                        Math.Abs(dx) <= dy + 4,
+                        IsTriangleOutline(
+                            dx,
+                            dy,
+                            radius),
+
                     CadSnapType.Center =>
-                        dx * dx + dy * dy <= 13,
+                        IsCircleOutline(
+                            dx,
+                            dy,
+                            radius),
+
                     CadSnapType.Vertex =>
-                        Math.Abs(dx) + Math.Abs(dy) <= 5,
+                        Math.Abs(
+                            adx + ady -
+                            radius) <= 1,
+
                     CadSnapType.Quadrant =>
-                        Math.Abs(dx) <= 2 ||
-                        Math.Abs(dy) <= 2,
+                        Math.Abs(
+                            adx + ady -
+                            radius) <= 1,
+
                     CadSnapType.Intersection =>
-                        Math.Abs(dx - dy) <= 1 ||
-                        Math.Abs(dx + dy) <= 1,
+                        Math.Abs(
+                            adx - ady) <= 1 &&
+                        adx <= radius &&
+                        ady <= radius,
+
                     CadSnapType.Perpendicular =>
                         (Math.Abs(dx + 3) <= 1 &&
-                         dy >= -4 && dy <= 4) ||
-                        (dx >= -3 && dx <= 4 &&
+                         dy >= -4 &&
+                         dy <= 4) ||
+                        (dx >= -3 &&
+                         dx <= 4 &&
                          Math.Abs(dy - 3) <= 1),
+
                     CadSnapType.Tangent =>
-                        (Math.Abs(dy + 3) <= 1 &&
-                         dx >= -4 && dx <= 4) ||
-                        (Math.Abs(dx) <= 1 &&
-                         dy >= -3 && dy <= 4),
+                        IsCircleOutline(
+                            dx,
+                            dy + 1,
+                            3) ||
+                        (Math.Abs(dy + 4) <= 1 &&
+                         dx >= -4 &&
+                         dx <= 4),
+
                     CadSnapType.Nearest =>
-                        dx * dx + dy * dy <= 5,
+                        (Math.Abs(dx) <= 1 &&
+                         ady <= radius) ||
+                        (Math.Abs(dy) <= 1 &&
+                         adx <= radius),
+
                     _ =>
-                        Math.Abs(dx) <= 2 &&
-                        Math.Abs(dy) <= 2
+                        Math.Max(adx, ady) ==
+                        radius
                 };
-                if (!fill) continue;
+
+                // Leave the exact resolved point visible through the marker.
+                if (adx <= 1 &&
+                    ady <= 1)
+                    draw = false;
+
+                if (!draw)
+                    continue;
 
                 var offset =
-                    (y * MarkerSize + x) * 4;
+                    (y * MarkerSize + x) *
+                    4;
                 pixels[offset] = color.B;
                 pixels[offset + 1] = color.G;
                 pixels[offset + 2] = color.R;
@@ -1206,4 +1251,47 @@ public sealed class CadSnapManager
 
         return pixels;
     }
+
+    private static bool IsCircleOutline(
+        int dx,
+        int dy,
+        int radius)
+    {
+        var distanceSquared =
+            dx * dx + dy * dy;
+        var outer =
+            radius * radius;
+        var inner =
+            Math.Max(1, radius - 2);
+        return distanceSquared <= outer &&
+               distanceSquared >=
+               inner * inner;
+    }
+
+    private static bool IsTriangleOutline(
+        int dx,
+        int dy,
+        int radius)
+    {
+        var top = -radius;
+        var bottom = radius;
+        if (dy < top ||
+            dy > bottom)
+            return false;
+
+        if (dy >= bottom - 1)
+            return Math.Abs(dx) <= radius;
+
+        var progress =
+            (double)(dy - top) /
+            Math.Max(1, bottom - top);
+        var edge =
+            (int)Math.Round(
+                progress * radius);
+
+        return Math.Abs(
+                   Math.Abs(dx) -
+                   edge) <= 1;
+    }
+
 }

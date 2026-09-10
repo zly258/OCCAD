@@ -67,8 +67,9 @@ public sealed class OffsetTool : CadSelectionTransformToolBase, ICadPointInputTo
             input.Button != OcctPointerButton.Left)
             return false;
 
-        return AcceptPoint(
+        _ = AcceptPoint(
             Context.ResolvePoint(input.X, input.Y).Point);
+        return true;
     }
 
     protected override bool CanCommitCurrentStageCore => true;
@@ -110,6 +111,25 @@ public sealed class OffsetTool : CadSelectionTransformToolBase, ICadPointInputTo
         return true;
     }
 
+    protected override bool CanStepBackCore =>
+        State == CadToolState.Drawing &&
+        Entities.Count > 0;
+
+    protected override bool OnStepBack()
+    {
+        SetSelectionFilter(
+            new CadSelectionFilter(
+                "offset.curves",
+                static entity =>
+                    entity is CadLineEntity or
+                    CadPolylineEntity or
+                    CadCircleEntity or
+                    CadArcEntity or
+                    CadPathEntity));
+        RestartSelection();
+        return true;
+    }
+
     protected override void ResetTransformState() =>
         _distance = null;
 
@@ -121,9 +141,10 @@ public sealed class OffsetTool : CadSelectionTransformToolBase, ICadPointInputTo
             SetPromptLocalized(
                 "Cad.Prompt.offset.Invalid",
                 "Offset: selected curves or paths must lie on the current drawing plane and produce valid offset geometry.");
-            return true;
+            return false;
         }
 
+        Context.Preview.Clear();
         Context.Workspace.AddGeneratedEntities(offsets, "Offset");
         Context.Workspace.Tools.CompleteCurrent();
         return true;

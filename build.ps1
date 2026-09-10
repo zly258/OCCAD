@@ -69,6 +69,11 @@ else {
     Write-Host '[build] Direct EXE:     flat Bridge SDK; build is valid. Run with -OcctRoot <path> or set OCCT_ROOT/CASROOT.' -ForegroundColor Yellow
 }
 
+$logoScript = Join-Path $root 'tools\generate-logo.ps1'
+if (Test-Path -LiteralPath $logoScript -PathType Leaf) {
+    & $logoScript
+}
+
 & dotnet build $solution -c $Configuration -p:Platform=x64 --nologo
 if ($LASTEXITCODE -ne 0) {
     throw "OCCAD build failed. OCCAD source $occadSourceCommit; Bridge SDK source $bridgeSourceCommit. Exit code: $LASTEXITCODE."

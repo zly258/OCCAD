@@ -225,24 +225,39 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
         }
     }
 
-    private void SetGripPrompt(CadPrecisionInputKind precisionInputs)
+    private void SetGripPrompt(
+        CadPrecisionInputKind precisionInputs)
     {
-        if (_grip.Kind is CadGripKind.Center or CadGripKind.Control || _grip.Index == 0)
+        var (key, fallback) = _grip.Kind switch
         {
-            SetStageLocalized(
-                0,
-                "Cad.Prompt.grip.Move",
-                "Grip Edit: move - specify new point [Esc cancel]",
-                precisionInputs);
-            return;
-        }
+            CadGripKind.Vertex =>
+                ("Cad.Prompt.grip.Vertex",
+                 "Grip Edit: move vertex [Esc cancel]"),
+            CadGripKind.Midpoint =>
+                ("Cad.Prompt.grip.Midpoint",
+                 "Grip Edit: move midpoint [Esc cancel]"),
+            CadGripKind.Center =>
+                ("Cad.Prompt.grip.Center",
+                 "Grip Edit: move center [Esc cancel]"),
+            CadGripKind.Radius =>
+                ("Cad.Prompt.grip.Radius",
+                 "Grip Edit: change radius [Esc cancel]"),
+            CadGripKind.Axis =>
+                ("Cad.Prompt.grip.Axis",
+                 "Grip Edit: change axis [Esc cancel]"),
+            CadGripKind.Height =>
+                ("Cad.Prompt.grip.Height",
+                 "Grip Edit: change height [Esc cancel]"),
+            _ =>
+                ("Cad.Prompt.grip.Move",
+                 "Grip Edit: move - specify new point [Esc cancel]")
+        };
 
         SetStageLocalized(
             0,
-            "Cad.Prompt.grip.Index",
-            "Grip Edit: grip {0} - specify new point [Esc cancel]",
-            precisionInputs,
-            _grip.Index);
+            key,
+            fallback,
+            precisionInputs);
     }
 
     private void ShowInvalidGripPrompt()

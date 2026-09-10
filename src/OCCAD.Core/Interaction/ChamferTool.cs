@@ -27,7 +27,8 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
     public override bool HandlePointer(
         OcctPointerInputEventArgs input)
     {
-        if (Context.Workspace.Preselection.Current is
+        if (!HasFirstEntity &&
+            Context.Workspace.Preselection.Current is
             {
                 Entity: var chain,
                 Point: var hit

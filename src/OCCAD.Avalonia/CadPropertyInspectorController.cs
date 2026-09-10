@@ -190,7 +190,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 _host.Children.Add(new Border
                 {
                     Background = CadTheme.PanelAlt,
-                    Padding = new Thickness(8, 4),
+                    Padding = new Thickness(7, 3),
                     Margin = new Thickness(0, 1),
                     Child = new TextBlock
                     {
@@ -464,7 +464,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         };
         row.ColumnDefinitions.Add(
             new ColumnDefinition(
-                new GridLength(118)));
+                new GridLength(108)));
         row.ColumnDefinitions.Add(
             new ColumnDefinition(
                 new GridLength(
@@ -545,9 +545,9 @@ internal sealed class CadPropertyInspectorController : IDisposable
         var row = new Grid
         {
             ColumnSpacing = 8,
-            Margin = new Thickness(8, 2)
+            Margin = new Thickness(7, 1)
         };
-        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(118)));
+        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(108)));
         row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
 
         var label = new TextBlock
@@ -772,7 +772,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         if (value is null)
             return string.Empty;
         if (value is double number)
-            return number.ToString("0.000", CultureInfo.CurrentCulture);
+            return number.ToString("0.######", CultureInfo.CurrentCulture);
 
         try
         {

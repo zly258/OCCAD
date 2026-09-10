@@ -131,8 +131,8 @@ internal sealed class CadLayerPanelController : IDisposable
                     StringComparer.CurrentCultureIgnoreCase)
                 .ToArray();
 
-            foreach (var layer in layers)
-                _host.Children.Add(CreateLayerRow(layer));
+            for (var index = 0; index < layers.Length; index++)
+                _host.Children.Add(CreateLayerRow(layers[index], index));
 
             _host.Children.Add(new TextBlock
             {
@@ -174,32 +174,32 @@ internal sealed class CadLayerPanelController : IDisposable
             grid,
             1,
             CadLanguageManager.Text(
-                "Cad.Text.LineWidth",
-                "Line width"));
+                "Cad.Text.Visible",
+                "Visible"));
         AddHeader(
             grid,
             2,
+            CadLanguageManager.Text(
+                "Cad.Text.Color",
+                "Color"));
+        AddHeader(
+            grid,
+            3,
             CadLanguageManager.Text(
                 "Cad.Text.LineStyle",
                 "Line style"));
         AddHeader(
             grid,
-            3,
-            CadLanguageManager.Text(
-                "Cad.Text.Visible",
-                "Visible"));
-        AddHeader(
-            grid,
             4,
             CadLanguageManager.Text(
-                "Cad.Text.Locked",
-                "Locked"));
+                "Cad.Text.LineWidth",
+                "Line width"));
         AddHeader(
             grid,
             5,
             CadLanguageManager.Text(
-                "Cad.Text.Color",
-                "Color"));
+                "Cad.Text.Locked",
+                "Locked"));
 
         return new Border
         {
@@ -216,15 +216,15 @@ internal sealed class CadLayerPanelController : IDisposable
             new ColumnDefinition(
                 new GridLength(1, GridUnitType.Star)));
         grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(48)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(42)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(76)));
+        grid.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(66)));
         grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(82)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(54)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(54)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(44)));
+            new ColumnDefinition(new GridLength(48)));
     }
 
     private static void AddHeader(
@@ -249,7 +249,9 @@ internal sealed class CadLayerPanelController : IDisposable
         grid.Children.Add(label);
     }
 
-    private Control CreateLayerRow(CadLayer layer)
+    private Control CreateLayerRow(
+        CadLayer layer,
+        int rowIndex)
     {
         var current = ReferenceEquals(
             layer,
@@ -300,7 +302,7 @@ internal sealed class CadLayerPanelController : IDisposable
                 layer,
                 () => layer.LineWidth = value);
         };
-        Grid.SetColumn(width, 1);
+        Grid.SetColumn(width, 4);
         grid.Children.Add(width);
 
         var styles = Enum.GetValues<OcctLineStyle>()
@@ -328,7 +330,7 @@ internal sealed class CadLayerPanelController : IDisposable
                 layer,
                 () => layer.LineStyle = item.Value);
         };
-        Grid.SetColumn(style, 2);
+        Grid.SetColumn(style, 3);
         grid.Children.Add(style);
 
         var visible = new CheckBox
@@ -346,7 +348,7 @@ internal sealed class CadLayerPanelController : IDisposable
                 layer,
                 visible.IsChecked == true);
         };
-        Grid.SetColumn(visible, 3);
+        Grid.SetColumn(visible, 1);
         grid.Children.Add(visible);
 
         var locked = new CheckBox
@@ -364,7 +366,7 @@ internal sealed class CadLayerPanelController : IDisposable
                 layer,
                 locked.IsChecked == true);
         };
-        Grid.SetColumn(locked, 4);
+        Grid.SetColumn(locked, 5);
         grid.Children.Add(locked);
 
         var color = new Button
@@ -398,14 +400,16 @@ internal sealed class CadLayerPanelController : IDisposable
                 layer,
                 () => layer.Color = next);
         };
-        Grid.SetColumn(color, 5);
+        Grid.SetColumn(color, 2);
         grid.Children.Add(color);
 
         return new Border
         {
             Background = current
                 ? CadTheme.AccentSoft
-                : CadTheme.Surface,
+                : rowIndex % 2 == 0
+                    ? CadTheme.Surface
+                    : CadTheme.Panel,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 0, 0, 1),
             Padding = new Thickness(6, 3),

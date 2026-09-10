@@ -20,6 +20,7 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
         throw new InvalidOperationException("First entity is not a line.");
 
     protected OcctPoint3d FirstPick => _firstPick;
+    protected bool HasFirstEntity => _first is not null;
 
     protected override void OnActivated()
     {

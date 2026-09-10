@@ -64,6 +64,8 @@ public static class CadPropertyCatalog
                 property.IsBrowsable)
             .Select(Create)
             .OrderBy(static property =>
+                CategoryOrder(property.Category))
+            .ThenBy(static property =>
                 property.Category,
                 StringComparer.Ordinal)
             .ThenBy(static property =>
@@ -73,6 +75,19 @@ public static class CadPropertyCatalog
                 StringComparer.Ordinal)
             .ToArray();
     }
+
+    private static int CategoryOrder(string category) =>
+        category switch
+        {
+            "General" => 0,
+            "Geometry" => 10,
+            "Orientation" => 20,
+            "Transform" => 30,
+            "Feature" => 40,
+            "Display" => 50,
+            "Annotation" => 60,
+            _ => 100
+        };
 
     private static CadPropertyDescriptor Create(
         PropertyDescriptor property)

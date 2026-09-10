@@ -606,11 +606,11 @@
     <sys:String x:Key="Cad.Text.Extend">Extend</sys:String>
     <sys:String x:Key="Cad.Prompt.trim.Select">Trim: select cutting curves [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.trim.Selected">Trim: {0} cutting curves selected [Enter accept, Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.trim.Target">Trim: click the curve or path segment to remove [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.trim.Target">Trim: click the curve or path segment to remove [Backspace boundaries, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.trim.Invalid">Trim: the hovered curve or path cannot be trimmed by the selected boundaries.</sys:String>
     <sys:String x:Key="Cad.Prompt.extend.Select">Extend: select boundary curves [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.extend.Selected">Extend: {0} boundary curves selected [Enter accept, Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.extend.Target">Extend: click near the curve or path endpoint to extend [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.extend.Target">Extend: click near the curve or path endpoint to extend [Backspace boundaries, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.extend.Invalid">Extend: the hovered curve or path cannot be extended to the selected boundaries.</sys:String>
     <sys:String x:Key="Cad.History.Trim">Trim</sys:String>
     <sys:String x:Key="Cad.History.Extend">Extend</sys:String>
@@ -618,10 +618,10 @@
     <sys:String x:Key="Cad.Text.Action.JoinUnavailable">Join requires connected lines or open polylines.</sys:String>
     <sys:String x:Key="Cad.History.Join">Join</sys:String>
     <sys:String x:Key="Cad.Text.Break">Break</sys:String>
-    <sys:String x:Key="Cad.Prompt.break.Select">Break: select one line, polyline, circle, or arc [Enter accept, Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.break.Select">Break: select one curve or path [Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Selected">Break: {0} selected [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Single">Break: select exactly one curve or path [Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.break.First">Break: specify first break point [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.break.First">Break: specify first break point [Backspace curve, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Second">Break: specify second break point [Backspace undo, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Invalid">Break: the two points do not define a valid removable segment.</sys:String>
     <sys:String x:Key="Cad.History.Break">Break</sys:String>
@@ -826,6 +826,13 @@
 
     <sys:String x:Key="Cad.Parameter.arc.Method.StartEndTangent">Start + End + Start Tangent</sys:String>
     <sys:String x:Key="Cad.Prompt.Arc.Tangent">Arc: specify start tangent direction [Backspace undo, Esc cancel]</sys:String>
+
+    <sys:String x:Key="Cad.Prompt.grip.Vertex">Grip Edit: move vertex [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.grip.Midpoint">Grip Edit: move midpoint [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.grip.Center">Grip Edit: move center [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.grip.Radius">Grip Edit: change radius [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.grip.Axis">Grip Edit: change axis [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.grip.Height">Grip Edit: change height [Esc cancel]</sys:String>
 </ResourceDictionary>
 
 

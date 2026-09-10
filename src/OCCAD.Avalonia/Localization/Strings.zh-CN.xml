@@ -606,11 +606,11 @@
     <sys:String x:Key="Cad.Text.Extend">延伸</sys:String>
     <sys:String x:Key="Cad.Prompt.trim.Select">修剪：选择修剪边界曲线 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.trim.Selected">修剪：已选择 {0} 条边界曲线 [Enter 确认，Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.trim.Target">修剪：单击需要移除的曲线段或路径段 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.trim.Target">修剪：单击需要移除的曲线段或路径段 [Backspace 返回边界，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.trim.Invalid">修剪：当前悬停曲线或路径无法由所选边界修剪。</sys:String>
     <sys:String x:Key="Cad.Prompt.extend.Select">延伸：选择边界曲线 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.extend.Selected">延伸：已选择 {0} 条边界曲线 [Enter 确认，Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.extend.Target">延伸：在需要延伸的曲线或路径端点附近单击 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.extend.Target">延伸：在需要延伸的曲线或路径端点附近单击 [Backspace 返回边界，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.extend.Invalid">延伸：当前悬停曲线或路径无法延伸到所选边界。</sys:String>
     <sys:String x:Key="Cad.History.Trim">修剪</sys:String>
     <sys:String x:Key="Cad.History.Extend">延伸</sys:String>
@@ -618,10 +618,10 @@
     <sys:String x:Key="Cad.Text.Action.JoinUnavailable">合并需要选择首尾相连的直线或开放多段线。</sys:String>
     <sys:String x:Key="Cad.History.Join">合并</sys:String>
     <sys:String x:Key="Cad.Text.Break">打断</sys:String>
-    <sys:String x:Key="Cad.Prompt.break.Select">打断：选择一条直线、多段线、圆或圆弧 [Enter 确认，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.break.Select">打断：选择一条曲线或路径 [Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Selected">打断：已选择 {0} 个对象 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Single">打断：请仅选择一条曲线或路径 [Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.break.First">打断：指定第一个打断点 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.break.First">打断：指定第一个打断点 [Backspace 返回曲线，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Second">打断：指定第二个打断点 [Backspace 返回，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Invalid">打断：两个点不能定义有效的移除区段。</sys:String>
     <sys:String x:Key="Cad.History.Break">打断</sys:String>
@@ -826,6 +826,13 @@
 
     <sys:String x:Key="Cad.Parameter.arc.Method.StartEndTangent">起点 + 终点 + 起点切线</sys:String>
     <sys:String x:Key="Cad.Prompt.Arc.Tangent">圆弧：指定起点切线方向 [Backspace 返回，Esc 取消]</sys:String>
+
+    <sys:String x:Key="Cad.Prompt.grip.Vertex">夹点编辑：移动端点 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.grip.Midpoint">夹点编辑：移动中点 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.grip.Center">夹点编辑：移动中心 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.grip.Radius">夹点编辑：调整半径 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.grip.Axis">夹点编辑：调整轴方向 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.grip.Height">夹点编辑：调整高度 [Esc 取消]</sys:String>
 </ResourceDictionary>
 
 

@@ -20,7 +20,8 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
     public override bool HandlePointer(
         OcctPointerInputEventArgs input)
     {
-        if (Context.Workspace.Preselection.Current is
+        if (!HasFirstEntity &&
+            Context.Workspace.Preselection.Current is
             {
                 Entity: var path,
                 Point: var hit

@@ -25,15 +25,13 @@ public sealed partial class MainWindow : Window
     private readonly ToggleButton _snapToggle = new();
     private readonly ToggleButton _orthoToggle = new();
     private readonly ToggleButton _polarToggle = new();
-    private readonly Button _finishButton = new();
-    private readonly Button _cancelButton = new();
 
     private readonly Border _modelPanel = new();
     private TextBlock? _modelHeaderText;
     private readonly TextBox _modelSearch = new();
     private readonly TreeView _modelTree = new();
     private readonly ColumnDefinition _modelColumn =
-        new(new GridLength(218));
+        new(new GridLength(210));
     private readonly ColumnDefinition _modelSplitterColumn =
         new(new GridLength(4));
 
@@ -53,7 +51,7 @@ public sealed partial class MainWindow : Window
     private readonly ColumnDefinition _rightSplitterColumn =
         new(new GridLength(4));
     private readonly ColumnDefinition _rightColumn =
-        new(new GridLength(352));
+        new(new GridLength(332));
 
     private readonly Grid _viewportHost = new();
     private readonly OcctAvaloniaViewport _viewport = new();
@@ -211,8 +209,8 @@ public sealed partial class MainWindow : Window
         var panel = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 2,
-            Margin = new Thickness(5, 2),
+            Spacing = 1,
+            Margin = new Thickness(4, 1),
             VerticalAlignment = VerticalAlignment.Center
         };
 
@@ -234,7 +232,7 @@ public sealed partial class MainWindow : Window
         panel.Children.Add(_planeXz);
         panel.Children.Add(ToolbarSeparator());
 
-        _layerCombo.Width = 152;
+        _layerCombo.Width = 140;
         _layerCombo.Classes.Add("cad-input");
         _layerCombo.SelectionChanged += (_, _) =>
         {
@@ -279,15 +277,6 @@ public sealed partial class MainWindow : Window
             RefreshInteractionUi();
         };
         panel.Children.Add(_polarToggle);
-        panel.Children.Add(ToolbarSeparator());
-
-        _finishButton.Classes.Add("cad-compact");
-        _finishButton.Classes.Add("cad-primary");
-        _finishButton.Click += (_, _) => FinishCurrentTool();
-        _cancelButton.Classes.Add("cad-compact");
-        _cancelButton.Click += (_, _) => _workspace.Tools.CancelCurrent();
-        panel.Children.Add(_finishButton);
-        panel.Children.Add(_cancelButton);
 
         return new Border
         {
@@ -506,13 +495,13 @@ public sealed partial class MainWindow : Window
 
     private Control BuildStatusBar()
     {
-        ConfigureStatusText(_toolStatus, 250);
-        ConfigureStatusText(_selectionStatus, 90);
-        ConfigureStatusText(_historyStatus, 120);
-        ConfigureStatusText(_snapStatus, 100);
-        ConfigureStatusText(_precisionStatus, 120);
-        ConfigureStatusText(_workPlaneStatus, 85);
-        ConfigureStatusText(_coordinateStatus, 220);
+        ConfigureStatusText(_toolStatus, 160);
+        ConfigureStatusText(_selectionStatus, 80);
+        ConfigureStatusText(_historyStatus, 105);
+        ConfigureStatusText(_snapStatus, 90);
+        ConfigureStatusText(_precisionStatus, 105);
+        ConfigureStatusText(_workPlaneStatus, 80);
+        ConfigureStatusText(_coordinateStatus, 190);
         _toolStatus.Foreground = CadTheme.Text;
         _coordinateStatus.Foreground = CadTheme.Text;
         _coordinateStatus.TextAlignment = TextAlignment.Right;
@@ -542,7 +531,7 @@ public sealed partial class MainWindow : Window
             Background = CadTheme.Toolbar,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
-            MinHeight = 27,
+            MinHeight = 25,
             Child = panel
         };
     }
@@ -767,8 +756,8 @@ public sealed partial class MainWindow : Window
         var button = new Button
         {
             Content = "×",
-            Width = 27,
-            Height = 27,
+            Width = 24,
+            Height = 24,
             Padding = new Thickness(0),
             Background = Brushes.Transparent,
             Foreground = CadTheme.Muted,
@@ -778,7 +767,7 @@ public sealed partial class MainWindow : Window
 
         var panel = new DockPanel
         {
-            Height = 30,
+            Height = 27,
             Background = CadTheme.Header
         };
         DockPanel.SetDock(button, Dock.Right);
@@ -849,15 +838,6 @@ public sealed partial class MainWindow : Window
         object? sender,
         EventArgs e) =>
         Ui(RefreshLanguageUi);
-
-    private void FinishCurrentTool()
-    {
-        if (_workspace.Tools.ActiveTool is null)
-            return;
-
-        _viewportInteraction.FlushPointerMoves();
-        _workspace.Tools.SubmitCurrent();
-    }
 
     private void DisposeWorkspace()
     {

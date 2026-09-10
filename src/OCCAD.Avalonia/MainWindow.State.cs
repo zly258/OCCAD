@@ -390,22 +390,6 @@ public sealed partial class MainWindow
                 _dynamicHud.IsVisible = false;
         }
 
-        var canAcceptStep =
-            tool is not null &&
-            tool.CanCommitCurrentStage &&
-            !tool.CurrentStep.RequiresPointer;
-        _finishButton.Content =
-            canAcceptStep
-                ? UiText("Cad.Text.Accept", "Accept")
-                : UiText("Cad.Text.Finish", "Finish");
-        _finishButton.IsEnabled =
-            canAcceptStep ||
-            tool?.CanFinish == true;
-        _cancelButton.Content =
-            UiText("Cad.Text.Cancel", "Cancel");
-        _cancelButton.IsEnabled =
-            tool?.CanCancel == true;
-
         RefreshInteractionUi();
         RefreshActionUi();
         RefreshPanelMenuState();

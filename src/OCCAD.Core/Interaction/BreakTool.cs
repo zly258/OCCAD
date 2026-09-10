@@ -9,6 +9,8 @@ public sealed class BreakTool : CadSelectionTransformToolBase, ICadPointInputToo
     public override string Id => "break";
     public override string DisplayName => "Break";
 
+    protected override bool AutoCommitValidSelection => true;
+
     protected override void OnActivated()
     {
         SetSelectionFilter(
@@ -77,7 +79,8 @@ public sealed class BreakTool : CadSelectionTransformToolBase, ICadPointInputToo
             input.X,
             input.Y,
             _firstPoint).Point;
-        return AcceptPoint(point);
+        _ = AcceptPoint(point);
+        return true;
     }
 
     protected override bool CanCommitCurrentStageCore =>
@@ -104,19 +107,24 @@ public sealed class BreakTool : CadSelectionTransformToolBase, ICadPointInputToo
         AcceptPoint(point);
 
     protected override bool CanStepBackCore =>
-        _firstPoint is not null;
+        State == CadToolState.Drawing &&
+        Entities.Count == 1;
 
     protected override bool OnStepBack()
     {
-        if (_firstPoint is null)
-            return false;
-
-        _firstPoint = null;
         Context.Preview.Clear();
-        SetStageLocalized(
-            0,
-            "Cad.Prompt.break.First",
-            "Break: specify first break point [Esc cancel]");
+
+        if (_firstPoint is not null)
+        {
+            _firstPoint = null;
+            SetStageLocalized(
+                0,
+                "Cad.Prompt.break.First",
+                "Break: specify first break point [Backspace curve, Esc cancel]");
+            return true;
+        }
+
+        RestartSelection();
         return true;
     }
 
@@ -149,7 +157,7 @@ public sealed class BreakTool : CadSelectionTransformToolBase, ICadPointInputToo
             SetPromptLocalized(
                 "Cad.Prompt.break.Invalid",
                 "Break: the two points do not define a valid removable segment.");
-            return true;
+            return false;
         }
 
         Context.Preview.Clear();

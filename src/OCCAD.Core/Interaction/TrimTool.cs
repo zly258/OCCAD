@@ -42,6 +42,25 @@ public sealed class TrimTool : CadSelectionTransformToolBase
             "Trim: click the curve segment to remove [Esc cancel]");
     }
 
+    protected override bool CanStepBackCore =>
+        State == CadToolState.Drawing &&
+        Entities.Count > 0;
+
+    protected override bool OnStepBack()
+    {
+        SetSelectionFilter(
+            new CadSelectionFilter(
+                "trim.boundaries",
+                static entity =>
+                    entity is CadLineEntity or
+                    CadPolylineEntity or
+                    CadCircleEntity or
+                    CadArcEntity or
+                    CadPathEntity));
+        RestartSelection();
+        return true;
+    }
+
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
         if (CancelOnRightClick(input))

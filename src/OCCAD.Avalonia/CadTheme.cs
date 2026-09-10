@@ -55,7 +55,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(TextBlock.FontSizeProperty, 12d),
+                new Setter(TextBlock.FontSizeProperty, 11.5d),
                 new Setter(TextBlock.ForegroundProperty, Text)
             }
         });
@@ -64,8 +64,8 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(Button.MinHeightProperty, 26d),
-                new Setter(Button.PaddingProperty, new Thickness(8, 2)),
+                new Setter(Button.MinHeightProperty, 24d),
+                new Setter(Button.PaddingProperty, new Thickness(7, 1)),
                 new Setter(Button.MarginProperty, new Thickness(1)),
                 new Setter(Button.BackgroundProperty, Surface),
                 new Setter(Button.BorderBrushProperty, Border),
@@ -89,8 +89,8 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(ToggleButton.MinHeightProperty, 26d),
-                new Setter(ToggleButton.PaddingProperty, new Thickness(8, 2)),
+                new Setter(ToggleButton.MinHeightProperty, 24d),
+                new Setter(ToggleButton.PaddingProperty, new Thickness(7, 1)),
                 new Setter(ToggleButton.MarginProperty, new Thickness(1)),
                 new Setter(ToggleButton.BackgroundProperty, Surface),
                 new Setter(ToggleButton.BorderBrushProperty, Border),
@@ -103,8 +103,8 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(TextBox.MinHeightProperty, 26d),
-                new Setter(TextBox.PaddingProperty, new Thickness(6, 2)),
+                new Setter(TextBox.MinHeightProperty, 24d),
+                new Setter(TextBox.PaddingProperty, new Thickness(6, 1)),
                 new Setter(TextBox.BackgroundProperty, Surface),
                 new Setter(TextBox.BorderBrushProperty, Border),
                 new Setter(TextBox.BorderThicknessProperty, new Thickness(1)),
@@ -116,7 +116,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(ComboBox.MinHeightProperty, 26d),
+                new Setter(ComboBox.MinHeightProperty, 24d),
                 new Setter(ComboBox.BackgroundProperty, Surface),
                 new Setter(ComboBox.BorderBrushProperty, Border),
                 new Setter(ComboBox.BorderThicknessProperty, new Thickness(1)),
@@ -128,8 +128,8 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(MenuItem.MinHeightProperty, 27d),
-                new Setter(MenuItem.PaddingProperty, new Thickness(9, 4)),
+                new Setter(MenuItem.MinHeightProperty, 25d),
+                new Setter(MenuItem.PaddingProperty, new Thickness(8, 3)),
                 new Setter(MenuItem.ForegroundProperty, Text)
             }
         });
@@ -138,7 +138,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(TreeViewItem.MinHeightProperty, 24d),
+                new Setter(TreeViewItem.MinHeightProperty, 22d),
                 new Setter(TreeViewItem.PaddingProperty, new Thickness(4, 1))
             }
         });
@@ -164,7 +164,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(TabItem.MinHeightProperty, 29d),
+                new Setter(TabItem.MinHeightProperty, 27d),
                 new Setter(TabItem.PaddingProperty, new Thickness(10, 4)),
                 new Setter(TabItem.FontWeightProperty, FontWeight.SemiBold)
             }
@@ -174,7 +174,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(Menu.MinHeightProperty, 29d),
+                new Setter(Menu.MinHeightProperty, 27d),
                 new Setter(Menu.BackgroundProperty, Toolbar),
                 new Setter(Menu.ForegroundProperty, Text)
             }
@@ -196,7 +196,7 @@ internal static class CadTheme
             BorderBrush = Border,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(2),
-            Padding = padding ?? new Thickness(8),
+            Padding = padding ?? new Thickness(6),
             Child = child
         };
 

@@ -41,6 +41,25 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
             "Extend: click near the curve or path endpoint to extend [Esc cancel]");
     }
 
+    protected override bool CanStepBackCore =>
+        State == CadToolState.Drawing &&
+        Entities.Count > 0;
+
+    protected override bool OnStepBack()
+    {
+        SetSelectionFilter(
+            new CadSelectionFilter(
+                "extend.boundaries",
+                static entity =>
+                    entity is CadLineEntity or
+                    CadPolylineEntity or
+                    CadCircleEntity or
+                    CadArcEntity or
+                    CadPathEntity));
+        RestartSelection();
+        return true;
+    }
+
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
         if (CancelOnRightClick(input))

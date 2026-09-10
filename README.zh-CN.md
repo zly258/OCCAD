@@ -6,9 +6,9 @@ OCCAD 是基于 **OcctCSharpBridge / OCCT** 的 Avalonia 桌面 CAD 应用与 CA
 
 ## 当前目标
 
-当前分支优先做一个**可用、可验证、职责清晰**的 CAD 基线，不继续堆叠演示型 UI。
+当前分支只做一个**可用、可验证、职责清晰**的 CAD 基线：优先保证 Document / Entity / Layer / Property / Tool / Selection / Snap / Grip / Precision / WorkPlane / History 的正确性，不继续堆叠演示型功能。
 
-`OCCTBIM-Source/release-1.0` 用作 Document / Entity / Layer / Property / Tool / Grip / Snap / WorkPlane / Viewport 交互语义参考；OCCAD 保留 C# / .NET / Avalonia / OcctCSharpBridge 技术架构，不复制 Qt 控件、单例和历史实现。
+`OCCTBIM-Source/release-1.0` 作为 CAD 行为和职责边界参考；OCCAD 保留 C# / .NET / Avalonia / OcctCSharpBridge 技术架构，不复制 Qt 控件、单例和历史实现。
 
 ## 架构
 
@@ -28,11 +28,17 @@ CadApplicationCore
         OcctCSharpBridge / OCCT
 ```
 
-`CadApplicationCore` 是桌面应用组合根。Avalonia 不再自行创建第二个 Workspace，也不保存一套平行 CAD 状态。
+核心约束：
+
+- Entity 保存 CAD 语义、几何、显示属性和稳定 `LayerId`；Viewer object 只是派生显示。
+- Tool 只负责交互状态机；Action 是用户操作入口；Command Line、Ribbon 和快捷键最终都委托 Core。
+- Preview / Snap marker / Tracking / Grip drag marker 只属于 Transient Scene，不进入 Document / Selection / History。
+- Property 与 Layer 修改统一经过 Core transaction/history，不由 Avalonia 直接写模型。
+- Avalonia 不维护第二套 Workspace、Selection、Layer、Tool 或 Property 状态。
 
 ## 极简 UI
 
-桌面界面长期只保留六个区域：
+桌面只保留六个长期区域：
 
 ```text
 ┌──────────────────── Ribbon ────────────────────┐
@@ -46,14 +52,54 @@ CadApplicationCore
 └─────────────────────────────────────────────────┘
 ```
 
-- Ribbon：纯文字、低高度，只显示真实注册的 Core Action。
+- Ribbon：采用 ModelScript 的紧凑三行 Avalonia Ribbon 思路，纯文字、低高度，只呈现真实 Core Action。
 - Model：浏览和选择 Document Entity。
-- Viewport：唯一主要场景；深色背景、ViewCube、Triedron、Window/Crossing、Grip、Snap、Preselection。
-- Inspector：属性 / 图层共用一个右侧 Tab，不重复占用视口。
-- Command Line：命令、坐标、精确值和完整 Tool Prompt 的唯一入口。
+- Viewport：唯一主要场景；深色背景、Triedron、Window/Crossing、Grip、Snap、Preselection；**不显示 ViewCube**。
+- Inspector：属性 / 图层共用右侧 Tab，不复制模型状态。
+- Command Line：命令、坐标、精确值和 Tool Prompt 的统一入口。
 - Status：选择、当前层、SNAP / ORTHO / POLAR、工作平面和坐标。
 
-不恢复大型品牌栏、假文档页签、重复 View 工具条、Floating Tool Panel、Dynamic HUD、常驻日志面板和没有 Core 行为支撑的按钮。
+不恢复大型品牌栏、假文档页签、重复 View 工具条、Floating Tool Panel、Dynamic HUD、常驻日志面板以及没有 Core 行为支撑的按钮。
+
+## 当前功能面
+
+当前 executable surface 只保留常用能力。
+
+**二维实体**：Point、Line、Polyline、Rectangle、Circle、Arc、Ellipse、Spline、Polygon、RegularPolygon、CenterLine、CenterMark。
+
+**三维实体**：Box、Cylinder、Cone、Sphere。
+
+**编辑**：Move、Copy、Rotate、Scale、Mirror、Array。
+
+**辅助**：Undo / Redo、Delete、Select All / Invert、Distance Measure、Fit、标准视角、Wireframe / Shaded、Hide / Isolate / ShowAll。
+
+Offset / Trim / Extend / Fillet / Chamfer、实验性 Feature、Annotation、额外 3D Primitive、ImportedShape 和 CAD Exchange 当前均不属于产品面，也不应通过 Registry / Action / Ribbon 暴露。
+
+## 精确绘图
+
+统一精确输入链路：
+
+```text
+Viewport / Command Line
+    ↓
+CadCommandManager
+    ↓
+Coordinate / Precision parser
+    ↓
+Effective WorkPlane
+    ↓
+Snap + Tracking + Ortho/Polar
+    ↓
+Tool state machine
+    ↓
+Preview
+    ↓
+Transaction / History
+    ↓
+Entity
+```
+
+支持绝对坐标、相对坐标、极坐标以及 Tool 长度/角度/因子输入。绘图输入必须使用当前 Effective WorkPlane，而不是偷偷回到世界 XY。
 
 ## 交互基线
 
@@ -62,40 +108,8 @@ CadApplicationCore
 - 绘图时 `T / F / S`：XY / XZ / YZ 工作平面。
 - 绘图状态使用中心留空 CAD 十字光标，不遮挡捕捉标记。
 - 左→右框选为 Window，右→左为 Crossing。
-- 空闲状态右键菜单只保留 Source 对应的 ShowAll / Hide / Isolate / Select / Move / Copy / Delete / Property。
-- 空闲时直接输入字母进入统一 Command Line；Space 重复上一命令；绘图时数字进入统一精确输入。
-- Esc / Backspace / Enter / Space / 右键均进入统一 ToolManager 生命周期，不由 UI 直接修改模型。
-
-## 数据与事务
-
-- Document / Entity geometry 是权威数据；Viewer object 是派生显示。
-- Preview、Snap marker、Tracking、Grip drag marker 都属于 Transient Scene，不进入 Document / Selection / History。
-- Tool 完成或取消后必须回到 neutral state，清理 Preview、Snap、Tracking、WorkPlane、Preselection 和 pointer transient。
-- Grip PointerMove 只编辑 duplicate preview，Accept 时一次写回真实 Entity。
-- Property 与 Layer 修改走 Core transaction / history；UI 不直接写 Entity geometry。
-- Entity 使用稳定 `LayerId`；Layer 名称只是可编辑显示值。
-
-## 当前功能面
-
-默认 Ribbon 暴露已经稳定并注册的核心能力：
-
-- 新建、Undo / Redo、删除、全选、反选、距离测量；
-- Point / Line / Polyline / Circle / Arc / Rectangle / Polygon / RegularPolygon / Ellipse / Spline；
-- Box / Cylinder / Cone / Sphere / Ellipsoid / Torus；
-- Extrude / Revolve / Sweep / Loft；
-- Move / Copy / Rotate / Scale / Mirror / Array / Offset / Trim / Extend / Fillet / Chamfer；
-- CenterLine / Text / Length / Angle / Radius / Diameter；
-- Fit / Isometric / Top / Front / Right / Wireframe / Shaded / Hide / Isolate / ShowAll。
-
-Core 中存在但未形成稳定产品工作流的能力可以保留，但默认 UI 不暴露占位入口。
-
-## 设置
-
-应用级设置由 `CadSettingsStore` 管理，并在退出时保存到：
-
-`%LOCALAPPDATA%\OCCAD\settings.json`
-
-当前 UI 不提供一套额外“假首选项”窗口。设置只在有明确 Core owner 和真实生效路径时才进入界面。
+- 空闲状态右键菜单只保留 ShowAll / Hide / Isolate / Move / Copy / Delete / Property。
+- Esc / Backspace / Enter / Space / 右键统一进入 ToolManager 生命周期。
 
 ## 编译与运行
 
@@ -106,7 +120,7 @@ Core 中存在但未形成稳定产品工作流的能力可以保留，但默认
 ```powershell
 cd D:\workspace\occt\OCCAD
 git pull
-.\build.ps1
+.\build.ps1 -Configuration Release
 .\run.ps1 -OcctRoot D:\tools\occt-vc144-64
 ```
 

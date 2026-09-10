@@ -45,7 +45,7 @@ public abstract class CadDrawingTool : CadTool
             return;
 
         ArgumentNullException.ThrowIfNull(entity);
-        entity.Layer = Context.Workspace.Layers.Current.Name;
+        entity.LayerId = Context.Workspace.Layers.Current.Id;
         Context.Preview.Show(entity);
     }
 
@@ -79,8 +79,8 @@ public abstract class CadDrawingTool : CadTool
     protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
     {
         // Exact input is a Core interaction, not a UI side effect. Rebuild the
-        // active preview immediately so command-line/MCP/floating-panel callers
-        // all observe the same geometry without requiring another mouse move.
+        // active preview immediately so every frontend observes the same
+        // geometry without requiring another mouse move.
         RefreshPreviewFromLastPointer();
         return true;
     }

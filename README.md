@@ -6,9 +6,9 @@ OCCAD is an Avalonia desktop CAD application and CAD Core built on **OcctCSharpB
 
 ## Current goal
 
-This branch prioritizes a **usable, verifiable and ownership-correct** CAD baseline instead of adding demo-oriented UI surfaces.
+This branch focuses on a **usable, verifiable and ownership-correct** CAD baseline. Document / Entity / Layer / Property / Tool / Selection / Snap / Grip / Precision / WorkPlane / History correctness takes priority over adding demo-oriented features.
 
-`OCCTBIM-Source/release-1.0` is the behavioral reference for Document / Entity / Layer / Property / Tool / Grip / Snap / WorkPlane / Viewport interaction. OCCAD keeps its C# / .NET / Avalonia / OcctCSharpBridge architecture and does not copy Qt widgets, singleton patterns or legacy implementation details.
+`OCCTBIM-Source/release-1.0` is the behavioral and responsibility reference. OCCAD keeps its C# / .NET / Avalonia / OcctCSharpBridge architecture and does not copy Qt widgets, singleton patterns or legacy implementation details.
 
 ## Architecture
 
@@ -28,11 +28,17 @@ CadApplicationCore
         OcctCSharpBridge / OCCT
 ```
 
-`CadApplicationCore` is the desktop composition root. Avalonia does not construct a second Workspace and does not mirror CAD state.
+Core rules:
+
+- Entity owns CAD semantics, geometry, presentation properties and stable `LayerId`; viewer objects are derived presentation only.
+- Tool owns the interaction state machine; Action is the user-operation entry point; Command Line, Ribbon and shortcuts delegate to Core.
+- Preview / Snap markers / Tracking / Grip drag markers belong only to the Transient Scene and never enter Document / Selection / History.
+- Property and Layer edits always use Core transaction/history paths; Avalonia does not mutate model state directly.
+- Avalonia does not own a second Workspace, Selection, Layer, Tool or Property state model.
 
 ## Minimal UI
 
-The desktop shell has six long-lived areas only:
+The desktop shell keeps six long-lived areas only:
 
 ```text
 ┌──────────────────── Ribbon ────────────────────┐
@@ -46,14 +52,54 @@ The desktop shell has six long-lived areas only:
 └─────────────────────────────────────────────────┘
 ```
 
-- Ribbon: text-first, low-height, and limited to registered Core actions.
+- Ribbon: follows ModelScript's compact three-row Avalonia Ribbon approach, text-first and limited to real Core actions.
 - Model: browses and selects document entities.
-- Viewport: the primary scene with dark background, ViewCube, triedron, Window/Crossing selection, Grip, Snap and Preselection.
-- Inspector: Properties and Layers share one right-side tab surface.
-- Command Line: the single entry point for commands, coordinates, exact values and the full Tool prompt.
+- Viewport: the single primary scene with dark background, triedron, Window/Crossing selection, Grip, Snap and Preselection; **ViewCube is disabled**.
+- Inspector: Properties and Layers share the right-side tab surface without duplicating model state.
+- Command Line: unified commands, coordinates, exact values and Tool prompt entry.
 - Status: selection, current layer, SNAP / ORTHO / POLAR, work plane and coordinates.
 
-Large branding bars, fake document tabs, duplicate view toolbars, Floating Tool Panel, Dynamic HUD, permanent log panels, and buttons without real Core behavior are intentionally excluded.
+Large branding bars, fake document tabs, duplicate view toolbars, Floating Tool Panel, Dynamic HUD, permanent log panels and buttons without real Core behavior are intentionally excluded.
+
+## Current product surface
+
+The executable product surface contains common capabilities only.
+
+**2D entities**: Point, Line, Polyline, Rectangle, Circle, Arc, Ellipse, Spline, Polygon, RegularPolygon, CenterLine, CenterMark.
+
+**3D entities**: Box, Cylinder, Cone, Sphere.
+
+**Edit**: Move, Copy, Rotate, Scale, Mirror, Array.
+
+**Utility**: Undo / Redo, Delete, Select All / Invert, Distance Measure, Fit, standard orientations, Wireframe / Shaded, Hide / Isolate / ShowAll.
+
+Offset / Trim / Extend / Fillet / Chamfer, experimental Features, Annotation, extra 3D primitives, ImportedShape and CAD Exchange are currently outside the product surface and must not leak through Registry / Action / Ribbon discovery.
+
+## Precise drawing
+
+Exact input uses one path:
+
+```text
+Viewport / Command Line
+    ↓
+CadCommandManager
+    ↓
+Coordinate / Precision parser
+    ↓
+Effective WorkPlane
+    ↓
+Snap + Tracking + Ortho/Polar
+    ↓
+Tool state machine
+    ↓
+Preview
+    ↓
+Transaction / History
+    ↓
+Entity
+```
+
+Absolute coordinates, relative coordinates, polar coordinates and Tool length/angle/factor inputs are supported. Drawing input must use the current Effective WorkPlane instead of silently falling back to world XY.
 
 ## Interaction baseline
 
@@ -62,40 +108,8 @@ Large branding bars, fake document tabs, duplicate view toolbars, Floating Tool 
 - During drawing, `T / F / S`: XY / XZ / YZ work plane.
 - Drawing uses a center-gap CAD cross cursor so snap markers remain visible.
 - Left-to-right rectangle is Window; right-to-left is Crossing.
-- Idle viewport context actions follow the Source baseline: ShowAll / Hide / Isolate / Select / Move / Copy / Delete / Property.
-- Typing a letter while idle enters the shared Command Line; Space repeats the previous command; numeric input during drawing enters the same exact-input path.
-- Esc / Backspace / Enter / Space / right-click all flow through the shared ToolManager lifecycle; the UI does not mutate geometry directly.
-
-## State and transactions
-
-- Document state and Entity geometry are authoritative; Viewer objects are derived presentation.
-- Preview, Snap markers, Tracking, Grip drag markers and other temporary graphics belong to the Transient Scene and never enter Document / Selection / History.
-- Tool completion and cancellation return to a neutral state that clears Preview, Snap, Tracking, WorkPlane, Preselection and pointer transients.
-- Grip pointer movement edits a duplicate preview and writes back to the real Entity only on accept.
-- Property and Layer edits use Core transaction/history paths.
-- Entity-to-layer references use stable `LayerId`; layer names are editable metadata only.
-
-## Current command surface
-
-The default Ribbon exposes the stabilized registered baseline:
-
-- New, Undo / Redo, Delete, Select All, Invert Selection, Distance Measure;
-- Point / Line / Polyline / Circle / Arc / Rectangle / Polygon / RegularPolygon / Ellipse / Spline;
-- Box / Cylinder / Cone / Sphere / Ellipsoid / Torus;
-- Extrude / Revolve / Sweep / Loft;
-- Move / Copy / Rotate / Scale / Mirror / Array / Offset / Trim / Extend / Fillet / Chamfer;
-- CenterLine / Text / Length / Angle / Radius / Diameter;
-- Fit / Isometric / Top / Front / Right / Wireframe / Shaded / Hide / Isolate / ShowAll.
-
-Core capabilities that do not yet form a stable product workflow may remain implemented without being exposed as default UI placeholders.
-
-## Settings
-
-Application settings are owned by `CadSettingsStore` and saved on exit to:
-
-`%LOCALAPPDATA%\OCCAD\settings.json`
-
-There is intentionally no separate fake Preferences surface. A setting enters the UI only when it has a clear Core owner and a real effect path.
+- Idle viewport context actions are limited to ShowAll / Hide / Isolate / Move / Copy / Delete / Property.
+- Esc / Backspace / Enter / Space / right-click all flow through the shared ToolManager lifecycle.
 
 ## Build and run
 
@@ -106,7 +120,7 @@ Requirements are Windows x64, the .NET SDK pinned by `global.json`, and an insta
 ```powershell
 cd D:\workspace\occt\OCCAD
 git pull
-.\build.ps1
+.\build.ps1 -Configuration Release
 .\run.ps1 -OcctRoot D:\tools\occt-vc144-64
 ```
 

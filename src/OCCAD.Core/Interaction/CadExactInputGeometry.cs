@@ -4,8 +4,8 @@ namespace OCCAD;
 
 /// <summary>
 /// Resolves geometry that is fully determined by drafting locks without
-/// requiring a previous mouse sample. This keeps command-line, floating-panel
-/// and pointer input on the same Core tool state machine.
+/// requiring a previous mouse sample. Command, script and pointer input share
+/// the same Core tool state machine and exact-geometry rules.
 /// </summary>
 public static class CadExactInputGeometry
 {

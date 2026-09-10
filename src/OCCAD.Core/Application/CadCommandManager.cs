@@ -214,8 +214,10 @@ public sealed class CadCommandManager
 
     private static bool LooksLikePointInput(string input) =>
         input.Contains(',', StringComparison.Ordinal) ||
+        input.Contains(';', StringComparison.Ordinal) ||
         input.Contains('<', StringComparison.Ordinal) ||
-        input.StartsWith('@');
+        input.StartsWith('@') ||
+        input.StartsWith('#');
 
     private bool TryPrecision(
         CadTool tool,

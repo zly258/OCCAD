@@ -20,12 +20,19 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
     private OcctVector3d _xAxis;
     private OcctVector3d _yAxis;
     private CadCircleEntity? _preview;
+    private bool _invalidPointPrompt;
 
     public override string Id => "circle";
     public override string DisplayName => "Circle";
     public override string PrecisionLengthLabel =>
-        _method == TwoPoints && Stage == 1
-            ? "Diameter"
+        Stage == 1
+            ? _method switch
+            {
+                CenterRadius => "Radius",
+                CenterDiameter or TwoPoints => "Diameter",
+                PointCenter => "Radius",
+                _ => base.PrecisionLengthLabel
+            }
             : base.PrecisionLengthLabel;
 
     public override CadToolPanelDescriptor ParameterPanel
@@ -73,6 +80,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         _preview = null;
         _radius = null;
         _diameter = null;
+        _invalidPointPrompt = false;
         _planeOrigin = Context.WorkPlane.Origin;
         _normal = Context.WorkPlane.Normal;
         _xAxis = Context.WorkPlane.XAxis;
@@ -116,6 +124,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
             _method = normalized;
             _radius = null;
             _diameter = null;
+            _invalidPointPrompt = false;
             RestorePrompt();
             NotifyUpdated();
             return true;
@@ -145,6 +154,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         if (_points.Count == 0) return false;
         _points.RemoveAt(_points.Count - 1);
         _preview = null;
+        _invalidPointPrompt = false;
         Context.Preview.Clear();
         Context.WorkPlane.SetOrigin(_points.Count == 0 ? _planeOrigin : _points[^1]);
         RestorePrompt();
@@ -255,12 +265,23 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
 
     private bool CommitThreePointCircle()
     {
-        if (!TryCircleFromThreePoints(_points[0], _points[1], _points[2], out var center, out var radius))
+        if (!TryCircleFromThreePoints(
+                _points[0],
+                _points[1],
+                _points[2],
+                out var center,
+                out var radius))
         {
             _points.RemoveAt(_points.Count - 1);
+            _invalidPointPrompt = true;
+            SetPromptLocalized(
+                "Cad.Prompt.Circle.Invalid",
+                "Circle: points do not define a valid circle.",
+                CadPrecisionInputKind.LengthAndAngle);
             return false;
         }
 
+        _invalidPointPrompt = false;
         Commit(new CadCircleEntity(center, _normal, radius));
         return true;
     }
@@ -289,8 +310,23 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
                     break;
                 }
             case ThreePoints when _points.Count >= 2:
-                if (TryCircleFromThreePoints(_points[0], _points[1], cursor, out var center, out var radius))
-                    entity = new CadCircleEntity(center, _normal, radius);
+                if (TryCircleFromThreePoints(
+                        _points[0],
+                        _points[1],
+                        cursor,
+                        out var center,
+                        out var radius))
+                {
+                    if (_invalidPointPrompt)
+                    {
+                        _invalidPointPrompt = false;
+                        RestorePrompt();
+                    }
+                    entity = new CadCircleEntity(
+                        center,
+                        _normal,
+                        radius);
+                }
                 break;
 
             case PointCenter when _points.Count >= 1:
@@ -334,9 +370,9 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         var (key, fallback, precision) = (_method, _points.Count) switch
         {
             (CenterRadius, 0) => ("Cad.Prompt.Circle.Center", "Circle: specify center [Esc cancel]", CadPrecisionInputKind.None),
-            (CenterRadius, _) => ("Cad.Prompt.Circle.Radius", "Circle: specify radius [Backspace undo, Esc cancel]", CadPrecisionInputKind.None),
+            (CenterRadius, _) => ("Cad.Prompt.Circle.Radius", "Circle: specify radius [Backspace undo, Esc cancel]", CadPrecisionInputKind.Length),
             (CenterDiameter, 0) => ("Cad.Prompt.Circle.Center", "Circle: specify center [Esc cancel]", CadPrecisionInputKind.None),
-            (CenterDiameter, _) => ("Cad.Prompt.Circle.Diameter", "Circle: specify diameter [Backspace undo, Esc cancel]", CadPrecisionInputKind.None),
+            (CenterDiameter, _) => ("Cad.Prompt.Circle.Diameter", "Circle: specify diameter [Backspace undo, Esc cancel]", CadPrecisionInputKind.Length),
             (TwoPoints, 0) => ("Cad.Prompt.Circle.FirstDiameterPoint", "Circle: specify first diameter point [Esc cancel]", CadPrecisionInputKind.None),
             (TwoPoints, _) => ("Cad.Prompt.Circle.SecondDiameterPoint", "Circle: specify second diameter point [Backspace undo, Esc cancel]", CadPrecisionInputKind.Length),
             (ThreePoints, 0) => ("Cad.Prompt.Circle.FirstPoint", "Circle: specify first point [Esc cancel]", CadPrecisionInputKind.None),
@@ -401,6 +437,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         _preview = null;
         _radius = null;
         _diameter = null;
+        _invalidPointPrompt = false;
     }
 
     private static bool TryOptionalPositive(string text, out double? value)

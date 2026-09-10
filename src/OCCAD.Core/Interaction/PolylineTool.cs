@@ -76,6 +76,7 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
         _preview = null;
         Context.Preview.Clear();
         RestorePolylineStage();
+        ShowAcceptedPolyline();
         return true;
     }
 
@@ -138,6 +139,15 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
                     ? "Polyline: specify next point [Enter/Space/right click finish, Backspace undo, Esc cancel]"
                     : "Polyline: specify next point [Backspace undo, Esc cancel]",
             CadPrecisionInputKind.LengthAndAngle);
+    }
+
+    private void ShowAcceptedPolyline()
+    {
+        if (_points.Count < 2)
+            return;
+
+        _preview = new CadPolylineEntity(_points);
+        ShowPreview(_preview);
     }
 
     private void UpdatePreview(OcctPoint3d cursor)

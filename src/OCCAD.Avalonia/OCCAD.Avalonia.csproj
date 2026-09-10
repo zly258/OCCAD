@@ -9,7 +9,6 @@
     <AssemblyName>OCCAD</AssemblyName>
     <RootNamespace>OCCAD.Avalonia</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets\OCCAD.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\OCCAD.Core\OCCAD.Core.csproj" />
@@ -18,33 +17,33 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.0" />
     <PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.1.0" />
     <Reference Include="OcctNet">
-      <HintPath>$(OcctBridgeSdkRoot)\OcctNet.dll</HintPath>
+      <HintPath>$(OcctBridgeDistRoot)\OcctNet.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="OcctNet.Avalonia">
-      <HintPath>$(OcctBridgeSdkRoot)\OcctNet.Avalonia.dll</HintPath>
+      <HintPath>$(OcctBridgeDistRoot)\OcctNet.Avalonia.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <EmbeddedResource Include="Localization\Strings.*.xml">
       <WithCulture>false</WithCulture>
     </EmbeddedResource>
     <AvaloniaResource Include="Assets\OCCAD.png" />
-    <None Include="$(OcctBridgeSdkRoot)\runtime\*" Link="runtime\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(OcctBridgeSdkRoot)\runtime\OcctNative.dll')" />
-    <None Include="$(OcctBridgeSdkRoot)\occt\**\*" Link="occt\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(OcctBridgeSdkRoot)\occt')" />
-    <None Include="$(OcctBridgeSdkRoot)\bridge-contract.json" Link="bridge-contract.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <None Include="$(OcctBridgeSdkRoot)\bridge-manifest.json" Link="bridge-manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <None Include="$(OcctBridgeSdkRoot)\package-manifest.json" Link="package-manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(OcctBridgeSdkRoot)\package-manifest.json')" />
+    <None Include="$(OcctBridgeDistRoot)\runtime\*" Link="runtime\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(OcctBridgeDistRoot)\runtime\OcctNative.dll')" />
+    <None Include="$(OcctBridgeDistRoot)\occt\**\*" Link="occt\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(OcctBridgeDistRoot)\occt')" />
+    <None Include="$(OcctBridgeDistRoot)\bridge-contract.json" Link="bridge-contract.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(OcctBridgeDistRoot)\bridge-manifest.json" Link="bridge-manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(OcctBridgeDistRoot)\package-manifest.json" Link="package-manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(OcctBridgeDistRoot)\package-manifest.json')" />
   </ItemGroup>
   <Target Name="PrepareCadBridgeRuntime" BeforeTargets="CopyFilesToOutputDirectory">
-    <Delete Files="$(TargetDir)OcctNative.dll" Condition="Exists('$(OcctBridgeSdkRoot)\runtime\OcctNative.dll')" />
-    <RemoveDir Directories="$(TargetDir)runtime;$(TargetDir)occt" Condition="!Exists('$(OcctBridgeSdkRoot)\runtime\OcctNative.dll')" />
-    <Delete Files="$(TargetDir)package-manifest.json" Condition="!Exists('$(OcctBridgeSdkRoot)\runtime\OcctNative.dll')" />
+    <Delete Files="$(TargetDir)OcctNative.dll" Condition="Exists('$(OcctBridgeDistRoot)\runtime\OcctNative.dll')" />
+    <RemoveDir Directories="$(TargetDir)runtime;$(TargetDir)occt" Condition="!Exists('$(OcctBridgeDistRoot)\runtime\OcctNative.dll')" />
+    <Delete Files="$(TargetDir)package-manifest.json" Condition="!Exists('$(OcctBridgeDistRoot)\runtime\OcctNative.dll')" />
   </Target>
   <Target Name="ValidateCadAvaloniaBridgeSdk" BeforeTargets="ResolveReferences">
-    <Error Condition="!Exists('$(OcctBridgeSdkRoot)\OcctNet.Avalonia.dll')" Text="OcctNet.Avalonia.dll is missing. Install the shared OcctCSharpBridge SDK or set OCCTCSHARPBRIDGE_SDK." />
-    <Error Condition="!Exists('$(OcctBridgeSdkRoot)\OcctNative.dll') and !Exists('$(OcctBridgeSdkRoot)\runtime\OcctNative.dll')" Text="OcctNative.dll is missing from both the flat and portable Bridge SDK layouts." />
+    <Error Condition="!Exists('$(OcctBridgeDistRoot)\OcctNet.Avalonia.dll')" Text="OcctNet.Avalonia.dll is missing. Install the shared OcctCSharpBridge SDK or set OCCTCSHARPBRIDGE_SDK." />
+    <Error Condition="!Exists('$(OcctBridgeDistRoot)\OcctNative.dll') and !Exists('$(OcctBridgeDistRoot)\runtime\OcctNative.dll')" Text="OcctNative.dll is missing from both the flat and portable Bridge SDK layouts." />
   </Target>
-  <Target Name="CopyCadFlatNativeBridge" AfterTargets="Build" Condition="!Exists('$(OcctBridgeSdkRoot)\runtime\OcctNative.dll') and Exists('$(OcctBridgeSdkRoot)\OcctNative.dll')">
-    <Copy SourceFiles="$(OcctBridgeSdkRoot)\OcctNative.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  <Target Name="CopyCadFlatNativeBridge" AfterTargets="Build" Condition="!Exists('$(OcctBridgeDistRoot)\runtime\OcctNative.dll') and Exists('$(OcctBridgeDistRoot)\OcctNative.dll')">
+    <Copy SourceFiles="$(OcctBridgeDistRoot)\OcctNative.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
   </Target>
 </Project>

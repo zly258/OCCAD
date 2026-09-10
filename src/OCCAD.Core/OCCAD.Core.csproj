@@ -9,12 +9,12 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="OcctNet">
-      <HintPath>$(OcctBridgeSdkRoot)\OcctNet.dll</HintPath>
+      <HintPath>$(OcctBridgeDistRoot)\OcctNet.dll</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>
   <Target Name="ValidateCadBridgeSdk" BeforeTargets="ResolveReferences">
-    <Error Condition="!Exists('$(OcctBridgeSdkRoot)\OcctNet.dll')" Text="OcctNet.dll is missing. Install the shared OcctCSharpBridge SDK or set OCCTCSHARPBRIDGE_SDK." />
-    <Error Condition="!Exists('$(OcctBridgeSdkRoot)\bridge-contract.json')" Text="bridge-contract.json is missing. Install the shared OcctCSharpBridge SDK or set OCCTCSHARPBRIDGE_SDK." />
+    <Error Condition="!Exists('$(OcctBridgeDistRoot)\OcctNet.dll')" Text="OcctNet.dll is missing. Install the shared OcctCSharpBridge SDK or set OCCTCSHARPBRIDGE_SDK." />
+    <Error Condition="!Exists('$(OcctBridgeDistRoot)\bridge-contract.json')" Text="bridge-contract.json is missing. Install the shared OcctCSharpBridge SDK or set OCCTCSHARPBRIDGE_SDK." />
   </Target>
 </Project>

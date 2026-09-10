@@ -565,6 +565,7 @@ public sealed class CadWorkspace : IDisposable
         Tools.CancelCurrent();
         Selection.Clear();
         Subobjects.Clear();
+        Preselection.Clear();
         Grips.Clear();
         using var changes = Document.BeginChangeSet();
         return History.Undo();
@@ -575,6 +576,7 @@ public sealed class CadWorkspace : IDisposable
         Tools.CancelCurrent();
         Selection.Clear();
         Subobjects.Clear();
+        Preselection.Clear();
         Grips.Clear();
         using var changes = Document.BeginChangeSet();
         return History.Redo();

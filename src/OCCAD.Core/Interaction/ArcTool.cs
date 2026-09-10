@@ -18,6 +18,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
     private OcctVector3d _xAxis;
     private OcctVector3d _yAxis;
     private CadEntity? _preview;
+    private bool _invalidPointPrompt;
 
     public override string Id => "arc";
     public override string DisplayName => "Arc";
@@ -25,6 +26,16 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         _method is CenterStartEnd or StartCenterEnd && Stage == 1
             ? "Radius"
             : base.PrecisionLengthLabel;
+
+    public override string PrecisionAngleLabel =>
+        _method == StartEndTangent && Stage >= 2
+            ? "Tangent Angle"
+            : base.PrecisionAngleLabel;
+
+    public override OcctPoint3d? PrecisionReferencePoint =>
+        _method == StartEndTangent && _points.Count >= 2
+            ? _points[0]
+            : base.PrecisionReferencePoint;
 
     public override CadToolPanelDescriptor ParameterPanel =>
         new("Arc", BuildParameters());
@@ -36,6 +47,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         _points.Clear();
         _preview = null;
         _clockwise = false;
+        _invalidPointPrompt = false;
         _planeOrigin = Context.WorkPlane.Origin;
         _xAxis = Context.WorkPlane.XAxis;
         _yAxis = Context.WorkPlane.YAxis;
@@ -80,6 +92,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
 
             _method = normalized;
             _clockwise = false;
+            _invalidPointPrompt = false;
             RestorePrecisionFrame();
             RestorePrompt();
             NotifyUpdated();
@@ -104,6 +117,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         if (_points.Count == 0) return false;
         _points.RemoveAt(_points.Count - 1);
         _preview = null;
+        _invalidPointPrompt = false;
         Context.Preview.Clear();
         RestorePrecisionFrame();
         RestorePrompt();
@@ -153,6 +167,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         {
             _points.RemoveAt(_points.Count - 1);
             RestorePrecisionFrame();
+            _invalidPointPrompt = true;
             SetPromptLocalized(
                 "Cad.Prompt.Arc.Invalid",
                 "Arc: points do not define a valid arc.",
@@ -189,7 +204,14 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
             return;
         }
         if (TryCreateArc(_points[0], _points[1], cursor, out var arc))
+        {
+            if (_invalidPointPrompt)
+            {
+                _invalidPointPrompt = false;
+                RestorePrompt();
+            }
             _preview = arc;
+        }
         else if (_method == StartEndTangent)
         {
             _preview = null;
@@ -492,6 +514,16 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
             return;
         }
 
+        if (_method == StartEndTangent &&
+            _points.Count >= 2)
+        {
+            SetWorkPlane(
+                _points[0],
+                _xAxis,
+                _yAxis);
+            return;
+        }
+
         SetWorkPlane(_points[^1], _xAxis, _yAxis);
     }
 
@@ -533,7 +565,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
             (StartCenterEnd, 1) => ("Cad.Prompt.Arc.Center", "Arc: specify center [Backspace undo, Esc cancel]", CadPrecisionInputKind.LengthAndAngle),
             (StartEndCenter, 0) => ("Cad.Prompt.Arc.Start", "Arc: specify start point [Esc cancel]", CadPrecisionInputKind.None),
             (StartEndCenter, 1) => ("Cad.Prompt.Arc.End", "Arc: specify end point [Backspace undo, Esc cancel]", CadPrecisionInputKind.LengthAndAngle),
-            (StartEndCenter, _) => ("Cad.Prompt.Arc.CenterForEndpoints", "Arc: specify center side/position [Backspace undo, Esc cancel]", CadPrecisionInputKind.Length),
+            (StartEndCenter, _) => ("Cad.Prompt.Arc.CenterForEndpoints", "Arc: specify center side/position [Backspace undo, Esc cancel]", CadPrecisionInputKind.None),
             (StartEndPoint, 0) => ("Cad.Prompt.Arc.Start", "Arc: specify start point [Esc cancel]", CadPrecisionInputKind.None),
             (StartEndPoint, 1) => ("Cad.Prompt.Arc.End", "Arc: specify end point [Backspace undo, Esc cancel]", CadPrecisionInputKind.LengthAndAngle),
             (StartEndPoint, _) => ("Cad.Prompt.Arc.PointOnArc", "Arc: specify a point on the arc [Backspace undo, Esc cancel]", CadPrecisionInputKind.LengthAndAngle),
@@ -553,5 +585,6 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         _points.Clear();
         _preview = null;
         _clockwise = false;
+        _invalidPointPrompt = false;
     }
 }

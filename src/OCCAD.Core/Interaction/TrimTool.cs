@@ -118,10 +118,17 @@ public sealed class TrimTool : CadSelectionTransformToolBase
 
         _invalidTargetPrompt = false;
         CommitReplacementPreview(
-            () => Context.Workspace.ReplaceEntities(
-                [target],
-                replacements,
-                "Trim"));
+            () =>
+            {
+                Context.Workspace.ReplaceEntities(
+                    [target],
+                    replacements,
+                    "Trim");
+                Context.Selection.Apply(
+                    Entities,
+                    CadSelectionOperation.Replace,
+                    Entities.LastOrDefault());
+            });
         SetPromptLocalized(
             "Cad.Prompt.trim.Target",
             "Trim: click the line segment to remove [Esc cancel]");

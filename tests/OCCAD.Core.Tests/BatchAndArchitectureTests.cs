@@ -143,12 +143,13 @@ public sealed class BatchAndArchitectureTests
     [TestMethod]
     public void CommandAndPropertyDescriptorsAreAuthoritative()
     {
-        using var w = new CadWorkspace();
+        using var application = new CadApplicationCore();
+        var w = application.Workspace;
         Assert.AreEqual("draw.line", w.Actions.ResolveCommand("L")!.Id);
         Assert.AreEqual("line", w.Actions.ResolveCommand("LINE")!.ToolId);
         Assert.IsTrue(w.Actions.Describe("draw.line")!.Repeatable);
         Assert.AreEqual("Ctrl+Z", w.Actions.Describe("edit.undo")!.Shortcut);
-        CollectionAssert.Contains(CadCommandManager.ForWorkspace(w).Complete("LI").ToArray(), "LINE");
+        CollectionAssert.Contains(application.Commands.Complete("LI").ToArray(), "LINE");
         var line = new CadLineEntity(default, new(10, 0, 0));
         var properties = CadPropertyCatalog.Describe(line);
         var layer = properties.Single(p => p.Name == nameof(CadEntity.LayerId));

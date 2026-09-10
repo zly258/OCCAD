@@ -56,6 +56,24 @@ public sealed class SettingsAndSchemaTests
     }
 
     [TestMethod]
+    public void MigratedToolsExposeSchemaWithoutLegacyPanelOverride()
+    {
+        CadTool[] tools =
+        [
+            new ChamferTool(),
+            new FilletTool(),
+            new OffsetTool(),
+            new CopyTool()
+        ];
+
+        foreach (var tool in tools)
+        {
+            Assert.IsNotNull(tool.ParameterSchema, tool.Id);
+            Assert.IsNull(tool.ParameterPanel, tool.Id);
+        }
+    }
+
+    [TestMethod]
     public void LegacyPanelDescriptorIsOnlyASchemaCompatibilityType()
     {
         CadToolParameterSchema schema = new CadToolPanelDescriptor(

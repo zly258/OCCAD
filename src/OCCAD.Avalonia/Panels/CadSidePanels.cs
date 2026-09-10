@@ -138,12 +138,12 @@ internal sealed class CadInspectorPanel : Border
         var propertiesScroll = new ScrollViewer
         {
             Content = _propertyHost,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
         };
         var layersScroll = new ScrollViewer
         {
             Content = _layerHost,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
         };
 
         _tabs = new TabControl

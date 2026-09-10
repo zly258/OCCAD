@@ -19,7 +19,7 @@ public sealed class OffsetTool : CadTool, ICadPointInputTool
     public override CadToolInteractionPolicy InteractionPolicy =>
         base.InteractionPolicy with { PreselectionEnabled = true };
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new(
             "Offset",
             [

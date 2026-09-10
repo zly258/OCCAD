@@ -10,7 +10,7 @@ public sealed class CopyTool : CadTranslateToolBase
     public override string Id => "copy";
     public override string DisplayName => "Copy";
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new(
             "Copy",
             [

@@ -68,7 +68,7 @@ internal sealed class CadSaveChangesDialog : Window
         Opened += (_, _) => save.Focus();
         KeyDown += (_, e) =>
         {
-            if (e.Key != Avalonia.Input.Key.Escape)
+            if (e.Key != global::Avalonia.Input.Key.Escape)
                 return;
             Close(CadSaveChangesDecision.Cancel);
             e.Handled = true;

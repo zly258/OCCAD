@@ -72,7 +72,7 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
         return base.HandlePointer(input);
     }
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new(
             "Fillet",
             [

@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -37,6 +37,7 @@ public sealed class CadSubobjectSelectionManager
         _document = document ?? throw new ArgumentNullException(nameof(document));
         _selection = selection ?? throw new ArgumentNullException(nameof(selection));
         _document.Changed += DocumentChanged;
+        _selection.Cleared += SelectionCleared;
         _selection.FilterChanged += SelectionFilterChanged;
     }
 
@@ -182,6 +183,8 @@ public sealed class CadSubobjectSelectionManager
             Primary = _selected.Count == 0 ? null : _selected[^1];
         RaiseChanged();
     }
+
+    private void SelectionCleared(object? sender, EventArgs args) => Clear();
 
     private void SelectionFilterChanged(object? sender, EventArgs args) =>
         RefreshValidity();

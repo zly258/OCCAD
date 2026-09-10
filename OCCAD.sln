@@ -4,7 +4,7 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OCCAD.Core", "src\OCCAD.Core\OCCAD.Core.csproj", "{C40E7EE1-151C-4D65-81E3-C5483D86AE58}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OCCAD.Wpf", "src\OCCAD.Wpf\OCCAD.Wpf.csproj", "{8493A56E-CC80-4549-B522-8A31F25D4E38}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OCCAD.Avalonia", "src\OCCAD.Avalonia\OCCAD.Avalonia.csproj", "{8493A56E-CC80-4549-B522-8A31F25D4E38}"
 EndProject
 Global
     GlobalSection(SolutionConfigurationPlatforms) = preSolution

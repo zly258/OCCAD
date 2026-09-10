@@ -36,7 +36,7 @@ OCCAD 不是 OCCT API Demo，也不是把内核接口直接暴露到 UI。目标
 
 ## 4. UI 产品目标
 
-唯一主界面是原生 WPF 经典 `Menu + 常驻 ToolBar + Viewport + Dock + StatusBar + 非模态 ToolPanel`。不再恢复 Ribbon，也不维护第三方 UI 主题体系。常用命令保持浅层菜单；ToolBar 放公共阶段输入；Radius/Width/Height 等稳定参数进入 ToolPanel。
+唯一主界面是Avalonia 原生紧凑型 `Menu + 常驻 ToolBar + Viewport + Dock + StatusBar + 非模态 ToolPanel`。不再恢复 Ribbon，也不维护第三方 UI 主题体系。常用命令保持浅层菜单；ToolBar 放公共阶段输入；Radius/Width/Height 等稳定参数进入 ToolPanel。
 
 ## 5. 非目标
 

@@ -195,7 +195,7 @@ Double 显示 3 位小数，但 setter 接收完整 double。Color 使用 ColorD
 - Snap；
 - Grip；
 - Precision；
-- PropertyGrid；
+- Property 编辑器；
 - Layer/ByLayer；
 - Undo/Redo；
 - Serialization；

@@ -30,7 +30,7 @@ Properties/Layers: both ByLayer and custom Color/LineWidth/LineStyle; direct Col
 
 ## UI target
 
-The single shell is native WPF classic `Menu + persistent ToolBar + Viewport + Docks + StatusBar + non-modal ToolPanel`. Ribbon and third-party theme shells are not supported targets. Common commands stay shallow; ToolBar owns common stage input; stable Radius/Width/Height-style values belong to ToolPanel.
+The single shell is native Avalonia compact `Menu + persistent ToolBar + Viewport + Docks + StatusBar + non-modal ToolPanel`. Ribbon and third-party theme shells are not supported targets. Common commands stay shallow; ToolBar owns common stage input; stable Radius/Width/Height-style values belong to ToolPanel.
 
 ## Non-goals
 

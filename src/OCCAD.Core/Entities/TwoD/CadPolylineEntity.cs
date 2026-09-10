@@ -119,6 +119,11 @@ public sealed class CadPolylineEntity : CadEntity
         CopyPropertiesTo(
             new CadPolylineEntity(points, closed));
 
+    internal CadPathEntity CreatePath(
+        IEnumerable<CadEntity> segments) =>
+        CopyPropertiesTo(
+            new CadPathEntity(segments));
+
     public override CadEntity Duplicate() =>
         CopyWithPoints(_points);
 

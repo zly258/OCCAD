@@ -641,7 +641,7 @@
     <sys:String x:Key="Cad.History.Fillet">圆角</sys:String>
     <sys:String x:Key="Cad.History.Chamfer">倒角</sys:String>
     <sys:String x:Key="Cad.Text.JoinArcNote">同圆且连续的圆弧可合并为一条圆弧。</sys:String>
-    <sys:String x:Key="Cad.Prompt.fillet.LineArc">圆角支持直线-直线、直线-圆弧和圆弧-圆弧组合。</sys:String>
+    <sys:String x:Key="Cad.Prompt.fillet.LineArc">圆角支持直线-直线、直线-圆弧、圆弧-圆弧，以及多段线或混合路径中的直线顶点。</sys:String>
     <sys:String x:Key="Cad.Text.Modeling">建模</sys:String>
     <sys:String x:Key="Cad.Text.Region">面域</sys:String>
     <sys:String x:Key="Cad.Text.Extrude">拉伸</sys:String>
@@ -678,8 +678,8 @@
     <sys:String x:Key="Cad.Text.Sweep">扫掠</sys:String>
     <sys:String x:Key="Cad.Prompt.sweep.Select">扫掠：选择一个闭合平面轮廓 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.sweep.Selected">扫掠：已选择 {0} 个轮廓 [Enter 确认，Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.sweep.Path">扫掠：选择一条开放多段线路径 [Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.sweep.Invalid">扫掠：当前悬停对象不是有效的开放多段线路径。</sys:String>
+    <sys:String x:Key="Cad.Prompt.sweep.Path">扫掠：选择直线、圆弧、螺旋线、开放多段线或混合路径 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.sweep.Invalid">扫掠：当前悬停对象不是有效的扫掠路径。</sys:String>
     <sys:String x:Key="Cad.History.Sweep">扫掠</sys:String>
     <sys:String x:Key="Cad.Text.Loft">放样</sys:String>
     <sys:String x:Key="Cad.ToolPanel.loft.Title">放样</sys:String>
@@ -701,6 +701,45 @@
     <sys:String x:Key="Cad.Prompt.edgechamfer.Ready">实体倒角：设置距离后单击或完成 [Esc 取消]</sys:String>
     <sys:String x:Key="Cad.History.EdgeFillet">实体圆角</sys:String>
     <sys:String x:Key="Cad.History.EdgeChamfer">实体倒角</sys:String>
+    <sys:String x:Key="Cad.Text.Path">路径</sys:String>
+    <sys:String x:Key="Cad.Text.RegionHoles">最后选择的主闭合轮廓作为外边界，其余共面闭合轮廓作为孔洞。</sys:String>
+    <sys:String x:Key="Cad.Text.Shell">抽壳</sys:String>
+    <sys:String x:Key="Cad.Text.ShapeOffset">实体偏移</sys:String>
+    <sys:String x:Key="Cad.ToolPanel.shell.Title">抽壳</sys:String>
+    <sys:String x:Key="Cad.ToolPanel.shapeoffset.Title">实体偏移</sys:String>
+    <sys:String x:Key="Cad.Parameter.shell.Thickness">厚度</sys:String>
+    <sys:String x:Key="Cad.Parameter.shapeoffset.Offset">偏移量</sys:String>
+    <sys:String x:Key="Cad.Prompt.shell.Select">抽壳：请先在实体上选择一个需要移除的面 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.shell.Ready">抽壳：设置厚度后单击或完成 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.shapeoffset.Select">实体偏移：选择一个实体 [Enter 确认，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.shapeoffset.Selected">实体偏移：已选择 {0} 个实体 [Enter 确认，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.shapeoffset.Ready">实体偏移：设置带符号偏移量后单击或按 Enter [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.History.Shell">抽壳</sys:String>
+    <sys:String x:Key="Cad.History.ShapeOffset">实体偏移</sys:String>
+    <sys:String x:Key="Cad.Text.Import">导入...</sys:String>
+    <sys:String x:Key="Cad.Text.Export">导出选中对象...</sys:String>
+    <sys:String x:Key="Cad.Text.ImportedShape">导入模型</sys:String>
+    <sys:String x:Key="Cad.Text.Importing">正在导入 {0}...</sys:String>
+    <sys:String x:Key="Cad.Text.Imported">已导入 {0}</sys:String>
+    <sys:String x:Key="Cad.Text.Exporting">正在导出 {0}...</sys:String>
+    <sys:String x:Key="Cad.Text.Exported">已导出 {0}</sys:String>
+    <sys:String x:Key="Cad.Text.ImportTitle">导入 CAD / 网格</sys:String>
+    <sys:String x:Key="Cad.Text.ExportTitle">导出 CAD / 网格</sys:String>
+    <sys:String x:Key="Cad.Text.ExportSelectionRequired">请选择且仅选择一个对象进行导出。</sys:String>
+    <sys:String x:Key="Cad.Property.Operation">操作</sys:String>
+    <sys:String x:Key="Cad.Value.CadBooleanKind.Union">并集</sys:String>
+    <sys:String x:Key="Cad.Value.CadBooleanKind.Cut">差集</sys:String>
+    <sys:String x:Key="Cad.Value.CadBooleanKind.Common">交集</sys:String>
+
+    <sys:String x:Key="Cad.Text.LayerHiddenMessage">图层 {0} 已隐藏。</sys:String>
+    <sys:String x:Key="Cad.Text.LayerLockedMessage">图层 {0} 已锁定。</sys:String>
+    <sys:String x:Key="Cad.Text.No">否</sys:String>
+    <sys:String x:Key="Cad.Text.Primitives">基本体</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionWithCount">选择 [{0}]</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionWithSubobjects">{0}：{1}（{2} 个子对象）</sys:String>
+    <sys:String x:Key="Cad.Text.StatusPolarValue">{0} {1:G}°</sys:String>
+    <sys:String x:Key="Cad.Text.ToolParameters">工具参数</sys:String>
+    <sys:String x:Key="Cad.Text.Yes">是</sys:String>
 </ResourceDictionary>
 
 

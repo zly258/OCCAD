@@ -32,13 +32,12 @@ public sealed class SweepTool : CadSelectionTransformToolBase
         SetSelectionFilter(
             new CadSelectionFilter(
                 "sweep.path",
-                static entity =>
-                    entity is CadPolylineEntity { Closed: false }));
+                CadSweepEntity.IsPath));
 
         SetStageLocalized(
             0,
             "Cad.Prompt.sweep.Path",
-            "Sweep: select an open polyline path [Esc cancel]");
+            "Sweep: select a line, arc, helix, open polyline, or mixed path [Esc cancel]");
     }
 
     public override bool HandlePointer(
@@ -64,7 +63,7 @@ public sealed class SweepTool : CadSelectionTransformToolBase
         {
             SetPromptLocalized(
                 "Cad.Prompt.sweep.Invalid",
-                "Sweep: the hovered object is not a valid open polyline path.");
+                "Sweep: the hovered object is not a valid sweep path.");
             return true;
         }
 
@@ -96,8 +95,9 @@ public sealed class SweepTool : CadSelectionTransformToolBase
         if (Entities.Count != 1 ||
             Context.Workspace.Preselection.Current is not
             {
-                Entity: CadPolylineEntity { Closed: false } path
-            })
+                Entity: var path
+            } ||
+            !CadSweepEntity.IsPath(path))
             return false;
 
         entity = new CadSweepEntity(

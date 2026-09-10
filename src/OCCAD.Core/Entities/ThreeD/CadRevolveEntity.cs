@@ -36,6 +36,12 @@ public sealed class CadRevolveEntity : CadEntity
     [Browsable(false)]
     public string ProfileType => _profile.EntityType;
 
+    [Category("Geometry"), ReadOnly(true)]
+    public int ProfileHoleCount =>
+        _profile is CadRegionEntity region
+            ? region.HoleCount
+            : 0;
+
     [Browsable(false)]
     public OcctPoint3d AxisPoint => _axisPoint;
 

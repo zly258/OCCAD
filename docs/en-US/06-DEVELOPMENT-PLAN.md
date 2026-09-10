@@ -6,7 +6,7 @@ Progress in this order: stability → UI/interaction foundation → complete per
 
 ## P0 Stability and compile health
 
-Keep the branch buildable; fix WPF/WinForms ambiguity, XAML name/event errors, and invalid resources. Complete local transaction exception boundaries for Tool/Grip/Property/Preview; Grip drag must not crash; Preview replacement is atomic and retains the last valid frame; Snap markers reappear after hide; navigation does not corrupt an active Tool.
+Keep the branch buildable; fix Avalonia control/API ambiguity and invalid UI resources, and invalid resources. Complete local transaction exception boundaries for Tool/Grip/Property/Preview; Grip drag must not crash; Preview replacement is atomic and retains the last valid frame; Snap markers reappear after hide; navigation does not corrupt an active Tool.
 
 Centralize finite/positive/tolerance/vector/index/work-plane/viewer-lifetime validation.
 
@@ -40,7 +40,7 @@ Use stable collections/local refresh rather than whole grid rebinding. Complete 
 
 Stabilize serializer versioning, registry-driven deserialization, safe unknown-data rejection, and modified/save-point history semantics. Large files run Read → Parse → Model → Viewer → Complete stages with cancellable bottom progress.
 
-DWG/DXF uses Parser/Adapter → CadEntity; parsers do not drive WPF/viewer directly. Prioritize complete geometry/layers/colors/line styles/line widths/blocks/attributes display before broad entity count.
+DWG/DXF uses Parser/Adapter → CadEntity; parsers do not drive Avalonia/viewer directly. Prioritize complete geometry/layers/colors/line styles/line widths/blocks/attributes display before broad entity count.
 
 ## P7 Performance
 

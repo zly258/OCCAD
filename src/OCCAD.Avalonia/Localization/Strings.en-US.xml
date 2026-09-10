@@ -641,7 +641,7 @@
     <sys:String x:Key="Cad.History.Fillet">Fillet</sys:String>
     <sys:String x:Key="Cad.History.Chamfer">Chamfer</sys:String>
     <sys:String x:Key="Cad.Text.JoinArcNote">Compatible contiguous arcs on the same circle can be joined.</sys:String>
-    <sys:String x:Key="Cad.Prompt.fillet.LineArc">Fillet supports line-line, line-arc, and arc-arc pairs.</sys:String>
+    <sys:String x:Key="Cad.Prompt.fillet.LineArc">Fillet supports line-line, line-arc, arc-arc, and line-line vertices in polylines or mixed paths.</sys:String>
     <sys:String x:Key="Cad.Text.Modeling">Modeling</sys:String>
     <sys:String x:Key="Cad.Text.Region">Region</sys:String>
     <sys:String x:Key="Cad.Text.Extrude">Extrude</sys:String>
@@ -678,8 +678,8 @@
     <sys:String x:Key="Cad.Text.Sweep">Sweep</sys:String>
     <sys:String x:Key="Cad.Prompt.sweep.Select">Sweep: select one closed planar profile [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.sweep.Selected">Sweep: {0} profile selected [Enter accept, Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.sweep.Path">Sweep: select an open polyline path [Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.sweep.Invalid">Sweep: the hovered object is not a valid open polyline path.</sys:String>
+    <sys:String x:Key="Cad.Prompt.sweep.Path">Sweep: select a line, arc, helix, open polyline, or mixed path [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.sweep.Invalid">Sweep: the hovered object is not a valid sweep path.</sys:String>
     <sys:String x:Key="Cad.History.Sweep">Sweep</sys:String>
     <sys:String x:Key="Cad.Text.Loft">Loft</sys:String>
     <sys:String x:Key="Cad.ToolPanel.loft.Title">Loft</sys:String>
@@ -701,6 +701,45 @@
     <sys:String x:Key="Cad.Prompt.edgechamfer.Ready">Edge Chamfer: set distance, then click or Finish [Esc cancel]</sys:String>
     <sys:String x:Key="Cad.History.EdgeFillet">Edge Fillet</sys:String>
     <sys:String x:Key="Cad.History.EdgeChamfer">Edge Chamfer</sys:String>
+    <sys:String x:Key="Cad.Text.Path">Path</sys:String>
+    <sys:String x:Key="Cad.Text.RegionHoles">Select the outer boundary last (primary); other selected coplanar closed profiles become holes.</sys:String>
+    <sys:String x:Key="Cad.Text.Shell">Shell</sys:String>
+    <sys:String x:Key="Cad.Text.ShapeOffset">Shape Offset</sys:String>
+    <sys:String x:Key="Cad.ToolPanel.shell.Title">Shell</sys:String>
+    <sys:String x:Key="Cad.ToolPanel.shapeoffset.Title">Shape Offset</sys:String>
+    <sys:String x:Key="Cad.Parameter.shell.Thickness">Thickness</sys:String>
+    <sys:String x:Key="Cad.Parameter.shapeoffset.Offset">Offset</sys:String>
+    <sys:String x:Key="Cad.Prompt.shell.Select">Shell: select one face on a solid before starting the command [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.shell.Ready">Shell: set thickness, then click or Finish [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.shapeoffset.Select">Shape Offset: select exactly one solid [Enter accept, Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.shapeoffset.Selected">Shape Offset: {0} solid selected [Enter accept, Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.shapeoffset.Ready">Shape Offset: set signed offset, then click or press Enter [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.History.Shell">Shell</sys:String>
+    <sys:String x:Key="Cad.History.ShapeOffset">Shape Offset</sys:String>
+    <sys:String x:Key="Cad.Text.Import">Import...</sys:String>
+    <sys:String x:Key="Cad.Text.Export">Export Selected...</sys:String>
+    <sys:String x:Key="Cad.Text.ImportedShape">Imported Shape</sys:String>
+    <sys:String x:Key="Cad.Text.Importing">Importing {0}...</sys:String>
+    <sys:String x:Key="Cad.Text.Imported">Imported {0}</sys:String>
+    <sys:String x:Key="Cad.Text.Exporting">Exporting {0}...</sys:String>
+    <sys:String x:Key="Cad.Text.Exported">Exported {0}</sys:String>
+    <sys:String x:Key="Cad.Text.ImportTitle">Import CAD / Mesh</sys:String>
+    <sys:String x:Key="Cad.Text.ExportTitle">Export CAD / Mesh</sys:String>
+    <sys:String x:Key="Cad.Text.ExportSelectionRequired">Select exactly one entity to export.</sys:String>
+    <sys:String x:Key="Cad.Property.Operation">Operation</sys:String>
+    <sys:String x:Key="Cad.Value.CadBooleanKind.Union">Union</sys:String>
+    <sys:String x:Key="Cad.Value.CadBooleanKind.Cut">Cut</sys:String>
+    <sys:String x:Key="Cad.Value.CadBooleanKind.Common">Common</sys:String>
+
+    <sys:String x:Key="Cad.Text.LayerHiddenMessage">Layer {0} is hidden.</sys:String>
+    <sys:String x:Key="Cad.Text.LayerLockedMessage">Layer {0} is locked.</sys:String>
+    <sys:String x:Key="Cad.Text.No">No</sys:String>
+    <sys:String x:Key="Cad.Text.Primitives">Primitives</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionWithCount">Selection [{0}]</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionWithSubobjects">{0}: {1} ({2} subobjects)</sys:String>
+    <sys:String x:Key="Cad.Text.StatusPolarValue">{0} {1:G}°</sys:String>
+    <sys:String x:Key="Cad.Text.ToolParameters">Tool Parameters</sys:String>
+    <sys:String x:Key="Cad.Text.Yes">Yes</sys:String>
 </ResourceDictionary>
 
 

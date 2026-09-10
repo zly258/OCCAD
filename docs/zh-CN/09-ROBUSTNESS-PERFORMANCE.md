@@ -6,7 +6,7 @@ CAD 的稳定性来自局部事务和可恢复状态，而不是在最外层吞�
 
 ## 2. 三层异常边界
 
-第一层是业务事务：Tool、Grip、Property、Document mutation 自己捕获可恢复异常并回滚。第二层是 Input/Viewport/UI 分发：阻止普通异常直接逃出 WPF Dispatcher，并清理瞬态状态。第三层是应用兜底：记录未处理错误并尽量提示用户，但不把 OutOfMemory、StackOverflow、AccessViolation 等不可恢复错误伪装成安全恢复。
+第一层是业务事务：Tool、Grip、Property、Document mutation 自己捕获可恢复异常并回滚。第二层是 Input/Viewport/UI 分发：阻止普通异常直接逃出 Avalonia Dispatcher，并清理瞬态状态。第三层是应用兜底：记录未处理错误并尽量提示用户，但不把 OutOfMemory、StackOverflow、AccessViolation 等不可恢复错误伪装成安全恢复。
 
 ## 3. 输入兜底
 

@@ -31,8 +31,20 @@ public sealed class CadBooleanEntity : CadEntity
         DisplayMode = OcctDisplayMode.Shaded;
     }
 
-    [Category("Geometry"), ReadOnly(true)]
-    public CadBooleanKind Operation => _operation;
+    [Category("Geometry")]
+    public CadBooleanKind Operation
+    {
+        get => _operation;
+        set
+        {
+            if (!Enum.IsDefined(value))
+                throw new ArgumentOutOfRangeException(nameof(value));
+
+            SetGeometry(
+                ref _operation,
+                value);
+        }
+    }
 
     [Browsable(false)]
     public string LeftType => _left.EntityType;

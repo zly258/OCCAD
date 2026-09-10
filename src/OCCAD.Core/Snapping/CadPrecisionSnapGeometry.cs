@@ -137,7 +137,6 @@ internal static class CadPrecisionSnapGeometry
                 for (var secondIndex = firstIndex + 1; secondIndex < curves.Count; secondIndex++)
                 {
                     var second = curves[secondIndex];
-                    if (ReferenceEquals(first.Entity, second.Entity)) continue;
 
                     foreach (var intersection in Intersections(first, second))
                     {

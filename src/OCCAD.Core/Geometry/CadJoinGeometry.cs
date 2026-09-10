@@ -22,10 +22,130 @@ internal static class CadJoinGeometry
                 entities.Cast<CadArcEntity>().ToArray(),
                 out result);
 
-        if (entities.Any(static entity => entity is CadArcEntity))
+        if (entities.All(
+                static entity =>
+                    entity is CadLineEntity or
+                    CadPolylineEntity { Closed: false }))
+            return TryJoinLinear(entities, out result);
+
+        return TryJoinMixed(entities, out result);
+    }
+
+    private static bool TryJoinMixed(
+        IReadOnlyList<CadEntity> entities,
+        out CadEntity result)
+    {
+        result = null!;
+
+        if (entities.Any(
+                static entity =>
+                    entity is not CadLineEntity and
+                    not CadArcEntity and
+                    not CadPolylineEntity { Closed: false }))
             return false;
 
-        return TryJoinLinear(entities, out result);
+        var fragments = entities
+            .Select(entity =>
+                new Fragment(
+                    entity,
+                    [EntityStart(entity), EntityEnd(entity)]))
+            .ToArray();
+
+        if (!TryOrderFragments(
+                fragments,
+                out var ordered))
+            return false;
+
+        var segments = new List<CadEntity>();
+        foreach (var item in ordered)
+        {
+            AppendEntitySegments(
+                item.Fragment.Source,
+                item.Reverse,
+                segments);
+        }
+
+        if (segments.Count == 0)
+            return false;
+
+        result = ordered[0].Fragment.Source switch
+        {
+            CadLineEntity line => line.CreatePath(segments),
+            CadArcEntity arc => arc.CreatePath(segments),
+            CadPolylineEntity polyline => polyline.CreatePath(segments),
+            _ => throw new InvalidOperationException()
+        };
+        return true;
+    }
+
+    private static OcctPoint3d EntityStart(CadEntity entity) =>
+        entity switch
+        {
+            CadLineEntity line => line.Start,
+            CadArcEntity arc => arc.Start,
+            CadPolylineEntity { Closed: false } polyline => polyline.Points[0],
+            _ => throw new ArgumentException("Unsupported join entity.", nameof(entity))
+        };
+
+    private static OcctPoint3d EntityEnd(CadEntity entity) =>
+        entity switch
+        {
+            CadLineEntity line => line.End,
+            CadArcEntity arc => arc.End,
+            CadPolylineEntity { Closed: false } polyline => polyline.Points[^1],
+            _ => throw new ArgumentException("Unsupported join entity.", nameof(entity))
+        };
+
+    private static void AppendEntitySegments(
+        CadEntity entity,
+        bool reverse,
+        List<CadEntity> target)
+    {
+        switch (entity)
+        {
+            case CadLineEntity line:
+                target.Add(
+                    reverse
+                        ? line.CreateLine(line.End, line.Start)
+                        : line.Duplicate());
+                return;
+
+            case CadArcEntity arc:
+                target.Add(
+                    reverse
+                        ? arc.ReversedCopy()
+                        : arc.Duplicate());
+                return;
+
+            case CadPolylineEntity { Closed: false } polyline:
+            {
+                if (!reverse)
+                {
+                    for (var index = 0; index + 1 < polyline.Points.Count; index++)
+                    {
+                        target.Add(
+                            new CadLineEntity(
+                                polyline.Points[index],
+                                polyline.Points[index + 1]));
+                    }
+                }
+                else
+                {
+                    for (var index = polyline.Points.Count - 1; index > 0; index--)
+                    {
+                        target.Add(
+                            new CadLineEntity(
+                                polyline.Points[index],
+                                polyline.Points[index - 1]));
+                    }
+                }
+
+                return;
+            }
+
+            default:
+                throw new InvalidOperationException();
+        }
     }
 
     private static bool TryJoinLinear(

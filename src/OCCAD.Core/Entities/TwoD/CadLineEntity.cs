@@ -144,6 +144,11 @@ public sealed class CadLineEntity : CadEntity
         CopyPropertiesTo(
             new CadPolylineEntity(points, closed: false));
 
+    internal CadPathEntity CreatePath(
+        IEnumerable<CadEntity> segments) =>
+        CopyPropertiesTo(
+            new CadPathEntity(segments));
+
     public override CadEntity Duplicate() => CopyPropertiesTo(new CadLineEntity(_start, _end));
 
     public override void RestoreGeometry(CadEntity snapshot)

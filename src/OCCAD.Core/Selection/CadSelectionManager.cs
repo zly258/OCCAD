@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -59,6 +59,7 @@ public sealed class CadSelectionManager
     public CadSelectionFilter? Filter { get; private set; }
 
     public event EventHandler<CadSelectionChangedEventArgs>? Changed;
+    public event EventHandler? Cleared;
     public event EventHandler? FilterChanged;
 
     public bool CanSelect(CadEntity entity)
@@ -144,8 +145,7 @@ public sealed class CadSelectionManager
         {
             CadSelectionOperation.Replace or CadSelectionOperation.Add =>
                 requested.Where(IsSelectable).ToArray(),
-            CadSelectionOperation.Remove =>
-                requested,
+            CadSelectionOperation.Remove => requested,
             CadSelectionOperation.Toggle =>
                 requested
                     .Where(entity =>
@@ -175,14 +175,21 @@ public sealed class CadSelectionManager
 
     public void Clear()
     {
-        if (_selected.Count == 0 && _primary is null)
+        var hadSelection = _selected.Count > 0 || _primary is not null;
+        if (hadSelection)
         {
-            if (_engine is { IsInitialized: true } engine)
-                engine.ClearSelection();
-            return;
+            SetSelection([], null, syncEngine: true);
+        }
+        else if (_engine is { IsInitialized: true } engine)
+        {
+            engine.ClearSelection();
         }
 
-        SetSelection([], null, syncEngine: true);
+        // This event represents the user's/API caller's explicit clear intent,
+        // not merely a transition to an empty entity set. Subobject selection is
+        // allowed to exist without entity selection, but an explicit Clear means
+        // clear the complete formal selection state.
+        Cleared?.Invoke(this, EventArgs.Empty);
     }
 
     public void RefreshValidity()
@@ -271,6 +278,7 @@ public sealed class CadSelectionManager
         if (args.Kind == CadDocumentChangeKind.Reset)
         {
             SetSelection([], null, syncEngine: false);
+            Cleared?.Invoke(this, EventArgs.Empty);
             return;
         }
 

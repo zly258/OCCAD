@@ -2,7 +2,7 @@
 
 ## Single shell target
 
-OCCAD uses a native WPF classic CAD shell: `Menu + ToolBar + Viewport + Docks + StatusBar + non-modal ToolPanel`. Ribbon is not a second supported shell.
+OCCAD uses a native Avalonia compact CAD shell: `Menu + ToolBar + Viewport + Docks + StatusBar + non-modal ToolPanel`. Ribbon is not a second supported shell.
 
 ## Menu
 

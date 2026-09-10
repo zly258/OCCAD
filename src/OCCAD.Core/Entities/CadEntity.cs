@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Drawing;
 using System.Runtime.CompilerServices;
 using OcctNet;
@@ -194,6 +194,7 @@ public abstract class CadEntity
     public abstract IReadOnlyList<CadSnapPoint> GetSnapPoints();
     public abstract IReadOnlyList<CadGripPoint> GetGripPoints();
     public abstract void MoveGrip(int index, OcctPoint3d targetPoint);
+
     public CadEntity MirroredCopy(OcctPoint3d origin, OcctVector3d normal) =>
         CopyPropertiesTo(CadMirrorGeometry.Create(this, origin, normal));
 
@@ -209,6 +210,7 @@ public abstract class CadEntity
         if (snapshot.GetType() != GetType())
             throw new ArgumentException("Snapshot type does not match.", nameof(snapshot));
 
+        var previous = Duplicate();
         var metadataChanged = _name != snapshot._name || _layer != snapshot._layer;
         var appearanceChanged =
             _visible != snapshot._visible ||
@@ -223,26 +225,38 @@ public abstract class CadEntity
             _displayMode != snapshot._displayMode ||
             _material != snapshot._material;
 
-        _name = snapshot._name;
-        _layer = snapshot._layer;
-        _visible = snapshot._visible;
-        _selectable = snapshot._selectable;
-        _colorByLayer = snapshot._colorByLayer;
-        _lineWidthByLayer = snapshot._lineWidthByLayer;
-        _lineStyleByLayer = snapshot._lineStyleByLayer;
-        _color = snapshot._color;
-        _transparency = snapshot._transparency;
-        _lineWidth = snapshot._lineWidth;
-        _lineStyle = snapshot._lineStyle;
-        _displayMode = snapshot._displayMode;
-        _material = snapshot._material;
+        try
+        {
+            ApplyBaseState(snapshot);
+            RestoreGeometry(snapshot);
 
-        RestoreGeometry(snapshot);
+            if (metadataChanged)
+                Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Metadata, nameof(RestoreState)));
+            if (appearanceChanged)
+                Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Appearance, nameof(RestoreState)));
+        }
+        catch (Exception failure)
+        {
+            try
+            {
+                ApplyBaseState(previous);
+                RestoreGeometry(previous);
 
-        if (metadataChanged)
-            Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Metadata, nameof(RestoreState)));
-        if (appearanceChanged)
-            Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Appearance, nameof(RestoreState)));
+                if (metadataChanged)
+                    Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Metadata, nameof(RestoreState)));
+                if (appearanceChanged)
+                    Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Appearance, nameof(RestoreState)));
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Entity state apply and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
+            throw;
+        }
     }
 
     protected T CopyPropertiesTo<T>(T target) where T : CadEntity
@@ -281,18 +295,39 @@ public abstract class CadEntity
     protected void RaiseGeometryChanged([CallerMemberName] string? propertyName = null) =>
         Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Geometry, propertyName));
 
-    protected bool SetGeometry<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    protected bool SetGeometry<T>(
+        ref T field,
+        T value,
+        [CallerMemberName] string? propertyName = null)
     {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-        Changing?.Invoke(this, new CadEntityChangingEventArgs(CadEntityChangeKind.Geometry, propertyName));
+        if (EqualityComparer<T>.Default.Equals(field, value))
+            return false;
+
+        Changing?.Invoke(
+            this,
+            new CadEntityChangingEventArgs(
+                CadEntityChangeKind.Geometry,
+                propertyName));
+
+        var previous = field;
         field = value;
-        RaiseGeometryChanged(propertyName);
-        return true;
+
+        try
+        {
+            RaiseGeometryChanged(propertyName);
+            return true;
+        }
+        catch
+        {
+            field = previous;
+            throw;
+        }
     }
 
     protected static void ValidateFinite(double value, string name)
     {
-        if (!double.IsFinite(value)) throw new ArgumentOutOfRangeException(name, "Value must be finite.");
+        if (!double.IsFinite(value))
+            throw new ArgumentOutOfRangeException(name, "Value must be finite.");
     }
 
     protected static void ValidatePositive(double value, string name)
@@ -301,21 +336,116 @@ public abstract class CadEntity
             throw new ArgumentOutOfRangeException(name, "Value must be finite and greater than zero.");
     }
 
-    private bool SetMetadata<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    private bool SetMetadata<T>(
+        ref T field,
+        T value,
+        [CallerMemberName] string? propertyName = null)
     {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-        Changing?.Invoke(this, new CadEntityChangingEventArgs(CadEntityChangeKind.Metadata, propertyName));
+        if (EqualityComparer<T>.Default.Equals(field, value))
+            return false;
+
+        Changing?.Invoke(
+            this,
+            new CadEntityChangingEventArgs(
+                CadEntityChangeKind.Metadata,
+                propertyName));
+
+        var previous = field;
         field = value;
-        Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Metadata, propertyName));
-        return true;
+        try
+        {
+            Changed?.Invoke(
+                this,
+                new CadEntityChangedEventArgs(
+                    CadEntityChangeKind.Metadata,
+                    propertyName));
+            return true;
+        }
+        catch (Exception failure)
+        {
+            field = previous;
+            try
+            {
+                Changed?.Invoke(
+                    this,
+                    new CadEntityChangedEventArgs(
+                        CadEntityChangeKind.Metadata,
+                        propertyName));
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Entity metadata apply and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
+            throw;
+        }
     }
 
-    private bool SetAppearance<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    private bool SetAppearance<T>(
+        ref T field,
+        T value,
+        [CallerMemberName] string? propertyName = null)
     {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-        Changing?.Invoke(this, new CadEntityChangingEventArgs(CadEntityChangeKind.Appearance, propertyName));
+        if (EqualityComparer<T>.Default.Equals(field, value))
+            return false;
+
+        Changing?.Invoke(
+            this,
+            new CadEntityChangingEventArgs(
+                CadEntityChangeKind.Appearance,
+                propertyName));
+
+        var previous = field;
         field = value;
-        Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Appearance, propertyName));
-        return true;
+        try
+        {
+            Changed?.Invoke(
+                this,
+                new CadEntityChangedEventArgs(
+                    CadEntityChangeKind.Appearance,
+                    propertyName));
+            return true;
+        }
+        catch (Exception failure)
+        {
+            field = previous;
+            try
+            {
+                Changed?.Invoke(
+                    this,
+                    new CadEntityChangedEventArgs(
+                        CadEntityChangeKind.Appearance,
+                        propertyName));
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Entity appearance apply and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
+            throw;
+        }
+    }
+
+    private void ApplyBaseState(CadEntity snapshot)
+    {
+        _name = snapshot._name;
+        _layer = snapshot._layer;
+        _visible = snapshot._visible;
+        _selectable = snapshot._selectable;
+        _colorByLayer = snapshot._colorByLayer;
+        _lineWidthByLayer = snapshot._lineWidthByLayer;
+        _lineStyleByLayer = snapshot._lineStyleByLayer;
+        _color = snapshot._color;
+        _transparency = snapshot._transparency;
+        _lineWidth = snapshot._lineWidth;
+        _lineStyle = snapshot._lineStyle;
+        _displayMode = snapshot._displayMode;
+        _material = snapshot._material;
     }
 }

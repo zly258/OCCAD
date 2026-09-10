@@ -19,6 +19,9 @@ internal static class CadSolidFeatureGeometry
         CadLoftEntity or
         CadEdgeFilletEntity or
         CadEdgeChamferEntity or
+        CadShellEntity or
+        CadShapeOffsetEntity or
+        CadImportedShapeEntity or
         CadBooleanEntity;
 
     internal static CadEntity Snapshot(CadEntity entity) =>
@@ -58,6 +61,12 @@ internal static class CadSolidFeatureGeometry
                 ("edgefillet", CadEdgeFilletEntity.WriteGeometry(value)),
             CadEdgeChamferEntity value =>
                 ("edgechamfer", CadEdgeChamferEntity.WriteGeometry(value)),
+            CadShellEntity value =>
+                ("shell", CadShellEntity.WriteGeometry(value)),
+            CadShapeOffsetEntity value =>
+                ("shapeoffset", CadShapeOffsetEntity.WriteGeometry(value)),
+            CadImportedShapeEntity value =>
+                ("importedshape", CadImportedShapeEntity.WriteGeometry(value)),
             CadBooleanEntity value =>
                 ("boolean", CadBooleanEntity.WriteGeometry(value)),
             _ => throw new ArgumentException(
@@ -100,6 +109,9 @@ internal static class CadSolidFeatureGeometry
             "loft" => CadLoftEntity.ReadGeometry(geometry),
             "edgefillet" => CadEdgeFilletEntity.ReadGeometry(geometry),
             "edgechamfer" => CadEdgeChamferEntity.ReadGeometry(geometry),
+            "shell" => CadShellEntity.ReadGeometry(geometry),
+            "shapeoffset" => CadShapeOffsetEntity.ReadGeometry(geometry),
+            "importedshape" => CadImportedShapeEntity.ReadGeometry(geometry),
             "boolean" => CadBooleanEntity.ReadGeometry(geometry),
             _ => throw new FormatException(
                 $"Unsupported solid feature type '{type}'.")

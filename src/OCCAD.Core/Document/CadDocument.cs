@@ -383,14 +383,55 @@ public sealed class CadDocument
 
     private void RebuildPresentation(CadEntity entity)
     {
-        var wasSelected = _engine is { IsInitialized: true } engine &&
-                          entity.ViewerObject is { } shape &&
-                          engine.IsSelected(shape);
-        DeletePresentation(entity);
-        BuildPresentation(entity);
-        if (wasSelected && IsEntitySelectable(entity) &&
-            _engine is { } currentEngine && entity.ViewerObject is { } replacement)
-            currentEngine.SelectObject(replacement);
+        var engine =
+            _engine ??
+            throw new InvalidOperationException(
+                "No engine is attached.");
+
+        var previous = entity.ViewerObject;
+        var wasSelected =
+            previous is not null &&
+            engine.ContainsObject(previous.Id) &&
+            engine.IsSelected(previous);
+
+        IOcctObject? replacement = null;
+        try
+        {
+            replacement = entity.BuildPresentation(engine);
+            ApplyAppearance(entity, replacement);
+        }
+        catch
+        {
+            if (replacement is not null &&
+                engine.ContainsObject(replacement.Id))
+                engine.Delete(replacement);
+            throw;
+        }
+
+        if (previous is not null &&
+            engine.ContainsObject(previous.Id))
+        {
+            try
+            {
+                engine.Delete(previous);
+            }
+            catch
+            {
+                if (engine.ContainsObject(replacement.Id))
+                    engine.Delete(replacement);
+                throw;
+            }
+        }
+
+        if (previous is not null)
+            _viewerObjects.Remove(previous.Id);
+
+        entity.ViewerObject = replacement;
+        _viewerObjects[replacement.Id] = entity;
+
+        if (wasSelected &&
+            IsEntitySelectable(entity))
+            engine.SelectObject(replacement);
     }
 
     private void BuildPresentation(CadEntity entity)
@@ -404,21 +445,52 @@ public sealed class CadDocument
 
     private void ApplyAppearance(CadEntity entity)
     {
-        var engine = _engine;
-        if (engine is null || entity.ViewerObject is not { } shape) return;
+        if (_engine is null ||
+            entity.ViewerObject is not { } shape)
+            return;
+
+        ApplyAppearance(entity, shape);
+    }
+
+    private void ApplyAppearance(
+        CadEntity entity,
+        IOcctObject shape)
+    {
+        var engine =
+            _engine ??
+            throw new InvalidOperationException(
+                "No engine is attached.");
 
         var appearance = ResolveAppearance(entity);
-        engine.SetObjectColor(shape, appearance.Color);
-        engine.SetObjectTransparency(shape, entity.Transparency);
+        engine.SetObjectColor(
+            shape,
+            appearance.Color);
+        engine.SetObjectTransparency(
+            shape,
+            entity.Transparency);
+
         if (shape is OcctShape)
         {
-            engine.SetObjectLineWidth(shape, appearance.LineWidth);
-            engine.SetObjectLineStyle(shape, appearance.LineStyle);
-            engine.SetObjectMaterial(shape, entity.Material);
-            engine.SetObjectDisplayMode(shape, entity.DisplayMode);
+            engine.SetObjectLineWidth(
+                shape,
+                appearance.LineWidth);
+            engine.SetObjectLineStyle(
+                shape,
+                appearance.LineStyle);
+            engine.SetObjectMaterial(
+                shape,
+                entity.Material);
+            engine.SetObjectDisplayMode(
+                shape,
+                entity.DisplayMode);
         }
-        engine.SetObjectVisible(shape, appearance.Visible);
-        engine.SetObjectSelectable(shape, appearance.Selectable);
+
+        engine.SetObjectVisible(
+            shape,
+            appearance.Visible);
+        engine.SetObjectSelectable(
+            shape,
+            appearance.Selectable);
     }
 
     private void DeletePresentation(CadEntity entity)

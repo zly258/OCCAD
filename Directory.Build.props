@@ -9,5 +9,7 @@
     <Authors>zly258</Authors>
     <Company>zly258</Company>
     <Product>OCCAD</Product>
+    <OcctBridgeSdkRoot Condition="'$(OCCTCSHARPBRIDGE_SDK)' != ''">$(OCCTCSHARPBRIDGE_SDK)</OcctBridgeSdkRoot>
+    <OcctBridgeSdkRoot Condition="'$(OcctBridgeSdkRoot)' == ''">$(ProgramFiles)\OcctCSharpBridge\SDK\3.0\win-x64</OcctBridgeSdkRoot>
   </PropertyGroup>
 </Project>

@@ -6,22 +6,57 @@ public sealed class CadRegionAction(CadWorkspace workspace)
     public override string Id => "model.region";
     public override string DisplayName => "Region";
 
-    public override bool CanExecute() =>
-        Workspace.Selection.Selected.Count == 1 &&
-        CadPlanarProfileGeometry.IsSource(
-            Workspace.Selection.Selected[0]);
+    public override bool CanExecute()
+    {
+        var selected = Workspace.Selection.Selected;
+        return selected.Count >= 1 &&
+               selected.All(CadPlanarProfileGeometry.IsSource) &&
+               ResolveOuter(selected) is not null;
+    }
 
     public override void Execute()
     {
-        if (!CanExecute())
+        var selected = Workspace.Selection.Selected.ToArray();
+        var outer = ResolveOuter(selected);
+        if (outer is null ||
+            !selected.All(CadPlanarProfileGeometry.IsSource))
+        {
             throw new InvalidOperationException(
-                "Region requires exactly one supported closed planar profile.");
+                "Region requires one outer closed profile and optional coplanar hole profiles.");
+        }
 
-        var source = Workspace.Selection.Selected[0];
-        var region = new CadRegionEntity(source);
+        var holes = selected
+            .Where(entity => !ReferenceEquals(entity, outer))
+            .ToArray();
+
+        if (!CadPlanarProfileGeometry.AreCoplanar(
+                outer,
+                holes))
+        {
+            throw new InvalidOperationException(
+                "Region outer and hole profiles must be coplanar.");
+        }
+
+        var region = new CadRegionEntity(
+            outer,
+            holes);
+
         Workspace.ReplaceEntities(
-            [source],
+            selected,
             [region],
             "Region");
+    }
+
+    private CadEntity? ResolveOuter(
+        IReadOnlyList<CadEntity> selected)
+    {
+        var primary = Workspace.Selection.Primary;
+        if (primary is not null &&
+            selected.Contains(primary))
+            return primary;
+
+        return selected.Count > 0
+            ? selected[0]
+            : null;
     }
 }

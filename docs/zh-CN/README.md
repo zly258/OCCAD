@@ -4,7 +4,7 @@
 
 ## 唯一产品界面目标
 
-原生 WPF 经典 CAD 界面：`Menu + 常驻 ToolBar + Viewport + Dock + StatusBar + 非模态 ToolPanel`。不再恢复 Ribbon，不维护双 UI 壳。
+Avalonia 原生紧凑型 CAD 界面：`Menu + 常驻 ToolBar + Viewport + Dock + StatusBar + 非模态 ToolPanel`。不再恢复 Ribbon，不维护双 UI 壳。
 
 ## 文档索引
 

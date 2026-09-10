@@ -1,19 +1,24 @@
-﻿using System.Drawing;
-using System.Windows.Input;
-using System.Windows.Threading;
+using System.Drawing;
+using Avalonia.Input;
+using Avalonia.Threading;
+using OCCAD;
 using OcctNet;
 
-namespace OCCAD.Wpf;
+namespace OCCAD.Avalonia;
 
-internal sealed class CadCoordinateChangedEventArgs(CadResolvedPoint value) : EventArgs
+internal sealed class CadCoordinateChangedEventArgs(CadResolvedPoint value)
+    : EventArgs
 {
     public CadResolvedPoint Value { get; } = value;
 }
 
 internal sealed class CadViewportInteractionController : IDisposable
 {
+    private static readonly Cursor NavigationCursor =
+        new(StandardCursorType.SizeAll);
+
     private readonly CadWorkspace _workspace;
-    private readonly OcctWpfViewport _viewport;
+    private readonly OcctAvaloniaViewport _viewport;
     private readonly CadPointerMoveScheduler _pointerMoves;
     private readonly List<OcctShape> _subobjectMarkers = [];
     private bool _shiftMiddleRotating;
@@ -22,7 +27,7 @@ internal sealed class CadViewportInteractionController : IDisposable
 
     public CadViewportInteractionController(
         CadWorkspace workspace,
-        OcctWpfViewport viewport,
+        OcctAvaloniaViewport viewport,
         Dispatcher dispatcher)
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
@@ -34,9 +39,9 @@ internal sealed class CadViewportInteractionController : IDisposable
         _viewport.PreviewKeyInput += PreviewKeyInput;
         _viewport.ObjectSelectionChanged += ObjectSelectionChanged;
         _viewport.HoverHitChanged += HoverHitChanged;
+        _viewport.PointerExited += ViewportPointerExited;
         _workspace.Tools.ToolChanged += ToolChanged;
         _workspace.Tools.ToolUpdated += ToolUpdated;
-        _viewport.MouseLeave += ViewportMouseLeave;
         _workspace.Subobjects.Changed += SubobjectsChanged;
         RefreshCursor();
     }
@@ -53,20 +58,23 @@ internal sealed class CadViewportInteractionController : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+
         _viewport.PreviewPointerInput -= PreviewPointerInput;
         _viewport.PreviewKeyInput -= PreviewKeyInput;
         _viewport.ObjectSelectionChanged -= ObjectSelectionChanged;
         _viewport.HoverHitChanged -= HoverHitChanged;
+        _viewport.PointerExited -= ViewportPointerExited;
         _workspace.Tools.ToolChanged -= ToolChanged;
         _workspace.Tools.ToolUpdated -= ToolUpdated;
-        _viewport.MouseLeave -= ViewportMouseLeave;
         _workspace.Subobjects.Changed -= SubobjectsChanged;
         ClearSubobjectMarkers();
         _pointerMoves.Dispose();
-        _viewport.Cursor = Cursors.Arrow;
+        _viewport.Cursor = Cursor.Default;
     }
 
-    private void PreviewPointerInput(object? sender, OcctPointerInputEventArgs input)
+    private void PreviewPointerInput(
+        object? sender,
+        OcctPointerInputEventArgs input)
     {
         if (_workspace.Engine is null) return;
 
@@ -78,8 +86,6 @@ internal sealed class CadViewportInteractionController : IDisposable
             TryHandleShiftMiddleRotation(input))
             return;
 
-        // Navigation owns ordinary middle-button pan and wheel zoom even while a
-        // drawing tool is active. Tool preview must never consume these gestures.
         if (IsViewportNavigationInput(input))
         {
             _pointerMoves.Clear();
@@ -99,7 +105,8 @@ internal sealed class CadViewportInteractionController : IDisposable
         ProcessPointer(input);
     }
 
-    private bool TryHandleMiddleDoubleClickFit(OcctPointerInputEventArgs input)
+    private bool TryHandleMiddleDoubleClickFit(
+        OcctPointerInputEventArgs input)
     {
         if (input.Kind != OcctPointerInputKind.DoubleClicked ||
             input.Button != OcctPointerButton.Middle ||
@@ -114,7 +121,8 @@ internal sealed class CadViewportInteractionController : IDisposable
         return true;
     }
 
-    private bool TryHandleCadRightButton(OcctPointerInputEventArgs input)
+    private bool TryHandleCadRightButton(
+        OcctPointerInputEventArgs input)
     {
         var isRightInput =
             input.Button == OcctPointerButton.Right ||
@@ -122,9 +130,6 @@ internal sealed class CadViewportInteractionController : IDisposable
         if (!isRightInput)
             return false;
 
-        // Right mouse is a CAD secondary action and never camera rotation.
-        // The finish/cancel policy lives in CadToolManager so all UI front ends
-        // use one command-lifecycle contract.
         _pointerMoves.Flush();
         input.Handled = true;
 
@@ -134,7 +139,8 @@ internal sealed class CadViewportInteractionController : IDisposable
         return true;
     }
 
-    private bool TryHandleShiftMiddleRotation(OcctPointerInputEventArgs input)
+    private bool TryHandleShiftMiddleRotation(
+        OcctPointerInputEventArgs input)
     {
         var engine = _workspace.Engine;
         if (engine is null || !engine.IsInitialized)
@@ -152,7 +158,8 @@ internal sealed class CadViewportInteractionController : IDisposable
             return true;
         }
 
-        if (input.Kind == OcctPointerInputKind.Moved && _shiftMiddleRotating)
+        if (input.Kind == OcctPointerInputKind.Moved &&
+            _shiftMiddleRotating)
         {
             if ((input.Buttons & OcctPointerButtons.Middle) == 0)
             {
@@ -180,9 +187,11 @@ internal sealed class CadViewportInteractionController : IDisposable
         return false;
     }
 
-    private void UpdateNavigationCursorState(OcctPointerInputEventArgs input)
+    private void UpdateNavigationCursorState(
+        OcctPointerInputEventArgs input)
     {
         var changed = false;
+
         if (input.Kind == OcctPointerInputKind.Pressed &&
             input.Button == OcctPointerButton.Middle)
         {
@@ -207,18 +216,22 @@ internal sealed class CadViewportInteractionController : IDisposable
     {
         _viewport.Cursor =
             _middleNavigating || _shiftMiddleRotating
-                ? Cursors.SizeAll
-                : _workspace.Tools.ActiveTool is { State: CadToolState.Drawing }
+                ? NavigationCursor
+                : _workspace.Tools.ActiveTool is
+                    { State: CadToolState.Drawing }
                     ? CadDrawingCursor.Instance
-                    : Cursors.Arrow;
+                    : Cursor.Default;
     }
 
-    private static bool IsViewportNavigationInput(OcctPointerInputEventArgs input) =>
+    private static bool IsViewportNavigationInput(
+        OcctPointerInputEventArgs input) =>
         input.Kind == OcctPointerInputKind.Wheel ||
         input.Button == OcctPointerButton.Middle ||
         (input.Buttons & OcctPointerButtons.Middle) != 0;
 
-    private void PreviewKeyInput(object? sender, OcctKeyInputEventArgs input)
+    private void PreviewKeyInput(
+        object? sender,
+        OcctKeyInputEventArgs input)
     {
         if (TryHandleInteractionShortcut(input))
         {
@@ -237,14 +250,17 @@ internal sealed class CadViewportInteractionController : IDisposable
 
         if (input.Kind == OcctKeyInputKind.Pressed &&
             input.Key == OcctKey.Tab &&
-            _workspace.Tools.ActiveTool is { State: CadToolState.Drawing } &&
+            _workspace.Tools.ActiveTool is
+                { State: CadToolState.Drawing } &&
             _workspace.Snap.Active)
         {
             _pointerMoves.Flush();
-            var backwards = (input.Modifiers & OcctInputModifiers.Shift) != 0;
+            var backwards =
+                (input.Modifiers & OcctInputModifiers.Shift) != 0;
             var cycled = backwards
                 ? _workspace.Snap.CyclePrevious()
                 : _workspace.Snap.CycleNext();
+
             if (cycled)
             {
                 input.Handled = true;
@@ -257,7 +273,8 @@ internal sealed class CadViewportInteractionController : IDisposable
             input.Handled = true;
     }
 
-    private bool TryHandleInteractionShortcut(OcctKeyInputEventArgs input)
+    private bool TryHandleInteractionShortcut(
+        OcctKeyInputEventArgs input)
     {
         if (input.Kind != OcctKeyInputKind.Pressed ||
             input.IsRepeat ||
@@ -292,7 +309,8 @@ internal sealed class CadViewportInteractionController : IDisposable
         }
     }
 
-    private bool TryHandleDrawingPlaneShortcut(OcctKeyInputEventArgs input)
+    private bool TryHandleDrawingPlaneShortcut(
+        OcctKeyInputEventArgs input)
     {
         if (input.Kind != OcctKeyInputKind.Pressed ||
             input.IsRepeat ||
@@ -314,7 +332,8 @@ internal sealed class CadViewportInteractionController : IDisposable
                _workspace.Tools.TryChangeDrawingPlane(value);
     }
 
-    private void RefreshDrawingPointer(OcctInputModifiers modifiers)
+    private void RefreshDrawingPointer(
+        OcctInputModifiers modifiers)
     {
         if (_workspace.LastPointerPosition is not { } pointer)
             return;
@@ -330,14 +349,22 @@ internal sealed class CadViewportInteractionController : IDisposable
         ProcessPointer(refresh);
     }
 
-    private void ObjectSelectionChanged(object? sender, OcctWpfSelectionEventArgs input)
+    private void ObjectSelectionChanged(
+        object? sender,
+        OcctAvaloniaSelectionEventArgs input)
     {
         var tool = _workspace.Tools.ActiveTool;
         if (tool is null || tool.State == CadToolState.WaitForSelect)
-            _workspace.Selection.UpdateFromViewer(input.SelectedObjects, input.SelectedObject);
+        {
+            _workspace.Selection.UpdateFromViewer(
+                input.SelectedObjects,
+                input.SelectedObject);
+        }
     }
 
-    private void HoverHitChanged(object? sender, OcctViewportHoverHitChangedEventArgs input)
+    private void HoverHitChanged(
+        object? sender,
+        OcctViewportHoverHitChangedEventArgs input)
     {
         var tool = _workspace.Tools.ActiveTool;
         if (tool is not null &&
@@ -355,18 +382,25 @@ internal sealed class CadViewportInteractionController : IDisposable
         _workspace.Preselection.Update(entity, hit);
     }
 
-    private void ToolChanged(object? sender, CadToolChangedEventArgs input)
+    private void ToolChanged(
+        object? sender,
+        CadToolChangedEventArgs input)
     {
         ClearTransientInput();
         RefreshCursor();
     }
 
-    private void ToolUpdated(object? sender, CadToolChangedEventArgs input) => RefreshCursor();
+    private void ToolUpdated(
+        object? sender,
+        CadToolChangedEventArgs input) =>
+        RefreshCursor();
 
-    private void ViewportMouseLeave(object sender, System.Windows.Input.MouseEventArgs input)
+    private void ViewportPointerExited(
+        object? sender,
+        PointerEventArgs input)
     {
         ClearTransientInput();
-        _viewport.Cursor = Cursors.Arrow;
+        _viewport.Cursor = Cursor.Default;
     }
 
     private void SubobjectsChanged(
@@ -374,7 +408,8 @@ internal sealed class CadViewportInteractionController : IDisposable
         CadSubobjectSelectionChangedEventArgs input) =>
         RebuildSubobjectMarkers(input.Items);
 
-    private void RebuildSubobjectMarkers(IReadOnlyList<CadSubobjectSelection> items)
+    private void RebuildSubobjectMarkers(
+        IReadOnlyList<CadSubobjectSelection> items)
     {
         var engine = _workspace.Engine;
         if (engine is null || !engine.IsInitialized) return;
@@ -386,11 +421,14 @@ internal sealed class CadViewportInteractionController : IDisposable
         foreach (var item in items)
         {
             if (!item.Point.IsFinite) continue;
+
             var marker = engine.MakeVertex(item.Point);
             _subobjectMarkers.Add(marker);
             engine.SetObjectSelectable(marker, false);
             engine.SetObjectColor(marker, Color.OrangeRed);
-            engine.SetObjectDisplayMode(marker, OcctDisplayMode.Wireframe);
+            engine.SetObjectDisplayMode(
+                marker,
+                OcctDisplayMode.Wireframe);
         }
     }
 
@@ -401,6 +439,7 @@ internal sealed class CadViewportInteractionController : IDisposable
             using var batch = engine.BeginDisplayBatch();
             DeleteSubobjectMarkers(engine);
         }
+
         _subobjectMarkers.Clear();
     }
 
@@ -424,7 +463,8 @@ internal sealed class CadViewportInteractionController : IDisposable
         _workspace.Tracking.Clear();
     }
 
-    private void ProcessPointer(OcctPointerInputEventArgs input)
+    private void ProcessPointer(
+        OcctPointerInputEventArgs input)
     {
         if (_workspace.Engine is null) return;
 
@@ -450,7 +490,8 @@ internal sealed class CadViewportInteractionController : IDisposable
             input.Kind == OcctPointerInputKind.Pressed &&
             input.Button == OcctPointerButton.Left)
         {
-            if (_workspace.Preselection.Current is { IsSubshape: true } subobject)
+            if (_workspace.Preselection.Current is
+                { IsSubshape: true } subobject)
             {
                 var operation =
                     (input.Modifiers & OcctInputModifiers.Control) != 0
@@ -463,22 +504,26 @@ internal sealed class CadViewportInteractionController : IDisposable
                 return;
             }
 
-            if ((input.Modifiers & (OcctInputModifiers.Control | OcctInputModifiers.Shift)) == 0)
+            if ((input.Modifiers &
+                 (OcctInputModifiers.Control |
+                  OcctInputModifiers.Shift)) == 0)
                 _workspace.Subobjects.Clear();
         }
 
-        if (input.Kind != OcctPointerInputKind.Moved) return;
+        if (input.Kind != OcctPointerInputKind.Moved)
+            return;
 
         if (_workspace.Tools.Mode == CadInteractionMode.Normal)
             _workspace.Grips.UpdateHot(input.X, input.Y);
 
         try
         {
-            PublishCoordinate(_workspace.ResolvePoint(input.X, input.Y));
+            PublishCoordinate(
+                _workspace.ResolvePoint(input.X, input.Y));
         }
         catch (InvalidOperationException)
         {
-            // A view ray parallel to the active plane has no coordinate to publish.
+            // View ray parallel to active work plane.
         }
     }
 
@@ -489,5 +534,7 @@ internal sealed class CadViewportInteractionController : IDisposable
     }
 
     private void PublishCoordinate(CadResolvedPoint value) =>
-        CoordinateChanged?.Invoke(this, new CadCoordinateChangedEventArgs(value));
+        CoordinateChanged?.Invoke(
+            this,
+            new CadCoordinateChangedEventArgs(value));
 }

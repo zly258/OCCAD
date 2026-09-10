@@ -53,7 +53,7 @@ function Resolve-OcctRoot {
 }
 
 $resolvedOcctRoot = Resolve-OcctRoot $OcctRoot
-$appDirectory = Join-Path $root "src\OCCAD.Wpf\bin\x64\$Configuration\net10.0-windows"
+$appDirectory = Join-Path $root "src\OCCAD.Avalonia\bin\x64\$Configuration\net10.0"
 $executable = Join-Path $appDirectory 'OCCAD.exe'
 if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
     throw "OCCAD executable was not found: $executable. Run '.\build.ps1' first."

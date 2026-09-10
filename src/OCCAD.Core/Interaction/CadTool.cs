@@ -17,7 +17,9 @@ public readonly record struct CadToolInteractionState(
     CadPrecisionInputKind PrecisionInputs,
     bool HasPreview,
     bool CanCommitCurrentStage,
-    bool CanCancel);
+    bool CanCancel,
+    bool CanFinish,
+    bool CanStepBack);
 
 public abstract class CadTool
 {
@@ -65,7 +67,9 @@ public abstract class CadTool
             PrecisionInputs,
             HasPreview,
             CanCommitCurrentStage,
-            CanCancel);
+            CanCancel,
+            CanFinish,
+            CanStepBack);
 
     public event EventHandler? Updated;
 

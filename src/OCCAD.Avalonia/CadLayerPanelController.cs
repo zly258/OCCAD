@@ -1,0 +1,466 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using OCCAD;
+using OcctNet;
+using DrawingColor = System.Drawing.Color;
+using MediaColor = Avalonia.Media.Color;
+
+namespace OCCAD.Avalonia;
+
+internal sealed class CadLayerPanelController : IDisposable
+{
+    private static readonly double[] LineWidths =
+        [0.25, 0.35, 0.50, 0.70, 1.00, 1.40, 2.00, 3.00];
+
+    private readonly Window _owner;
+    private readonly CadWorkspace _workspace;
+    private readonly StackPanel _host;
+    private readonly Action<CadLayer> _inspectLayer;
+    private readonly TextBox _search;
+    private bool _refreshing;
+    private bool _disposed;
+
+    public CadLayerPanelController(
+        Window owner,
+        CadWorkspace workspace,
+        StackPanel host,
+        Action<CadLayer> inspectLayer)
+    {
+        _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+        _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
+        _host = host ?? throw new ArgumentNullException(nameof(host));
+        _inspectLayer = inspectLayer ?? throw new ArgumentNullException(nameof(inspectLayer));
+
+        _search = new TextBox
+        {
+            PlaceholderText = CadLanguageManager.Text(
+                "Cad.Text.FilterLayers",
+                "Filter layers")
+        };
+        _search.Classes.Add("cad-input");
+        _search.TextChanged += (_, _) => Rebuild();
+
+        _workspace.Layers.Changed += LayersChanged;
+        Rebuild();
+    }
+
+    public void Refresh() => Rebuild();
+
+    public void RefreshLanguage()
+    {
+        _search.PlaceholderText = CadLanguageManager.Text(
+            "Cad.Text.FilterLayers",
+            "Filter layers");
+        Rebuild();
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _workspace.Layers.Changed -= LayersChanged;
+        _host.Children.Clear();
+    }
+
+    private void LayersChanged(
+        object? sender,
+        CadLayerManagerChangedEventArgs e) =>
+        Rebuild();
+
+    private void Rebuild()
+    {
+        if (_disposed || _refreshing)
+            return;
+
+        _refreshing = true;
+        try
+        {
+            _host.Children.Clear();
+
+            var toolbar = new Grid
+            {
+                ColumnSpacing = 4,
+                Margin = new Thickness(6)
+            };
+            toolbar.ColumnDefinitions.Add(
+                new ColumnDefinition(
+                    new GridLength(1, GridUnitType.Star)));
+            toolbar.ColumnDefinitions.Add(
+                new ColumnDefinition(GridLength.Auto));
+            toolbar.ColumnDefinitions.Add(
+                new ColumnDefinition(GridLength.Auto));
+            toolbar.ColumnDefinitions.Add(
+                new ColumnDefinition(GridLength.Auto));
+
+            toolbar.Children.Add(_search);
+
+            var add = CompactButton(
+                CadLanguageManager.Text("Cad.Text.New", "New"));
+            add.Click += async (_, _) => await AddLayerAsync();
+            Grid.SetColumn(add, 1);
+            toolbar.Children.Add(add);
+
+            var rename = CompactButton(
+                CadLanguageManager.Text("Cad.Text.Rename", "Rename"));
+            rename.Click += async (_, _) => await RenameLayerAsync();
+            Grid.SetColumn(rename, 2);
+            toolbar.Children.Add(rename);
+
+            var remove = CompactButton(
+                CadLanguageManager.Text("Cad.Text.Remove", "Remove"));
+            remove.Click += (_, _) => RemoveLayer();
+            Grid.SetColumn(remove, 3);
+            toolbar.Children.Add(remove);
+
+            _host.Children.Add(toolbar);
+
+            var filter = _search.Text?.Trim() ?? string.Empty;
+            var layers = _workspace.Layers.Layers
+                .Where(layer =>
+                    filter.Length == 0 ||
+                    layer.Name.Contains(
+                        filter,
+                        StringComparison.CurrentCultureIgnoreCase))
+                .OrderBy(
+                    static layer => layer.Name,
+                    StringComparer.CurrentCultureIgnoreCase)
+                .ToArray();
+
+            foreach (var layer in layers)
+                _host.Children.Add(CreateLayerRow(layer));
+
+            var footer = new Grid
+            {
+                Margin = new Thickness(6, 5, 6, 7),
+                ColumnSpacing = 5
+            };
+            footer.ColumnDefinitions.Add(
+                new ColumnDefinition(
+                    new GridLength(1, GridUnitType.Star)));
+            footer.ColumnDefinitions.Add(
+                new ColumnDefinition(GridLength.Auto));
+
+            footer.Children.Add(new TextBlock
+            {
+                Text = string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    CadLanguageManager.Text(
+                        "Cad.Text.LayerCurrent",
+                        "Layer: {0}"),
+                    _workspace.Layers.Current.Name),
+                Foreground = CadTheme.Muted,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            var properties = CompactButton(
+                CadLanguageManager.Text(
+                    "Cad.Text.Properties",
+                    "Properties"));
+            properties.Click += (_, _) =>
+                _inspectLayer(_workspace.Layers.Current);
+            Grid.SetColumn(properties, 1);
+            footer.Children.Add(properties);
+            _host.Children.Add(footer);
+        }
+        finally
+        {
+            _refreshing = false;
+        }
+    }
+
+    private Control CreateLayerRow(CadLayer layer)
+    {
+        var current = ReferenceEquals(
+            layer,
+            _workspace.Layers.Current);
+
+        var grid = new Grid
+        {
+            ColumnSpacing = 5
+        };
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(
+                new GridLength(1, GridUnitType.Star)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(66)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(82)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(GridLength.Auto));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(GridLength.Auto));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(36)));
+
+        var name = new Button
+        {
+            Content = layer.Name,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Background = current
+                ? CadTheme.PanelAlt
+                : Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(6, 3),
+            FontWeight = current
+                ? FontWeight.SemiBold
+                : FontWeight.Normal
+        };
+        name.Click += (_, _) =>
+            _workspace.SetCurrentLayer(layer);
+        grid.Children.Add(name);
+
+        var width = new ComboBox
+        {
+            ItemsSource = LineWidths,
+            SelectedItem = LineWidths.FirstOrDefault(
+                value => Math.Abs(value - layer.LineWidth) < 1e-12)
+        };
+        width.Classes.Add("cad-input");
+        width.SelectionChanged += (_, _) =>
+        {
+            if (_refreshing ||
+                width.SelectedItem is not double value ||
+                Math.Abs(value - layer.LineWidth) < 1e-12)
+                return;
+
+            ApplyLayerChange(
+                layer,
+                () => layer.LineWidth = value);
+        };
+        Grid.SetColumn(width, 1);
+        grid.Children.Add(width);
+
+        var styles = Enum.GetValues<OcctLineStyle>()
+            .Select(value => new StyleChoice(
+                value,
+                CadLanguageManager.Text(
+                    $"Cad.Value.OcctLineStyle.{value}",
+                    value.ToString())))
+            .ToArray();
+        var style = new ComboBox
+        {
+            ItemsSource = styles,
+            SelectedItem = styles.FirstOrDefault(
+                item => item.Value == layer.LineStyle)
+        };
+        style.Classes.Add("cad-input");
+        style.SelectionChanged += (_, _) =>
+        {
+            if (_refreshing ||
+                style.SelectedItem is not StyleChoice item ||
+                item.Value == layer.LineStyle)
+                return;
+
+            ApplyLayerChange(
+                layer,
+                () => layer.LineStyle = item.Value);
+        };
+        Grid.SetColumn(style, 2);
+        grid.Children.Add(style);
+
+        var visible = new CheckBox
+        {
+            IsChecked = layer.Visible,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        ToolTip.SetTip(
+            visible,
+            CadLanguageManager.Text("Cad.Text.Visible", "Visible"));
+        visible.IsCheckedChanged += (_, _) =>
+        {
+            if (_refreshing) return;
+            _workspace.SetLayerVisible(
+                layer,
+                visible.IsChecked == true);
+        };
+        Grid.SetColumn(visible, 3);
+        grid.Children.Add(visible);
+
+        var locked = new CheckBox
+        {
+            IsChecked = layer.Locked,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        ToolTip.SetTip(
+            locked,
+            CadLanguageManager.Text("Cad.Text.Locked", "Locked"));
+        locked.IsCheckedChanged += (_, _) =>
+        {
+            if (_refreshing) return;
+            _workspace.SetLayerLocked(
+                layer,
+                locked.IsChecked == true);
+        };
+        Grid.SetColumn(locked, 4);
+        grid.Children.Add(locked);
+
+        var color = new Button
+        {
+            Width = 32,
+            MinHeight = 24,
+            Padding = new Thickness(0),
+            Background = new SolidColorBrush(
+                ToMediaColor(layer.Color)),
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(1)
+        };
+        ToolTip.SetTip(
+            color,
+            CadLanguageManager.Text(
+                "Cad.Text.Color",
+                "Color"));
+        color.Click += async (_, _) =>
+        {
+            if (_refreshing)
+                return;
+
+            var selected = await CadColorDialog.ShowAsync(
+                _owner,
+                layer.Color);
+            if (selected is not { } next ||
+                next.ToArgb() == layer.Color.ToArgb())
+                return;
+
+            ApplyLayerChange(
+                layer,
+                () => layer.Color = next);
+        };
+        Grid.SetColumn(color, 5);
+        grid.Children.Add(color);
+
+        return new Border
+        {
+            Background = current
+                ? new SolidColorBrush(
+                    MediaColor.FromArgb(28, 50, 120, 184))
+                : Brushes.Transparent,
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(6, 3),
+            Child = grid
+        };
+    }
+
+    private async Task AddLayerAsync()
+    {
+        var suggested =
+            _workspace.Layers.GenerateUniqueName("Layer");
+        var dialog = new LayerNameDialog(
+            suggested,
+            creating: true);
+        var name = await dialog.ShowDialog<string?>(_owner);
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        try
+        {
+            _workspace.AddLayer(name.Trim());
+        }
+        catch
+        {
+            Rebuild();
+        }
+    }
+
+    private async Task RenameLayerAsync()
+    {
+        var layer = _workspace.Layers.Current;
+        if (layer.IsDefault)
+            return;
+
+        var dialog = new LayerNameDialog(
+            layer.Name,
+            creating: false);
+        var name = await dialog.ShowDialog<string?>(_owner);
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        try
+        {
+            _workspace.RenameLayer(
+                layer,
+                name.Trim());
+        }
+        catch
+        {
+            Rebuild();
+        }
+    }
+
+    private void RemoveLayer()
+    {
+        var layer = _workspace.Layers.Current;
+        if (layer.IsDefault)
+            return;
+
+        try
+        {
+            _workspace.RemoveLayer(layer);
+        }
+        catch
+        {
+            Rebuild();
+        }
+    }
+
+    private void ApplyLayerChange(
+        CadLayer layer,
+        Action change)
+    {
+        var before = _workspace.CaptureLayerState(layer);
+        try
+        {
+            change();
+            _workspace.RecordLayerStateChange(
+                layer,
+                before,
+                "Layer Edit");
+        }
+        catch
+        {
+            try
+            {
+                layer.RestoreState(before);
+            }
+            catch
+            {
+            }
+        }
+
+        Rebuild();
+    }
+
+    private static Button CompactButton(string text)
+    {
+        var button = new Button
+        {
+            Content = text,
+            HorizontalContentAlignment = HorizontalAlignment.Center
+        };
+        button.Classes.Add("cad-compact");
+        return button;
+    }
+
+    private static MediaColor ToMediaColor(DrawingColor value) =>
+        MediaColor.FromArgb(
+            value.A,
+            value.R,
+            value.G,
+            value.B);
+
+    private static DrawingColor ToDrawingColor(MediaColor value) =>
+        DrawingColor.FromArgb(
+            value.A,
+            value.R,
+            value.G,
+            value.B);
+
+    private sealed record StyleChoice(
+        OcctLineStyle Value,
+        string Label)
+    {
+        public override string ToString() => Label;
+    }
+}

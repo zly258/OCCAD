@@ -2,65 +2,39 @@
 
 ## 1. 最终界面基线
 
-OCCAD 使用原生 WPF 经典 CAD 桌面界面，正式冻结为 `Menu + ToolBar + Viewport + Dock + Command Line + StatusBar`。不使用 Ribbon，不引入第三方主题/控件作为主框架。
+OCCAD 使用 Avalonia 12 原生紧凑型 CAD 桌面界面：
 
 ```text
-┌────────────────────────────────────────────────────────────┐
-│ Menu：文件 编辑 绘图 修改 视图 面板 设置                    │
-├────────────────────────────────────────────────────────────┤
-│ ToolBar：S F T | 当前层 | L/锁 | A/锁 | 完成 | 取消          │
-├──────────────┬───────────────────────────────┬──────────────┤
-│ Model Dock   │                               │ Layer Dock   │
-│              │           Viewport            ├──────────────┤
-│              │                               │ Property Dock│
-├──────────────┴───────────────────────────────┴──────────────┤
-│ Command Output / 当前 Tool Prompt                           │
-│ > Command / Tool Input                                      │
-├────────────────────────────────────────────────────────────┤
-│ StatusBar：Snap | Ortho | Polar | Coordinate | Progress     │
-└────────────────────────────────────────────────────────────┘
+Menu：文件 编辑 绘图 修改 建模 标注 视图 面板 设置
+ToolBar：工作平面 | 当前层 | 捕捉 | 正交 | 极轴 | 完成 | 取消
+Model Dock | Viewport | Layer / Property Tabs
+Command Line
+StatusBar：Prompt | Selection | History | Snap | Precision | Work Plane | Coordinate
++ 非模态 ToolPanel
 ```
 
-Viewport 始终是最大区域；Command Line 保持紧凑，不允许挤压主要绘图区。
+Viewport 始终是最大区域。界面使用 Fluent Compact 密度和克制的工业软件配色，不再使用 Ribbon、图标堆叠或第三方壳层/主题框架。
 
 ## 2. Menu
 
-顶级菜单固定：文件、编辑、绘图、修改、视图、面板、设置。常用命令直接放顶级菜单下一层，通过 Separator 分类；最多再增加一层真正的命令族。
+菜单只调用已经注册的 Action ID。Circle、Arc、Ellipse、Boolean、Array 等真正的命令族允许一层二级菜单；未注册 Action 不显示为可用命令。对象捕捉设置只暴露已经完成运行时契约的类型。
 
-Menu、键盘快捷键、Command Line 必须使用同一个稳定 Action ID，不允许 MainWindow 再维护第二套命令 switch。
+## 3. ToolBar / ToolPanel
 
-未注册 Action 不得显示为可执行菜单。已经注册的基础 Entity/Tool 必须有一致入口。
+ToolBar 只放全局和当前阶段状态。实体/工具专属参数统一进入 Avalonia 原生 `CadToolPanel`。标题栏 × 只隐藏面板，不取消 Tool；启动新 Tool 时重新显示。参数修改实时驱动 Preview；Finish/Cancel 走统一 Tool 生命周期。
 
-## 3. ToolBar 与 ToolPanel
+## 4. Dock / Layer / Property
 
-ToolBar 常驻：S/F/T 工作平面、Current Layer、当前阶段 Length/Angle、Finish/Cancel 以及真正全局的精度状态。Radius、Width、Height、Depth、Sides 等 Tool 稳定参数只进入 `CadToolPanel`。
+Model 默认左侧。Layer 与 Property 合并为右侧紧凑 Tab，不再固定上下堆叠占用视口。
 
-## 4. Command Line
+Layer 使用 Avalonia 原生控件编辑当前层、颜色、可见、锁定、线宽和线型。Property 使用 `TypeDescriptor` 元数据生成编辑器，支持单选/多选共同属性、Layer/Enum/Bool/Color、double 三位显示、History 和失败回滚；不再嵌 WinForms PropertyGrid。
 
-Command Line 位于 StatusBar 上方，包含一行输出/Prompt 和一行输入。它不是独立命令系统，而是 `CadCommandManager → CadActionManager / Active Tool` 的界面。
+## 5. Viewport / HUD / Cursor
 
-Idle 状态支持 `LINE/L`、`CIRCLE/C`、`MOVE/M`、`BOX`、`FIT`、`UNDO` 等命令与别名；空输入 Enter 重复最近 repeatable Action。Up/Down 浏览原始命令输入历史，Esc 清空输入或取消 Active Tool。
+唯一 OCCT Host 是 `OcctAvaloniaViewport`。Drawing 使用中心留空的自定义十字光标；中键导航使用导航光标；普通/选择阶段使用正常指针。Snap Aperture 和 Dynamic HUD 根据 Avalonia `RenderScaling` 换算，125%/150% DPI 下与 native viewport input 保持对齐。
 
-Active Tool 状态下输入优先交给当前 Tool：支持 Finish/Cancel/StepBack、`L 100`、`A 45`、`F 2` 和 `parameter=value`。坐标输入必须走统一 WorkPlane/precision point contract，不能绕过 Tool 状态机直接修改 Entity；在该 contract 完成前不得用 MainWindow 特例模拟坐标提交。
+S/F/T 只切工作平面，不切相机。右键执行 CAD secondary action。F3/F8/F10 对应 Snap/Ortho/Polar。Tab 轮换捕捉候选。ViewCube 隐藏，保留左下角 triedron。
 
-Prompt 来源必须是 `ActiveTool.Prompt`。Command Line 主显示完整 Prompt；StatusBar 只显示状态、Snap/Tracking、坐标、错误/结果和后台进度。
+## 6. Localization
 
-## 5. WorkPlane / Tracking 显示
-
-WorkPlane 是几何约束，不是常驻绘图对象。默认不绘制工作平面局部 X/Y 两条轴线；左下角 triedron 已提供全局方向参考。
-
-Tracking guide 仅在 ORTHO/POLAR 实际命中跟踪方向时显示。没有 tracking result 时不绘制从工作平面原点到鼠标的额外指引线，避免与 Line/Polyline 等 Tool 的真实 Preview 重叠、加粗或闪烁。
-
-切换 S/F/T 只改变工作平面，不改变相机。需要强调工作平面时应采用短暂、按需的 Presentation，不把显示状态写进 `CadWorkPlane` Core。
-
-## 6. Dock / Property / Layer
-
-Model 默认左侧；Layer 默认右上；Property 默认右下。Dock 是 Workspace/Document/Selection 状态的视图，不保存第二份业务数据。
-
-Layer 编辑采用稳定集合和局部刷新；编辑非当前层属性不得改变 Current Layer。PropertyGrid 单选完整、多选共同属性，ByLayer/custom 状态独立，double 显示 3 位但底层不舍入。
-
-## 7. Viewport 与 DPI
-
-默认黑色背景，左下小型坐标轴，右上 ViewCube。Preview 使用最终 Entity 几何和解析后外观；Snap/Grip/Selection marker 保持屏幕像素稳定。
-
-字体继承系统；布局按 DIP/DPI 工作。125%/150% 缩放下窗口、Dock、Menu、Command Line、ToolPanel 不得超屏、裁切或错位。
+持久 UI 文本统一来自中英文资源。Tool Prompt、Command Result、Action、History、Layer/Property 和面板标题在语言切换后即时刷新。

@@ -25,11 +25,34 @@ public sealed class CadExtrudeEntity : CadEntity
     [Browsable(false)]
     public string ProfileType => _profile.EntityType;
 
+    [Category("Geometry"), ReadOnly(true)]
+    public int ProfileHoleCount =>
+        _profile is CadRegionEntity region
+            ? region.HoleCount
+            : 0;
+
     [Browsable(false)]
     public OcctVector3d Vector => _vector;
 
-    [Category("Geometry"), ReadOnly(true)]
-    public double Length => Math.Sqrt(_vector.LengthSquared);
+    [Category("Geometry")]
+    public double Length
+    {
+        get => Math.Sqrt(_vector.LengthSquared);
+        set
+        {
+            ValidatePositive(value, nameof(value));
+
+            var current = Math.Sqrt(_vector.LengthSquared);
+            if (current <= 1e-12)
+                throw new InvalidOperationException(
+                    "Extrusion direction is invalid.");
+
+            var factor = value / current;
+            SetGeometry(
+                ref _vector,
+                _vector * factor);
+        }
+    }
 
     [Category("Geometry"), ReadOnly(true)]
     public double VectorX => _vector.X;

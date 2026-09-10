@@ -2,7 +2,7 @@
 
 ## 1. 唯一界面目标
 
-OCCAD 采用原生 WPF 经典桌面 CAD 界面，不再恢复 Ribbon：
+OCCAD 采用Avalonia 原生紧凑型桌面 CAD 界面，不再恢复 Ribbon：
 
 ```text
 Menu

@@ -12,7 +12,64 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
     public override string DisplayName => "Fillet";
 
     protected override bool IsSupportedEntity(CadEntity entity) =>
-        entity is CadLineEntity or CadArcEntity;
+        entity is CadLineEntity or
+        CadArcEntity or
+        CadPolylineEntity or
+        CadPathEntity;
+
+    public override bool HandlePointer(
+        OcctPointerInputEventArgs input)
+    {
+        if (Context.Workspace.Preselection.Current is
+            {
+                Entity: var path,
+                Point: var hit
+            } &&
+            path is CadPolylineEntity or CadPathEntity)
+        {
+            if (input.Kind == OcctPointerInputKind.Moved)
+            {
+                if (CadPathFilletGeometry.TryFillet(
+                        path,
+                        hit,
+                        _radius,
+                        Context.WorkPlane,
+                        out var preview))
+                    Context.Preview.Show(preview);
+                else
+                    Context.Preview.Clear();
+                return true;
+            }
+
+            if (input.Kind == OcctPointerInputKind.Pressed &&
+                input.Button == OcctPointerButton.Left)
+            {
+                if (!CadPathFilletGeometry.TryFillet(
+                        path,
+                        hit,
+                        _radius,
+                        Context.WorkPlane,
+                        out var replacement))
+                {
+                    Context.Preview.Clear();
+                    SetPromptLocalized(
+                        "Cad.Prompt.fillet.Invalid",
+                        "Fillet: selected vertex and radius do not define a valid fillet.");
+                    return true;
+                }
+
+                Context.Preview.Clear();
+                Context.Workspace.ReplaceEntities(
+                    [path],
+                    [replacement],
+                    "Fillet");
+                Context.Workspace.Tools.CompleteCurrent();
+                return true;
+            }
+        }
+
+        return base.HandlePointer(input);
+    }
 
     public override CadToolPanelDescriptor ParameterPanel =>
         new(

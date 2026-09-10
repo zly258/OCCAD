@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -82,18 +82,6 @@ public sealed class GripEditTool : CadTool
             Context.ResolvePoint(pointer.X, pointer.Y, ConstraintOrigin).Point);
     }
 
-    protected override void OnCanceled()
-    {
-        if (_before is null) return;
-        try
-        {
-            _grip.Entity.RestoreGeometry(_before);
-        }
-        catch (Exception exception) when (IsRecoverable(exception))
-        {
-        }
-    }
-
     private bool AcceptPoint(OcctPoint3d point)
     {
         if (_preview is null || _before is null || !point.IsFinite)
@@ -105,29 +93,54 @@ public sealed class GripEditTool : CadTool
         if (Context.Workspace.Entities.GeometryEquals(_before, _preview))
             return true;
 
+        var workspace = Context.Workspace;
         var actualBefore = _grip.Entity.Duplicate();
-        try
-        {
-            _grip.Entity.RestoreGeometry(_preview);
-            Context.Workspace.RecordGeometryChange(
-                _grip.Entity,
-                _before,
-                "Grip Edit");
-            Context.Workspace.Tools.CompleteCurrent();
-        }
-        catch (Exception exception) when (IsRecoverable(exception))
+        var wasModified = workspace.IsModified;
+        var historyState = workspace.History.CurrentStateId;
+        Exception? failure = null;
+
+        using (workspace.Document.BeginChangeSet())
         {
             try
             {
-                _grip.Entity.RestoreGeometry(actualBefore);
+                _grip.Entity.RestoreGeometry(_preview);
+                workspace.RecordGeometryChange(
+                    _grip.Entity,
+                    _before,
+                    "Grip Edit");
             }
-            catch (Exception restoreException) when (IsRecoverable(restoreException))
+            catch (Exception exception) when (IsRecoverable(exception))
             {
+                failure = exception;
+                try
+                {
+                    _grip.Entity.RestoreGeometry(actualBefore);
+                }
+                catch (Exception restoreException) when (IsRecoverable(restoreException))
+                {
+                    failure = new AggregateException(
+                        "Grip commit and rollback both failed.",
+                        exception,
+                        restoreException);
+                }
             }
-
-            ShowInvalidGripPrompt();
         }
 
+        if (failure is not null)
+        {
+            if (!wasModified &&
+                workspace.History.CurrentStateId == historyState)
+                workspace.MarkSaved();
+
+            ShowInvalidGripPrompt();
+            return true;
+        }
+
+        // Model and history are already committed at this point. Tool cleanup is
+        // deliberately outside the mutation rollback path: a transient cleanup
+        // failure must never roll back a successful model edit while leaving its
+        // history entry behind.
+        workspace.Tools.CompleteCurrent();
         return true;
     }
 
@@ -152,6 +165,9 @@ public sealed class GripEditTool : CadTool
 
         try
         {
+            // Every pointer frame starts from the original geometry. This keeps
+            // indexed grips deterministic when a side/arc crosses its opposite
+            // side and avoids cumulative drift from the previous preview frame.
             if (_before is not null)
                 _preview.RestoreGeometry(_before);
             _preview.MoveGrip(_grip.Index, point);

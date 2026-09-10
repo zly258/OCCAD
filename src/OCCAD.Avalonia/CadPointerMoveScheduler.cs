@@ -1,7 +1,7 @@
-﻿using System.Windows.Threading;
+using Avalonia.Threading;
 using OcctNet;
 
-namespace OCCAD.Wpf;
+namespace OCCAD.Avalonia;
 
 internal sealed class CadPointerMoveScheduler : IDisposable
 {
@@ -18,16 +18,17 @@ internal sealed class CadPointerMoveScheduler : IDisposable
         _timer = new DispatcherTimer(
             TimeSpan.FromMilliseconds(16),
             DispatcherPriority.Render,
-            Tick,
             dispatcher);
-        _timer.Stop();
+        _timer.Tick += Tick;
     }
 
     public void Post(OcctPointerInputEventArgs input)
     {
         ArgumentNullException.ThrowIfNull(input);
         if (input.Kind != OcctPointerInputKind.Moved)
-            throw new ArgumentException("Only pointer-move events can be coalesced.", nameof(input));
+            throw new ArgumentException(
+                "Only pointer-move events can be coalesced.",
+                nameof(input));
 
         _pending = input;
         if (!_timer.IsEnabled)

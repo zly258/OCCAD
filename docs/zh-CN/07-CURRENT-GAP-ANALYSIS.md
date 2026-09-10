@@ -16,7 +16,7 @@
 
 ### 3.1 主界面
 
-目标统一为原生 WPF 经典界面：`Menu + ToolBar + Viewport + Dock + StatusBar + 非模态 ToolPanel`。不再恢复 Ribbon，不再保留 Ribbon 命名、Style、Runtime Patch 或第三方 Ribbon 依赖。
+目标统一为Avalonia 原生紧凑型界面：`Menu + ToolBar + Viewport + Dock + StatusBar + 非模态 ToolPanel`。不再恢复 Ribbon，不再保留 Ribbon 命名、Style、Runtime Patch 或第三方 Ribbon 依赖。
 
 当前仍需清理：
 
@@ -125,7 +125,7 @@ Entity Property 必须明确支持：
 
 ## 9. 稳定性差距
 
-普通用户输入不允许导致进程退出。需要在局部事务层、Viewport/Input 分发层和 WPF Dispatcher 层形成三层边界，但不可恢复异常不伪装成功。
+普通用户输入不允许导致进程退出。需要在局部事务层、Viewport/Input 分发层和 Avalonia Dispatcher 层形成三层边界，但不可恢复异常不伪装成功。
 
 所有 `BuildShape`、`MoveGrip`、Preview、Property Apply、File Parse 都要考虑：NaN、Infinity、0/负尺寸、过小长度、退化向量、平行射线、空 Shape、OCCT 构造失败、已删除 ViewerObject、无效索引。
 

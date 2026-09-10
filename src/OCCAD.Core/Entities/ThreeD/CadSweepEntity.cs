@@ -7,18 +7,14 @@ namespace OCCAD;
 public sealed class CadSweepEntity : CadEntity
 {
     private CadEntity _profile;
-    private CadPolylineEntity _path;
+    private CadEntity _path;
 
     public CadSweepEntity(
         CadEntity profile,
-        CadPolylineEntity path) : base("Sweep")
+        CadEntity path) : base("Sweep")
     {
         _profile = CadPlanarProfileGeometry.Snapshot(profile);
-        if (path.Closed)
-            throw new ArgumentException(
-                "Sweep path must be an open polyline.",
-                nameof(path));
-        _path = (CadPolylineEntity)path.Duplicate();
+        _path = SnapshotPath(path);
         DisplayMode = OcctDisplayMode.Shaded;
     }
 
@@ -26,11 +22,18 @@ public sealed class CadSweepEntity : CadEntity
     public string ProfileType => _profile.EntityType;
 
     [Category("Geometry"), ReadOnly(true)]
-    public int PathPointCount => _path.Points.Count;
+    public int PathSegmentCount =>
+        _path switch
+        {
+            CadPolylineEntity polyline => polyline.Points.Count - 1,
+            CadPathEntity path => path.SegmentCount,
+            CadHelixEntity => 1,
+            _ => 0
+        };
 
     internal override OcctShape BuildShape(OcctEngine engine)
     {
-        var spine = _path.BuildShape(engine);
+        var spine = BuildSpine(engine);
         var profile =
             CadPlanarProfileGeometry.BuildFace(
                 engine,
@@ -122,8 +125,7 @@ public sealed class CadSweepEntity : CadEntity
                 nameof(snapshot));
 
         _profile = value._profile.Duplicate();
-        _path =
-            (CadPolylineEntity)value._path.Duplicate();
+        _path = SnapshotPath(value._path);
         RaiseGeometryChanged(nameof(RestoreGeometry));
     }
 
@@ -167,27 +169,114 @@ public sealed class CadSweepEntity : CadEntity
         {
             ["profile"] =
                 CadPlanarProfileGeometry.Write(entity._profile),
-            ["path"] =
-                CadPolylineEntity.WriteGeometry(entity._path)
+            ["path"] = WritePath(entity._path)
         };
 
     internal static CadSweepEntity ReadGeometry(
         JsonObject data)
     {
-        var path =
-            CadPolylineEntity.ReadGeometry(
-                data["path"] as JsonObject ??
-                throw new FormatException(
-                    "Sweep path is missing."));
-        if (path.Closed)
-            throw new FormatException(
-                "Sweep path must be open.");
-
         return new CadSweepEntity(
             CadPlanarProfileGeometry.Read(
                 data["profile"] as JsonObject ??
                 throw new FormatException(
                     "Sweep profile is missing.")),
-            path);
+            ReadPath(
+                data["path"] as JsonObject ??
+                throw new FormatException(
+                    "Sweep path is missing.")));
+    }
+
+    internal static bool IsPath(CadEntity entity) =>
+        entity switch
+        {
+            CadLineEntity => true,
+            CadArcEntity => true,
+            CadHelixEntity => true,
+            CadPolylineEntity { Closed: false } => true,
+            CadPathEntity { Closed: false } => true,
+            _ => false
+        };
+
+    private static CadEntity SnapshotPath(CadEntity path) =>
+        path switch
+        {
+            CadLineEntity line =>
+                new CadPathEntity([line]),
+            CadArcEntity arc =>
+                new CadPathEntity([arc]),
+            CadHelixEntity helix =>
+                helix.Duplicate(),
+            CadPolylineEntity { Closed: false } polyline =>
+                polyline.Duplicate(),
+            CadPathEntity { Closed: false } mixed =>
+                mixed.Duplicate(),
+            _ => throw new ArgumentException(
+                "Sweep path must be a line, arc, helix, open polyline, or open path.",
+                nameof(path))
+        };
+
+    private static JsonObject WritePath(CadEntity path) =>
+        path switch
+        {
+            CadPolylineEntity polyline =>
+                new JsonObject
+                {
+                    ["type"] = "polyline",
+                    ["geometry"] =
+                        CadPolylineEntity.WriteGeometry(polyline)
+                },
+            CadPathEntity mixed =>
+                new JsonObject
+                {
+                    ["type"] = "path",
+                    ["geometry"] =
+                        CadPathEntity.WriteGeometry(mixed)
+                },
+            CadHelixEntity helix =>
+                new JsonObject
+                {
+                    ["type"] = "helix",
+                    ["geometry"] =
+                        CadHelixEntity.WriteGeometry(helix)
+                },
+            _ => throw new InvalidOperationException()
+        };
+
+    private OcctShape BuildSpine(OcctEngine engine)
+    {
+        if (_path is not CadHelixEntity helix)
+            return _path.BuildShape(engine);
+
+        using var model = new OcctModelingSession();
+        var edge = model.MakeHelix(
+            helix.Radius,
+            helix.Pitch,
+            helix.Turns,
+            helix.Origin,
+            helix.Axis,
+            helix.XAxis);
+        var wire = model.MakeWire([edge]);
+        return engine.CreateShapeFromModel(model, wire);
+    }
+
+    private static CadEntity ReadPath(JsonObject data)
+    {
+        var type =
+            data["type"]?.GetValue<string>() ??
+            throw new FormatException(
+                "Sweep path type is missing.");
+        var geometry =
+            data["geometry"] as JsonObject ??
+            throw new FormatException(
+                "Sweep path geometry is missing.");
+
+        return type.ToLowerInvariant() switch
+        {
+            "polyline" => CadPolylineEntity.ReadGeometry(geometry),
+            "path" => CadPathEntity.ReadGeometry(geometry),
+            "helix" => CadHelixEntity.ReadGeometry(geometry),
+            _ => throw new FormatException(
+                $"Unsupported sweep path type '{type}'.")
+        };
     }
 }

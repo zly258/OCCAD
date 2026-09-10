@@ -137,7 +137,7 @@ Multi-selection exposes common properties only. ByLayer flags are explicitly edi
 Three layers:
 
 1. Local Tool/Grip/Property transaction boundary catches recoverable input/geometry/presentation errors and rolls back;
-2. UI interaction boundary prevents ordinary exceptions from escaping the WPF Dispatcher, reports the error, and clears inconsistent transient state;
+2. UI interaction boundary prevents ordinary exceptions from escaping the Avalonia Dispatcher, reports the error, and clears inconsistent transient state;
 3. Fatal failures such as OutOfMemory, StackOverflow, and AccessViolation are not falsely reported as safely recovered.
 
 Every failure path must leave Tool, Preview, Grip, Selection, and WorkPlane in a coherent state.

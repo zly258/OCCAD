@@ -1,10 +1,10 @@
 # OCCAD CAD Development Specification
 
-This documentation set is the single product, UI, interaction, and technical baseline for the `cad` branch. The second-pass review compares both the real OCCTBIM-Source module boundaries and the current OCCAD code while defining OCCAD's own .NET/WPF contracts.
+This documentation set is the single product, UI, interaction, and technical baseline for the `cad` branch. The second-pass review compares both the real OCCTBIM-Source module boundaries and the current OCCAD code while defining OCCAD's own .NET/Avalonia contracts.
 
 ## Single UI target
 
-Native WPF classic CAD shell: `Menu + persistent ToolBar + Viewport + Docks + StatusBar + non-modal ToolPanel`. Ribbon is not a second supported shell.
+Native Avalonia compact CAD shell: `Menu + persistent ToolBar + Viewport + Docks + StatusBar + non-modal ToolPanel`. Ribbon is not a second supported shell.
 
 ## Index
 

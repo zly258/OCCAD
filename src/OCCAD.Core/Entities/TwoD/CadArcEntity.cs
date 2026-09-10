@@ -334,6 +334,23 @@ public sealed class CadArcEntity : CadEntity
                 middle,
                 end));
 
+    internal CadArcEntity ReversedCopy() =>
+        CopyPropertiesTo(
+            new CadArcEntity(
+                _center,
+                _normal,
+                _xAxis,
+                _radius,
+                NormalizeDegrees(
+                    _startAngleDegrees +
+                    _sweepAngleDegrees),
+                -_sweepAngleDegrees));
+
+    internal CadPathEntity CreatePath(
+        IEnumerable<CadEntity> segments) =>
+        CopyPropertiesTo(
+            new CadPathEntity(segments));
+
     public override CadEntity Duplicate() =>
         CopyPropertiesTo(new CadArcEntity(
             _center,

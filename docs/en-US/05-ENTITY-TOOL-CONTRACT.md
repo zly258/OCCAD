@@ -175,4 +175,4 @@ All Entity/Tool implementations follow the same rules:
 
 ## 14. Completion checklist for a new Entity/Tool
 
-A feature is complete only when it covers Entity geometry/properties, registration, Tool stages/prompts, Preview, Snap, Grip, Precision, PropertyGrid, Layer/ByLayer, Undo/Redo, serialization, Chinese/English localization, degenerate input, cancel/step-back/right-click finish, and navigation while the Tool is active.
+A feature is complete only when it covers Entity geometry/properties, registration, Tool stages/prompts, Preview, Snap, Grip, Precision, Property editor, Layer/ByLayer, Undo/Redo, serialization, Chinese/English localization, degenerate input, cancel/step-back/right-click finish, and navigation while the Tool is active.

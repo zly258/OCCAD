@@ -1,4 +1,4 @@
-﻿using System.Runtime.ExceptionServices;
+using System.Runtime.ExceptionServices;
 using OcctNet;
 
 namespace OCCAD;
@@ -40,10 +40,7 @@ public sealed class CadToolManager
         _registry.Register<TTool>(id);
     }
 
-    public bool IsRegistered(string id)
-    {
-        return _registry.Contains(id);
-    }
+    public bool IsRegistered(string id) => _registry.Contains(id);
 
     public bool Activate(string id)
     {
@@ -62,36 +59,61 @@ public sealed class CadToolManager
 
     public bool TryChangeDrawingPlane(CadWorkPlanePreset preset)
     {
-        if (!Enum.IsDefined(preset)) throw new ArgumentOutOfRangeException(nameof(preset));
-        if (!CanChangeDrawingPlane) return false;
+        if (!Enum.IsDefined(preset))
+            throw new ArgumentOutOfRangeException(nameof(preset));
+        if (!CanChangeDrawingPlane)
+            return false;
 
         var tool = ActiveTool;
         var origin = _context.WorkPlane.Origin;
-        // Recreate the first-point tool so every cached axis uses the new frame.
-        // Preserve panel values, including the method before its dependent dimensions.
-        var parameters = tool?.ParameterPanel?.Parameters.Select(parameter =>
-            (parameter.Id, Value: parameter switch
-            {
-                CadChoiceToolParameterDescriptor value => value.Value,
-                CadBooleanToolParameterDescriptor value => value.Value.ToString(),
-                CadIntegerToolParameterDescriptor value => value.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                CadDoubleToolParameterDescriptor value => value.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
-                CadOptionalDoubleToolParameterDescriptor value => value.Value?.ToString("R", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
-                _ => throw new NotSupportedException($"Unsupported tool parameter: {parameter.Id}")
-            })).ToArray() ?? [];
-        if (tool is not null) CancelCurrent();
+        var parameters = tool?.ParameterPanel?.Parameters
+            .Select(parameter =>
+                (parameter.Id, Value: parameter switch
+                {
+                    CadChoiceToolParameterDescriptor value => value.Value,
+                    CadBooleanToolParameterDescriptor value => value.Value.ToString(),
+                    CadIntegerToolParameterDescriptor value => value.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    CadDoubleToolParameterDescriptor value => value.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
+                    CadOptionalDoubleToolParameterDescriptor value => value.Value?.ToString("R", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+                    _ => throw new NotSupportedException(
+                        $"Unsupported tool parameter: {parameter.Id}")
+                }))
+            .ToArray() ?? [];
+
+        if (tool is not null)
+            CancelCurrent();
+
         _context.WorkPlane.SetPreset(preset, origin);
         _context.Snap.Clear();
         _context.Tracking.Clear();
-        if (tool is not null)
+
+        if (tool is null)
+            return true;
+
+        try
         {
             Activate(tool.Id);
             foreach (var parameter in parameters)
+            {
                 if (!ActiveTool!.TrySetParameter(parameter.Id, parameter.Value))
-                    throw new InvalidOperationException($"Unable to restore tool parameter: {parameter.Id}");
+                {
+                    throw new InvalidOperationException(
+                        $"Unable to restore tool parameter: {parameter.Id}");
+                }
+            }
         }
+        catch
+        {
+            // The user work plane change is persistent, but a partially recreated
+            // Tool must never survive a restore failure. Cancel restores every
+            // transient Tool plane/lock/filter/snap/preview state.
+            CancelCurrent();
+            throw;
+        }
+
         return true;
     }
+
     public void BeginGripEdit(CadGripPoint grip)
     {
         CancelCurrent();
@@ -102,7 +124,6 @@ public sealed class CadToolManager
     {
         var tool = ActiveTool;
         if (tool is null) return;
-
         DeactivateActiveTool(tool, canceled: false);
     }
 
@@ -129,9 +150,7 @@ public sealed class CadToolManager
         _context.Workspace.ObservePointer(input.X, input.Y);
 
         var tool = ActiveTool;
-        if (tool is null) return false;
-
-        return tool.HandlePointer(input);
+        return tool?.HandlePointer(input) == true;
     }
 
     public bool CommitCurrentStage()
@@ -159,7 +178,11 @@ public sealed class CadToolManager
             return false;
 
         if (tool.State == CadToolState.WaitForSelect)
-            return CommitCurrentStage();
+        {
+            if (CommitCurrentStage())
+                return true;
+            return CancelCurrent();
+        }
 
         if (tool.CanFinish && FinishCurrent())
             return true;
@@ -181,13 +204,22 @@ public sealed class CadToolManager
         if (input.Kind == OcctKeyInputKind.Pressed &&
             input.Key == OcctKey.Backspace &&
             ActiveTool is { CanStepBack: true })
-        {
             return StepBackCurrent();
+
+        if (input.Kind == OcctKeyInputKind.Pressed &&
+            input.Key == OcctKey.Enter)
+        {
+            if (ActiveTool is { State: CadToolState.WaitForSelect })
+                return CommitCurrentStage();
+
+            if (ActiveTool is
+                {
+                    State: CadToolState.Drawing,
+                    CanFinish: true
+                })
+                return FinishCurrent();
         }
 
-        if (input.Kind == OcctKeyInputKind.Pressed && input.Key == OcctKey.Enter &&
-            ActiveTool is { State: CadToolState.Drawing, CanFinish: true })
-            return FinishCurrent();
         return ActiveTool?.HandleKey(input) == true;
     }
 
@@ -213,10 +245,12 @@ public sealed class CadToolManager
             RestoreSelectionGrips();
 
             if (cleanupFailure is not null)
+            {
                 throw new AggregateException(
                     "Tool activation and cleanup both failed.",
                     activationFailure,
                     cleanupFailure);
+            }
 
             ExceptionDispatchInfo.Capture(activationFailure).Throw();
             return;
@@ -255,11 +289,8 @@ public sealed class CadToolManager
         if (sender is not CadTool tool || !ReferenceEquals(tool, ActiveTool))
             return;
 
-        PublishToolUpdated(tool);
-    }
-
-    private void PublishToolUpdated(CadTool tool) =>
         ToolUpdated?.Invoke(this, new CadToolChangedEventArgs(tool));
+    }
 
     private void RestoreSelectionGrips() =>
         _context.Workspace.Grips.Show(_context.Workspace.Selection.Selected);

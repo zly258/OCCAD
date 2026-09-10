@@ -5,12 +5,16 @@ namespace OCCAD;
 
 internal static class CadPlanarProfileGeometry
 {
+    private const double PlaneTolerance = 1e-7;
+
     internal static bool IsSource(CadEntity entity) =>
         entity is CadCircleEntity or
+        CadEllipseEntity or
         CadRectangleEntity or
         CadPolygonEntity or
         CadRegularPolygonEntity or
-        CadPolylineEntity { Closed: true };
+        CadPolylineEntity { Closed: true } or
+        CadPathEntity { Closed: true };
 
     internal static bool IsSupported(CadEntity entity) =>
         IsSource(entity) || entity is CadRegionEntity;
@@ -18,29 +22,35 @@ internal static class CadPlanarProfileGeometry
     internal static bool IsWireProfile(CadEntity entity) =>
         entity switch
         {
+            CadCircleEntity => true,
+            CadEllipseEntity => true,
             CadRectangleEntity => true,
             CadPolygonEntity => true,
             CadRegularPolygonEntity => true,
             CadPolylineEntity { Closed: true } => true,
-            CadRegionEntity region =>
-                IsWireProfile(region.ProfileSnapshot()),
+            CadPathEntity { Closed: true } => true,
+            CadRegionEntity region => region.HoleCount == 0,
             _ => false
         };
 
     internal static CadEntity WireProfileSnapshot(CadEntity entity)
     {
-        var snapshot = Snapshot(entity);
-        if (!IsWireProfile(snapshot))
+        if (!IsWireProfile(entity))
             throw new ArgumentException(
                 "Entity is not a supported wire profile.",
                 nameof(entity));
-        return snapshot;
+
+        return entity switch
+        {
+            CadRegionEntity region => region.OuterSnapshot(),
+            _ => entity.Duplicate()
+        };
     }
 
     internal static CadEntity Snapshot(CadEntity entity) =>
         entity switch
         {
-            CadRegionEntity region => region.ProfileSnapshot(),
+            CadRegionEntity region => region.Duplicate(),
             _ when IsSource(entity) => entity.Duplicate(),
             _ => throw new ArgumentException(
                 "Entity is not a supported planar profile.",
@@ -54,26 +64,91 @@ internal static class CadPlanarProfileGeometry
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(profile);
 
-        var wire = profile.BuildShape(engine);
-        try
+        using var model = new OcctModelingSession();
+
+        OcctModelShape face;
+        if (profile is CadRegionEntity region)
         {
-            return engine.MakeFace(wire);
+            var outer = BuildWire(model, region.OuterSnapshot());
+            var holes = region.HoleSnapshots()
+                .Select(hole => BuildWire(model, hole))
+                .ToArray();
+
+            face = model.MakePlanarFace(outer, holes);
         }
-        finally
+        else
         {
-            if (engine.ContainsObject(wire.Id))
-                engine.Delete(wire);
+            var outer = BuildWire(model, profile);
+            face = model.MakePlanarFace(outer);
         }
+
+        return engine.CreateShapeFromModel(model, face);
+    }
+
+    internal static OcctModelShape BuildWire(
+        OcctModelingSession model,
+        CadEntity profile)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(profile);
+
+        return profile switch
+        {
+            CadCircleEntity circle =>
+                model.MakeWire(
+                    [
+                        model.MakeCircle(
+                            circle.Center,
+                            circle.Normal,
+                            circle.Radius)
+                    ]),
+
+            CadEllipseEntity ellipse =>
+                model.MakeWire(
+                    [
+                        BuildEllipseEdge(model, ellipse)
+                    ]),
+
+            CadRectangleEntity rectangle =>
+                model.MakePolyline(
+                    rectangle.CornerPoints,
+                    closed: true),
+
+            CadPolygonEntity polygon =>
+                model.MakePolyline(
+                    polygon.Points,
+                    closed: true),
+
+            CadRegularPolygonEntity polygon =>
+                model.MakePolyline(
+                    polygon.VertexPoints,
+                    closed: true),
+
+            CadPolylineEntity { Closed: true } polyline =>
+                model.MakePolyline(
+                    polyline.Points,
+                    closed: true),
+
+            CadPathEntity { Closed: true } path =>
+                BuildPathWire(model, path),
+
+            _ => throw new ArgumentException(
+                "Entity is not a supported closed wire profile.",
+                nameof(profile))
+        };
     }
 
     internal static OcctPoint3d Center(CadEntity profile) =>
         profile switch
         {
             CadCircleEntity circle => circle.Center,
+            CadEllipseEntity ellipse => ellipse.Center,
             CadRectangleEntity rectangle => rectangle.Center,
             CadRegularPolygonEntity polygon => polygon.Center,
             CadPolygonEntity polygon => Average(polygon.Points),
             CadPolylineEntity { Closed: true } polyline => Average(polyline.Points),
+            CadPathEntity { Closed: true } path => PathCenter(path),
+            CadRegionEntity region => Center(region.OuterSnapshot()),
             _ => throw new ArgumentException(
                 "Entity is not a supported planar profile.",
                 nameof(profile))
@@ -83,16 +158,60 @@ internal static class CadPlanarProfileGeometry
         profile switch
         {
             CadCircleEntity circle => circle.Normal,
+            CadEllipseEntity ellipse => ellipse.Normal,
             CadRectangleEntity rectangle =>
                 rectangle.XAxis.Cross(rectangle.YAxis).Normalized(),
             CadRegularPolygonEntity polygon => polygon.Normal,
             CadPolygonEntity polygon => PolygonNormal(polygon.Points),
             CadPolylineEntity { Closed: true } polyline =>
                 PolygonNormal(polyline.Points),
+            CadPathEntity { Closed: true } path =>
+                PathNormal(path),
+            CadRegionEntity region =>
+                Normal(region.OuterSnapshot()),
             _ => throw new ArgumentException(
                 "Entity is not a supported planar profile.",
                 nameof(profile))
         };
+
+    internal static bool AreCoplanar(
+        CadEntity outer,
+        IEnumerable<CadEntity> holes)
+    {
+        ArgumentNullException.ThrowIfNull(outer);
+        ArgumentNullException.ThrowIfNull(holes);
+
+        if (!IsSource(outer))
+            return false;
+
+        var origin = Center(outer);
+        var normal = Normal(outer).Normalized();
+
+        foreach (var hole in holes)
+        {
+            if (!IsSource(hole))
+                return false;
+
+            var holeNormal = Normal(hole).Normalized();
+            if (Math.Abs(
+                    Math.Abs(CadTransformMath.Dot(normal, holeNormal)) -
+                    1.0) >
+                PlaneTolerance)
+                return false;
+
+            foreach (var point in RepresentativePoints(hole))
+            {
+                var distance = Math.Abs(
+                    CadTransformMath.Dot(
+                        CadTransformMath.Between(origin, point),
+                        normal));
+                if (distance > PlaneTolerance)
+                    return false;
+            }
+        }
+
+        return true;
+    }
 
     internal static JsonObject Write(CadEntity profile)
     {
@@ -100,6 +219,8 @@ internal static class CadPlanarProfileGeometry
         {
             CadCircleEntity value =>
                 ("circle", CadCircleEntity.WriteGeometry(value)),
+            CadEllipseEntity value =>
+                ("ellipse", CadEllipseEntity.WriteGeometry(value)),
             CadRectangleEntity value =>
                 ("rectangle", CadRectangleEntity.WriteGeometry(value)),
             CadPolygonEntity value =>
@@ -108,6 +229,10 @@ internal static class CadPlanarProfileGeometry
                 ("regularpolygon", CadRegularPolygonEntity.WriteGeometry(value)),
             CadPolylineEntity { Closed: true } value =>
                 ("polyline", CadPolylineEntity.WriteGeometry(value)),
+            CadPathEntity { Closed: true } value =>
+                ("path", CadPathEntity.WriteGeometry(value)),
+            CadRegionEntity value =>
+                ("region", CadRegionEntity.WriteGeometry(value)),
             _ => throw new ArgumentException(
                 "Entity is not a supported planar profile.",
                 nameof(profile))
@@ -133,13 +258,79 @@ internal static class CadPlanarProfileGeometry
         return type.ToLowerInvariant() switch
         {
             "circle" => CadCircleEntity.ReadGeometry(geometry),
+            "ellipse" => CadEllipseEntity.ReadGeometry(geometry),
             "rectangle" => CadRectangleEntity.ReadGeometry(geometry),
             "polygon" => CadPolygonEntity.ReadGeometry(geometry),
             "regularpolygon" => CadRegularPolygonEntity.ReadGeometry(geometry),
             "polyline" => ReadClosedPolyline(geometry),
+            "path" => ReadClosedPath(geometry),
+            "region" => CadRegionEntity.ReadGeometry(geometry),
             _ => throw new FormatException(
                 $"Unsupported profile type '{type}'.")
         };
+    }
+
+    private static OcctModelShape BuildEllipseEdge(
+        OcctModelingSession model,
+        CadEllipseEntity ellipse)
+    {
+        var edge = model.MakeEllipse(
+            OcctPoint3d.Origin,
+            OcctVector3d.UnitZ,
+            ellipse.MajorRadius,
+            ellipse.MinorRadius);
+
+        var yAxis =
+            ellipse.Normal.Cross(ellipse.XAxis).Normalized();
+
+        if (CadTransformMath.TryGetAxisAngle(
+                ellipse.XAxis,
+                yAxis,
+                ellipse.Normal,
+                out var axis,
+                out var angle))
+        {
+            edge = model.Rotate(
+                edge,
+                OcctPoint3d.Origin,
+                axis,
+                angle);
+        }
+
+        if (ellipse.Center != OcctPoint3d.Origin)
+        {
+            edge = model.Translate(
+                edge,
+                new OcctVector3d(
+                    ellipse.Center.X,
+                    ellipse.Center.Y,
+                    ellipse.Center.Z));
+        }
+
+        return edge;
+    }
+
+    private static OcctModelShape BuildPathWire(
+        OcctModelingSession model,
+        CadPathEntity path)
+    {
+        var edges = path.Segments
+            .Select(segment =>
+                segment switch
+                {
+                    CadLineEntity line =>
+                        model.MakeLine(line.Start, line.End),
+                    CadArcEntity arc =>
+                        model.MakeArc(
+                            arc.Start,
+                            arc.Middle,
+                            arc.End),
+                    _ => throw new InvalidOperationException(
+                        "Path contains an unsupported segment.")
+                })
+            .ToArray();
+
+        return model.MakeWire(edges);
     }
 
     private static CadEntity ReadClosedPolyline(JsonObject data)
@@ -147,9 +338,106 @@ internal static class CadPlanarProfileGeometry
         var value = CadPolylineEntity.ReadGeometry(data);
         if (!value.Closed)
             throw new FormatException(
-                "Region and feature profiles require a closed polyline.");
+                "Feature profile requires a closed polyline.");
         return value;
     }
+
+    private static CadEntity ReadClosedPath(JsonObject data)
+    {
+        var value = CadPathEntity.ReadGeometry(data);
+        if (!value.Closed)
+            throw new FormatException(
+                "Feature profile requires a closed path.");
+        return value;
+    }
+
+    private static OcctPoint3d PathCenter(CadPathEntity path) =>
+        Average(
+            path.Segments
+                .SelectMany(segment =>
+                    segment switch
+                    {
+                        CadLineEntity line =>
+                            new[] { line.Start, line.End },
+                        CadArcEntity arc =>
+                            new[] { arc.Start, arc.Middle, arc.End },
+                        _ => Array.Empty<OcctPoint3d>()
+                    })
+                .ToArray());
+
+    private static OcctVector3d PathNormal(CadPathEntity path)
+    {
+        var arcNormals = path.Segments
+            .OfType<CadArcEntity>()
+            .Select(static arc => arc.Normal.Normalized())
+            .ToArray();
+
+        if (arcNormals.Length > 0)
+        {
+            var reference = arcNormals[0];
+            if (arcNormals.Any(normal =>
+                    Math.Abs(
+                        Math.Abs(CadTransformMath.Dot(reference, normal)) -
+                        1.0) >
+                    PlaneTolerance))
+            {
+                throw new ArgumentException(
+                    "Path arc segments are not coplanar.",
+                    nameof(path));
+            }
+
+            var origin = path.Start;
+            foreach (var point in RepresentativePoints(path))
+            {
+                var distance = Math.Abs(
+                    CadTransformMath.Dot(
+                        CadTransformMath.Between(origin, point),
+                        reference));
+                if (distance > PlaneTolerance)
+                    throw new ArgumentException(
+                        "Path segments are not coplanar.",
+                        nameof(path));
+            }
+
+            return reference;
+        }
+
+        return PolygonNormal(
+            path.Segments
+                .Select(CadPathEntity.SegmentStart)
+                .ToArray());
+    }
+
+    private static IReadOnlyList<OcctPoint3d> RepresentativePoints(
+        CadEntity profile) =>
+        profile switch
+        {
+            CadCircleEntity circle =>
+                circle.GetSnapPoints()
+                    .Select(static snap => snap.Position)
+                    .ToArray(),
+            CadEllipseEntity ellipse =>
+                ellipse.GetSnapPoints()
+                    .Select(static snap => snap.Position)
+                    .ToArray(),
+            CadRectangleEntity rectangle => rectangle.CornerPoints,
+            CadRegularPolygonEntity polygon => polygon.VertexPoints,
+            CadPolygonEntity polygon => polygon.Points,
+            CadPolylineEntity polyline => polyline.Points,
+            CadPathEntity path =>
+                path.Segments
+                    .SelectMany(segment =>
+                        segment switch
+                        {
+                            CadLineEntity line =>
+                                new[] { line.Start, line.End },
+                            CadArcEntity arc =>
+                                new[] { arc.Start, arc.Middle, arc.End },
+                            _ => Array.Empty<OcctPoint3d>()
+                        })
+                    .ToArray(),
+            _ => Array.Empty<OcctPoint3d>()
+        };
 
     private static OcctPoint3d Average(
         IReadOnlyList<OcctPoint3d> points)

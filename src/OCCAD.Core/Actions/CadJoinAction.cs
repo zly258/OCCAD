@@ -39,12 +39,10 @@ public sealed class CadJoinAction(CadWorkspace workspace)
         if (selection.Count < 2)
             return false;
 
-        if (selection.All(static entity => entity is CadArcEntity))
-            return true;
-
         return selection.All(
             static entity =>
                 entity is CadLineEntity or
+                CadArcEntity or
                 CadPolylineEntity { Closed: false });
     }
 }

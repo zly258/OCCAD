@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -66,10 +66,14 @@ public sealed class CadPreviewManager
                 nextShapes.Add(shape);
                 engine.SetObjectSelectable(shape, false);
                 engine.SetObjectColor(shape, entity.Color);
-                engine.SetObjectTransparency(shape, Math.Clamp(entity.Transparency, 0.0, 1.0));
+                engine.SetObjectTransparency(
+                    shape,
+                    Math.Clamp(entity.Transparency, 0.0, 1.0));
                 if (shape is OcctShape)
                 {
-                    engine.SetObjectLineWidth(shape, Math.Max(0.1, entity.LineWidth));
+                    engine.SetObjectLineWidth(
+                        shape,
+                        Math.Max(0.1, entity.LineWidth));
                     engine.SetObjectDisplayMode(shape, entity.DisplayMode);
                     engine.SetObjectMaterial(shape, entity.Material);
                 }
@@ -77,16 +81,30 @@ public sealed class CadPreviewManager
         }
         catch
         {
-            DeleteObjects(engine, nextShapes);
+            TryDeleteObjects(engine, nextShapes);
             throw;
         }
 
-        DeleteObjects(engine, _shapes);
+        try
+        {
+            DeleteObjects(engine, _shapes);
+        }
+        catch
+        {
+            // Replacement is atomic from the manager's point of view: if the
+            // previous preview cannot be removed, discard the new frame and keep
+            // the previous shape list authoritative.
+            TryDeleteObjects(engine, nextShapes);
+            throw;
+        }
+
         _shapes.Clear();
         _shapes.AddRange(nextShapes);
     }
 
-    private static void DeleteObjects(OcctEngine engine, IEnumerable<IOcctObject> shapes)
+    private static void DeleteObjects(
+        OcctEngine engine,
+        IEnumerable<IOcctObject> shapes)
     {
         var existing = shapes
             .Where(shape => engine.ContainsObject(shape.Id))
@@ -94,5 +112,22 @@ public sealed class CadPreviewManager
         if (existing.Length > 0)
             engine.Delete(existing);
     }
-}
 
+    private static void TryDeleteObjects(
+        OcctEngine engine,
+        IEnumerable<IOcctObject> shapes)
+    {
+        try
+        {
+            DeleteObjects(engine, shapes);
+        }
+        catch (Exception exception) when (IsRecoverable(exception))
+        {
+        }
+    }
+
+    private static bool IsRecoverable(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
+}

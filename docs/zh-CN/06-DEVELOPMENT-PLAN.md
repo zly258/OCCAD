@@ -6,7 +6,7 @@
 
 ## 2. P0 稳定性与编译
 
-先保证当前分支持续可编译；修复 WPF/WinForms 类型歧义、XAML 名称/事件错误和无效资源。完成 Tool/Grip/Property/Preview 的局部事务异常边界；Grip 拖拽不得闪退；Preview 原子替换并保留上一有效帧；Snap marker 隐藏后可重新显示；Active Tool 导航不破坏状态。
+先保证当前分支持续可编译；修复 Avalonia 控件/API 歧义和无效 UI 资源。完成 Tool/Grip/Property/Preview 的局部事务异常边界；Grip 拖拽不得闪退；Preview 原子替换并保留上一有效帧；Snap marker 隐藏后可重新显示；Active Tool 导航不破坏状态。
 
 同时统一几何兜底：finite、正尺寸、容差、向量、索引、工作平面求交、ViewerObject 生命周期。
 
@@ -42,7 +42,7 @@ Layer 使用稳定集合/局部刷新，不整表重绑。完成单击 Color/Vis
 
 稳定 serializer 版本、Entity Registry 反序列化、未知数据安全拒绝、modified/save-point 与 History 一致。大文件按读取→解析→模型→Viewer→完成分阶段，底部进度可取消。
 
-DWG/DXF 通过 Parser/Adapter → CadEntity，解析器不直接操作 WPF/Viewer。优先完整几何、图层、颜色、线型、线宽、块/属性等实际展示，再扩实体类型。
+DWG/DXF 通过 Parser/Adapter → CadEntity，解析器不直接操作 Avalonia/Viewer。优先完整几何、图层、颜色、线型、线宽、块/属性等实际展示，再扩实体类型。
 
 ## 9. P7 性能
 

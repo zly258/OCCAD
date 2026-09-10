@@ -7,16 +7,20 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $root = $PSScriptRoot
-$project = Join-Path $root 'src\OCCAD.Wpf\OCCAD.Wpf.csproj'
-$bridgeRoot = Join-Path $root 'external\OcctCSharpBridge\win-x64'
+$project = Join-Path $root 'src\OCCAD.Avalonia\OCCAD.Avalonia.csproj'
+$bridgeRoot = if (-not [string]::IsNullOrWhiteSpace($env:OCCTCSHARPBRIDGE_SDK)) {
+    [System.IO.Path]::GetFullPath($env:OCCTCSHARPBRIDGE_SDK)
+} else {
+    Join-Path $env:ProgramFiles 'OcctCSharpBridge\SDK\3.0\win-x64'
+}
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $root 'artifacts\publish\OCCAD'
 }
 $OutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
 
-foreach ($name in @('OcctNative.dll','OcctNet.dll','OcctNet.Wpf.dll','bridge-contract.json')) {
+foreach ($name in @('OcctNative.dll','OcctNet.dll','OcctNet.Avalonia.dll','bridge-contract.json')) {
     if (-not (Test-Path -LiteralPath (Join-Path $bridgeRoot $name) -PathType Leaf)) {
-        throw "CAD Bridge SDK is missing '$name'. Run '.\build.ps1 -SyncBridge -BridgeBranch main' once."
+        throw "Installed OcctCSharpBridge SDK is missing '$name' at '$bridgeRoot'. Run OcctCSharpBridge .\publish.ps1 from an elevated PowerShell session, or set OCCTCSHARPBRIDGE_SDK."
     }
 }
 
@@ -32,7 +36,6 @@ if ($LASTEXITCODE -ne 0) {
     throw "OCCAD publish failed. Exit code: $LASTEXITCODE."
 }
 
-$nativeBridge = Join-Path $bridgeRoot 'OcctNative.dll'
-Copy-Item -LiteralPath $nativeBridge -Destination (Join-Path $OutputDirectory 'OcctNative.dll') -Force
+Copy-Item -LiteralPath (Join-Path $bridgeRoot 'OcctNative.dll') -Destination (Join-Path $OutputDirectory 'OcctNative.dll') -Force
 
 Write-Host "[publish] Output: $OutputDirectory"

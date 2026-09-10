@@ -21,6 +21,7 @@ internal static class CadCoreRegistration
         entities.Register("arc", "Arc", static () => new CadArcEntity(new OcctNet.OcctPoint3d(1, 0, 0), new OcctNet.OcctPoint3d(0, 1, 0), new OcctNet.OcctPoint3d(-1, 0, 0)), CadArcEntity.WriteGeometry, CadArcEntity.ReadGeometry);
         entities.Register("ellipse", "Ellipse", static () => new CadEllipseEntity(OcctNet.OcctPoint3d.Origin, OcctNet.OcctVector3d.UnitZ, 2, 1), CadEllipseEntity.WriteGeometry, CadEllipseEntity.ReadGeometry);
         entities.Register("spline", "Spline", static () => new CadSplineEntity([OcctNet.OcctPoint3d.Origin, new OcctNet.OcctPoint3d(1, 0, 0)]), CadSplineEntity.WriteGeometry, CadSplineEntity.ReadGeometry);
+        entities.RegisterPersistent("path", "Path", CadPathEntity.WriteGeometry, CadPathEntity.ReadGeometry);
 
         entities.Register("box", "Box", static () => new CadBoxEntity(OcctNet.OcctPoint3d.Origin, 1, 1, 1), CadBoxEntity.WriteGeometry, CadBoxEntity.ReadGeometry);
         entities.Register("cylinder", "Cylinder", static () => new CadCylinderEntity(OcctNet.OcctPoint3d.Origin, 1, 1), CadCylinderEntity.WriteGeometry, CadCylinderEntity.ReadGeometry);
@@ -40,6 +41,9 @@ internal static class CadCoreRegistration
         entities.RegisterPersistent("loft", "Loft", CadLoftEntity.WriteGeometry, CadLoftEntity.ReadGeometry);
         entities.RegisterPersistent("edgefillet", "Edge Fillet", CadEdgeFilletEntity.WriteGeometry, CadEdgeFilletEntity.ReadGeometry);
         entities.RegisterPersistent("edgechamfer", "Edge Chamfer", CadEdgeChamferEntity.WriteGeometry, CadEdgeChamferEntity.ReadGeometry);
+        entities.RegisterPersistent("shell", "Shell", CadShellEntity.WriteGeometry, CadShellEntity.ReadGeometry);
+        entities.RegisterPersistent("shapeoffset", "Shape Offset", CadShapeOffsetEntity.WriteGeometry, CadShapeOffsetEntity.ReadGeometry);
+        entities.RegisterPersistent("importedshape", "Imported Shape", CadImportedShapeEntity.WriteGeometry, CadImportedShapeEntity.ReadGeometry);
 
         return entities;
     }
@@ -88,6 +92,8 @@ internal static class CadCoreRegistration
         tools.Register<LoftTool>("loft");
         tools.Register<EdgeFilletTool>("edgefillet");
         tools.Register<EdgeChamferTool>("edgechamfer");
+        tools.Register<ShellTool>("shell");
+        tools.Register<ShapeOffsetTool>("shapeoffset");
         tools.Register<RotateTool>("rotate");
         tools.Register<ScaleTool>("scale");
         tools.Register<MoveTool>("move");
@@ -183,6 +189,8 @@ internal static class CadCoreRegistration
         actions.Register(new CadToolAction(workspace, "solid.loft", "Loft", "loft"));
         actions.Register(new CadEdgeFeatureAction(workspace, "solid.edgefillet", "Edge Fillet", "edgefillet"));
         actions.Register(new CadEdgeFeatureAction(workspace, "solid.edgechamfer", "Edge Chamfer", "edgechamfer"));
+        actions.Register(new CadShellAction(workspace));
+        actions.Register(new CadToolAction(workspace, "solid.shapeoffset", "Shape Offset", "shapeoffset"));
         actions.Register(new CadToolAction(workspace, "modify.rotate", "Rotate", "rotate"));
         actions.Register(new CadToolAction(workspace, "modify.scale", "Scale", "scale"));
         actions.Register(new CadToolAction(workspace, "modify.move", "Move", "move"));

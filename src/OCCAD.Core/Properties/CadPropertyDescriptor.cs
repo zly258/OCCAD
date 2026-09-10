@@ -14,8 +14,6 @@ public enum CadPropertyEditorKind
     Text
 }
 
-
-
 [AttributeUsage(
     AttributeTargets.Property,
     AllowMultiple = false,
@@ -62,25 +60,36 @@ public sealed class CadPropertyDescriptor
         CadValueSemantic.Length => "drawing-unit",
         _ => null
     };
-    public string? ByLayerProperty => typeof(CadEntity).IsAssignableFrom(Property.ComponentType) ? Name switch
-    {
-        nameof(CadEntity.Color) => nameof(CadEntity.ColorByLayer),
-        nameof(CadEntity.LineWidth) => nameof(CadEntity.LineWidthByLayer),
-        nameof(CadEntity.LineStyle) => nameof(CadEntity.LineStyleByLayer),
-        _ => null
-    } : null;
-    public CadPropertyEditorKind Editor => IsReadOnly ? CadPropertyEditorKind.ReadOnly :
-        ByLayerProperty is not null ? CadPropertyEditorKind.ByLayer : Value.Semantic switch
-        {
-            CadValueSemantic.Layer => CadPropertyEditorKind.Layer,
-            CadValueSemantic.Boolean => CadPropertyEditorKind.Boolean,
-            CadValueSemantic.Enum or CadValueSemantic.Choice => CadPropertyEditorKind.Choice,
-            CadValueSemantic.Color => CadPropertyEditorKind.Color,
-            CadValueSemantic.Point or CadValueSemantic.Vector => CadPropertyEditorKind.Text,
-            _ => CadValueTextConverter.IsNumericType(PropertyType) ? CadPropertyEditorKind.Numeric :
-                PropertyType == typeof(string) || Converter.CanConvertFrom(typeof(string))
-                    ? CadPropertyEditorKind.Text : CadPropertyEditorKind.ReadOnly
-        };
+
+    public string? ByLayerProperty =>
+        typeof(CadEntity).IsAssignableFrom(Property.ComponentType)
+            ? Name switch
+            {
+                nameof(CadEntity.Color) => nameof(CadEntity.ColorByLayer),
+                nameof(CadEntity.LineWidth) => nameof(CadEntity.LineWidthByLayer),
+                nameof(CadEntity.LineStyle) => nameof(CadEntity.LineStyleByLayer),
+                _ => null
+            }
+            : null;
+
+    public CadPropertyEditorKind Editor =>
+        IsReadOnly
+            ? CadPropertyEditorKind.ReadOnly
+            : ByLayerProperty is not null
+                ? CadPropertyEditorKind.ByLayer
+                : Value.Semantic switch
+                {
+                    CadValueSemantic.Layer => CadPropertyEditorKind.Layer,
+                    CadValueSemantic.Boolean => CadPropertyEditorKind.Boolean,
+                    CadValueSemantic.Enum or CadValueSemantic.Choice => CadPropertyEditorKind.Choice,
+                    CadValueSemantic.Color => CadPropertyEditorKind.Color,
+                    CadValueSemantic.Point or CadValueSemantic.Vector => CadPropertyEditorKind.Text,
+                    _ => CadValueTextConverter.IsNumericType(PropertyType)
+                        ? CadPropertyEditorKind.Numeric
+                        : PropertyType == typeof(string) || Converter.CanConvertFrom(typeof(string))
+                            ? CadPropertyEditorKind.Text
+                            : CadPropertyEditorKind.ReadOnly
+                };
 
     public IReadOnlyList<string> GetChoices(CadWorkspace workspace) =>
         Value.Semantic == CadValueSemantic.Layer
@@ -95,12 +104,14 @@ public sealed class CadPropertyDescriptor
         object? value) =>
         Property.SetValue(target, value);
 
-    public static string NormalizeCategory(string rawCategory, string propertyName)
+    public static string NormalizeCategory(
+        string rawCategory,
+        string propertyName)
     {
-        if (string.Equals(propertyName, "EntityType", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(propertyName, "Name", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(propertyName, "Id", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(propertyName, "Layer", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(propertyName, nameof(CadEntity.EntityType), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(propertyName, nameof(CadEntity.Name), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(propertyName, nameof(CadEntity.Id), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(propertyName, nameof(CadEntity.LayerId), StringComparison.OrdinalIgnoreCase))
         {
             return "General";
         }
@@ -129,13 +140,13 @@ public sealed class CadPropertyDescriptor
             return "Position";
         }
 
-        if (string.Equals(propertyName, "Color", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(propertyName, "LineWidth", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(propertyName, "LineStyle", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(propertyName, "Transparency", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(propertyName, "Visible", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(propertyName, "DisplayMode", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(propertyName, "Material", StringComparison.OrdinalIgnoreCase) ||
+        if (string.Equals(propertyName, nameof(CadEntity.Color), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(propertyName, nameof(CadEntity.LineWidth), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(propertyName, nameof(CadEntity.LineStyle), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(propertyName, nameof(CadEntity.Transparency), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(propertyName, nameof(CadEntity.Visible), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(propertyName, nameof(CadEntity.DisplayMode), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(propertyName, nameof(CadEntity.Material), StringComparison.OrdinalIgnoreCase) ||
             rawCategory is "Display" or "Appearance")
         {
             return "Display";
@@ -162,11 +173,11 @@ public sealed class CadPropertyDescriptor
         }
 
         if (rawCategory is "Data" or "Parameters" or "Custom")
-        {
             return "Data";
-        }
 
-        return string.IsNullOrWhiteSpace(rawCategory) ? "General" : rawCategory;
+        return string.IsNullOrWhiteSpace(rawCategory)
+            ? "General"
+            : rawCategory;
     }
 }
 
@@ -195,16 +206,10 @@ public static class CadPropertyCatalog
                 property.IsBrowsable &&
                 (includeInternal || !InternalNames.Contains(property.Name)))
             .Select(Create)
-            .OrderBy(static property =>
-                CategoryOrder(property.Category))
-            .ThenBy(static property =>
-                property.Category,
-                StringComparer.Ordinal)
-            .ThenBy(static property =>
-                property.Order)
-            .ThenBy(static property =>
-                property.DisplayName,
-                StringComparer.Ordinal)
+            .OrderBy(static property => CategoryOrder(property.Category))
+            .ThenBy(static property => property.Category, StringComparer.Ordinal)
+            .ThenBy(static property => property.Order)
+            .ThenBy(static property => property.DisplayName, StringComparer.Ordinal)
             .ToArray();
     }
 
@@ -223,9 +228,8 @@ public static class CadPropertyCatalog
         PropertyDescriptor property)
     {
         var attribute =
-            property.Attributes[
-                typeof(CadPropertyAttribute)]
-            as CadPropertyAttribute;
+            property.Attributes[typeof(CadPropertyAttribute)]
+                as CadPropertyAttribute;
 
         var semantic =
             attribute?.Semantic ??
@@ -234,20 +238,16 @@ public static class CadPropertyCatalog
                 property.PropertyType);
 
         double? minimum =
-            attribute is not null &&
-            double.IsFinite(attribute.Minimum)
+            attribute is not null && double.IsFinite(attribute.Minimum)
                 ? attribute.Minimum
-                : semantic ==
-                    CadValueSemantic.Transparency
+                : semantic == CadValueSemantic.Transparency
                     ? 0.0
                     : null;
 
         double? maximum =
-            attribute is not null &&
-            double.IsFinite(attribute.Maximum)
+            attribute is not null && double.IsFinite(attribute.Maximum)
                 ? attribute.Maximum
-                : semantic ==
-                    CadValueSemantic.Transparency
+                : semantic == CadValueSemantic.Transparency
                     ? 1.0
                     : null;
 
@@ -268,7 +268,6 @@ public static class CadPropertyCatalog
         return new CadPropertyDescriptor(
             property,
             value,
-            attribute?.Order ??
-            int.MaxValue);
+            attribute?.Order ?? int.MaxValue);
     }
 }

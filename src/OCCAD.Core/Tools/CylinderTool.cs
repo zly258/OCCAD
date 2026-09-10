@@ -25,7 +25,7 @@ public sealed class CylinderTool : CadDrawingTool, ICadPointInputTool
         _ => base.PrecisionLengthLabel
     };
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new("Cylinder", BuildParameters());
 
     protected override bool CanStepBackCore => Stage > 0;
@@ -182,36 +182,36 @@ public sealed class CylinderTool : CadDrawingTool, ICadPointInputTool
                 break;
 
             case 1:
-                {
-                    var radiusPoint = ProjectBasePoint(point);
-                    var radius = _radiusParameter ??
-                        CadPlaneGeometry.RadialDistance(
-                            _center,
-                            radiusPoint,
-                            _xAxis,
-                            _yAxis);
-                    if (radius <= 1e-9)
-                        return false;
-
-                    _radius = radius;
-                    _radiusPoint = _radiusParameter is not null
-                        ? _center + _xAxis * radius
-                        : radiusPoint;
-                    SetStageLocalized(
-                        2,
-                        "Cad.Prompt.Cylinder.Height",
-                        "Cylinder: specify height [Backspace undo, Esc cancel]",
-                        CadPrecisionInputKind.Length);
-                    SetWorkPlane(_radiusPoint, _axis, _xAxis);
-                    LockStageAngle(0.0);
-                    Show(new CadCylinderEntity(
+            {
+                var radiusPoint = ProjectBasePoint(point);
+                var radius = _radiusParameter ??
+                    CadPlaneGeometry.RadialDistance(
                         _center,
-                        _axis,
-                        _radius,
-                        _heightParameter ?? MinSize));
-                    RefreshParameterDrivenPreview();
-                    break;
-                }
+                        radiusPoint,
+                        _xAxis,
+                        _yAxis);
+                if (radius <= 1e-9)
+                    return false;
+
+                _radius = radius;
+                _radiusPoint = _radiusParameter is not null
+                    ? _center + _xAxis * radius
+                    : radiusPoint;
+                SetStageLocalized(
+                    2,
+                    "Cad.Prompt.Cylinder.Height",
+                    "Cylinder: specify height [Backspace undo, Esc cancel]",
+                    CadPrecisionInputKind.Length);
+                SetWorkPlane(_radiusPoint, _axis, _xAxis);
+                LockStageAngle(0.0);
+                Show(new CadCylinderEntity(
+                    _center,
+                    _axis,
+                    _radius,
+                    _heightParameter ?? MinSize));
+                RefreshParameterDrivenPreview();
+                break;
+            }
 
             case 2:
                 Update(point);

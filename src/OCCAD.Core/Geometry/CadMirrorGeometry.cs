@@ -3,10 +3,9 @@ using OcctNet;
 namespace OCCAD;
 
 /// <summary>
-/// Creates detached mirrored geometry for the entity types owned by the current
-/// core capability surface. Associative annotation copies deliberately drop
-/// their source references: mirroring the derived geometry must not leave it
-/// reacting to the original, unmirrored host entities.
+/// Creates detached mirrored geometry for entity types in the active OCCAD
+/// capability surface. Associative derived entities deliberately drop source
+/// references so a mirrored copy cannot keep reacting to an original host.
 /// </summary>
 internal static class CadMirrorGeometry
 {
@@ -33,9 +32,8 @@ internal static class CadMirrorGeometry
             return world - n * (2.0 * world.Dot(n));
         }
 
-        // Curves whose orientation is defined by a plane normal keep the same
-        // winding convention after a reflection by reversing the reflected
-        // normal as well.
+        // Reflection flips handedness. Reverse reflected plane normals so curve
+        // winding remains consistent with the source entity convention.
         OcctVector3d PlaneNormal(OcctVector3d vector) => Vector(vector) * -1.0;
 
         return entity switch
@@ -128,24 +126,6 @@ internal static class CadMirrorGeometry
                     value.Height),
             CadSphereEntity value =>
                 new CadSphereEntity(Point(value.Center), value.Radius),
-
-            // Source supports these primitive entity types even though OCCAD
-            // intentionally keeps them outside the current registered surface.
-            CadEllipsoidEntity value =>
-                new CadEllipsoidEntity(
-                    Point(value.Center),
-                    Vector(value.XAxis),
-                    Vector(value.YAxis),
-                    PlaneNormal(value.ZAxis),
-                    value.XRadius,
-                    value.YRadius,
-                    value.ZRadius),
-            CadTorusEntity value =>
-                new CadTorusEntity(
-                    Point(value.Center),
-                    Vector(value.Axis),
-                    value.MajorRadius,
-                    value.MinorRadius),
             _ => throw new NotSupportedException(
                 $"Mirroring is not supported for entity type '{entity.EntityType}'.")
         };

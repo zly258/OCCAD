@@ -12,7 +12,7 @@ public sealed class SphereTool : CadDrawingTool, ICadPointInputTool
     public override string DisplayName => "Sphere";
     public override string PrecisionLengthLabel => "Radius";
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new(
             "Sphere",
             [

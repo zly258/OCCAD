@@ -32,11 +32,11 @@ public sealed class CoreAlignmentTests
         workspace.AddEntity(line);
         workspace.AssignEntitiesToLayer([line], layer.Name);
 
-        Assert.AreEqual(layer.Id, line.Layer);
+        Assert.AreEqual(layer.Id, line.LayerId);
         workspace.Layers.Rename(layer, "Review");
-        Assert.AreEqual(layer.Id, line.Layer);
+        Assert.AreEqual(layer.Id, line.LayerId);
         Assert.AreSame(layer, workspace.Layers.GetRequiredByName("Review"));
-        Assert.AreSame(layer, workspace.Layers.GetRequiredById(line.Layer));
+        Assert.AreSame(layer, workspace.Layers.GetRequiredById(line.LayerId));
         Assert.HasCount(1, workspace.Document.GetEntitiesByLayer("Review"));
     }
 
@@ -61,8 +61,8 @@ public sealed class CoreAlignmentTests
         var restoredLayer = target.Layers.GetRequiredByName("Review");
         var restoredEntity = target.Document.Entities.Single();
         Assert.AreEqual(expectedId, restoredLayer.Id);
-        Assert.AreEqual(expectedId, restoredEntity.Layer);
-        Assert.AreSame(restoredLayer, target.Layers.GetRequiredById(restoredEntity.Layer));
+        Assert.AreEqual(expectedId, restoredEntity.LayerId);
+        Assert.AreSame(restoredLayer, target.Layers.GetRequiredById(restoredEntity.LayerId));
     }
 
     [TestMethod]
@@ -74,7 +74,7 @@ public sealed class CoreAlignmentTests
         workspace.AddEntity(line);
 
         var properties = CadPropertyService.Describe(workspace, line);
-        var layer = properties.Single(value => value.Name == nameof(CadEntity.Layer));
+        var layer = properties.Single(value => value.Name == nameof(CadEntity.LayerId));
 
         Assert.AreEqual("General", layer.Group);
         Assert.AreEqual(CadPropertyEditorKind.Layer, layer.EditorType);
@@ -85,12 +85,12 @@ public sealed class CoreAlignmentTests
         Assert.IsTrue(CadPropertyService.TryApply(
             workspace,
             [line],
-            nameof(CadEntity.Layer),
+            nameof(CadEntity.LayerId),
             "Review",
             out var error), error);
-        Assert.AreEqual(review.Id, line.Layer);
+        Assert.AreEqual(review.Id, line.LayerId);
         Assert.AreEqual("Review", CadPropertyService.Describe(workspace, line)
-            .Single(value => value.Name == nameof(CadEntity.Layer)).Value);
+            .Single(value => value.Name == nameof(CadEntity.LayerId)).Value);
     }
 
     [TestMethod]

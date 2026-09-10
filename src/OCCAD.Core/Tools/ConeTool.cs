@@ -25,7 +25,7 @@ public sealed class ConeTool : CadDrawingTool, ICadPointInputTool
         _ => base.PrecisionLengthLabel
     };
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new("Cone", BuildParameters());
 
     protected override bool CanStepBackCore => Stage > 0;
@@ -181,45 +181,45 @@ public sealed class ConeTool : CadDrawingTool, ICadPointInputTool
                 return true;
 
             case 1:
-                {
-                    var radiusPoint = ProjectBasePoint(point);
-                    var radius = _radiusParameter ??
-                        CadPlaneGeometry.RadialDistance(
-                            _center,
-                            radiusPoint,
-                            _xAxis,
-                            _yAxis);
-                    if (radius <= 1e-9)
-                        return false;
-
-                    _radius = radius;
-                    _radiusPoint = _radiusParameter is not null
-                        ? _center + _xAxis * radius
-                        : radiusPoint;
-                    SetStageLocalized(
-                        2,
-                        "Cad.Prompt.Cone.Height",
-                        "Cone: specify height [Backspace undo, Esc cancel]",
-                        CadPrecisionInputKind.Length);
-                    SetWorkPlane(_radiusPoint, _baseNormal, _xAxis);
-                    LockStageAngle(0.0);
-                    Show(new CadConeEntity(
+            {
+                var radiusPoint = ProjectBasePoint(point);
+                var radius = _radiusParameter ??
+                    CadPlaneGeometry.RadialDistance(
                         _center,
-                        _baseNormal,
-                        _radius,
-                        _heightParameter ?? MinSize));
-                    RefreshParameterDrivenPreview();
-                    return true;
-                }
+                        radiusPoint,
+                        _xAxis,
+                        _yAxis);
+                if (radius <= 1e-9)
+                    return false;
+
+                _radius = radius;
+                _radiusPoint = _radiusParameter is not null
+                    ? _center + _xAxis * radius
+                    : radiusPoint;
+                SetStageLocalized(
+                    2,
+                    "Cad.Prompt.Cone.Height",
+                    "Cone: specify height [Backspace undo, Esc cancel]",
+                    CadPrecisionInputKind.Length);
+                SetWorkPlane(_radiusPoint, _baseNormal, _xAxis);
+                LockStageAngle(0.0);
+                Show(new CadConeEntity(
+                    _center,
+                    _baseNormal,
+                    _radius,
+                    _heightParameter ?? MinSize));
+                RefreshParameterDrivenPreview();
+                return true;
+            }
 
             case 2:
-                {
-                    var entity = CreateCone(point);
-                    if (entity is null)
-                        return false;
-                    CommitPreview(entity);
-                    return true;
-                }
+            {
+                var entity = CreateCone(point);
+                if (entity is null)
+                    return false;
+                CommitPreview(entity);
+                return true;
+            }
 
             default:
                 return false;

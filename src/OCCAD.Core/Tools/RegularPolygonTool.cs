@@ -32,7 +32,7 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
             ? true
             : base.CanCommitCurrentStage;
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new(
             "Regular Polygon",
             [

@@ -22,33 +22,35 @@ Core product layers include Document / Entity / Layer, Tool / Action / Transacti
 
 ## UI baseline
 
-The product has one **classic CAD shell**:
+The product keeps one **classic CAD shell**:
 
 ```text
 Menu: File | Draw | Model | View | Window | Language
 Single-row Toolbar
-Active Tool Parameter Strip (visible only for tools with parameters)
 
 Model Tree | CAD Viewport | Layers / Properties
 
+Fixed Tool Parameter Strip
 Operation Prompt | XY YZ XZ | SNAP ORTHO POLAR
 ```
 
 Rules:
 
-- no Ribbon;
+- no Ribbon and no legacy CleanShell/Ribbon compatibility layer;
 - no grouped three-row command surface;
-- no `DensityStyle.Compact` or custom global control skin;
 - Button / TextBox / ComboBox / CheckBox / Menu use native Avalonia Fluent styling;
-- `CadTheme` contains only CAD layout metrics and product-specific viewport/overlay visuals;
+- `CadTheme` contains layout metrics and CAD product colors/sizes only, not a second global control skin;
+- the Tool parameter strip is fixed directly above the status bar, so parameter visibility does not resize the viewport;
+- Settings label columns use shared content-based sizing while value columns consume remaining width;
+- dialog action captions are horizontally and vertically centered;
 - the custom CAD ColorTable is retained;
 - dark viewport, lower-left triedron, ViewCube disabled by default;
 - no permanent bottom command input, `Ready`, version text, or permanent coordinate noise;
 - the current operation prompt remains visible in the status strip.
 
-## Tool parameters
+## Tool parameters and live values
 
-A Tool `ParameterPanel` is rendered automatically in the active-tool parameter strip, avoiding the previous state where Core had parameters but the UI exposed no editor.
+A Tool `ParameterPanel` is rendered automatically in the **fixed bottom parameter strip**. The strip is a projection of current Tool state and does not maintain a second business-state model.
 
 Regular Polygon example:
 
@@ -60,7 +62,24 @@ Regular Polygon: Sides [6]  Mode [Inscribed]
 - `Mode`: Inscribed / Circumscribed;
 - before the center is specified, a side count can also be typed directly and confirmed with Enter.
 
-The same parameter surface is used by existing parameterized tools such as Box, Cylinder, Cone, Frustum, Sphere, Ellipsoid, Torus, Helix, Ellipse, and Extrude.
+The same parameter surface is used by parameterized tools such as Box, Cylinder, Cone, Frustum, Sphere, Ellipsoid, Torus, Helix, Ellipse, and Extrude.
+
+Parameter editors are bidirectional: user edits are committed to the active Tool, while common dimensional previews feed their current values back to the strip. Current live dimensions include Circle Radius/Diameter, Rectangle Width/Height, Ellipse Major/Minor Radius, Box Length/Width/Height, and Cylinder Radius/Height. A focused editor is never overwritten by live refresh.
+
+## Escape and work planes
+
+`Esc` is the unified CAD cancel operation:
+
+`cancel active Tool → clear Entity/Subobject/Preselection → clear Snap/Tracking → return focus to Viewport`
+
+It is intended to work whether focus is in the viewport or in a Tool parameter editor.
+
+XY / YZ / XZ represent the current drawing work plane. When a plane change is requested while drawing:
+
+- if the current stage permits the change, the new preset is applied immediately and preview is refreshed;
+- if the Tool is in a fixed temporary construction-plane stage, Core first steps back to the nearest stage that permits a plane change, then applies the requested preset;
+- a user-plane lock or fixed Grip plane still blocks the change;
+- planar Tools that cache basis vectors, including Circle, Arc, Rectangle, Ellipse, and Regular Polygon, must refresh that cache so UI state and generated geometry cannot diverge.
 
 ## PropertyGrid
 
@@ -113,7 +132,7 @@ OcctNet / OcctCSharpBridge
 OCCT
 ```
 
-Core does not depend on Avalonia. The UI adapts input and presents state; it does not duplicate Document, Selection, History, Layer, Geometry, or Tool business state.
+Core does not depend on Avalonia. The UI adapts input and presents state; it does not duplicate Document, Selection, History, Layer, Geometry, or Tool business state. Safe work-plane rollback, Tool lifecycle, transactions, and resource ownership belong in Core rather than being reimplemented independently by each UI entry point.
 
 ## Repository layout
 
@@ -132,7 +151,7 @@ OCCAD/
 └─ OCCAD.sln
 ```
 
-## Build
+## Build and validation
 
 Windows:
 
@@ -150,9 +169,19 @@ If the Bridge SDK does not include a complete portable runtime, configure `OCCT_
 
 The project currently does not maintain a separate Test project. Validation order is:
 
-`Core build → Avalonia build → real interactive regression → native/transient cleanup checks`
+`static inspection → Core build → Avalonia build → real interactive regression → native/transient cleanup checks`
 
-A source file or registered Action alone does not prove product support.
+Manual regression must cover at least:
+
+- no viewport height jump when parameterized Tools start or cancel;
+- parameter edits and live preview values remain synchronized without overwriting an active editor;
+- XY/YZ/XZ behaves consistently in 2D Tools and staged 3D Tools;
+- `Esc` cancels the command and clears all formal selection state;
+- long Chinese/English Settings labels are not clipped and dialog button captions are centered;
+- 125% / 150% DPI layouts remain usable;
+- preview, snap, tracking, and other transient state is gone after Tool completion/cancelation.
+
+A source file or registered Action alone does not prove product support, and build success must not be claimed without real build output.
 
 ## Documentation
 

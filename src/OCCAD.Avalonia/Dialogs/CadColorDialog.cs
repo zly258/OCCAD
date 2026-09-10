@@ -89,7 +89,7 @@ internal sealed class CadColorDialog : Window
 
         var cancel = CreateDialogButton(CadLanguageManager.Text("Cad.Text.Cancel", "Cancel"));
         cancel.Click += (_, _) => Close(null);
-        var ok = CreateDialogButton(CadLanguageManager.Text("Cad.Text.OK", "OK"), true);
+        var ok = CreateDialogButton(CadLanguageManager.Text("Cad.Text.OK", "OK"));
         ok.Click += (_, _) => Close(_selected);
 
         var actions = new StackPanel
@@ -123,19 +123,15 @@ internal sealed class CadColorDialog : Window
     private void RefreshPreview() =>
         _preview.Background = new SolidColorBrush(ToMediaColor(_selected));
 
-    private static Button CreateDialogButton(string text, bool primary = false)
-    {
-        var button = new Button
+    private static Button CreateDialogButton(string text) =>
+        new()
         {
             Content = text,
             MinWidth = CadTheme.DialogButtonWidth,
-            MinHeight = CadTheme.ControlHeight
+            MinHeight = CadTheme.ControlHeight,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center
         };
-        button.Classes.Add("cad-compact");
-        if (primary)
-            button.Classes.Add("cad-primary");
-        return button;
-    }
 
     private static MediaColor ToMediaColor(DrawingColor value) =>
         MediaColor.FromArgb(value.A, value.R, value.G, value.B);

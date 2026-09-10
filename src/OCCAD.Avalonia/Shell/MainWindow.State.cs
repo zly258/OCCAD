@@ -48,7 +48,7 @@ public sealed partial class MainWindow
         _propertyInspector.RefreshLanguage();
         ModelPanel.RefreshLanguage();
         RefreshCommandStatusLanguage();
-        RebuildCleanToolbar();
+        RebuildClassicShell();
 
         UpdateToolUi(_workspace.Tools.ActiveTool);
         UpdateSelectionStatus();

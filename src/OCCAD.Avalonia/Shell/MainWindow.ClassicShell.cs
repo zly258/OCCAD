@@ -22,7 +22,7 @@ public sealed partial class MainWindow
     };
     private readonly Border _classicToolOptionsSurface = new()
     {
-        IsVisible = false
+        IsVisible = true
     };
 
     private StackPanel? _classicShellHost;
@@ -42,6 +42,7 @@ public sealed partial class MainWindow
         _classicShellHost = BuildClassicShellHost();
         DockPanel.SetDock(_classicShellHost, Dock.Top);
         root.Children.Insert(0, _classicShellHost);
+        BuildClassicToolOptionsSurface();
 
         DisableViewCube();
         _viewport.EngineRecreated += (_, args) =>
@@ -79,7 +80,6 @@ public sealed partial class MainWindow
         };
         host.Children.Add(BuildClassicMenu());
         host.Children.Add(BuildClassicToolbar());
-        host.Children.Add(BuildClassicToolOptionsSurface());
         return host;
     }
 
@@ -299,7 +299,7 @@ public sealed partial class MainWindow
         };
     }
 
-    private Control BuildClassicToolOptionsSurface()
+    private void BuildClassicToolOptionsSurface()
     {
         _classicToolOptionsSurface.Child = new ScrollViewer
         {
@@ -307,7 +307,6 @@ public sealed partial class MainWindow
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
-        return _classicToolOptionsSurface;
     }
 
     private void RefreshClassicToolOptions()
@@ -317,12 +316,8 @@ public sealed partial class MainWindow
         var tool = _workspace.Tools.ActiveTool;
         var panel = tool?.ParameterPanel;
         if (tool is null || panel is null || panel.Parameters.Count == 0)
-        {
-            _classicToolOptionsSurface.IsVisible = false;
             return;
-        }
 
-        _classicToolOptionsSurface.IsVisible = true;
         _classicToolOptions.Children.Add(new TextBlock
         {
             Text = CadLanguageManager.Text(tool.LocalizationKey, panel.Title) + ":",
@@ -436,13 +431,13 @@ public sealed partial class MainWindow
             if (tool.TrySetParameter(parameterId, text))
             {
                 submitted = text;
-                global::Avalonia.Threading.Dispatcher.UIThread.Post(RefreshClassicToolOptions);
+                Dispatcher.UIThread.Post(RefreshClassicToolOptions);
                 _viewport.Focus();
                 return;
             }
 
             ShowStatusFeedback(Label("参数值无效", "Invalid parameter value"));
-            global::Avalonia.Threading.Dispatcher.UIThread.Post(RefreshClassicToolOptions);
+            Dispatcher.UIThread.Post(RefreshClassicToolOptions);
         }
 
         editor.KeyDown += (_, args) =>
@@ -464,7 +459,7 @@ public sealed partial class MainWindow
         if (!tool.TrySetParameter(id, value))
             ShowStatusFeedback(Label("参数值无效", "Invalid parameter value"));
 
-        global::Avalonia.Threading.Dispatcher.UIThread.Post(RefreshClassicToolOptions);
+        Dispatcher.UIThread.Post(RefreshClassicToolOptions);
         _viewport.Focus();
     }
 
@@ -634,20 +629,14 @@ public sealed partial class MainWindow
 
         if (_layerCombo.Parent is Panel layerParent)
             layerParent.Children.Remove(_layerCombo);
-        if (_classicToolOptionsSurface.Parent is Panel optionsParent)
-            optionsParent.Children.Remove(_classicToolOptionsSurface);
 
         _classicActionControls.Clear();
         _classicShellHost.Children.Clear();
         _classicShellHost.Children.Add(BuildClassicMenu());
         _classicShellHost.Children.Add(BuildClassicToolbar());
-        _classicShellHost.Children.Add(BuildClassicToolOptionsSurface());
         RefreshClassicShellActions();
         RefreshClassicToolOptions();
     }
-
-    private void RebuildCleanToolbar() => RebuildClassicShell();
-    private void RefreshCleanShellActions() => RefreshClassicShellActions();
 
     private static string Label(string chinese, string english) =>
         CadLanguageManager.CurrentLanguage.Equals("zh-CN", StringComparison.OrdinalIgnoreCase)

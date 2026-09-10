@@ -45,28 +45,30 @@ Menu
 └─ 语言
 
 Single-row Toolbar
-Active Tool Parameter Strip（仅当前 Tool 有参数时显示）
 
 Model Tree | CAD Viewport | Layers / Properties
 
+Fixed Tool Parameter Strip
 Operation Prompt | XY YZ XZ | SNAP ORTHO POLAR
 ```
 
 UI 规则：
 
-- 不使用 Ribbon；
+- 不使用 Ribbon，也不保留旧 CleanShell / Ribbon 兼容层；
 - 不使用三行分组工具区；
-- 不使用 `DensityStyle.Compact` 或自定义全局控件皮肤；
 - Button / TextBox / ComboBox / CheckBox / Menu 等使用 Avalonia 原生 Fluent；
-- `CadTheme` 只保留 CAD 布局指标、Viewport/Overlay 等产品必要视觉；
-- 自定义 ColorTable 保留；
+- `CadTheme` 只保留布局指标和 CAD 产品必要的颜色/尺寸，不维护第二套全局控件皮肤；
+- Tool 参数条固定停靠在底部状态栏上方，参数出现/消失不会改变 Viewport 高度；
+- 设置页标签列按内容共享自适应，Value 列占据剩余宽度；
+- 弹窗操作按钮文字水平、垂直居中；
+- 自定义 CAD ColorTable 保留；
 - Viewport 保持深色，左下角 Triedron 保留，ViewCube 默认关闭；
 - 底部不显示永久 Command Input、`Ready`、版本字符串或永久坐标噪声；
 - 当前操作提示保留在状态栏。
 
-## Tool 参数输入
+## Tool 参数输入与实时联动
 
-Tool 的 `ParameterPanel` 会自动呈现在顶部参数条，不再出现“Core 有参数但 UI 无入口”的情况。
+Tool 的 `ParameterPanel` 自动呈现在**底部固定参数条**。参数条属于 Tool 状态的 UI 投影，不保存第二份业务状态。
 
 例如正多边形：
 
@@ -79,6 +81,23 @@ Tool 的 `ParameterPanel` 会自动呈现在顶部参数条，不再出现“Cor
 - 在指定圆心之前，也可以直接键入边数并回车。
 
 Box、Cylinder、Cone、Frustum、Sphere、Ellipsoid、Torus、Helix、Ellipse、Extrude 等已有 Tool 参数同样使用统一参数条。
+
+参数编辑器与当前 Tool 双向联动：用户输入提交到 Tool；常用尺寸型 Preview 会反向刷新参数条中的实际值，例如 Circle 的 Radius/Diameter、Rectangle 的 Width/Height、Ellipse 的 Major/Minor Radius、Box 的 Length/Width/Height、Cylinder 的 Radius/Height。用户正在编辑输入框时不会被实时刷新覆盖。
+
+## ESC 与工作平面
+
+`Esc` 是统一 CAD 取消动作：
+
+`取消当前 Tool → 清空 Entity/Subobject/Preselection → 清理 Snap/Tracking → 返回 Viewport`
+
+因此无论焦点在 Viewport 还是参数编辑器，`Esc` 都不应留下活动命令或旧选择。
+
+XY / YZ / XZ 是当前绘图工作平面。绘图过程中请求切换时：
+
+- 如果当前阶段允许切换，立即应用新工作平面并刷新 Preview；
+- 如果当前 Tool 正处于固定临时施工平面阶段，Core 会先回退到最近的可切换阶段，再应用新平面；
+- User Plane Lock 或固定 Grip Plane 仍会阻止切换；
+- Circle、Arc、Rectangle、Ellipse、Regular Polygon 等缓存平面基向量的 Tool 必须在切换后同步刷新缓存，不能出现 UI 已切换而几何仍沿用旧平面的状态。
 
 ## PropertyGrid
 
@@ -131,7 +150,7 @@ OcctNet / OcctCSharpBridge
 OCCT
 ```
 
-Core 不引用 Avalonia。UI 只负责输入适配和状态呈现，不复制 Document、Selection、History、Layer、Geometry 或 Tool 业务状态。
+Core 不引用 Avalonia。UI 只负责输入适配和状态呈现，不复制 Document、Selection、History、Layer、Geometry 或 Tool 业务状态。工作平面安全回退、Tool 生命周期、事务和资源所有权属于 Core，不应在不同 UI 入口各自实现一套。
 
 ## 目录
 
@@ -150,7 +169,7 @@ OCCAD/
 └─ OCCAD.sln
 ```
 
-## 构建
+## 构建与验证
 
 Windows：
 
@@ -168,9 +187,19 @@ Linux：
 
 当前项目不维护独立 Test 项目。验证顺序为：
 
-`Core build → Avalonia build → 实机交互回归 → Native/Transient 清理检查`
+`静态检查 → Core build → Avalonia build → 实机交互回归 → Native/Transient 清理检查`
 
-不能仅因为源码存在或 Action 已注册就视为功能完成。
+重点手工验证：
+
+- 参数 Tool 启动/取消时 Viewport 高度不跳动；
+- 参数输入与 Preview 实际值联动，编辑过程中不被刷新覆盖；
+- XY/YZ/XZ 在二维 Tool 和分阶段三维 Tool 中行为一致；
+- `Esc` 同时取消命令并清空所有选择；
+- 设置页中英文长标签不截断，弹窗按钮文字居中；
+- 125% / 150% DPI 下布局可用；
+- Tool 完成/取消后 Preview、Snap、Tracking 等 transient 无残留。
+
+不能仅因为源码存在或 Action 已注册就视为功能完成，也不能在没有真实构建输出时宣称构建通过。
 
 ## 文档
 

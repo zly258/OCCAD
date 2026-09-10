@@ -45,7 +45,6 @@ internal sealed class CadErrorWindow : Window
             AcceptsReturn = true,
             TextWrapping = global::Avalonia.Media.TextWrapping.Wrap
         };
-        details.Classes.Add("cad-input");
 
         var path = new TextBlock
         {
@@ -55,7 +54,7 @@ internal sealed class CadErrorWindow : Window
             FontSize = CadTheme.SmallFontSize
         };
 
-        var close = DialogButton(CadLanguageManager.Text("Cad.Text.Continue", "Continue"), primary: true);
+        var close = DialogButton(CadLanguageManager.Text("Cad.Text.Continue", "Continue"));
         close.Click += (_, _) => Close();
 
         var exit = DialogButton(CadLanguageManager.Text("Cad.Text.Exit", "Exit"));
@@ -134,17 +133,13 @@ internal sealed class CadErrorWindow : Window
         }
     }
 
-    private static Button DialogButton(string text, bool primary = false)
-    {
-        var button = new Button
+    private static Button DialogButton(string text) =>
+        new()
         {
             Content = text,
             MinWidth = CadTheme.DialogButtonWidth,
-            MinHeight = CadTheme.ControlHeight
+            MinHeight = CadTheme.ControlHeight,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center
         };
-        button.Classes.Add("cad-compact");
-        if (primary)
-            button.Classes.Add("cad-primary");
-        return button;
-    }
 }

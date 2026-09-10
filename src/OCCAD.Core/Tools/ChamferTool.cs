@@ -116,7 +116,7 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
         }
     }
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new(
             "Chamfer",
             [

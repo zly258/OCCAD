@@ -4,7 +4,7 @@ namespace OCCAD.Core.Tests;
 public sealed class ApplicationCoreTests
 {
     [TestMethod]
-    public void ApplicationCoreOwnsSettingsWorkspaceAndDocumentSession()
+    public void ApplicationCoreOwnsSettingsWorkspaceCommandsAndDocumentSession()
     {
         using var app = new CadApplicationCore();
         app.Settings.Set(CadSettingKeys.SnapSize, 21);
@@ -12,11 +12,27 @@ public sealed class ApplicationCoreTests
 
         Assert.AreEqual(21, app.Workspace.Snap.MarkerSize);
         Assert.AreEqual(17, app.Workspace.Grips.MarkerSize);
+        Assert.IsNotNull(app.Commands);
         Assert.AreEqual(CadDocumentSession.UntitledName, app.Documents.DisplayName);
     }
 
     [TestMethod]
-    public void LoadingSettingsRefreshesCoreServices()
+    public void CommandSessionsAreApplicationScoped()
+    {
+        using var first = new CadApplicationCore();
+        using var second = new CadApplicationCore();
+
+        var result = first.Commands.Execute("not-a-real-command");
+
+        Assert.AreEqual(CadCommandResultKind.Failed, result.Kind);
+        CollectionAssert.AreEqual(
+            new[] { "not-a-real-command" },
+            first.Commands.History.ToArray());
+        Assert.IsEmpty(second.Commands.History);
+    }
+
+    [TestMethod]
+    public void LoadingSettingsPublishesIntoCoreServices()
     {
         using var source = new MemoryStream();
         var settings = new CadSettingsStore();
@@ -54,7 +70,7 @@ public sealed class ApplicationCoreTests
     }
 
     [TestMethod]
-    public void InvalidPersistedPreferencesAreIgnoredAndNormalized()
+    public void InvalidPersistedPreferencesRollBackStoreAndCoreState()
     {
         using var source = new MemoryStream();
         var persisted = new CadSettingsStore();
@@ -66,21 +82,21 @@ public sealed class ApplicationCoreTests
         source.Position = 0;
 
         using var app = new CadApplicationCore();
+        var beforeSettings = app.Settings.Snapshot();
         var expectedSelection = app.Workspace.Selection.PixelTolerance;
         var expectedGrip = app.Workspace.Grips.MarkerSize;
         var expectedSnap = app.Workspace.Snap.MarkerSize;
         var expectedPolar = app.Workspace.Drafting.PolarIncrementDegrees;
 
-        app.LoadSettings(source);
+        Assert.Throws<ArgumentOutOfRangeException>(() => app.LoadSettings(source));
 
         Assert.AreEqual(expectedSelection, app.Workspace.Selection.PixelTolerance);
         Assert.AreEqual(expectedGrip, app.Workspace.Grips.MarkerSize);
         Assert.AreEqual(expectedSnap, app.Workspace.Snap.MarkerSize);
         Assert.AreEqual(expectedPolar, app.Workspace.Drafting.PolarIncrementDegrees);
-        Assert.AreEqual(expectedSelection, app.Settings.Get(CadSettingKeys.SelectionTolerance, -1));
-        Assert.AreEqual(expectedGrip, app.Settings.Get(CadSettingKeys.GripSize, -1));
-        Assert.AreEqual(expectedSnap, app.Settings.Get(CadSettingKeys.SnapSize, -1));
-        Assert.AreEqual(expectedPolar, app.Settings.Get(CadSettingKeys.PolarIncrementDegrees, -1.0));
+        CollectionAssert.AreEquivalent(
+            beforeSettings.Keys.ToArray(),
+            app.Settings.Keys.ToArray());
     }
 
     [TestMethod]

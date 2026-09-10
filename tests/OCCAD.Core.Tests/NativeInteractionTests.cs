@@ -235,26 +235,51 @@ internal sealed class NativeScene : IDisposable
 {
     private readonly nint _display;
     private readonly nuint _window;
+
+    public CadApplicationCore Application { get; }
     public OcctEngine Engine { get; }
-    public CadWorkspace Workspace { get; }
+    public CadWorkspace Workspace => Application.Workspace;
+    public CadCommandManager Commands => Application.Commands;
 
     public NativeScene()
     {
-        if (!OperatingSystem.IsLinux() || Environment.GetEnvironmentVariable("OCCAD_NATIVE_TESTS") != "1")
-            Assert.Inconclusive("Set OCCAD_NATIVE_TESTS=1 with an X11 display and the native SDK to run viewer tests.");
+        if (!OperatingSystem.IsLinux() ||
+            Environment.GetEnvironmentVariable("OCCAD_NATIVE_TESTS") != "1")
+        {
+            Assert.Inconclusive(
+                "Set OCCAD_NATIVE_TESTS=1 with an X11 display and the native SDK to run viewer tests.");
+        }
+
         XInitThreads();
         _display = XOpenDisplay(null);
         Assert.AreNotEqual(nint.Zero, _display, "An X11 display is required.");
-        _window = XCreateSimpleWindow(_display, XDefaultRootWindow(_display), 0, 0, 640, 480, 0, 0, 0);
-        XMapWindow(_display, _window); XSync(_display, false);
-        Engine = new OcctEngine(); Engine.Initialize((nint)_window);
-        Workspace = new CadWorkspace(); Workspace.AttachEngine(Engine);
+        _window = XCreateSimpleWindow(
+            _display,
+            XDefaultRootWindow(_display),
+            0,
+            0,
+            640,
+            480,
+            0,
+            0,
+            0);
+        XMapWindow(_display, _window);
+        XSync(_display, false);
+
+        Engine = new OcctEngine();
+        Engine.Initialize((nint)_window);
+        Application = new CadApplicationCore();
+        Workspace.AttachEngine(Engine);
     }
+
     public void Dispose()
     {
-        Workspace.Dispose(); Engine.Dispose();
-        XDestroyWindow(_display, _window); XCloseDisplay(_display);
+        Application.Dispose();
+        Engine.Dispose();
+        XDestroyWindow(_display, _window);
+        XCloseDisplay(_display);
     }
+
     [DllImport("libX11.so.6")] private static extern int XInitThreads();
     [DllImport("libX11.so.6")] private static extern nint XOpenDisplay(string? display);
     [DllImport("libX11.so.6")] private static extern nuint XDefaultRootWindow(nint display);

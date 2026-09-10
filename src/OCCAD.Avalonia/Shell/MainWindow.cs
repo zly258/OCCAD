@@ -74,7 +74,7 @@ internal sealed class MainWindow : Window
         _workspace = application.Workspace;
         _settings = application.Settings;
         _documents = new CadDocumentStorage(application);
-        _commands = CadCommandManager.ForWorkspace(_workspace);
+        _commands = application.Commands;
         _inspector = new CadInspectorPanel(_workspace, ShowFeedback);
 
         Width = 1280;

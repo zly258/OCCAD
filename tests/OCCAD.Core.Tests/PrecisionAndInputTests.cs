@@ -84,7 +84,9 @@ public sealed class PrecisionAndInputTests
     [TestMethod]
     public void OffsetConsumesBasePointWithoutAdvancingTool()
     {
-        using var w = new CadWorkspace(); var commands = CadCommandManager.ForWorkspace(w);
+        using var app = new CadApplicationCore();
+        var w = app.Workspace;
+        var commands = app.Commands;
         w.Tools.Activate("line");
         Assert.IsTrue(commands.Execute("O").Success);
         Assert.IsTrue(commands.Execute("10,20").Success);
@@ -118,7 +120,7 @@ public sealed class PrecisionAndInputTests
             case "point": w.Tools.SubmitCurrent(new CadResolvedPoint(exact, null)); break;
             case "command":
                 var text = FormattableString.Invariant($"#{exact.X},{exact.Y},{exact.Z}");
-                Assert.IsTrue(CadCommandManager.ForWorkspace(w).Execute(text).Success); break;
+                Assert.IsTrue(scene.Commands.Execute(text).Success); break;
             case "pointer": w.Tools.HandlePointer(new(OcctPointerInputKind.Pressed, OcctPointerButton.Left,
                 OcctPointerButtons.Left, pixel.X, pixel.Y, 0, OcctInputModifiers.None)); break;
             case "enter": Assert.IsTrue(w.Tools.HandleKey(new(OcctKeyInputKind.Pressed, OcctKey.Enter, OcctInputModifiers.None))); break;

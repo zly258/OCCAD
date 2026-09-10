@@ -26,6 +26,6 @@ Selection、Preselection、SubobjectSelection 相互独立。点解析继续统�
 
 Preview、Grip、Snap、Preselection、Subobject overlay 分别管理 transient 生命周期。GripEdit 在 Duplicate Preview 上编辑，Accept 后只产生一次真实状态修改和 History。
 
-Layer/Property 是 Core 状态的 Avalonia 视图。Property 通过 `TypeDescriptor` 元数据生成编辑器，不使用反射调用，也不再嵌 WinForms PropertyGrid。所有修改路径遵循 Capture → Validate/Build → Apply → History，失败回滚。
+Layer/Property 是 Core 状态的 Avalonia 视图。Property 语义由 Core 的 `CadPropertyDescriptor`/`CadValueDescriptor` 提供，`TypeDescriptor` 只作为 CLR 属性适配层，不是 UI 业务模型。所有修改路径遵循 Capture → Validate/Build → Apply → History，失败回滚。
 
 Avalonia Viewport 直接消费安装 SDK 提供的官方 `OcctAvaloniaViewport`；OCCAD 不再自建第二层 HWND/NativeControlHost 包装。

@@ -27,15 +27,16 @@ Geometry setters validate finite/positive/range constraints before mutating fiel
 Prefer one entity and one principal tool per file:
 
 ```text
-Entities/
-  CadLine.cs
-  CadCircle.cs
-  CadArc.cs
-  CadRectangle.cs
-  CadPolyline.cs
-  CadBox.cs
-  CadCylinder.cs
-Tools/
+Entities/TwoD/
+  CadLineEntity.cs
+  CadCircleEntity.cs
+  CadArcEntity.cs
+  CadRectangleEntity.cs
+  CadPolylineEntity.cs
+Entities/ThreeD/
+  CadBoxEntity.cs
+  CadCylinderEntity.cs
+Interaction/
   LineTool.cs
   CircleTool.cs
   ArcTool.cs
@@ -50,7 +51,7 @@ Shared geometry algorithms belong in explicit helpers/services, not copied acros
 
 `Duplicate()` copies complete business state into a new object instance. Identity semantics must be explicit: edit snapshots are not distinguished by identity, while a true Copy operation creates a new Entity Id.
 
-`RestoreGeometry()` restores geometry only. `RestoreState()` restores full business state including metadata and appearance.
+`RestoreGeometry()` restores definition geometry. `RestoreState()` restores full business state including metadata, appearance, and placement. Rigid Move/Rotate use `CadPlacement`; geometry algorithms explicitly convert between local and world space rather than treating raw fields as world coordinates.
 
 ## 5. Snap contract
 
@@ -97,20 +98,18 @@ The real Entity is never modified continuously during grip drag.
 
 Every Tool declares:
 
-- Id;
-- localized display name;
-- State;
-- stage count and stage prompts;
-- pointer left/right/move behavior;
-- Enter/Esc/Backspace behavior;
-- `CanFinish`;
-- `PrecisionInputs`;
-- `PrecisionReferencePoint`;
-- work-plane lock policy;
-- `ParameterPanel`;
+- stable Id and localized display name;
+- `CadToolState`;
+- `CadToolStep` with explicit `InputKind`, precision inputs and prompt;
+- whether the current step requires a pointer;
+- pointer behavior and StepBack behavior;
+- `InteractionPolicy` and `SnapResolvePolicy`;
+- precision reference point and work-plane policy;
+- parameter descriptors for ToolPanel;
 - preview construction/update;
-- commit;
-- cancel cleanup.
+- commit/finish/cancel cleanup.
+
+Enter, right-click, and UI Accept/Finish use `CadToolManager.SubmitCurrent()`; UI code does not interpret raw stage integers.
 
 ## 8. Stage values versus stable Tool parameters
 

@@ -26,6 +26,6 @@ Selection, Preselection and SubobjectSelection remain separate. Point resolution
 
 Preview, Grip, Snap, Preselection and subobject overlays have separate lifecycles. GripEdit works on a duplicate preview and creates one real state/history change on Accept.
 
-Layer and Property panels are Avalonia views over Core state. The Property editor uses `TypeDescriptor` metadata rather than reflection invocation or WinForms hosting. All modifying paths follow Capture → Validate/Build → Apply → History with rollback on failure.
+Layer and Property panels are Avalonia views over Core state. Property semantics come from Core `CadPropertyDescriptor`/`CadValueDescriptor`; `TypeDescriptor` is only the Core adapter for CLR properties, not the UI business model. All modifying paths follow Capture → Validate/Build → Apply → History with rollback on failure.
 
 The Avalonia viewport adapter consumes the official `OcctAvaloniaViewport` from the installed Bridge SDK; OCCAD does not create a second HWND/NativeControlHost wrapper.

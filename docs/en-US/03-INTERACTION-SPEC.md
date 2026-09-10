@@ -24,7 +24,7 @@ Cancel or Finish according to Tool contract
 Clear transient state → Idle
 ```
 
-Right-click finishes a Tool when it is currently finishable; otherwise it cancels. With no active Tool it may be handled by viewport/context behavior. Backspace means Tool StepBack. Delete means delete selection and is not a second StepBack key.
+Right-click first submits the current non-pointer Tool step when that step can be accepted; otherwise it finishes a finishable Tool, and only then falls back to cancel. Enter and the ToolPanel Accept/Finish control use the same Core submission rule. Backspace means Tool StepBack. Delete means delete selection and is not a second StepBack key.
 
 ## 3. Point-resolution pipeline
 

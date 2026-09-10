@@ -1,6 +1,4 @@
 using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
-
 namespace OCCAD.Avalonia;
 
 internal static class Program
@@ -12,8 +10,6 @@ internal static class Program
             .Configure<CadApplication>()
             .UsePlatformDetect()
             .LogToTrace()
-            .StartWithClassicDesktopLifetime(
-                args,
-                ShutdownMode.OnLastWindowClose);
+            .StartWithClassicDesktopLifetime(args);
     }
 }

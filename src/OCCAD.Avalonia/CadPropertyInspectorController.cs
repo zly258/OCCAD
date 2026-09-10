@@ -159,8 +159,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
             var title = _layer is not null
                 ? $"{CadLanguageManager.Text("Cad.Text.Layers", "Layers")}: {_layer.Name}"
-                : _subobject is { } subobject
-                    ? LocalizeSubobjectTitle(subobject)
+                : _subobject is { } selectedSubobject
+                    ? LocalizeSubobjectTitle(selectedSubobject)
                     : _entities.Length == 1
                         ? LocalizeEntityName(_entities[0])
                         : string.Format(
@@ -301,9 +301,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
         }
 
         var engine = _workspace.Engine;
-        var owner = selection.Entity.ViewerShape;
         if (engine is not { IsInitialized: true } ||
-            owner is null)
+            selection.Entity.ViewerShape is not { } owner)
             return;
 
         OcctShape? temporary = null;
@@ -332,16 +331,17 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
                 case OcctShapeType.Edge:
                 {
-                    temporary = engine.GetSubshapeAt(
+                    var edgeShape = engine.GetSubshapeAt(
                         owner,
                         OcctShapeType.Edge,
                         selection.SubshapeIndex);
+                    temporary = edgeShape;
                     var curveType =
-                        engine.GetEdgeCurveType(temporary);
+                        engine.GetEdgeCurveType(edgeShape);
                     var endpoints =
-                        engine.GetEdgeEndpoints(temporary);
+                        engine.GetEdgeEndpoints(edgeShape);
                     var properties =
-                        engine.GetShapeLinearProperties(temporary);
+                        engine.GetShapeLinearProperties(edgeShape);
 
                     rows.Add((
                         Text("Cad.Property.SubobjectType", "Type"),
@@ -365,14 +365,15 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
                 case OcctShapeType.Face:
                 {
-                    temporary = engine.GetSubshapeAt(
+                    var faceShape = engine.GetSubshapeAt(
                         owner,
                         OcctShapeType.Face,
                         selection.SubshapeIndex);
+                    temporary = faceShape;
                     var surfaceType =
-                        engine.GetFaceSurfaceType(temporary);
+                        engine.GetFaceSurfaceType(faceShape);
                     var properties =
-                        engine.GetShapeSurfaceProperties(temporary);
+                        engine.GetShapeSurfaceProperties(faceShape);
                     rows.Add((
                         Text("Cad.Property.SubobjectType", "Type"),
                         Text(
@@ -388,14 +389,14 @@ internal sealed class CadPropertyInspectorController : IDisposable
                     try
                     {
                         var bounds =
-                            engine.GetFaceUvBounds(temporary);
+                            engine.GetFaceUvBounds(faceShape);
                         var u =
                             (bounds.UMin + bounds.UMax) * 0.5;
                         var v =
                             (bounds.VMin + bounds.VMax) * 0.5;
                         var evaluation =
                             engine.EvaluateFace(
-                                temporary,
+                                faceShape,
                                 u,
                                 v);
                         rows.Add((
@@ -428,8 +429,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
         }
         finally
         {
-            if (temporary is not null)
-                TryDeleteTemporaryShape(engine, temporary);
+            if (temporary is { } temporaryShape)
+                TryDeleteTemporaryShape(
+                    engine,
+                    temporaryShape);
         }
 
         AddReadOnlyGroup(
@@ -742,7 +745,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         editor.KeyDown += (_, e) =>
         {
-            if (e.Key != Avalonia.Input.Key.Enter) return;
+            if (e.Key != global::Avalonia.Input.Key.Enter) return;
             Commit();
             e.Handled = true;
         };

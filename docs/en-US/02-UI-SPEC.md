@@ -27,7 +27,7 @@ The toolbar contains only global/current-stage state. Entity/tool-specific param
 
 Model is left. Layer and Property share a compact tabbed right dock instead of two permanently stacked panels. Both docks are views over Workspace state and can be hidden without changing business state.
 
-Layer editing provides current layer, color, visible, locked, line width and line style using native Avalonia controls. Property editing uses `TypeDescriptor` metadata, supports single/multi-selection, common properties, layer/enum/bool/color editors, three-decimal display and transaction/history rollback. WinForms PropertyGrid is not used.
+Layer editing provides current layer, color, visible, locked, line width and line style using native Avalonia controls. Property editing consumes Core `CadPropertyDescriptor`/`CadValueDescriptor` metadata, supports single/multi-selection, common properties, layer/enum/bool/color editors, concise numeric display and transaction/history rollback. WinForms PropertyGrid is not used.
 
 ## Viewport / HUD / Cursor
 

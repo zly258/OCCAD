@@ -20,7 +20,7 @@ Active Tool + Command Line
 
 ## 2. Tool 生命周期
 
-统一状态：`Idle → Activate → Drawing/WaitForSelection → Preview Updated → Commit Stage → next/complete`。Esc/Cancel 清理 Preview、Tracking、Snap 临时状态和 Tool 临时工作平面。右键：CanFinish 时 Finish，否则 Cancel。Backspace/StepBack 回退一个阶段，不等价于 Cancel。
+统一状态：`Idle → Activate → Drawing/WaitForSelection → Preview Updated → Commit Stage → next/complete`。Esc/Cancel 清理 Preview、Tracking、Snap 临时状态和 Tool 临时工作平面。右键优先提交当前可接受的非 Point Step，其次 Finish，可提交和可结束都不满足时才 Cancel；Enter 与 ToolPanel 的 Accept/Finish 使用同一套 Core 提交规则。Backspace/StepBack 回退一个阶段，不等价于 Cancel。
 
 ## 3. Command Line 键盘优先级
 

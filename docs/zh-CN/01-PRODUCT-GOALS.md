@@ -56,4 +56,4 @@ OCCAD 不是 OCCT API Demo，也不是把内核接口直接暴露到 UI。目标
 
 ## 7. 完成判定
 
-一个功能只有在入口、Tool 生命周期、Preview/最终一致、正常/异常退出、Undo/Redo、UI 状态、本地化、持久化和扩展契约全部一致后才算完成。具体以 `12-ACCEPTANCE-CHECKLIST.md` 为发布门槛。
+一个功能只有在入口、Tool 生命周期、Preview/最终一致、正常/异常退出、Undo/Redo、UI 状态、本地化、持久化和扩展契约全部一致后才算完成。

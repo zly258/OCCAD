@@ -161,6 +161,19 @@ public sealed class CadToolManager
         return tool?.HandlePointer(input) == true;
     }
 
+    public bool CommitPoint(OcctPoint3d point)
+    {
+        if (!point.IsFinite)
+            return false;
+
+        var tool = ActiveTool;
+        if (tool is not ICadPointInputTool pointInput ||
+            tool.CurrentStep.InputKind != CadToolInputKind.Point)
+            return false;
+
+        return pointInput.TryAcceptPoint(point);
+    }
+
     public bool CommitCurrentStage()
     {
         var tool = ActiveTool;

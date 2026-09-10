@@ -29,7 +29,7 @@ internal sealed class CadMessageDialog : Window
         var text = new TextBlock
         {
             Text = message,
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            TextWrapping = global::Avalonia.Media.TextWrapping.Wrap,
             Foreground = CadTheme.Text,
             MaxWidth = 390
         };

@@ -194,6 +194,8 @@ public sealed class CadRevolveEntity : CadFeatureEntity
         {
             case 0:
             {
+                _profileSourceId = null;
+                _axisSourceId = null;
                 var center = CadPlanarProfileGeometry.Center(_profile);
                 var displacement =
                     CadTransformMath.Between(center, targetPoint);
@@ -203,11 +205,13 @@ public sealed class CadRevolveEntity : CadFeatureEntity
             }
 
             case 1:
+                _axisSourceId = null;
                 _axisPoint = targetPoint;
                 break;
 
             case 2:
             {
+                _axisSourceId = null;
                 var direction =
                     CadTransformMath.Between(
                         _axisPoint,
@@ -257,6 +261,8 @@ public sealed class CadRevolveEntity : CadFeatureEntity
 
     public override void Translate(OcctVector3d displacement)
     {
+        _profileSourceId = null;
+        _axisSourceId = null;
         _profile.Translate(displacement);
         _axisPoint += displacement;
         RaiseGeometryChanged(nameof(Translate));
@@ -267,6 +273,8 @@ public sealed class CadRevolveEntity : CadFeatureEntity
         OcctVector3d axis,
         double angleDegrees)
     {
+        _profileSourceId = null;
+        _axisSourceId = null;
         _profile.Rotate(center, axis, angleDegrees);
         _axisPoint =
             CadTransformMath.RotatePoint(
@@ -287,6 +295,8 @@ public sealed class CadRevolveEntity : CadFeatureEntity
         double factor)
     {
         CadTransformMath.ValidateScale(factor);
+        _profileSourceId = null;
+        _axisSourceId = null;
         _profile.Scale(center, factor);
         _axisPoint =
             CadTransformMath.ScalePoint(

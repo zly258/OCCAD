@@ -158,6 +158,7 @@ public sealed class CadExtrudeEntity : CadFeatureEntity
         switch (index)
         {
             case 0:
+                _profileSourceId = null;
                 _profile.Translate(
                     CadTransformMath.Between(
                         center,
@@ -208,6 +209,7 @@ public sealed class CadExtrudeEntity : CadFeatureEntity
     public override void Translate(
         OcctVector3d displacement)
     {
+        _profileSourceId = null;
         _profile.Translate(displacement);
         RaiseGeometryChanged(nameof(Translate));
     }
@@ -217,6 +219,7 @@ public sealed class CadExtrudeEntity : CadFeatureEntity
         OcctVector3d axis,
         double angleDegrees)
     {
+        _profileSourceId = null;
         _profile.Rotate(center, axis, angleDegrees);
         _vector =
             CadTransformMath.RotateVector(
@@ -231,6 +234,7 @@ public sealed class CadExtrudeEntity : CadFeatureEntity
         double factor)
     {
         CadTransformMath.ValidateScale(factor);
+        _profileSourceId = null;
         _profile.Scale(center, factor);
         _vector = _vector * factor;
         RaiseGeometryChanged(nameof(Scale));

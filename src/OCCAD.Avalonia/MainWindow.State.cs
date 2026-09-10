@@ -105,11 +105,6 @@ public sealed partial class MainWindow
             _propertyInspector.InspectEntities(args.Entities);
         }
 
-        _workspace.Grips.Show(
-            _workspace.Tools.Mode == CadInteractionMode.Normal
-                ? args.Entities
-                : []);
-
         UpdateSelectionStatus();
         SelectTreeEntity(args.Primary);
         RefreshActionUi();
@@ -417,14 +412,17 @@ public sealed partial class MainWindow
                 _dynamicHud.IsVisible = false;
         }
 
-        _finishButton.Content =
-            tool?.CanFinish == true
-                ? UiText("Cad.Text.Finish", "Finish")
-                : UiText("Cad.Text.Accept", "Accept");
-        _finishButton.IsEnabled =
+        var canAcceptStep =
             tool is not null &&
-            (tool.CanFinish ||
-             tool.CanCommitCurrentStage);
+            tool.CanCommitCurrentStage &&
+            !tool.CurrentStep.RequiresPointer;
+        _finishButton.Content =
+            canAcceptStep
+                ? UiText("Cad.Text.Accept", "Accept")
+                : UiText("Cad.Text.Finish", "Finish");
+        _finishButton.IsEnabled =
+            canAcceptStep ||
+            tool?.CanFinish == true;
         _cancelButton.Content =
             UiText("Cad.Text.Cancel", "Cancel");
         _cancelButton.IsEnabled =
@@ -492,7 +490,7 @@ public sealed partial class MainWindow
             {
                 pair.Value.IsChecked =
                     Math.Abs(
-                        _workspace.WorkPlane
+                        _workspace.Drafting
                             .PolarIncrementDegrees -
                         pair.Key) <= 1e-12;
             }

@@ -40,4 +40,4 @@ The current completion gate does not require every DWG/DXF entity, a full parame
 
 Recoverable invalid input, degenerate geometry, Grip/Preview/Property/file errors do not terminate the app and roll back safely. Appearance, point resolution, selection, history, preview, and property mutation each have one authoritative path. New basic entities add focused files and registration rather than large MainWindow switches. PointerMove avoids unnecessary delete/recreate; bulk display is batched; large loads are staged with progress. Chinese and English fully cover visible UI while internal IDs remain stable.
 
-A feature is complete only when entry points, Tool lifecycle, preview/final consistency, normal/error exits, Undo/Redo, UI state, localization, persistence, and extensibility all agree. `12-ACCEPTANCE-CHECKLIST.md` is the release gate.
+A feature is complete only when entry points, Tool lifecycle, preview/final consistency, normal/error exits, Undo/Redo, UI state, localization, persistence, and extensibility all agree.

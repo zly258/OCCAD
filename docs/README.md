@@ -1,8 +1,18 @@
 # OCCAD Documentation
 
-This directory is the single design and development baseline for the OCCAD repository. It is based on a second-pass analysis of `zly258/OCCTBIM-Source` and the current OCCAD implementation, but defines OCCAD's own .NET/Avalonia contracts rather than copying Qt implementation details.
+This directory contains the stable design contracts for OCCAD. It does not track sprint status, commit-by-commit progress, temporary gap lists, or local validation notes.
 
-- 中文：[`zh-CN/README.md`](zh-CN/README.md)
-- English: [`en-US/README.md`](en-US/README.md)
+- English: [en-US/README.md](en-US/README.md)
+- 中文: [zh-CN/README.md](zh-CN/README.md)
 
-The language trees mirror each other. The normative shell is native Avalonia compact `Menu + ToolBar + Docks + StatusBar + non-modal ToolPanel`; Ribbon is not part of the target architecture.
+The English and Chinese trees describe the same seven long-lived topics:
+
+1. Product goals
+2. UI specification
+3. Interaction specification
+4. Architecture
+5. Entity and Tool contract
+6. Quality, performance, localization, and data semantics
+7. Code organization and cleanup
+
+OCCTBIM-Source/release-1.0 remains a behavioral and architectural reference for Document/Entity/Tool/Action/Grip/Snap/Property responsibility boundaries. OCCAD does not copy its Qt UI, singleton structure, or exact class hierarchy.

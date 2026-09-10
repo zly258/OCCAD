@@ -185,6 +185,7 @@ public sealed class CadLoftEntity : CadFeatureEntity
 
         var center =
             CadPlanarProfileGeometry.Center(_sections[index]);
+        _sectionSourceIds[index] = null;
         _sections[index].Translate(
             CadTransformMath.Between(
                 center,
@@ -231,6 +232,7 @@ public sealed class CadLoftEntity : CadFeatureEntity
 
     public override void Translate(OcctVector3d displacement)
     {
+        ClearSectionSourceReferences();
         foreach (var section in _sections)
             section.Translate(displacement);
         RaiseGeometryChanged(nameof(Translate));
@@ -241,6 +243,7 @@ public sealed class CadLoftEntity : CadFeatureEntity
         OcctVector3d axis,
         double angleDegrees)
     {
+        ClearSectionSourceReferences();
         foreach (var section in _sections)
             section.Rotate(center, axis, angleDegrees);
         RaiseGeometryChanged(nameof(Rotate));
@@ -251,9 +254,20 @@ public sealed class CadLoftEntity : CadFeatureEntity
         double factor)
     {
         CadTransformMath.ValidateScale(factor);
+        ClearSectionSourceReferences();
         foreach (var section in _sections)
             section.Scale(center, factor);
         RaiseGeometryChanged(nameof(Scale));
+    }
+
+    private void ClearSectionSourceReferences()
+    {
+        for (var index = 0;
+             index < _sectionSourceIds.Count;
+             index++)
+        {
+            _sectionSourceIds[index] = null;
+        }
     }
 
     internal static JsonObject WriteGeometry(

@@ -27,23 +27,22 @@ OCCTBIM-Source 的 Entity 同时提供 shape、visual、properties、gripPoints�
 推荐：
 
 ```text
-Entities/
-  CadLine.cs
-  CadCircle.cs
-  CadArc.cs
-  CadRectangle.cs
-  CadPolyline.cs
-  CadBox.cs
-  CadCylinder.cs
-  ...
-Tools/
+Entities/TwoD/
+  CadLineEntity.cs
+  CadCircleEntity.cs
+  CadArcEntity.cs
+  CadRectangleEntity.cs
+  CadPolylineEntity.cs
+Entities/ThreeD/
+  CadBoxEntity.cs
+  CadCylinderEntity.cs
+Interaction/
   LineTool.cs
   CircleTool.cs
   ArcTool.cs
   RectangleTool.cs
   BoxTool.cs
   CylinderTool.cs
-  ...
 ```
 
 一个基本实体一个文件；一个主要 Tool 一个文件。共享几何算法放到明确的 geometry helper/service，不复制到多个 Tool。
@@ -52,7 +51,7 @@ Tools/
 
 `Duplicate()` 必须复制完整业务状态，包括几何和外观，但生成“新对象实例”。是否保留 Id 由调用契约明确：用于编辑快照时不依赖 Id 区分；用于真正 Copy 新实体时必须生成新 Id。
 
-`RestoreGeometry()` 只恢复几何，不覆盖 Name/Layer/Appearance；`RestoreState()` 恢复完整业务状态。
+`RestoreGeometry()` 恢复定义几何；`RestoreState()` 恢复完整业务状态，包括 Metadata、Appearance 和 Placement。刚性 Move/Rotate 使用 `CadPlacement`；几何算法显式进行 local/world 转换，不能把原始字段直接当成世界坐标。
 
 ## 5. Snap 契约
 
@@ -104,20 +103,18 @@ Grip 拖拽中不得逐帧修改真实 Entity。
 
 每个 Tool 需要明确：
 
-- Id；
-- DisplayName localization key；
-- Tool State；
-- Stage 数量与每个 Stage Prompt；
-- Pointer left/right/move 行为；
-- Keyboard Enter/Esc/Backspace 行为；
-- `CanFinish`；
-- `PrecisionInputs`；
-- `PrecisionReferencePoint`；
-- 是否锁 WorkPlane；
-- `ParameterPanel`；
-- Preview 生成；
-- Commit；
-- Cancel 清理。
+- 稳定 Id 与本地化 DisplayName；
+- `CadToolState`；
+- 带有明确 `InputKind`、PrecisionInputs、Prompt 的 `CadToolStep`；
+- 当前 Step 是否要求 Pointer；
+- Pointer 行为与 StepBack；
+- `InteractionPolicy` 与 `SnapResolvePolicy`；
+- Precision reference point 与 WorkPlane 策略；
+- ToolPanel 参数描述；
+- Preview 生成/更新；
+- Commit/Finish/Cancel 清理。
+
+Enter、右键和 UI Accept/Finish 统一调用 `CadToolManager.SubmitCurrent()`，UI 不再解释原始 Stage 整数。
 
 ## 8. Tool 参数与阶段参数
 

@@ -83,7 +83,7 @@ public sealed partial class MainWindow : Window
     private bool _refreshingTree;
     private bool _closingConfirmed;
     private bool _disposed;
-    private Avalonia.Platform.Storage.IStorageFile? _documentFile;
+    private global::Avalonia.Platform.Storage.IStorageFile? _documentFile;
 
     public MainWindow()
     {

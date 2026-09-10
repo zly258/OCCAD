@@ -109,8 +109,8 @@ internal sealed class CadToolPanel : Border
 
         var scroll = new ScrollViewer
         {
-            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             Content = _content
         };
 
@@ -659,15 +659,19 @@ internal sealed class CadToolPanel : Border
                 }
             }
 
-            _finish.Content = tool.CanFinish
+            var canAcceptStep =
+                tool.CanCommitCurrentStage &&
+                !tool.CurrentStep.RequiresPointer;
+            _finish.Content = canAcceptStep
                 ? CadLanguageManager.Text(
-                    "Cad.Text.Finish",
-                    "Finish")
-                : CadLanguageManager.Text(
                     "Cad.Text.Accept",
-                    "Accept");
+                    "Accept")
+                : CadLanguageManager.Text(
+                    "Cad.Text.Finish",
+                    "Finish");
             _finish.IsEnabled =
-                tool.CanFinish || tool.CanCommitCurrentStage;
+                canAcceptStep ||
+                tool.CanFinish;
             _cancel.Content = CadLanguageManager.Text(
                 "Cad.Text.Cancel",
                 "Cancel");

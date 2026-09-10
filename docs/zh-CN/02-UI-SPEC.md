@@ -27,7 +27,7 @@ ToolBar 只放全局和当前阶段状态。实体/工具专属参数统一进�
 
 Model 默认左侧。Layer 与 Property 合并为右侧紧凑 Tab，不再固定上下堆叠占用视口。
 
-Layer 使用 Avalonia 原生控件编辑当前层、颜色、可见、锁定、线宽和线型。Property 使用 `TypeDescriptor` 元数据生成编辑器，支持单选/多选共同属性、Layer/Enum/Bool/Color、double 三位显示、History 和失败回滚；不再嵌 WinForms PropertyGrid。
+Layer 使用 Avalonia 原生控件编辑当前层、颜色、可见、锁定、线宽和线型。Property 消费 Core 的 `CadPropertyDescriptor`/`CadValueDescriptor` 元数据，支持单选/多选共同属性、Layer/Enum/Bool/Color、简洁数值显示、History 和失败回滚；不再嵌 WinForms PropertyGrid。
 
 ## 5. Viewport / HUD / Cursor
 

@@ -172,6 +172,13 @@ public sealed class CadSelectionManager
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         };
 
+        if (operation == CadSelectionOperation.Replace &&
+            target.Count == 0)
+        {
+            Clear();
+            return;
+        }
+
         var nextPrimary = ResolvePrimary(
             operation,
             values,

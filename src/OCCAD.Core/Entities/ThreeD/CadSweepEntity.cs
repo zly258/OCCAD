@@ -149,6 +149,7 @@ public sealed class CadSweepEntity : CadFeatureEntity
         if ((uint)index >= (uint)grips.Count)
             throw new ArgumentOutOfRangeException(nameof(index));
 
+        _pathSourceId = null;
         _path.MoveGrip(
             grips[index].Index,
             targetPoint);
@@ -184,6 +185,8 @@ public sealed class CadSweepEntity : CadFeatureEntity
     public override void Translate(
         OcctVector3d displacement)
     {
+        _profileSourceId = null;
+        _pathSourceId = null;
         _profile.Translate(displacement);
         _path.Translate(displacement);
         RaiseGeometryChanged(nameof(Translate));
@@ -194,6 +197,8 @@ public sealed class CadSweepEntity : CadFeatureEntity
         OcctVector3d axis,
         double angleDegrees)
     {
+        _profileSourceId = null;
+        _pathSourceId = null;
         _profile.Rotate(
             center,
             axis,
@@ -210,6 +215,8 @@ public sealed class CadSweepEntity : CadFeatureEntity
         double factor)
     {
         CadTransformMath.ValidateScale(factor);
+        _profileSourceId = null;
+        _pathSourceId = null;
         _profile.Scale(center, factor);
         _path.Scale(center, factor);
         RaiseGeometryChanged(nameof(Scale));

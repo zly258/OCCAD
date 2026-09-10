@@ -678,9 +678,6 @@ internal sealed class CadViewportInteractionController : IDisposable
         CadSelectionOperation operation,
         CadEntity? primary = null)
     {
-        if (operation == CadSelectionOperation.Replace)
-            _workspace.Subobjects.Clear();
-
         _workspace.Selection.Apply(
             entities,
             operation,

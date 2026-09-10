@@ -427,7 +427,7 @@ public sealed class CadSnapManager
         Current = null;
         DeleteMarker();
         if (changed)
-            CurrentChanged?.Invoke(this, EventArgs.Empty);
+            PublishCurrentChanged();
     }
 
     private static CadSnapPoint? ApplyPlanePolicy(
@@ -1092,7 +1092,7 @@ public sealed class CadSnapManager
         {
             DeleteMarker();
         }
-        CurrentChanged?.Invoke(this, EventArgs.Empty);
+        PublishCurrentChanged();
     }
 
     private void ShowMarker(
@@ -1166,6 +1166,34 @@ public sealed class CadSnapManager
         {
         }
     }
+
+    private void PublishCurrentChanged()
+    {
+        var handlers = CurrentChanged;
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, EventArgs.Empty);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                // Candidate/current state is already authoritative. Snap UI and
+                // status observers must not invalidate a resolved point, break
+                // candidate cycling, or starve later observers in the pointer path.
+                System.Diagnostics.Debug.WriteLine(
+                    $"Snap CurrentChanged observer failed after snap state changed: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private static bool IsRecoverableSnapFailure(Exception exception) =>
         exception is not OutOfMemoryException and

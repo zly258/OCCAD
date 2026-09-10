@@ -59,6 +59,41 @@ public sealed class BatchTransactionRegressionTests
     }
 
     [TestMethod]
+    public void ExecuteInsideOuterTransactionUsesOnlyOuterUndoEntry()
+    {
+        using var w = new CadWorkspace();
+        w.MarkSaved();
+        var line = new CadLineEntity(
+            OcctPoint3d.Origin,
+            new OcctPoint3d(10.0, 0.0, 0.0));
+
+        using (var transaction = w.BeginTransaction("Batch Create"))
+        {
+            // AddEntity routes through CadTransaction.Execute. While the outer
+            // transaction has history recording suspended, Execute must apply
+            // the mutation without installing its own nested history entry.
+            w.AddEntity(line);
+
+            Assert.HasCount(1, w.Document.Entities);
+            Assert.IsFalse(w.History.CanUndo);
+            transaction.Commit();
+        }
+
+        Assert.HasCount(1, w.Document.Entities);
+        Assert.IsTrue(w.History.CanUndo);
+        Assert.AreEqual("Batch Create", w.History.UndoName);
+
+        Assert.IsTrue(w.Undo());
+        Assert.IsEmpty(w.Document.Entities);
+        Assert.IsFalse(w.IsModified);
+
+        Assert.IsTrue(w.Redo());
+        Assert.HasCount(1, w.Document.Entities);
+        Assert.AreSame(line, w.Document.Entities[0]);
+        Assert.IsTrue(w.IsModified);
+    }
+
+    [TestMethod]
     public void DisposingUncommittedOuterTransactionRollsBackAllInnerChanges()
     {
         using var w = new CadWorkspace();

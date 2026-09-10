@@ -20,6 +20,7 @@ public sealed class CadWorkPlane
     private bool _userPlaneLocked;
     private bool _toolPlaneFixed;
     private bool _gripPlaneFixed;
+
     public CadWorkPlane()
     {
         _userPlane = CreatePresetFrame(
@@ -66,7 +67,7 @@ public sealed class CadWorkPlane
         _toolPlaneFixed = false;
         _gripPlane = null;
         _gripPlaneFixed = false;
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
 
     public void EndToolPlane()
@@ -79,28 +80,28 @@ public sealed class CadWorkPlane
         _gripPlaneFixed = false;
         _toolPlane = null;
         _toolPlaneFixed = false;
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
 
     public void SetUserPlaneLocked(bool value)
     {
         if (_userPlaneLocked == value) return;
         _userPlaneLocked = value;
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
 
     public void SetToolPlaneFixed(bool value)
     {
         if (_toolPlane is null || _toolPlaneFixed == value) return;
         _toolPlaneFixed = value;
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
 
     public void SetGripPlaneFixed(bool value)
     {
         if (_gripPlane is null || _gripPlaneFixed == value) return;
         _gripPlaneFixed = value;
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
 
     public void SetPreset(
@@ -131,7 +132,7 @@ public sealed class CadWorkPlane
         }
 
         if (changed)
-            Changed?.Invoke(this, EventArgs.Empty);
+            PublishChanged();
     }
 
     public void SetCustom(
@@ -155,7 +156,7 @@ public sealed class CadWorkPlane
         if (_userPlane == next) return;
 
         _userPlane = next;
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
 
     public void SetToolPlane(
@@ -176,7 +177,7 @@ public sealed class CadWorkPlane
         if (_toolPlane == next) return;
 
         _toolPlane = next;
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
 
     public void SetGripPlane(
@@ -200,7 +201,7 @@ public sealed class CadWorkPlane
 
         _gripPlane = next;
         _gripPlaneFixed = fixedPlane;
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
 
     public void ClearGripPlane()
@@ -208,7 +209,7 @@ public sealed class CadWorkPlane
         if (_gripPlane is null && !_gripPlaneFixed) return;
         _gripPlane = null;
         _gripPlaneFixed = false;
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
 
     public void SetOrigin(OcctPoint3d origin)
@@ -234,7 +235,7 @@ public sealed class CadWorkPlane
             _userPlane = WithOrigin(_userPlane, origin);
         }
 
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
 
     public bool TryIntersect(
@@ -286,6 +287,34 @@ public sealed class CadWorkPlane
                frame.XAxis * point.X +
                frame.YAxis * point.Y;
     }
+
+    private void PublishChanged()
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, EventArgs.Empty);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                // Work-plane state is already authoritative. Changed is used by
+                // UI/status observers and must not turn an applied frame/lock
+                // transition into a false failure or starve later observers.
+                System.Diagnostics.Debug.WriteLine(
+                    $"Work-plane Changed observer failed after state changed: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private static CadPlaneFrame CreatePresetFrame(
         CadWorkPlanePreset preset,

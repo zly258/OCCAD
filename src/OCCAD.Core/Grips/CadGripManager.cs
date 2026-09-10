@@ -272,7 +272,7 @@ public sealed class CadGripManager
         }
 
         if (hadHot)
-            HotChanged?.Invoke(this, EventArgs.Empty);
+            PublishHotChanged();
     }
 
     public bool UpdateHot(int x, int y)
@@ -311,7 +311,7 @@ public sealed class CadGripManager
             }
         }
 
-        HotChanged?.Invoke(this, EventArgs.Empty);
+        PublishHotChanged();
         return _hotIndex >= 0;
     }
 
@@ -351,7 +351,7 @@ public sealed class CadGripManager
                 _normalMarkerPixels);
         }
 
-        HotChanged?.Invoke(this, EventArgs.Empty);
+        PublishHotChanged();
     }
 
     public void Clear()
@@ -364,7 +364,7 @@ public sealed class CadGripManager
         _grips.Clear();
 
         if (hadHot)
-            HotChanged?.Invoke(this, EventArgs.Empty);
+            PublishHotChanged();
     }
 
     private bool SameEntities(IReadOnlyList<CadEntity> values)
@@ -431,7 +431,7 @@ public sealed class CadGripManager
         }
 
         if (hadHot)
-            HotChanged?.Invoke(this, EventArgs.Empty);
+            PublishHotChanged();
     }
 
     private void RefreshGripList()
@@ -633,6 +633,34 @@ public sealed class CadGripManager
             _retiredMarkers.Add(marker);
         }
     }
+
+    private void PublishHotChanged()
+    {
+        var handlers = HotChanged;
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, EventArgs.Empty);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                // Hot grip state and native marker styling have already changed.
+                // UI/status observers are notification-only and cannot invalidate
+                // hover state or starve later observers in the pointer pipeline.
+                System.Diagnostics.Debug.WriteLine(
+                    $"Grip HotChanged observer failed after hot state changed: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private static bool IsRecoverableMarkerFailure(Exception exception) =>
         exception is not OutOfMemoryException and

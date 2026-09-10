@@ -88,7 +88,7 @@ public sealed class CadDraftingSettings
             _orthogonalTrackingEnabled = value;
             if (value)
                 _polarTrackingEnabled = false;
-            Changed?.Invoke(this, EventArgs.Empty);
+            PublishChanged();
         }
     }
 
@@ -104,7 +104,7 @@ public sealed class CadDraftingSettings
             _polarTrackingEnabled = value;
             if (value)
                 _orthogonalTrackingEnabled = false;
-            Changed?.Invoke(this, EventArgs.Empty);
+            PublishChanged();
         }
     }
 
@@ -369,7 +369,7 @@ public sealed class CadDraftingSettings
         _lockedAngleDegrees = 0.0;
 
         if (changed)
-            Changed?.Invoke(this, EventArgs.Empty);
+            PublishChanged();
     }
 
     public void ResetLocks()
@@ -389,7 +389,7 @@ public sealed class CadDraftingSettings
         _lockedAngleDegrees = 0.0;
 
         if (changed || transientChanged)
-            Changed?.Invoke(this, EventArgs.Empty);
+            PublishChanged();
     }
 
     private void Set<T>(ref T field, T value)
@@ -398,8 +398,36 @@ public sealed class CadDraftingSettings
             return;
 
         field = value;
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
+
+    private void PublishChanged()
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, EventArgs.Empty);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                // Drafting state has already advanced. UI/status observers are
+                // notification-only and cannot invalidate exact-input or
+                // tracking state, nor starve later observers.
+                System.Diagnostics.Debug.WriteLine(
+                    $"CadDraftingSettings Changed observer failed after state changed: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private static double AngleDeltaDegrees(
         double left,

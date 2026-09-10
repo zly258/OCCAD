@@ -439,16 +439,6 @@ public sealed class CadCenterLineEntity : CadEntity, ICadSourceDependentEntity
         return normalized;
     }
 
-    private static void ValidatePoint(
-        OcctPoint3d point,
-        string name)
-    {
-        if (!point.IsFinite)
-            throw new ArgumentOutOfRangeException(
-                name,
-                "Point must be finite.");
-    }
-
     private static void ValidateExtension(
         double value,
         string name)

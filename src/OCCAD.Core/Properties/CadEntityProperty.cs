@@ -18,15 +18,28 @@ public sealed record CadEntityProperty(
 
 public static class CadPropertyService
 {
+    /// <summary>
+    /// Projects the normal user-facing property surface. Stable entity identity
+    /// is technical document metadata and is hidden by default; automation and
+    /// diagnostic callers can opt in explicitly without requiring a second
+    /// property model in the UI.
+    /// </summary>
     public static IReadOnlyList<CadEntityProperty> Describe(
         CadWorkspace workspace,
-        object target)
+        object target,
+        bool includeIdentity = false)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(target);
 
         return CadPropertyCatalog
             .Describe(target)
+            .Where(descriptor =>
+                includeIdentity ||
+                !string.Equals(
+                    descriptor.Name,
+                    nameof(CadEntity.Id),
+                    StringComparison.Ordinal))
             .Select(descriptor => Project(workspace, target, descriptor))
             .ToArray();
     }

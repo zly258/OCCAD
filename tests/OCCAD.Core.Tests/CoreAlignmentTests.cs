@@ -94,6 +94,25 @@ public sealed class CoreAlignmentTests
     }
 
     [TestMethod]
+    public void PropertyServiceHidesTechnicalIdentityUnlessExplicitlyRequested()
+    {
+        using var workspace = new CadWorkspace();
+        var line = new CadLineEntity(default, new(10, 0, 0));
+        workspace.AddEntity(line);
+
+        Assert.IsFalse(CadPropertyService.Describe(workspace, line)
+            .Any(value => value.Name == nameof(CadEntity.Id)));
+
+        var identity = CadPropertyService.Describe(
+                workspace,
+                line,
+                includeIdentity: true)
+            .Single(value => value.Name == nameof(CadEntity.Id));
+        Assert.IsTrue(identity.ReadOnly);
+        Assert.AreEqual(line.Id, identity.Value);
+    }
+
+    [TestMethod]
     public void SettingsStoreRoundTripsWithoutUiDependency()
     {
         var settings = new CadSettingsStore();

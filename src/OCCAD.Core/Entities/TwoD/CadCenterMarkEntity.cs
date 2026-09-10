@@ -386,12 +386,6 @@ public sealed class CadCenterMarkEntity : CadEntity, ICadSourceDependentEntity
         SetGeometry(ref field, value, propertyName);
     }
 
-    private static void ValidatePoint(OcctPoint3d point, string name)
-    {
-        if (!point.IsFinite)
-            throw new ArgumentOutOfRangeException(name, "Point must be finite.");
-    }
-
     private static void ValidateFactor(double value, string name)
     {
         if (!double.IsFinite(value) || value < 0.0)

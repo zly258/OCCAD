@@ -26,28 +26,6 @@ public readonly record struct CadSubobjectSelection(
     public bool IsValid =>
         Entity is not null &&
         IsSubshape;
-
-    public bool TryGetPathSegment(
-        out CadPathSegmentInfo segment)
-    {
-        if (Entity is CadPathEntity path &&
-            SubshapeType == OcctShapeType.Edge &&
-            path.TryGetSegmentInfo(SubshapeIndex, out segment))
-        {
-            segment = segment with
-            {
-                Start = Entity.ToWorldPoint(segment.Start),
-                End = Entity.ToWorldPoint(segment.End),
-                Middle = segment.Middle is { } middle
-                    ? Entity.ToWorldPoint(middle)
-                    : null
-            };
-            return true;
-        }
-
-        segment = default;
-        return false;
-    }
 }
 
 public sealed class CadSubobjectSelectionChangedEventArgs(

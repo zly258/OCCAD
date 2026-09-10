@@ -1,3 +1,4 @@
+using System.Globalization;
 using OcctNet;
 
 namespace OCCAD.Core.Tests;
@@ -78,5 +79,78 @@ public sealed class PreciseDrawingTests
         Assert.AreEqual(5.0, input.Point.X, 1e-9);
         Assert.AreEqual(6.0, input.Point.Y, 1e-9);
         Assert.AreEqual(17.0, input.Point.Z, 1e-9);
+    }
+
+    [TestMethod]
+    public void AbsolutePolarUsesWorkPlaneOriginNotReferencePoint()
+    {
+        var plane = new CadWorkPlane();
+        plane.SetCustom(
+            new OcctPoint3d(10, 20, 30),
+            OcctVector3d.UnitX,
+            OcctVector3d.UnitZ);
+        var reference = new OcctPoint3d(100, 200, 300);
+
+        Assert.IsTrue(CadCoordinateInputParser.TryParse(
+            "#10<90",
+            reference,
+            plane,
+            out var input));
+
+        Assert.AreEqual(CadCoordinateInputMode.AbsolutePolar, input.Mode);
+        Assert.AreEqual(10.0, input.Point.X, 1e-9);
+        Assert.AreEqual(20.0, input.Point.Y, 1e-9);
+        Assert.AreEqual(40.0, input.Point.Z, 1e-9);
+    }
+
+    [TestMethod]
+    public void SemicolonSeparatorSupportsCommaDecimalCultures()
+    {
+        var original = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+            var plane = new CadWorkPlane();
+            plane.SetPreset(CadWorkPlanePreset.XY);
+
+            Assert.IsTrue(CadCoordinateInputParser.TryParse(
+                "1,5;2,5;3,5",
+                OcctPoint3d.Origin,
+                plane,
+                out var input));
+
+            Assert.AreEqual(new OcctPoint3d(1.5, 2.5, 3.5), input.Point);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
+
+    [TestMethod]
+    public void MalformedPolarAndEmptyPrefixedInputAreRejected()
+    {
+        var plane = new CadWorkPlane();
+
+        Assert.IsFalse(CadCoordinateInputParser.TryParse(
+            "@",
+            OcctPoint3d.Origin,
+            plane,
+            out _));
+        Assert.IsFalse(CadCoordinateInputParser.TryParse(
+            "#",
+            OcctPoint3d.Origin,
+            plane,
+            out _));
+        Assert.IsFalse(CadCoordinateInputParser.TryParse(
+            "10<20<30",
+            OcctPoint3d.Origin,
+            plane,
+            out _));
+        Assert.IsFalse(CadCoordinateInputParser.TryParse(
+            "0<45",
+            OcctPoint3d.Origin,
+            plane,
+            out _));
     }
 }

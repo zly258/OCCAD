@@ -151,4 +151,71 @@ public sealed class CapabilitySurfaceTests
                 $"Dormant action '{actionId}' leaked into the active surface.");
         }
     }
+
+    [TestMethod]
+    public void CommandCatalogResolvesOnlyActiveAliases()
+    {
+        using var workspace = new CadWorkspace();
+
+        Assert.AreEqual(
+            "draw.centerline",
+            workspace.Actions.ResolveCommand("CL")?.Id);
+        Assert.AreEqual(
+            "draw.centermark",
+            workspace.Actions.ResolveCommand("CM")?.Id);
+        Assert.AreEqual(
+            "draw.line",
+            workspace.Actions.ResolveCommand("L")?.Id);
+        Assert.AreEqual(
+            "modify.move",
+            workspace.Actions.ResolveCommand("M")?.Id);
+
+        foreach (var dormantAlias in new[]
+                 {
+                     "TRIM",
+                     "EXTEND",
+                     "FILLET",
+                     "CHAMFER",
+                     "EXTRUDE",
+                     "REVOLVE",
+                     "SWEEP",
+                     "LOFT",
+                     "TEXT",
+                     "DIMLINEAR"
+                 })
+        {
+            Assert.IsNull(
+                workspace.Actions.ResolveCommand(dormantAlias),
+                $"Dormant command alias '{dormantAlias}' leaked into the active catalog.");
+        }
+    }
+
+    [TestMethod]
+    public void ActiveCoreSurfaceHasNoDeletedPathCompatibilityTypes()
+    {
+        foreach (var entityType in new[]
+                 {
+                     typeof(CadLineEntity),
+                     typeof(CadArcEntity),
+                     typeof(CadPolylineEntity)
+                 })
+        {
+            Assert.IsFalse(
+                entityType.GetMethods()
+                    .Any(static method =>
+                        method.ReturnType.Name == "CadPathEntity" ||
+                        method.GetParameters().Any(static parameter =>
+                            parameter.ParameterType.Name == "CadPathEntity")),
+                $"{entityType.Name} still exposes deleted CadPathEntity compatibility.");
+        }
+
+        Assert.IsFalse(
+            typeof(CadSubobjectSelectionManager)
+                .GetMethods()
+                .Any(static method =>
+                    method.ReturnType.Name == "CadPathSegmentInfo" ||
+                    method.GetParameters().Any(static parameter =>
+                        parameter.ParameterType.Name == "CadPathSegmentInfo")),
+            "Subobject selection still exposes deleted CadPathSegmentInfo compatibility.");
+    }
 }

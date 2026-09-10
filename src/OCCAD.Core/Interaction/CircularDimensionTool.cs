@@ -15,6 +15,15 @@ public class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
     public CircularDimensionTool(CadCircularDimensionKind kind) => _kind=kind;
     public override string Id => _kind==CadCircularDimensionKind.Radius ? "radiusdimension" : "diameterdimension";
     public override string DisplayName => _kind==CadCircularDimensionKind.Radius ? "Radius Dimension" : "Diameter Dimension";
+    public override CadToolInputKind InputKind =>
+        _source is null
+            ? CadToolInputKind.Selection
+            : CadToolInputKind.Point;
+    public override CadToolInteractionPolicy InteractionPolicy =>
+        base.InteractionPolicy with
+        {
+            PreselectionEnabled = _source is null
+        };
     protected override bool CanStepBackCore => _source is not null;
     public override CadToolPanelDescriptor ParameterPanel => new(DisplayName,
         [new CadDoubleToolParameterDescriptor("TextHeight","Text Height",_textHeight,1e-9,1_000_000),
@@ -62,8 +71,9 @@ public class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
     public bool TryAcceptSource(CadEntity entity)
     {
         if(!IsActive || _source is not null || !Context.Document.IsEntitySelectable(entity)) return false;
-        if(entity is CadCircleEntity circle) { _center=circle.Center; _normal=circle.Normal; _radius=circle.Radius; }
-        else if(_kind==CadCircularDimensionKind.Radius && entity is CadArcEntity arc) { _center=arc.Center; _normal=arc.Normal; _radius=arc.Radius; }
+        var world=entity.CreateWorldGeometrySnapshot();
+        if(world is CadCircleEntity circle) { _center=circle.Center; _normal=circle.Normal; _radius=circle.Radius; }
+        else if(_kind==CadCircularDimensionKind.Radius && world is CadArcEntity arc) { _center=arc.Center; _normal=arc.Normal; _radius=arc.Radius; }
         else return false;
         _source=entity; Context.WorkPlane.SetToolPlaneFixed(true); UpdatePrompt(); return true;
     }
@@ -71,7 +81,7 @@ public class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
     public bool TryAcceptPoint(OcctPoint3d point)
     {
         if(!IsActive || _source is null || !point.IsFinite) return false;
-        var entity=Create(point); if(entity is null) return true;
+        var entity=Create(point); if(entity is null) return false;
         Context.AddEntity(entity); Context.Workspace.Tools.CompleteCurrent(); return true;
     }
 
@@ -92,7 +102,14 @@ public class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
         var offset=_kind==CadCircularDimensionKind.Radius ? planar.Length-_radius : 0;
         return new(_kind,_center,_normal,direction,_radius,offset,_textHeight,_arrowSize);
     }
-    private void Show(OcctPoint3d point) { var e=Create(point); if(e is not null) ShowPreview(e); }
+    private void Show(OcctPoint3d point)
+    {
+        var e=Create(point);
+        if(e is not null)
+            ShowPreview(e);
+        else
+            Context.Preview.Clear();
+    }
     private void UpdatePrompt() => SetStageLocalized(_source is null?0:1,
         _source is null ? $"Cad.Prompt.{Id}.Select" : $"Cad.Prompt.{Id}.Position",
         _source is null ? $"{DisplayName}: select circle{(_kind==CadCircularDimensionKind.Radius ? " or arc" : "")} [Esc cancel]" : $"{DisplayName}: specify label position [Backspace undo, Esc cancel]");

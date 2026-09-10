@@ -798,6 +798,11 @@
     <sys:String x:Key="Cad.Value.OcctSurfaceType.Extrusion">Extrusion Surface</sys:String>
     <sys:String x:Key="Cad.Value.OcctSurfaceType.Offset">Offset Surface</sys:String>
     <sys:String x:Key="Cad.Value.OcctSurfaceType.Other">Other</sys:String>
+    <sys:String x:Key="Cad.Text.ErrorTitle">OCCAD Error</sys:String>
+    <sys:String x:Key="Cad.Text.ErrorMessage">OCCAD encountered an error. Details were written to the application log.</sys:String>
+    <sys:String x:Key="Cad.Text.ErrorLog">Log:</sys:String>
+    <sys:String x:Key="Cad.Text.Continue">Continue</sys:String>
+    <sys:String x:Key="Cad.Text.Exit">Exit</sys:String>
 </ResourceDictionary>
 
 

@@ -138,7 +138,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
     {
         if (!point.IsFinite) return false;
         if (_points.Count > 0 && _points[^1].DistanceTo(point) <= 1e-9)
-            return true;
+            return false;
 
         _points.Add(point);
         RestorePrecisionFrame();
@@ -158,7 +158,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
                 _method == ThreePoints
                     ? CadPrecisionInputKind.LengthAndAngle
                     : CadPrecisionInputKind.Angle);
-            return true;
+            return false;
         }
 
         Context.AddEntity(arc);
@@ -170,19 +170,33 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
     {
         if (_points.Count == 1)
         {
-            if (_points[0].DistanceTo(cursor) <= 1e-9) return;
+            if (_points[0].DistanceTo(cursor) <= 1e-9)
+            {
+                _preview = null;
+                Context.Preview.Clear();
+                return;
+            }
             _preview = new CadLineEntity(_points[0], cursor);
             ShowPreview(_preview);
             return;
         }
 
-        if (_points.Count < 2) return;
+        if (_points.Count < 2)
+        {
+            _preview = null;
+            Context.Preview.Clear();
+            return;
+        }
         if (TryCreateArc(_points[0], _points[1], cursor, out var arc))
             _preview = arc;
         else if (_points[1].DistanceTo(cursor) > 1e-9)
             _preview = new CadPolylineEntity([_points[0], _points[1], cursor]);
         else
+        {
+            _preview = null;
+            Context.Preview.Clear();
             return;
+        }
 
         ShowPreview(_preview);
     }

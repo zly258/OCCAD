@@ -132,6 +132,7 @@ public abstract class CadTool
         Context.WorkPlane.BeginToolPlane(Context.WorkPlane.Origin);
         Context.Snap.Active = true;
         OnActivated();
+        SynchronizeSnapState();
     }
 
     internal void Deactivate(bool canceled)
@@ -242,7 +243,7 @@ public abstract class CadTool
 
         var normalized = message.Trim();
         Prompt = new CadToolPrompt(normalized, precisionInputs);
-        Updated?.Invoke(this, EventArgs.Empty);
+        PublishUpdated();
     }
 
     protected void SetStageLocalized(
@@ -287,14 +288,14 @@ public abstract class CadTool
             ResourceKey = resourceKey.Trim(),
             FormatArguments = arguments.ToArray()
         };
-        Updated?.Invoke(this, EventArgs.Empty);
+        PublishUpdated();
     }
 
     protected void SetState(CadToolState state)
     {
         if (_state == state) return;
         _state = state;
-        Updated?.Invoke(this, EventArgs.Empty);
+        PublishUpdated();
     }
 
     protected void SetWorkPlane(
@@ -312,7 +313,22 @@ public abstract class CadTool
         Context.Selection.SetFilter(filter);
 
     protected void NotifyUpdated() =>
+        PublishUpdated();
+
+    private void PublishUpdated()
+    {
+        SynchronizeSnapState();
         Updated?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void SynchronizeSnapState()
+    {
+        if (!IsActive)
+            return;
+
+        Context.Snap.Active =
+            CurrentStep.RequiresPointer;
+    }
 
     protected void LockStageAngle(double angleDegrees)
     {

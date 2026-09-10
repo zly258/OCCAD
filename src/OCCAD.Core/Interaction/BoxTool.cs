@@ -107,7 +107,8 @@ public sealed class BoxTool : CadDrawingTool, ICadPointInputTool
             case 1:
                 {
                     var basePoint = ProjectBasePoint(point);
-                    if (!SetBase(basePoint)) return true;
+                    if (!SetBase(basePoint))
+                        return false;
                     _second = basePoint;
                     SetStageLocalized(
                         2,
@@ -157,7 +158,11 @@ public sealed class BoxTool : CadDrawingTool, ICadPointInputTool
         if (Stage == 1)
         {
             if (!TryBasePreview(ProjectBasePoint(point), out var center, out var length, out var width))
+            {
+                _preview = null;
+                Context.Preview.Clear();
                 return;
+            }
 
             var origin = center
                 - _xAxis * (length * 0.5)

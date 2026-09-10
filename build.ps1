@@ -14,11 +14,34 @@ $bridgeSdk = if (-not [string]::IsNullOrWhiteSpace($env:OCCTCSHARPBRIDGE_SDK)) {
     Join-Path $env:ProgramFiles 'OcctCSharpBridge\SDK\3.0\win-x64'
 }
 
-foreach ($name in @('OcctNative.dll','OcctNet.dll','OcctNet.Avalonia.dll','bridge-contract.json','bridge-manifest.json')) {
+foreach ($name in @('OcctNet.dll','OcctNet.Avalonia.dll','bridge-contract.json','bridge-manifest.json')) {
     if (-not (Test-Path -LiteralPath (Join-Path $bridgeSdk $name) -PathType Leaf)) {
         throw "Installed OcctCSharpBridge SDK is missing '$name' at '$bridgeSdk'. Run OcctCSharpBridge .\publish.ps1 from an elevated PowerShell session, or set OCCTCSHARPBRIDGE_SDK."
     }
 }
+
+$flatNative = Join-Path $bridgeSdk 'OcctNative.dll'
+$runtimeDirectory = Join-Path $bridgeSdk 'runtime'
+$runtimeNative = Join-Path $runtimeDirectory 'OcctNative.dll'
+if (-not (Test-Path -LiteralPath $flatNative -PathType Leaf) -and
+    -not (Test-Path -LiteralPath $runtimeNative -PathType Leaf)) {
+    throw "Installed OcctCSharpBridge SDK contains neither flat nor portable OcctNative.dll: $bridgeSdk"
+}
+
+$runtime = if (Test-Path -LiteralPath $runtimeNative -PathType Leaf) {
+    $runtimeDirectory
+}
+else {
+    $bridgeSdk
+}
+$runtimeCount = @(Get-ChildItem -LiteralPath $runtime -Filter '*.dll' -File -ErrorAction SilentlyContinue).Count
+$runtimeLayout = if ([string]::Equals($runtime, $bridgeSdk, [StringComparison]::OrdinalIgnoreCase)) {
+    'flat'
+}
+else {
+    'runtime-subdir'
+}
+$hasResources = Test-Path -LiteralPath (Join-Path $bridgeSdk 'occt\resources') -PathType Container
 
 $bridgeManifestPath = Join-Path $bridgeSdk 'bridge-manifest.json'
 $bridgeManifest = Get-Content -LiteralPath $bridgeManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -34,9 +57,17 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($occadSourceCommit)) {
     $occadSourceCommit = $occadSourceCommit.Trim()
 }
 
-Write-Host "[build] OCCAD source:  $occadSourceCommit"
-Write-Host "[build] Bridge SDK:    $bridgeSdk"
-Write-Host "[build] Bridge source: $bridgeSourceCommit"
+Write-Host "[build] OCCAD source:   $occadSourceCommit"
+Write-Host "[build] Bridge SDK:     $bridgeSdk"
+Write-Host "[build] Bridge source:  $bridgeSourceCommit"
+Write-Host "[build] Bridge runtime: $runtime ($runtimeCount DLLs, $runtimeLayout)"
+Write-Host "[build] OCCT resources: $hasResources"
+if ($runtimeLayout -eq 'runtime-subdir') {
+    Write-Host '[build] Direct EXE:     portable runtime will be copied beside the application.'
+}
+else {
+    Write-Host '[build] Direct EXE:     external OCCT_ROOT/CASROOT is required unless the SDK is switched to a portable layout.' -ForegroundColor Yellow
+}
 
 & dotnet build $solution -c $Configuration -p:Platform=x64 --nologo
 if ($LASTEXITCODE -ne 0) {

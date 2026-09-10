@@ -6,13 +6,19 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
 {
     private OcctPoint3d? _center;
     private double? _referenceLength;
+    private OcctPoint3d _initialOrigin;
     public override string Id => "scale";
     public override string DisplayName => "Scale";
     public override OcctPoint3d? PrecisionReferencePoint => _center;
     protected override bool CanCommitCurrentStageCore => State == CadToolState.Drawing;
     protected override bool CanStepBackCore => _center is not null;
     protected override bool CanFinishCore => _referenceLength is not null && Context.Workspace.Precision.Factor is not null;
-    protected override void OnTransformStarted() => RestorePrompt();
+    protected override void OnTransformStarted()
+    {
+        _initialOrigin =
+            Context.WorkPlane.Origin;
+        RestorePrompt();
+    }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
@@ -74,14 +80,28 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
 
     protected override bool OnStepBack()
     {
-        if (_referenceLength is not null) _referenceLength = null;
-        else { _center = null; Context.WorkPlane.SetToolPlaneFixed(false); }
+        if (_referenceLength is not null)
+        {
+            _referenceLength = null;
+        }
+        else
+        {
+            _center = null;
+            Context.WorkPlane.SetToolPlaneFixed(false);
+            Context.WorkPlane.SetOrigin(
+                _initialOrigin);
+        }
         Context.Preview.Clear();
         RestorePrompt();
         return true;
     }
 
-    protected override void ResetTransformState() { _center = null; _referenceLength = null; }
+    protected override void ResetTransformState()
+    {
+        _center = null;
+        _referenceLength = null;
+        _initialOrigin = default;
+    }
     private double Factor(OcctPoint3d point) => Context.Workspace.Precision.Factor ?? point.DistanceTo(_center!.Value) / _referenceLength!.Value;
 
     private void Preview(OcctPoint3d point)

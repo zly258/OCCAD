@@ -121,7 +121,8 @@ public sealed class FrustumTool : CadDrawingTool, ICadPointInputTool
                 {
                     var radiusPoint = ProjectBasePoint(point);
                     _baseRadius = CadPlaneGeometry.RadialDistance(_center, radiusPoint, _xAxis, _yAxis);
-                    if (_baseRadius <= 1e-9) return true;
+                    if (_baseRadius <= 1e-9)
+                        return false;
                     _baseRadiusPoint = radiusPoint;
                     SetStageLocalized(
                         2,
@@ -158,7 +159,8 @@ public sealed class FrustumTool : CadDrawingTool, ICadPointInputTool
             case 3:
                 {
                     var entity = CreateFrustum(ProjectTopPoint(point));
-                    if (entity is null) return true;
+                    if (entity is null)
+                        return false;
                     Context.AddEntity(entity);
                     Context.Workspace.Tools.CompleteCurrent();
                     return true;
@@ -192,13 +194,23 @@ public sealed class FrustumTool : CadDrawingTool, ICadPointInputTool
                     Math.Max(radius * 0.5, MinSize),
                     MinSize));
             }
+            else
+            {
+                _preview = null;
+                Context.Preview.Clear();
+            }
             return;
         }
 
         if (Stage == 2)
         {
             var signedHeight = CadPlaneGeometry.SignedDistance(_baseRadiusPoint, point, _baseNormal);
-            if (Math.Abs(signedHeight) <= 1e-9) return;
+            if (Math.Abs(signedHeight) <= 1e-9)
+            {
+                _preview = null;
+                Context.Preview.Clear();
+                return;
+            }
             var axis = signedHeight < 0 ? Negate(_baseNormal) : _baseNormal;
             Show(new CadFrustumEntity(
                 _center,
@@ -212,6 +224,11 @@ public sealed class FrustumTool : CadDrawingTool, ICadPointInputTool
         if (Stage != 3) return;
         if (CreateFrustum(ProjectTopPoint(point)) is { } entity)
             Show(entity);
+        else
+        {
+            _preview = null;
+            Context.Preview.Clear();
+        }
     }
 
     private OcctPoint3d ProjectBasePoint(OcctPoint3d point) =>

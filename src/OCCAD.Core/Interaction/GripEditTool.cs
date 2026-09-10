@@ -75,11 +75,16 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
 
         if (input.Button != OcctPointerButton.Left) return false;
 
-        return AcceptPoint(Context.ResolvePoint(input.X, input.Y, ConstraintOrigin).Point);
+        _ = TryCommitPoint(
+            Context.ResolvePoint(
+                input.X,
+                input.Y,
+                ConstraintOrigin).Point);
+        return true;
     }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
-        AcceptPoint(point);
+        TryCommitPoint(point);
 
     protected override bool CanCommitCurrentStageCore => true;
 
@@ -88,20 +93,27 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
         if (_preview is null)
             return false;
 
-        return AcceptPoint(
-            Context.ResolvePoint(pointer.X, pointer.Y, ConstraintOrigin).Point);
+        return TryCommitPoint(
+            Context.ResolvePoint(
+                pointer.X,
+                pointer.Y,
+                ConstraintOrigin).Point);
     }
 
-    private bool AcceptPoint(OcctPoint3d point)
+    private bool TryCommitPoint(OcctPoint3d point)
     {
-        if (_preview is null || _before is null || !point.IsFinite)
-            return true;
+        if (_preview is null ||
+            _before is null ||
+            !point.IsFinite)
+            return false;
 
         if (!TryMovePreview(point))
-            return true;
+            return false;
 
-        if (Context.Workspace.Entities.GeometryEquals(_before, _preview))
-            return true;
+        if (Context.Workspace.Entities.GeometryEquals(
+                _before,
+                _preview))
+            return false;
 
         var workspace = Context.Workspace;
         var actualBefore = _grip.Entity.Duplicate();

@@ -17,10 +17,13 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
     private CadRegularPolygonEntity? _preview;
     private int _sides = DefaultSides;
     private bool _inscribed = true;
+    private WorkPlaneFrame _initialPlane;
 
     public override string Id => "regularpolygon";
     public override string DisplayName => "Regular Polygon";
     public override string PrecisionLengthLabel => "Radius";
+    protected override bool CanStepBackCore =>
+        _center is not null;
 
     public override CadToolPanelDescriptor ParameterPanel =>
         new(
@@ -46,6 +49,7 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
         _preview = null;
         _sides = DefaultSides;
         _inscribed = true;
+        _initialPlane = CaptureWorkPlaneFrame();
         SetStageLocalized(
             0,
             "Cad.Prompt.RegularPolygon.Center",
@@ -90,7 +94,9 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
 
     public bool TryAcceptPoint(OcctPoint3d point)
     {
-        if (!IsActive || State != CadToolState.Drawing)
+        if (!IsActive ||
+            State != CadToolState.Drawing ||
+            !point.IsFinite)
             return false;
         _currentPoint = point;
         return AcceptPoint(point);
@@ -146,6 +152,23 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
         return false;
     }
 
+    protected override bool OnStepBack()
+    {
+        if (_center is null)
+            return false;
+
+        _center = null;
+        _currentPoint = null;
+        _preview = null;
+        Context.Preview.Clear();
+        RestoreWorkPlaneFrame(_initialPlane);
+        SetStageLocalized(
+            0,
+            "Cad.Prompt.RegularPolygon.Center",
+            "Regular Polygon: specify center [Esc cancel]");
+        return true;
+    }
+
     protected override void OnCanceled()
     {
         _center = null;
@@ -173,7 +196,7 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
         }
 
         if (!TryGeometry(point, out var axis, out var radius))
-            return true;
+            return false;
 
         var polygon = new CadRegularPolygonEntity(
             _center.Value,
@@ -192,7 +215,11 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
         OcctPoint3d point)
     {
         if (!TryGeometry(point, out var axis, out var radius))
+        {
+            _preview = null;
+            Context.Preview.Clear();
             return;
+        }
 
         _preview = new CadRegularPolygonEntity(
             center,
@@ -232,8 +259,8 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
 
     private string StagePromptFormat() =>
         _inscribed
-            ? "Regular Polygon: specify radius [{0} sides, inscribed, Esc cancel]"
-            : "Regular Polygon: specify radius [{0} sides, circumscribed, Esc cancel]";
+            ? "Regular Polygon: specify radius [{0} sides, inscribed, Backspace undo, Esc cancel]"
+            : "Regular Polygon: specify radius [{0} sides, circumscribed, Backspace undo, Esc cancel]";
 
     private bool TryGeometry(
         OcctPoint3d point,

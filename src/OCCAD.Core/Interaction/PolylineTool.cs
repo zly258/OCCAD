@@ -87,7 +87,9 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
     private bool AcceptPoint(OcctPoint3d point)
     {
         if (!point.IsFinite) return false;
-        if (_points.Count > 0 && _points[^1].DistanceTo(point) <= 1e-9) return true;
+        if (_points.Count > 0 &&
+            _points[^1].DistanceTo(point) <= 1e-9)
+            return false;
 
         var previous = _points.Count == 0 ? (OcctPoint3d?)null : _points[^1];
         _points.Add(point);

@@ -129,7 +129,7 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
         }
 
         if (!TryGeometry(_first.Value, point, out var center, out var width, out var height))
-            return true;
+            return false;
 
         _preview = new CadRectangleEntity(center, _xAxis, _yAxis, width, height);
         ShowPreview(_preview);

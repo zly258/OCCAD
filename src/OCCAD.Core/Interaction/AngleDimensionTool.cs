@@ -12,6 +12,15 @@ public sealed class AngleDimensionTool : CadDrawingTool, ICadPointInputTool
 
     public override string Id=>"angledimension";
     public override string DisplayName=>"Angle Dimension";
+    public override CadToolInputKind InputKind =>
+        _lines.Count < 2
+            ? CadToolInputKind.Selection
+            : CadToolInputKind.Point;
+    public override CadToolInteractionPolicy InteractionPolicy =>
+        base.InteractionPolicy with
+        {
+            PreselectionEnabled = _lines.Count < 2
+        };
     protected override bool CanStepBackCore=>_lines.Count>0;
     public override CadToolPanelDescriptor ParameterPanel=>new("Angle Dimension",
         [new CadDoubleToolParameterDescriptor("TextHeight","Text Height",_textHeight,1e-9,1_000_000),new CadDoubleToolParameterDescriptor("ArrowSize","Arrow Size",_arrowSize,1e-9,1_000_000)]);
@@ -43,7 +52,7 @@ public sealed class AngleDimensionTool : CadDrawingTool, ICadPointInputTool
     public bool TryAcceptPoint(OcctPoint3d point)
     {
         if(!IsActive||_lines.Count!=2||!point.IsFinite)return false;
-        var delta=point-_vertex;delta-=_normal*delta.Dot(_normal);if(delta.Length<=1e-9)return true;
+        var delta=point-_vertex;delta-=_normal*delta.Dot(_normal);if(delta.Length<=1e-9)return false;
         Context.AddEntity(new CadAngleDimensionEntity(_vertex,_firstDirection,_secondDirection,delta.Length,_textHeight,_arrowSize));Context.Workspace.Tools.CompleteCurrent();return true;
     }
     protected override bool OnSetParameter(string id,string value)
@@ -53,11 +62,23 @@ public sealed class AngleDimensionTool : CadDrawingTool, ICadPointInputTool
     }
     protected override bool OnStepBack(){if(_lines.Count==0)return false;_lines.RemoveAt(_lines.Count-1);Context.Preview.Clear();Context.WorkPlane.SetToolPlaneFixed(false);UpdatePrompt();return true;}
     private void TryAcceptSelected(){foreach(var line in Context.Selection.Selected.OfType<CadLineEntity>().Take(2))if(!TryAcceptLine(line))break;}
-    private void Show(OcctPoint3d point){var delta=point-_vertex;delta-=_normal*delta.Dot(_normal);if(delta.Length>1e-9)ShowPreview(new CadAngleDimensionEntity(_vertex,_firstDirection,_secondDirection,delta.Length,_textHeight,_arrowSize));}
+    private void Show(OcctPoint3d point)
+    {
+        var delta=point-_vertex;
+        delta-=_normal*delta.Dot(_normal);
+        if(delta.Length>1e-9)
+            ShowPreview(new CadAngleDimensionEntity(_vertex,_firstDirection,_secondDirection,delta.Length,_textHeight,_arrowSize));
+        else
+            Context.Preview.Clear();
+    }
     private void UpdatePrompt(){var key=_lines.Count switch{0=>"First",1=>"Second",_=>"Position"};var text=_lines.Count switch{0=>"Angle dimension: select first line [Esc cancel]",1=>"Angle dimension: select second line [Backspace undo, Esc cancel]",_=>"Angle dimension: specify arc position [Backspace undo, Esc cancel]"};SetStageLocalized(_lines.Count,$"Cad.Prompt.angledimension.{key}",text);}
     private static bool TryFrame(CadLineEntity first,CadLineEntity second,out OcctPoint3d vertex,out OcctVector3d d1,out OcctVector3d d2,out OcctVector3d normal)
     {
-        var pairs=new[]{(first.Start,first.End,second.Start,second.End),(first.Start,first.End,second.End,second.Start),(first.End,first.Start,second.Start,second.End),(first.End,first.Start,second.End,second.Start)};
+        var firstStart=first.ToWorldPoint(first.Start);
+        var firstEnd=first.ToWorldPoint(first.End);
+        var secondStart=second.ToWorldPoint(second.Start);
+        var secondEnd=second.ToWorldPoint(second.End);
+        var pairs=new[]{(firstStart,firstEnd,secondStart,secondEnd),(firstStart,firstEnd,secondEnd,secondStart),(firstEnd,firstStart,secondStart,secondEnd),(firstEnd,firstStart,secondEnd,secondStart)};
         foreach(var p in pairs)if((p.Item1-p.Item3).Length<=1e-7){vertex=p.Item1;d1=(p.Item2-vertex).Normalized();d2=(p.Item4-vertex).Normalized();var cross=d1.Cross(d2);if(cross.TryNormalize(out normal)&&Math.Abs(d1.Dot(d2))<1-1e-10)return true;break;}
         vertex=default;d1=default;d2=default;normal=default;return false;
     }

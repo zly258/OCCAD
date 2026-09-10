@@ -26,6 +26,8 @@ Clear transient state → Idle
 
 Right-click first submits the current non-pointer Tool step when that step can be accepted; otherwise it finishes a finishable Tool, and only then falls back to cancel. Enter and the ToolPanel Accept/Finish control use the same Core submission rule. Backspace means Tool StepBack. Delete means delete selection and is not a second StepBack key.
 
+StepBack restores both Tool-owned stage data and the temporary WorkPlane frame/origin for the preceding stage. An exact point API reports success only when that point was actually accepted; pointer handlers may still consume an invalid click while keeping the Tool active.
+
 A blank Command Line Enter uses the same `SubmitCurrent()` rule. Point steps never reuse a previously observed pointer position as implicit input.
 
 ## 3. Point-resolution pipeline
@@ -129,6 +131,8 @@ Preview replacement is atomic: successfully create/configure the new presentatio
 Pan/Rotate/Zoom remain available while a Tool is active. Navigation must neither commit nor cancel the Tool, and preview continues afterward.
 
 Right-click cannot simultaneously mean camera rotation and Tool Finish; navigation uses a distinct mouse contract.
+
+Leaving the viewport invalidates the last observed pointer and clears preselection, Snap/Tracking candidates, hot Grip state, dynamic input, and the snap aperture. A later shortcut or Tool refresh must not reuse an off-viewport coordinate.
 
 ## 12. Property edit
 

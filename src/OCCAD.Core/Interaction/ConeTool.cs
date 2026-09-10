@@ -105,7 +105,8 @@ public sealed class ConeTool : CadDrawingTool, ICadPointInputTool
                 {
                     var radiusPoint = ProjectBasePoint(point);
                     _radius = CadPlaneGeometry.RadialDistance(_center, radiusPoint, _xAxis, _yAxis);
-                    if (_radius <= 1e-9) return true;
+                    if (_radius <= 1e-9)
+                        return false;
                     _radiusPoint = radiusPoint;
                     SetStageLocalized(
                         2,
@@ -121,7 +122,8 @@ public sealed class ConeTool : CadDrawingTool, ICadPointInputTool
             case 2:
                 {
                     var entity = CreateCone(point);
-                    if (entity is null) return true;
+                    if (entity is null)
+                        return false;
                     Context.AddEntity(entity);
                     Context.Workspace.Tools.CompleteCurrent();
                     return true;
@@ -147,12 +149,22 @@ public sealed class ConeTool : CadDrawingTool, ICadPointInputTool
             var radius = CadPlaneGeometry.RadialDistance(_center, radiusPoint, _xAxis, _yAxis);
             if (radius > 1e-9)
                 Show(new CadConeEntity(_center, _baseNormal, radius, MinSize));
+            else
+            {
+                _preview = null;
+                Context.Preview.Clear();
+            }
             return;
         }
 
         if (Stage != 2) return;
         if (CreateCone(point) is { } entity)
             Show(entity);
+        else
+        {
+            _preview = null;
+            Context.Preview.Clear();
+        }
     }
 
     private OcctPoint3d ProjectBasePoint(OcctPoint3d point) =>

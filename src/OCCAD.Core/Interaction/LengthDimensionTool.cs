@@ -83,6 +83,10 @@ public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
             Context.WorkPlane.SetOrigin(_points[0]);
             Context.WorkPlane.SetToolPlaneFixed(true);
         }
+        else
+        {
+            Context.WorkPlane.SetOrigin(_planeOrigin);
+        }
         UpdatePrompt();
         return true;
     }
@@ -101,14 +105,16 @@ public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
         }
         if (_points.Count == 1)
         {
-            if ((point - _points[0]).Length <= 1e-9) return true;
+            if ((point - _points[0]).Length <= 1e-9)
+                return false;
             _points.Add(point);
             UpdatePrompt();
             return true;
         }
 
         var entity = Create(point);
-        if (entity is null) return true;
+        if (entity is null)
+            return false;
         Context.AddEntity(entity);
         Context.Workspace.Tools.CompleteCurrent();
         return true;
@@ -119,13 +125,29 @@ public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
         point = Project(point);
         if (_points.Count == 1)
         {
-            if ((point - _points[0]).Length <= 1e-9) return;
+            if ((point - _points[0]).Length <= 1e-9)
+            {
+                _preview = null;
+                Context.Preview.Clear();
+                return;
+            }
+
             ShowPreview(new CadLineEntity(_points[0], point));
             return;
         }
-        if (_points.Count != 2) return;
+
+        if (_points.Count != 2)
+        {
+            _preview = null;
+            Context.Preview.Clear();
+            return;
+        }
+
         _preview = Create(point);
-        if (_preview is not null) ShowPreview(_preview);
+        if (_preview is not null)
+            ShowPreview(_preview);
+        else
+            Context.Preview.Clear();
     }
 
     private CadLengthDimensionEntity? Create(OcctPoint3d placement)

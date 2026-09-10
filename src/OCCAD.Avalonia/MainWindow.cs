@@ -87,6 +87,9 @@ public sealed partial class MainWindow : Window
 
     public MainWindow()
     {
+        CadDiagnostics.Trace(
+            "MainWindow constructor entered.");
+
         Title = "OCCAD";
         Width = 1180;
         Height = 760;
@@ -100,7 +103,12 @@ public sealed partial class MainWindow : Window
         _toolPanel.PanelVisibilityChanged += (_, _) =>
             RefreshPanelMenuState();
         ConfigureViewport();
+        CadDiagnostics.Trace(
+            "MainWindow viewport configured.");
+
         Content = BuildShell();
+        CadDiagnostics.Trace(
+            "MainWindow shell built.");
 
         _viewportInteraction = new CadViewportInteractionController(
             _workspace,
@@ -122,22 +130,40 @@ public sealed partial class MainWindow : Window
                 _workspace,
                 _commandHost);
 
+        CadDiagnostics.Trace(
+            "MainWindow controllers created.");
+
         WireEvents();
         BuildMenu();
         RefreshAll();
         UpdateWindowTitle();
 
+        CadDiagnostics.Trace(
+            "MainWindow initial UI refresh completed.");
+
         Opened += (_, _) =>
         {
+            CadDiagnostics.Trace(
+                "MainWindow opened.");
+
             _viewport.Focus();
             Dispatcher.Post(
                 () =>
                 {
+                    CadDiagnostics.Trace(
+                        "Initial viewport redraw requested.");
+
                     if (_workspace.Engine is { IsInitialized: true } engine)
                         engine.Redraw();
+
+                    CadDiagnostics.Trace(
+                        "Initial viewport redraw completed.");
                 },
                 DispatcherPriority.Loaded);
         };
+
+        CadDiagnostics.Trace(
+            "MainWindow constructor completed.");
     }
 
     private Control BuildShell()
@@ -500,21 +526,62 @@ public sealed partial class MainWindow : Window
         _viewport.EngineRecreated += (_, args) =>
             Ui(() =>
             {
-                _workspace.AttachEngine(args.Engine);
-                ConfigureEngine(args.Engine);
-                _toolStatus.Text = UiFormat(
-                    "Cad.Text.ReadyOcct",
-                    "Ready - OCCT {0}",
-                    OcctEngine.OcctVersion);
-                RefreshTree();
-                RefreshActionUi();
+                CadDiagnostics.Trace(
+                    $"Viewport engine recreated. Initialized={args.Engine.IsInitialized}.");
+
+                try
+                {
+                    _workspace.AttachEngine(args.Engine);
+                    ConfigureEngine(args.Engine);
+                    _viewportInteraction.AttachEngine(args.Engine);
+                    _toolStatus.Text = UiFormat(
+                        "Cad.Text.ReadyOcct",
+                        "Ready - OCCT {0}",
+                        OcctEngine.OcctVersion);
+                    RefreshTree();
+                    RefreshActionUi();
+
+                    CadDiagnostics.Trace(
+                        $"Viewport engine attached. OCCT={OcctEngine.OcctVersion}.");
+                }
+                catch (Exception exception)
+                {
+                    CadDiagnostics.Report(
+                        exception,
+                        "Viewport engine initialization");
+
+                    if (CadDiagnostics.IsFatal(exception))
+                        throw;
+
+                    _toolStatus.Text =
+                        exception.Message;
+                    CadErrorWindow.ShowError(
+                        exception,
+                        "Viewport initialization");
+                }
             });
 
         _viewport.ErrorOccurred += (_, args) =>
-            Ui(() => _toolStatus.Text = args.Exception.Message);
+            Ui(() =>
+            {
+                CadDiagnostics.Report(
+                    args.Exception,
+                    "Viewport");
+
+                if (CadDiagnostics.IsFatal(args.Exception))
+                    throw args.Exception;
+
+                _toolStatus.Text =
+                    args.Exception.Message;
+                CadErrorWindow.ShowError(
+                    args.Exception,
+                    "Viewport");
+            });
 
         _viewportInteraction.CoordinateChanged += (_, args) =>
             Ui(() => UpdateCoordinateStatus(args.Value));
+        _viewportInteraction.CoordinateCleared += (_, _) =>
+            Ui(ClearCoordinateStatus);
         _viewportInteraction.InteractionSettingsChanged += (_, _) =>
             Ui(RefreshInteractionUi);
 
@@ -531,7 +598,14 @@ public sealed partial class MainWindow : Window
         _workspace.Tools.ToolUpdated += (_, _) =>
             Ui(() => UpdateToolUi(_workspace.Tools.ActiveTool));
         _workspace.Actions.ActionFailed += (_, args) =>
-            Ui(() => _toolStatus.Text = args.Exception.Message);
+            Ui(() =>
+            {
+                CadDiagnostics.Report(
+                    args.Exception,
+                    $"Action '{args.Action.Id}'");
+                _toolStatus.Text =
+                    args.Exception.Message;
+            });
         _workspace.Snap.CurrentChanged += (_, _) =>
             Ui(RefreshSnapStatus);
         _workspace.WorkPlane.Changed += (_, _) =>
@@ -720,5 +794,8 @@ public sealed partial class MainWindow : Window
         _propertyInspector.Dispose();
         _viewportInteraction.Dispose();
         _workspace.Dispose();
+
+        CadDiagnostics.Trace(
+            "MainWindow workspace disposed.");
     }
 }

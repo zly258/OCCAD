@@ -6,14 +6,18 @@ public sealed class LineTool : CadDrawingTool, ICadPointInputTool
 {
     private OcctPoint3d? _start;
     private CadLineEntity? _preview;
+    private WorkPlaneFrame _initialPlane;
 
     public override string Id => "line";
     public override string DisplayName => "Line";
+    protected override bool CanStepBackCore =>
+        _start is not null;
 
     protected override void OnActivated()
     {
         _start = null;
         _preview = null;
+        _initialPlane = CaptureWorkPlaneFrame();
         SetStageLocalized(0, "Cad.Prompt.Line.First", "Line: specify first point [Esc cancel]");
     }
 
@@ -33,7 +37,26 @@ public sealed class LineTool : CadDrawingTool, ICadPointInputTool
     protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
         CommitResolvedPoint(pointer, _start, AcceptPoint);
 
-    public bool TryAcceptPoint(OcctPoint3d point) => AcceptPoint(point);
+    public bool TryAcceptPoint(OcctPoint3d point) =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        AcceptPoint(point);
+
+    protected override bool OnStepBack()
+    {
+        if (_start is null)
+            return false;
+
+        _start = null;
+        _preview = null;
+        Context.Preview.Clear();
+        RestoreWorkPlaneFrame(_initialPlane);
+        SetStageLocalized(
+            0,
+            "Cad.Prompt.Line.First",
+            "Line: specify first point [Esc cancel]");
+        return true;
+    }
 
     protected override void OnCanceled() => Reset();
 
@@ -44,10 +67,11 @@ public sealed class LineTool : CadDrawingTool, ICadPointInputTool
         {
             _start = point;
             Context.WorkPlane.SetOrigin(point);
-            SetStageLocalized(1, "Cad.Prompt.Line.Next", "Line: specify next point [Esc cancel]", CadPrecisionInputKind.LengthAndAngle);
+            SetStageLocalized(1, "Cad.Prompt.Line.Next", "Line: specify next point [Backspace undo, Esc cancel]", CadPrecisionInputKind.LengthAndAngle);
             return true;
         }
-        if (_start.Value.DistanceTo(point) <= 1e-9) return true;
+        if (_start.Value.DistanceTo(point) <= 1e-9)
+            return false;
         UpdatePreview(_start.Value, point);
         if (_preview is not null) Context.AddEntity(_preview.Duplicate());
         Context.Workspace.Tools.CompleteCurrent();
@@ -56,7 +80,12 @@ public sealed class LineTool : CadDrawingTool, ICadPointInputTool
 
     private void UpdatePreview(OcctPoint3d start, OcctPoint3d end)
     {
-        if (start.DistanceTo(end) <= 1e-9) return;
+        if (start.DistanceTo(end) <= 1e-9)
+        {
+            _preview = null;
+            Context.Preview.Clear();
+            return;
+        }
         _preview = new CadLineEntity(start, end);
         ShowPreview(_preview);
     }

@@ -22,6 +22,8 @@ Active Tool + Command Line
 
 统一状态：`Idle → Activate → Drawing/WaitForSelection → Preview Updated → Commit Stage → next/complete`。Esc/Cancel 清理 Preview、Tracking、Snap 临时状态和 Tool 临时工作平面。右键优先提交当前可接受的非 Point Step，其次 Finish，可提交和可结束都不满足时才 Cancel；Enter 与 ToolPanel 的 Accept/Finish 使用同一套 Core 提交规则。Backspace/StepBack 回退一个阶段，不等价于 Cancel。
 
+StepBack 不只回退 Tool 数据，还必须恢复上一阶段对应的临时 WorkPlane frame/origin。精确点接口只有在该点真实被接受时才返回成功；鼠标点击即使几何无效也可以被 UI 消费，但 Tool 应保持当前阶段继续等待输入。
+
 ## 3. Command Line 键盘优先级
 
 当 Command Line TextBox 获得焦点：Enter 提交；Up/Down 浏览输入历史；Esc 先清空文本，空文本时取消 Active Tool；Backspace 是正常文本编辑。全局 Tool Backspace/快捷键不得抢占 TextBox 编辑。
@@ -55,5 +57,7 @@ Preview 是 transient，不进入 Document/Selection/History。替换 Preview �
 ## 7. 导航、属性和异常
 
 Active Tool 期间仍允许平移/缩放/旋转。Property 编辑采用 capture → validate → apply → rebuild/presentation → history，失败恢复旧状态。
+
+鼠标离开 Viewport 时必须失效最后一次 pointer observation，并清理 Preselection、Snap/Tracking candidates、hot Grip、动态输入与捕捉孔径；后续快捷键或 Tool 刷新不得复用视口外的旧坐标。
 
 异常分层处理：Tool/Grip/Property 局部事务负责 rollback；Viewport/UI boundary 负责报告并恢复可操作状态；不可恢复异常不得静默吞掉。

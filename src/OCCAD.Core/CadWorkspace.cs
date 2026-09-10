@@ -74,6 +74,14 @@ public sealed class CadWorkspace : IDisposable
         SetModified(false);
     }
 
+    public void ClearPointerObservation()
+    {
+        LastResolvedPoint = null;
+        LastPointerPosition = null;
+        Snap.Clear();
+        Tracking.Clear();
+    }
+
     public void AttachEngine(OcctEngine engine)
     {
         ArgumentNullException.ThrowIfNull(engine);
@@ -82,6 +90,7 @@ public sealed class CadWorkspace : IDisposable
         if (ReferenceEquals(Engine, engine)) return;
 
         Tools.CancelCurrent();
+        ClearPointerObservation();
         var previousEngine = Engine;
         var previousSuppress = _suppressModifiedTracking;
         Engine = engine;

@@ -75,7 +75,8 @@ public sealed class SphereTool : CadDrawingTool, ICadPointInputTool
         }
 
         var radius = _center.Value.DistanceTo(point);
-        if (radius <= 1e-9) return true;
+        if (radius <= 1e-9)
+            return false;
 
         Context.AddEntity(new CadSphereEntity(_center.Value, radius));
         Context.Workspace.Tools.CompleteCurrent();
@@ -86,7 +87,10 @@ public sealed class SphereTool : CadDrawingTool, ICadPointInputTool
     {
         var radius = center.DistanceTo(point);
         if (radius <= 1e-9)
+        {
+            Context.Preview.Clear();
             return;
+        }
 
         ShowPreview(new CadSphereEntity(center, radius));
     }

@@ -84,9 +84,11 @@ public sealed class SplineTool : CadDrawingTool, ICadPointInputTool
 
     private bool AcceptPoint(OcctPoint3d point)
     {
+        if (!point.IsFinite)
+            return false;
         if (_fitPoints.Count > 0 &&
             _fitPoints[^1].DistanceTo(point) <= 1e-9)
-            return true;
+            return false;
 
         _fitPoints.Add(point);
         Context.WorkPlane.SetOrigin(point);

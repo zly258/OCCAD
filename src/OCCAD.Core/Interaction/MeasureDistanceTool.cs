@@ -13,6 +13,7 @@ public readonly record struct CadDistanceMeasurement(OcctPoint3d Start, OcctPoin
 public sealed class MeasureDistanceTool : CadDrawingTool, ICadPointInputTool
 {
     private OcctPoint3d? _first;
+    private OcctPoint3d _initialOrigin;
     public override string Id => "distance";
     public override string DisplayName => "Distance";
     public CadDistanceMeasurement? Measurement { get; private set; }
@@ -20,7 +21,12 @@ public sealed class MeasureDistanceTool : CadDrawingTool, ICadPointInputTool
     protected override bool CanStepBackCore => _first is not null;
     protected override bool CanFinishCore => Stage == 2;
 
-    protected override void OnActivated() => Reset();
+    protected override void OnActivated()
+    {
+        _initialOrigin =
+            Context.WorkPlane.Origin;
+        Reset();
+    }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
@@ -96,6 +102,8 @@ public sealed class MeasureDistanceTool : CadDrawingTool, ICadPointInputTool
         _first = null;
         Measurement = null;
         Context.Preview.Clear();
+        Context.WorkPlane.SetOrigin(
+            _initialOrigin);
         SetStageLocalized(0, "Cad.Prompt.Distance.First", "Distance: specify first point [Esc cancel]");
     }
 }

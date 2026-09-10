@@ -7,6 +7,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     private OcctPoint3d? _center;
     private OcctVector3d? _reference;
     private OcctVector3d _normal;
+    private OcctPoint3d _initialOrigin;
     public override string Id => "rotate";
     public override string DisplayName => "Rotate";
     public override OcctPoint3d? PrecisionReferencePoint => _center;
@@ -16,6 +17,8 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
 
     protected override void OnTransformStarted()
     {
+        _initialOrigin =
+            Context.WorkPlane.Origin;
         _normal = Context.WorkPlane.Normal;
         RestorePrompt();
     }
@@ -78,14 +81,28 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
 
     protected override bool OnStepBack()
     {
-        if (_reference is not null) _reference = null;
-        else { _center = null; Context.WorkPlane.SetToolPlaneFixed(false); }
+        if (_reference is not null)
+        {
+            _reference = null;
+        }
+        else
+        {
+            _center = null;
+            Context.WorkPlane.SetToolPlaneFixed(false);
+            Context.WorkPlane.SetOrigin(
+                _initialOrigin);
+        }
         Context.Preview.Clear();
         RestorePrompt();
         return true;
     }
 
-    protected override void ResetTransformState() { _center = null; _reference = null; }
+    protected override void ResetTransformState()
+    {
+        _center = null;
+        _reference = null;
+        _initialOrigin = default;
+    }
 
     private bool Direction(OcctPoint3d point, out OcctVector3d direction)
     {

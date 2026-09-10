@@ -106,7 +106,8 @@ public sealed class CylinderTool : CadDrawingTool, ICadPointInputTool
                 {
                     var radiusPoint = ProjectBasePoint(point);
                     _radius = CadPlaneGeometry.RadialDistance(_center, radiusPoint, _xAxis, _yAxis);
-                    if (_radius <= 1e-9) return true;
+                    if (_radius <= 1e-9)
+                        return false;
                     _radiusPoint = radiusPoint;
                     SetStageLocalized(
                         2,
@@ -155,7 +156,11 @@ public sealed class CylinderTool : CadDrawingTool, ICadPointInputTool
             var radiusPoint = ProjectBasePoint(point);
             var radius = CadPlaneGeometry.RadialDistance(_center, radiusPoint, _xAxis, _yAxis);
             if (radius <= 1e-9)
+            {
+                _preview = null;
+                Context.Preview.Clear();
                 return;
+            }
 
             Show(new CadCylinderEntity(
                 _center,

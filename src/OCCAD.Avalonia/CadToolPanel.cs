@@ -742,24 +742,9 @@ internal sealed class CadToolPanel : Border
             return false;
 
         if (string.IsNullOrWhiteSpace(value))
-        {
-            switch (kind)
-            {
-                case CadPrecisionInputKind.Length:
-                    _workspace.Drafting.LengthLockEnabled = false;
-                    _workspace.Drafting.LockedLength = 0;
-                    return true;
-
-                case CadPrecisionInputKind.Angle:
-                    _workspace.Drafting.AngleLockEnabled = false;
-                    _workspace.Drafting.LockedAngleDegrees = 0;
-                    return true;
-
-                case CadPrecisionInputKind.Factor:
-                    _workspace.Precision.ResetFactor();
-                    return true;
-            }
-        }
+            return _workspace.Precision.ClearLock(
+                _tool,
+                kind);
 
         if (!double.TryParse(
                 value,

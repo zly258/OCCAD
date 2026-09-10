@@ -11,6 +11,7 @@ public sealed class CircularArrayTool : CadSelectionTransformToolBase, ICadPoint
     private int _count = 6;
     private double _sweep = 360;
     private bool _rotate = true;
+    private OcctPoint3d _initialOrigin;
     public override string Id => "circlearray";
     public override string DisplayName => "Circular Array";
     public override CadToolInputKind InputKind =>
@@ -30,7 +31,13 @@ public sealed class CircularArrayTool : CadSelectionTransformToolBase, ICadPoint
          new CadDoubleToolParameterDescriptor("Sweep", "Sweep angle", _sweep, -360, 360),
          new CadBooleanToolParameterDescriptor("RotateItems", "Rotate copies", _rotate)]);
 
-    protected override void OnTransformStarted() { _axis = Context.WorkPlane.Normal; UpdatePreview(); }
+    protected override void OnTransformStarted()
+    {
+        _initialOrigin =
+            Context.WorkPlane.Origin;
+        _axis = Context.WorkPlane.Normal;
+        UpdatePreview();
+    }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
@@ -93,12 +100,30 @@ public sealed class CircularArrayTool : CadSelectionTransformToolBase, ICadPoint
     }
     protected override bool OnStepBack()
     {
-        if (!_rotate && _reference is not null) _reference = null;
-        else { _center = null; _reference = null; Context.WorkPlane.SetToolPlaneFixed(false); }
+        if (!_rotate && _reference is not null)
+        {
+            _reference = null;
+        }
+        else
+        {
+            _center = null;
+            _reference = null;
+            Context.WorkPlane.SetToolPlaneFixed(false);
+            Context.WorkPlane.SetOrigin(
+                _initialOrigin);
+        }
         UpdatePreview();
         return true;
     }
-    protected override void ResetTransformState() { _center = null; _reference = null; _count = 6; _sweep = 360; _rotate = true; }
+    protected override void ResetTransformState()
+    {
+        _center = null;
+        _reference = null;
+        _count = 6;
+        _sweep = 360;
+        _rotate = true;
+        _initialOrigin = default;
+    }
 
     private void UpdatePreview()
     {

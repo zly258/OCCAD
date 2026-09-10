@@ -141,6 +141,76 @@ public sealed class CadPrecisionInputManager
         }
     }
 
+    public bool ClearLock(
+        CadTool? tool,
+        CadPrecisionInputKind kind)
+    {
+        if (tool is null ||
+            kind is not (CadPrecisionInputKind.Length or
+                CadPrecisionInputKind.Angle or
+                CadPrecisionInputKind.Factor) ||
+            (tool.PrecisionInputs & kind) == 0)
+            return false;
+
+        var previousAxisLock =
+            _drafting.AxisLockEnabled;
+        var previousLengthLock =
+            _drafting.LengthLockEnabled;
+        var previousLength =
+            _drafting.LockedLength;
+        var previousAngleLock =
+            _drafting.AngleLockEnabled;
+        var previousAngle =
+            _drafting.LockedAngleDegrees;
+        var previousFactor =
+            Factor;
+
+        try
+        {
+            switch (kind)
+            {
+                case CadPrecisionInputKind.Length:
+                    ClearLength();
+                    break;
+                case CadPrecisionInputKind.Angle:
+                    ClearAngle();
+                    break;
+                case CadPrecisionInputKind.Factor:
+                    Factor = null;
+                    break;
+            }
+
+            _tracking.Clear();
+            if (tool.ApplyPrecisionInput(default))
+                return true;
+
+            RestorePreviousState();
+            return false;
+        }
+        catch
+        {
+            RestorePreviousState();
+            throw;
+        }
+
+        void RestorePreviousState()
+        {
+            _drafting.AxisLockEnabled =
+                previousAxisLock;
+            _drafting.LockedLength =
+                previousLength;
+            _drafting.LengthLockEnabled =
+                previousLengthLock;
+            _drafting.LockedAngleDegrees =
+                previousAngle;
+            _drafting.AngleLockEnabled =
+                previousAngleLock;
+            Factor =
+                previousFactor;
+            _tracking.Clear();
+        }
+    }
+
     public void ResetFactor() =>
         Factor = null;
 

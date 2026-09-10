@@ -2,7 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Themes.Fluent;
-using Avalonia.Threading;
+using OcctNet;
 
 namespace OCCAD.Avalonia;
 
@@ -10,6 +10,9 @@ public sealed class CadApplication : Application
 {
     public override void Initialize()
     {
+        CadDiagnostics.Trace(
+            "CadApplication.Initialize entered.");
+
         Styles.Add(new FluentTheme
         {
             DensityStyle = DensityStyle.Compact
@@ -27,31 +30,55 @@ public sealed class CadApplication : Application
                 StringComparison.OrdinalIgnoreCase)
                 ? "zh-CN"
                 : "en-US");
+
+        CadDiagnostics.Trace(
+            "CadApplication.Initialize completed.");
     }
 
     public override void OnFrameworkInitializationCompleted()
     {
-        Dispatcher.UIThread.UnhandledException += OnUnhandledException;
+        CadDiagnostics.AttachUiDispatcher();
+        CadDiagnostics.Trace(
+            $"Framework initialization entered. Lifetime={ApplicationLifetime?.GetType().FullName ?? "<null>"}.");
 
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            desktop.MainWindow = new MainWindow();
+        CadDiagnostics.Trace(
+            "Configuring OCCT runtime.");
+        OcctRuntime.Configure();
+        CadDiagnostics.Trace(
+            "OCCT runtime configured." +
+            Environment.NewLine +
+            OcctRuntime.GetDiagnosticReport());
+
+        if (ApplicationLifetime is
+            IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            CadDiagnostics.Trace(
+                "Constructing MainWindow.");
+
+            var window =
+                new MainWindow();
+
+            CadDiagnostics.Trace(
+                "MainWindow constructed.");
+
+            desktop.MainWindow =
+                window;
+            desktop.Exit += (_, args) =>
+                CadDiagnostics.Trace(
+                    $"Desktop lifetime exit requested. ExitCode={args.ApplicationExitCode}.");
+
+            CadDiagnostics.Trace(
+                "MainWindow assigned to desktop lifetime.");
+        }
+        else
+        {
+            CadDiagnostics.Trace(
+                "Classic desktop lifetime was not available.");
+        }
 
         base.OnFrameworkInitializationCompleted();
+
+        CadDiagnostics.Trace(
+            "Framework initialization completed.");
     }
-
-    private static void OnUnhandledException(
-        object sender,
-        DispatcherUnhandledExceptionEventArgs e)
-    {
-        if (!IsRecoverable(e.Exception))
-            return;
-
-        e.Handled = true;
-        System.Diagnostics.Debug.WriteLine(e.Exception);
-    }
-
-    private static bool IsRecoverable(Exception exception) =>
-        exception is not OutOfMemoryException and
-        not StackOverflowException and
-        not AccessViolationException;
 }

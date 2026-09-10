@@ -5,6 +5,7 @@ namespace OCCAD;
 public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICadPointInputTool
 {
     private OcctPoint3d? _basePoint;
+    private OcctPoint3d _initialOrigin;
 
     protected OcctPoint3d BasePoint =>
         _basePoint ??
@@ -13,6 +14,8 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
     protected override void OnTransformStarted()
     {
         _basePoint = null;
+        _initialOrigin =
+            Context.WorkPlane.Origin;
         SetStageLocalized(
             0,
             $"Cad.Prompt.{Id}.Base",
@@ -51,6 +54,8 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
     }
 
     protected override bool CanCommitCurrentStageCore => true;
+    protected override bool CanStepBackCore =>
+        _basePoint is not null;
 
     protected override bool OnCommitCurrentStage(
         CadPointerPosition pointer)
@@ -73,8 +78,27 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
 
     protected abstract void Commit(OcctVector3d displacement);
 
-    protected override void ResetTransformState() =>
+    protected override bool OnStepBack()
+    {
+        if (_basePoint is null)
+            return false;
+
         _basePoint = null;
+        Context.Preview.Clear();
+        Context.WorkPlane.SetOrigin(
+            _initialOrigin);
+        SetStageLocalized(
+            0,
+            $"Cad.Prompt.{Id}.Base",
+            $"{DisplayName}: specify base point [Esc cancel]");
+        return true;
+    }
+
+    protected override void ResetTransformState()
+    {
+        _basePoint = null;
+        _initialOrigin = default;
+    }
 
     private bool AcceptPoint(OcctPoint3d point)
     {
@@ -87,7 +111,7 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
             SetStageLocalized(
                 1,
                 $"Cad.Prompt.{Id}.Target",
-                $"{DisplayName}: specify target point [Esc cancel]",
+                $"{DisplayName}: specify target point [Backspace undo, Esc cancel]",
                 CadPrecisionInputKind.LengthAndAngle);
             return true;
         }

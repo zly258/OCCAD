@@ -1031,7 +1031,29 @@ public sealed class CadSnapManager
 
     private void SetCurrent(CadSnapPoint? value)
     {
-        if (Nullable.Equals(Current, value)) return;
+        if (Nullable.Equals(Current, value))
+        {
+            if (value is { } current &&
+                (_marker is not { } marker ||
+                 _engine is not { IsInitialized: true } engine ||
+                 !engine.ContainsObject(marker.Id)))
+            {
+                try
+                {
+                    ShowMarker(
+                        current.Position,
+                        current.Type);
+                }
+                catch (Exception exception)
+                    when (IsRecoverableSnapFailure(exception))
+                {
+                    DeleteMarker();
+                }
+            }
+
+            return;
+        }
+
         Current = value;
         try
         {

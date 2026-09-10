@@ -798,6 +798,11 @@
     <sys:String x:Key="Cad.Value.OcctSurfaceType.Extrusion">拉伸面</sys:String>
     <sys:String x:Key="Cad.Value.OcctSurfaceType.Offset">偏移面</sys:String>
     <sys:String x:Key="Cad.Value.OcctSurfaceType.Other">其他</sys:String>
+    <sys:String x:Key="Cad.Text.ErrorTitle">OCCAD 错误</sys:String>
+    <sys:String x:Key="Cad.Text.ErrorMessage">OCCAD 发生错误。详细信息已写入应用日志。</sys:String>
+    <sys:String x:Key="Cad.Text.ErrorLog">日志：</sys:String>
+    <sys:String x:Key="Cad.Text.Continue">继续</sys:String>
+    <sys:String x:Key="Cad.Text.Exit">退出</sys:String>
 </ResourceDictionary>
 
 

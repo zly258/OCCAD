@@ -107,7 +107,8 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
         {
             var majorPoint = ProjectMajorPoint(point);
             _majorRadius = CadPlaneGeometry.RadialDistance(_center, majorPoint, _xAxis, _yAxis);
-            if (_majorRadius <= 1e-9) return true;
+            if (_majorRadius <= 1e-9)
+                return false;
             _majorPoint = majorPoint;
             _radialAxis = CadTransformMath.Normalize(
                 CadTransformMath.Between(_center, _majorPoint),
@@ -128,7 +129,7 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
 
         var tubePoint = ProjectTubePoint(point);
         if (_majorPoint.DistanceTo(tubePoint) <= 1e-9)
-            return true;
+            return false;
 
         Update(tubePoint);
         if (_preview is not null)
@@ -151,7 +152,11 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
             var majorPoint = ProjectMajorPoint(point);
             var major = CadPlaneGeometry.RadialDistance(_center, majorPoint, _xAxis, _yAxis);
             if (major <= 1e-9)
+            {
+                _preview = null;
+                Context.Preview.Clear();
                 return;
+            }
 
             Show(new CadTorusEntity(
                 _center,

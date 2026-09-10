@@ -47,6 +47,7 @@ internal sealed class CadViewportInteractionController : IDisposable
         _viewport.ObjectSelectionChanged += ObjectSelectionChanged;
         _viewport.HoverHitChanged += HoverHitChanged;
         _viewport.PointerExited += ViewportPointerExited;
+        _viewport.EngineRecreated += ViewportEngineRecreated;
         _workspace.Tools.ToolChanged += ToolChanged;
         _workspace.Tools.ToolUpdated += ToolUpdated;
         _workspace.Subobjects.Changed += SubobjectsChanged;
@@ -54,12 +55,24 @@ internal sealed class CadViewportInteractionController : IDisposable
     }
 
     public event EventHandler<CadCoordinateChangedEventArgs>? CoordinateChanged;
+    public event EventHandler? CoordinateCleared;
     public event EventHandler? InteractionSettingsChanged;
 
     public void FlushPointerMoves() => _pointerMoves.Flush();
 
     public void RefreshCurrentDrawingPointer() =>
         RefreshDrawingPointer(OcctInputModifiers.None);
+
+    public void AttachEngine(OcctEngine engine)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+        if (!engine.IsInitialized)
+            throw new InvalidOperationException(
+                "The OCCT engine is not initialized.");
+
+        RebuildSubobjectMarkers(
+            _workspace.Subobjects.Selected);
+    }
 
     public void Dispose()
     {
@@ -71,6 +84,7 @@ internal sealed class CadViewportInteractionController : IDisposable
         _viewport.ObjectSelectionChanged -= ObjectSelectionChanged;
         _viewport.HoverHitChanged -= HoverHitChanged;
         _viewport.PointerExited -= ViewportPointerExited;
+        _viewport.EngineRecreated -= ViewportEngineRecreated;
         _workspace.Tools.ToolChanged -= ToolChanged;
         _workspace.Tools.ToolUpdated -= ToolUpdated;
         _workspace.Subobjects.Changed -= SubobjectsChanged;
@@ -225,7 +239,8 @@ internal sealed class CadViewportInteractionController : IDisposable
             _middleNavigating || _shiftMiddleRotating
                 ? NavigationCursor
                 : _workspace.Tools.ActiveTool is
-                    { State: CadToolState.Drawing }
+                    { State: CadToolState.Drawing } tool &&
+                  tool.CurrentStep.RequiresPointer
                     ? CadDrawingCursor.Instance
                     : Cursor.Default;
     }
@@ -394,19 +409,50 @@ internal sealed class CadViewportInteractionController : IDisposable
         CadToolChangedEventArgs input)
     {
         ClearTransientInput();
+        _workspace.ClearPointerObservation();
+        CoordinateCleared?.Invoke(
+            this,
+            EventArgs.Empty);
         RefreshCursor();
     }
 
     private void ToolUpdated(
         object? sender,
-        CadToolChangedEventArgs input) =>
+        CadToolChangedEventArgs input)
+    {
+        if (input.Tool is null ||
+            !input.Tool.InteractionPolicy.PreselectionEnabled)
+        {
+            _workspace.Preselection.Clear();
+        }
+
         RefreshCursor();
+    }
+
+    private void ViewportEngineRecreated(
+        object? sender,
+        OcctEngineLifecycleEventArgs input)
+    {
+        _pointerMoves.Clear();
+        _selectionGesture = false;
+        _selectionRectangleVisible = false;
+
+        // Presentation handles are scoped to one native engine generation.
+        // Drop old handles before Workspace.AttachEngine can stabilize
+        // subobject selections and raise selection events against the new
+        // engine.
+        _subobjectMarkers.Clear();
+    }
 
     private void ViewportPointerExited(
         object? sender,
         PointerEventArgs input)
     {
         ClearTransientInput();
+        _workspace.ClearPointerObservation();
+        CoordinateCleared?.Invoke(
+            this,
+            EventArgs.Empty);
         _viewport.Cursor = Cursor.Default;
     }
 
@@ -469,6 +515,7 @@ internal sealed class CadViewportInteractionController : IDisposable
         _workspace.Preselection.Clear();
         _workspace.Snap.Clear();
         _workspace.Tracking.Clear();
+        _workspace.Grips.ClearHot();
     }
 
     private void ProcessPointer(

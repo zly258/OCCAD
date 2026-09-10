@@ -683,6 +683,13 @@ public sealed partial class MainWindow
         UpdateSnapAperture();
     }
 
+    private void ClearCoordinateStatus()
+    {
+        _coordinateStatus.Text = string.Empty;
+        _dynamicHud.IsVisible = false;
+        _snapAperture.IsVisible = false;
+    }
+
     private void UpdateSnapAperture()
     {
         if (!_workspace.Snap.Enabled ||
@@ -690,7 +697,8 @@ public sealed partial class MainWindow
             _workspace.Snap.EffectiveModes ==
                 CadSnapType.None ||
             _workspace.Tools.ActiveTool is not
-                { State: CadToolState.Drawing } ||
+                { State: CadToolState.Drawing } apertureTool ||
+            !apertureTool.CurrentStep.RequiresPointer ||
             _workspace.LastPointerPosition is not { } pointer)
         {
             _snapAperture.IsVisible = false;
@@ -734,6 +742,7 @@ public sealed partial class MainWindow
         var tool = _workspace.Tools.ActiveTool;
         if (tool is null ||
             tool.State != CadToolState.Drawing ||
+            !tool.CurrentStep.RequiresPointer ||
             _workspace.LastPointerPosition is not { } pointer)
         {
             _dynamicHud.IsVisible = false;

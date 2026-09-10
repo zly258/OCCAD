@@ -150,6 +150,29 @@ public sealed class CadGripManager
         return true;
     }
 
+    public void ClearHot()
+    {
+        if (_hotIndex < 0)
+            return;
+
+        var previousIndex = _hotIndex;
+        _hotIndex = -1;
+
+        if (_engine is { IsInitialized: true } engine &&
+            previousIndex < _markers.Count &&
+            engine.ContainsObject(_markers[previousIndex].Id))
+        {
+            using var batch = engine.BeginDisplayBatch();
+            SetMarkerStyle(
+                engine,
+                previousIndex,
+                NormalMarkerSize,
+                NormalMarkerPixels);
+        }
+
+        HotChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public void Clear()
     {
         var hadHot = _hotIndex >= 0;
@@ -239,7 +262,9 @@ public sealed class CadGripManager
             return;
         }
 
-        if (next.Count != _markers.Count)
+        if (next.Count != _markers.Count ||
+            _markers.Any(marker =>
+                !engine.ContainsObject(marker.Id)))
         {
             RebuildMarkers();
             return;

@@ -7,6 +7,7 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
     private OcctPoint3d? _first;
     private OcctVector3d _workNormal;
     private bool _keepSource = true;
+    private OcctPoint3d _initialOrigin;
     public override string Id => "mirror";
     public override string DisplayName => "Mirror";
     public override OcctPoint3d? PrecisionReferencePoint => _first;
@@ -17,6 +18,8 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
 
     protected override void OnTransformStarted()
     {
+        _initialOrigin =
+            Context.WorkPlane.Origin;
         _workNormal = Context.WorkPlane.Normal;
         SetStageLocalized(0, "Cad.Prompt.mirror.First", "Mirror: specify first point of mirror line [Esc cancel]");
     }
@@ -65,10 +68,17 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
         _first = null;
         Context.Preview.Clear();
         Context.WorkPlane.SetToolPlaneFixed(false);
+        Context.WorkPlane.SetOrigin(
+            _initialOrigin);
         SetStageLocalized(0, "Cad.Prompt.mirror.First", "Mirror: specify first point of mirror line [Esc cancel]");
         return true;
     }
-    protected override void ResetTransformState() { _first = null; _keepSource = true; }
+    protected override void ResetTransformState()
+    {
+        _first = null;
+        _keepSource = true;
+        _initialOrigin = default;
+    }
     private bool TryNormal(OcctPoint3d point, out OcctVector3d normal) =>
         (point - _first!.Value).Cross(_workNormal).TryNormalize(out normal);
 }

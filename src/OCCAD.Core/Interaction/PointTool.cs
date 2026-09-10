@@ -32,7 +32,10 @@ public sealed class PointTool : CadDrawingTool, ICadPointInputTool
     protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
         CommitResolvedPoint(pointer, null, AcceptPoint);
 
-    public bool TryAcceptPoint(OcctPoint3d point) => AcceptPoint(point);
+    public bool TryAcceptPoint(OcctPoint3d point) =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        AcceptPoint(point);
 
     private bool AcceptPoint(OcctPoint3d point)
     {

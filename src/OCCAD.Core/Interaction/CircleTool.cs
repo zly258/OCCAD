@@ -157,7 +157,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
     {
         if (!point.IsFinite) return false;
         if (_points.Count > 0 && _points[^1].DistanceTo(point) <= 1e-9)
-            return true;
+            return false;
 
         _points.Add(point);
         Context.WorkPlane.SetOrigin(point);
@@ -212,7 +212,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         if (radius <= 1e-9)
         {
             _points.RemoveAt(_points.Count - 1);
-            return true;
+            return false;
         }
 
         Commit(new CadCircleEntity(center, _normal, radius));
@@ -227,7 +227,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         if (radius <= 1e-9)
         {
             _points.RemoveAt(_points.Count - 1);
-            return true;
+            return false;
         }
 
         Commit(new CadCircleEntity(Midpoint(first, second), _normal, radius));
@@ -246,7 +246,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         if (radius <= 1e-9)
         {
             _points.RemoveAt(_points.Count - 1);
-            return true;
+            return false;
         }
 
         Commit(new CadCircleEntity(center, _normal, radius));
@@ -258,7 +258,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         if (!TryCircleFromThreePoints(_points[0], _points[1], _points[2], out var center, out var radius))
         {
             _points.RemoveAt(_points.Count - 1);
-            return true;
+            return false;
         }
 
         Commit(new CadCircleEntity(center, _normal, radius));

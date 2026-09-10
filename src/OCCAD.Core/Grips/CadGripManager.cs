@@ -22,6 +22,7 @@ public sealed class CadGripManager
 
     private readonly List<CadGripPoint> _grips = [];
     private readonly List<OcctPoint> _markers = [];
+    private readonly List<OcctPoint> _retiredMarkers = [];
     private readonly List<CadEntity> _entities = [];
     private OcctEngine? _engine;
     private int _hotIndex = -1;
@@ -45,15 +46,25 @@ public sealed class CadGripManager
             size,
             Color.FromArgb(255, 245, 178, 35));
 
-        var createdMarker = engine.AddPointPixmap(
-            point,
-            size,
-            size,
-            _dragMarkerPixels);
+        OcctPoint? createdMarker = null;
+        try
+        {
+            createdMarker = engine.AddPointPixmap(
+                point,
+                size,
+                size,
+                _dragMarkerPixels);
+            engine.SetObjectSelectable(createdMarker.Value, false);
+            engine.SetDisplayPriority(createdMarker.Value, 10);
+            _dragMarker = createdMarker;
+        }
+        catch (Exception exception) when (IsRecoverableMarkerFailure(exception))
+        {
+            if (createdMarker is { } marker)
+                RetireMarkers(engine, [marker]);
 
-        _dragMarker = createdMarker;
-        engine.SetObjectSelectable(createdMarker, false);
-        engine.SetDisplayPriority(createdMarker, 10);
+            _dragMarker = null;
+        }
     }
 
     internal void UpdateDragMarker(OcctPoint3d point)
@@ -72,12 +83,19 @@ public sealed class CadGripManager
             return;
         }
 
-        engine.UpdatePoints([
-            new OcctPointStateUpdate(
-                marker,
-                point,
-                true)
-        ]);
+        try
+        {
+            engine.UpdatePoints([
+                new OcctPointStateUpdate(
+                    marker,
+                    point,
+                    true)
+            ]);
+        }
+        catch (Exception exception) when (IsRecoverableMarkerFailure(exception))
+        {
+            ClearDragMarker();
+        }
     }
 
     internal void ClearDragMarker()
@@ -96,8 +114,10 @@ public sealed class CadGripManager
             engine.Delete(existingMarker);
             _dragMarker = null;
         }
-        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException and not AccessViolationException)
+        catch (Exception exception) when (IsRecoverableMarkerFailure(exception))
         {
+            RetireMarkers(engine, [existingMarker]);
+            _dragMarker = null;
         }
     }
 
@@ -199,6 +219,7 @@ public sealed class CadGripManager
         ClearMarkers();
         ClearDragMarker();
         _dragMarker = null;
+        _retiredMarkers.Clear();
         _engine = engine;
         if (_entities.Count > 0)
             RebuildMarkers();
@@ -383,19 +404,30 @@ public sealed class CadGripManager
         ClearMarkers();
         RefreshGripList();
 
-        using (engine.BeginDisplayBatch())
+        var created = new List<OcctPoint>(_grips.Count);
+        try
         {
-            foreach (var gripPoint in _grips)
+            using (engine.BeginDisplayBatch())
             {
-                var marker = engine.AddPointPixmap(
-                    gripPoint.Position,
-                    MarkerSize,
-                    MarkerSize,
-                    _normalMarkerPixels[gripPoint.Kind]);
-                engine.SetObjectSelectable(marker, false);
-                engine.SetDisplayPriority(marker, 10);
-                _markers.Add(marker);
+                foreach (var gripPoint in _grips)
+                {
+                    var marker = engine.AddPointPixmap(
+                        gripPoint.Position,
+                        MarkerSize,
+                        MarkerSize,
+                        _normalMarkerPixels[gripPoint.Kind]);
+                    created.Add(marker);
+                    engine.SetObjectSelectable(marker, false);
+                    engine.SetDisplayPriority(marker, 10);
+                }
             }
+
+            _markers.AddRange(created);
+        }
+        catch (Exception exception) when (IsRecoverableMarkerFailure(exception))
+        {
+            RetireMarkers(engine, created);
+            _markers.Clear();
         }
 
         if (hadHot)
@@ -426,6 +458,8 @@ public sealed class CadGripManager
             _markers.Any(marker =>
                 !engine.ContainsObject(marker.Id)))
         {
+            _grips.Clear();
+            _grips.AddRange(next);
             RebuildMarkers();
             return;
         }
@@ -446,43 +480,52 @@ public sealed class CadGripManager
                 true);
         }
 
-        using var batch = engine.BeginDisplayBatch();
-        engine.UpdatePoints(updates);
-        if (kindsChanged)
+        try
         {
-            for (var index = 0; index < _markers.Count; index++)
-                SetMarkerStyle(
-                    engine,
-                    index,
-                    MarkerSize,
-                    _normalMarkerPixels);
-
-            if (_hotIndex >= 0 &&
-                _hotIndex < _markers.Count)
+            using var batch = engine.BeginDisplayBatch();
+            engine.UpdatePoints(updates);
+            if (kindsChanged)
             {
-                SetMarkerStyle(
-                    engine,
-                    _hotIndex,
-                    HotMarkerSize,
-                    _hotMarkerPixels);
+                for (var index = 0; index < _markers.Count; index++)
+                    SetMarkerStyle(
+                        engine,
+                        index,
+                        MarkerSize,
+                        _normalMarkerPixels);
+
+                if (_hotIndex >= 0 &&
+                    _hotIndex < _markers.Count)
+                {
+                    SetMarkerStyle(
+                        engine,
+                        _hotIndex,
+                        HotMarkerSize,
+                        _hotMarkerPixels);
+                }
             }
+        }
+        catch (Exception exception) when (IsRecoverableMarkerFailure(exception))
+        {
+            RebuildMarkers();
         }
     }
 
     private void ClearMarkers()
     {
-        if (_engine is { IsInitialized: true } engine && _markers.Count > 0)
-        {
-            using var batch = engine.BeginDisplayBatch();
-            var existing = _markers
-                .Where(marker => engine.ContainsObject(marker.Id))
-                .Cast<IOcctObject>()
-                .ToArray();
-            if (existing.Length > 0)
-                engine.Delete(existing);
-        }
+        if (_markers.Count == 0 &&
+            _retiredMarkers.Count == 0)
+            return;
 
+        var markers = _retiredMarkers
+            .Concat(_markers)
+            .GroupBy(static marker => marker.Id)
+            .Select(static group => group.First())
+            .ToArray();
         _markers.Clear();
+        _retiredMarkers.Clear();
+
+        if (_engine is { IsInitialized: true } engine)
+            RetireMarkers(engine, markers);
     }
 
     private int FindHitIndex(int x, int y)
@@ -537,6 +580,64 @@ public sealed class CadGripManager
             size,
             styles[_grips[index].Kind]);
     }
+
+    private void RetireMarkers(
+        OcctEngine engine,
+        IEnumerable<OcctPoint> markers)
+    {
+        var values = markers
+            .Where(marker => engine.ContainsObject(marker.Id))
+            .GroupBy(static marker => marker.Id)
+            .Select(static group => group.First())
+            .ToArray();
+        if (values.Length == 0)
+            return;
+
+        try
+        {
+            using var batch = engine.BeginDisplayBatch();
+            engine.Delete(values.Cast<IOcctObject>().ToArray());
+        }
+        catch (Exception exception) when (IsRecoverableMarkerFailure(exception))
+        {
+        }
+
+        foreach (var marker in values)
+        {
+            if (!engine.ContainsObject(marker.Id))
+                continue;
+
+            try
+            {
+                engine.Delete(marker);
+            }
+            catch (Exception exception) when (IsRecoverableMarkerFailure(exception))
+            {
+            }
+
+            if (!engine.ContainsObject(marker.Id))
+                continue;
+
+            // If native deletion fails, make the retired marker harmless and keep
+            // its handle so a later cleanup pass can retry deletion. This avoids
+            // visible or selectable ghost grips without losing ownership.
+            try
+            {
+                engine.SetObjectVisible(marker, false);
+                engine.SetObjectSelectable(marker, false);
+            }
+            catch (Exception exception) when (IsRecoverableMarkerFailure(exception))
+            {
+            }
+
+            _retiredMarkers.Add(marker);
+        }
+    }
+
+    private static bool IsRecoverableMarkerFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private static IReadOnlyDictionary<CadGripKind, byte[]> CreateMarkerSet(
         int size,

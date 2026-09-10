@@ -141,15 +141,43 @@ public sealed class CadHistory
             _undo.Push(record);
     }
 
-    private void RaiseChanged() =>
-        Changed?.Invoke(
-            this,
-            new CadHistoryChangedEventArgs(
-                CanUndo,
-                CanRedo,
-                UndoName,
-                RedoName,
-                CurrentStateId));
+    private void RaiseChanged()
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        var args = new CadHistoryChangedEventArgs(
+            CanUndo,
+            CanRedo,
+            UndoName,
+            RedoName,
+            CurrentStateId);
+
+        foreach (EventHandler<CadHistoryChangedEventArgs> handler in
+                 handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception exception)
+                when (IsRecoverableObserverFailure(exception))
+            {
+                // History state is already authoritative at this point. Event
+                // observers are presentation/integration side effects and must
+                // not invalidate Record/Undo/Redo or prevent later observers
+                // from receiving the same state transition.
+                System.Diagnostics.Debug.WriteLine(
+                    $"History Changed observer failed at state {CurrentStateId}: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private sealed record CadHistoryRecord(
         ICadHistoryEntry Entry,

@@ -97,9 +97,20 @@ public sealed class CadPreviewManager
             }
             Show(replacements);
         }
-        catch
+        catch (Exception failure)
         {
-            Clear();
+            try
+            {
+                Clear();
+            }
+            catch (Exception cleanupFailure)
+            {
+                throw new AggregateException(
+                    "Replacement preview failed and cleanup also failed.",
+                    failure,
+                    cleanupFailure);
+            }
+
             throw;
         }
     }
@@ -131,12 +142,43 @@ public sealed class CadPreviewManager
 
     public void Clear()
     {
-        try { ClearPresentation(); }
-        finally
+        Exception? presentationFailure = null;
+        Exception? replacementFailure = null;
+
+        try
         {
-            _entities.Clear();
+            ClearPresentation();
+        }
+        catch (Exception exception)
+        {
+            presentationFailure = exception;
+        }
+
+        // Logical preview state must become empty even when native cleanup needs
+        // a later retry. Presentation ownership itself remains in _shapes/tags.
+        _entities.Clear();
+
+        try
+        {
             RestoreReplacementSources();
         }
+        catch (Exception exception)
+        {
+            replacementFailure = exception;
+        }
+
+        if (presentationFailure is not null && replacementFailure is not null)
+        {
+            throw new AggregateException(
+                "Preview presentation cleanup and replacement-source restoration both failed.",
+                presentationFailure,
+                replacementFailure);
+        }
+
+        if (presentationFailure is not null)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(presentationFailure).Throw();
+        if (replacementFailure is not null)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(replacementFailure).Throw();
     }
 
     private void ClearPresentation()

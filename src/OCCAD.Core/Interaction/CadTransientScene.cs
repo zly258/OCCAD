@@ -24,13 +24,46 @@ public sealed class CadTransientScene
 
     internal long BeginToolSession()
     {
+        if (CurrentToolOwner != 0)
+            throw new InvalidOperationException(
+                $"Transient tool session {CurrentToolOwner} is still active.");
+
         CurrentToolOwner = ++_nextOwner;
         foreach (var channel in _channels.Values.Where(c => c.Lifetime == CadTransientLifetime.Tool))
             channel.Owner = CurrentToolOwner;
         return CurrentToolOwner;
     }
 
-    public void ClearOwner(long owner) => Clear(_channels.Values.Where(c => c.Lifetime == CadTransientLifetime.Tool && c.Owner == owner));
+    public void ClearOwner(long owner)
+    {
+        Exception? failure = null;
+        try
+        {
+            Clear(_channels.Values.Where(c =>
+                c.Lifetime == CadTransientLifetime.Tool &&
+                c.Owner == owner));
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+        }
+        finally
+        {
+            foreach (var channel in _channels.Values.Where(c =>
+                         c.Lifetime == CadTransientLifetime.Tool &&
+                         c.Owner == owner))
+            {
+                channel.Owner = 0;
+            }
+
+            if (CurrentToolOwner == owner)
+                CurrentToolOwner = 0;
+        }
+
+        if (failure is not null)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
     public void ClearToolState() => Clear(_channels.Values.Where(c => c.Lifetime == CadTransientLifetime.Tool));
     public void ClearAll() => Clear(_channels.Values);
 

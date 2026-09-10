@@ -41,11 +41,17 @@ public sealed class CadTransaction : IDisposable
         var after = CadWorkspaceSnapshot.Capture(_workspace);
         _hasChanges = !_before.SameState(after, _workspace.Entities);
         _workspace.History.ResumeRecording();
-        // RecordApplied publishes after updating history. A failing observer must
-        // not make Dispose roll back a command that already has an Undo entry.
         _committed = true;
         if (_hasChanges)
-            _workspace.History.RecordApplied(new SnapshotEntry(_workspace, _name, _before, after));
+        {
+            RecordApplied(
+                _workspace.History,
+                new SnapshotEntry(
+                    _workspace,
+                    _name,
+                    _before,
+                    after));
+        }
     }
 
     public void Dispose()
@@ -76,7 +82,21 @@ public sealed class CadTransaction : IDisposable
     {
         using var batch = workspace.Engine?.BeginDisplayBatch();
         using var changes = workspace.Document.BeginChangeSet();
-        workspace.History.Execute(entry);
+        var state = workspace.History.CurrentStateId;
+        try
+        {
+            workspace.History.Execute(entry);
+        }
+        catch (Exception exception)
+            when (workspace.History.CurrentStateId != state &&
+                  IsRecoverableHistoryNotificationFailure(exception))
+        {
+            // The operation and its Undo record are already authoritative.
+            // UI/event observers must not turn a committed command into a
+            // reported failure and tempt the caller to apply it again.
+            System.Diagnostics.Debug.WriteLine(
+                $"History observer failed after '{entry.Name}' committed: {exception}");
+        }
     }
 
     internal static void ApplyCreatedEntity(
@@ -119,7 +139,6 @@ public sealed class CadTransaction : IDisposable
                 nameof(entities));
 
         var wasModified = workspace.IsModified;
-        var historyState = workspace.History.CurrentStateId;
         var historyInstalled = false;
         var rollbackComplete = false;
         Exception? failure = null;
@@ -137,22 +156,13 @@ public sealed class CadTransaction : IDisposable
                     // released and the tool has returned to the neutral interaction state.
                     complete();
 
-                    try
-                    {
-                        workspace.History.RecordApplied(
-                            new CadAddEntitiesHistoryEntry(
-                                workspace.Document,
-                                values,
-                                name.Trim()));
-                    }
-                    finally
-                    {
-                        // RecordApplied updates CurrentStateId before publishing Changed.
-                        // If an observer throws, the history entry is already authoritative
-                        // and must not be rolled back here.
-                        historyInstalled =
-                            workspace.History.CurrentStateId != historyState;
-                    }
+                    RecordApplied(
+                        workspace.History,
+                        new CadAddEntitiesHistoryEntry(
+                            workspace.Document,
+                            values,
+                            name.Trim()));
+                    historyInstalled = true;
                 }
                 catch (Exception error)
                 {
@@ -242,16 +252,12 @@ public sealed class CadTransaction : IDisposable
                     // operation as failed.
                     complete?.Invoke();
 
-                    // History notifications may throw after the entry is installed.
-                    var state = workspace.History.CurrentStateId;
-                    try
-                    {
-                        workspace.History.RecordApplied(geometryOnly
+                    RecordApplied(
+                        workspace.History,
+                        geometryOnly
                             ? new CadGeometryHistoryEntry(targets, before, after, name)
                             : new CadEntityStateHistoryEntry(targets, before, after, name));
-                        recorded = true;
-                    }
-                    finally { recorded |= workspace.History.CurrentStateId != state; }
+                    recorded = true;
                 }
             }
             catch (Exception error)
@@ -275,6 +281,29 @@ public sealed class CadTransaction : IDisposable
         workspace.Subobjects.RefreshValidity();
         return recorded;
     }
+
+    private static void RecordApplied(
+        CadHistory history,
+        ICadHistoryEntry entry)
+    {
+        var state = history.CurrentStateId;
+        try
+        {
+            history.RecordApplied(entry);
+        }
+        catch (Exception exception)
+            when (history.CurrentStateId != state &&
+                  IsRecoverableHistoryNotificationFailure(exception))
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"History observer failed after '{entry.Name}' committed: {exception}");
+        }
+    }
+
+    private static bool IsRecoverableHistoryNotificationFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private sealed record SnapshotEntry(CadWorkspace Workspace, string Name,
         CadWorkspaceSnapshot Before, CadWorkspaceSnapshot After) : ICadHistoryEntry

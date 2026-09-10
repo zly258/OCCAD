@@ -65,7 +65,24 @@ public sealed class CadTransientScene
     }
 
     public void ClearToolState() => Clear(_channels.Values.Where(c => c.Lifetime == CadTransientLifetime.Tool));
-    public void ClearAll() => Clear(_channels.Values);
+
+    public void ClearAll()
+    {
+        try
+        {
+            Clear(_channels.Values);
+        }
+        catch (Exception exception) when (IsRecoverableCleanupFailure(exception))
+        {
+            // ClearAll is used by workspace/view lifetime disposal. One native
+            // presentation channel failing to delete must not abort the rest of
+            // the workspace teardown and leave event subscriptions or document
+            // presentations attached. Individual tool-session cleanup remains
+            // strict through ClearOwner/ClearToolState.
+            System.Diagnostics.Debug.WriteLine(
+                $"Workspace transient cleanup completed with recoverable failures: {exception}");
+        }
+    }
 
     private static void Clear(IEnumerable<Channel> channels)
     {
@@ -78,6 +95,18 @@ public sealed class CadTransientScene
         if (failures.Count > 0) throw new AggregateException(failures);
     }
 
+    private static bool IsRecoverableCleanupFailure(Exception exception)
+    {
+        if (exception is AggregateException aggregate)
+            return aggregate.Flatten().InnerExceptions.All(IsRecoverableCleanupFailure);
+
+        if (exception is OutOfMemoryException or StackOverflowException or AccessViolationException)
+            return false;
+
+        return exception.InnerException is null ||
+               IsRecoverableCleanupFailure(exception.InnerException);
+    }
+
     private sealed class Channel(CadTransientScene scene, CadTransientChannel kind, Action clear,
         Func<bool> hasState, CadTransientLifetime lifetime) : IDisposable
     {
@@ -86,11 +115,25 @@ public sealed class CadTransientScene
         public Func<bool> HasState { get; } = hasState;
         public CadTransientLifetime Lifetime { get; } = lifetime;
         public long Owner { get; set; }
+
         public void Dispose()
         {
-            Clear();
-            // Retain a failed native deletion so subsequent cleanup can retry.
-            if (!HasState()) scene._channels.Remove(Kind);
+            try
+            {
+                Clear();
+            }
+            catch (Exception exception) when (IsRecoverableCleanupFailure(exception))
+            {
+                // Registration disposal belongs to UI/workspace teardown. Keep a
+                // channel with surviving native state registered so ClearAll can
+                // retry it later, but never abort the caller's remaining event
+                // unsubscription and resource cleanup for a recoverable failure.
+                System.Diagnostics.Debug.WriteLine(
+                    $"Transient channel {Kind} failed to clear during registration disposal: {exception}");
+            }
+
+            if (!HasState())
+                scene._channels.Remove(Kind);
         }
     }
 }

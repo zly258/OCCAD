@@ -178,9 +178,6 @@ public sealed class CadSubobjectSelectionManager
             index < 0;
         if (willAdd && _selection.Selected.Count > 0)
         {
-            // Formal selection is one coherent mode at a time. Subobject
-            // selection keeps its parent Entity context but does not coexist
-            // with whole-Entity selection.
             _selection.Apply(
                 Array.Empty<CadEntity>(),
                 CadSelectionOperation.Replace);
@@ -488,10 +485,26 @@ public sealed class CadSubobjectSelectionManager
     private void SelectionFilterChanged(object? sender, EventArgs args) =>
         RefreshValidity();
 
-    private void RaiseChanged() =>
-        Changed?.Invoke(
-            this,
-            new CadSubobjectSelectionChangedEventArgs(
-                _selected.ToArray(),
-                Primary));
+    private void RaiseChanged()
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        var args = new CadSubobjectSelectionChangedEventArgs(
+            _selected.ToArray(),
+            Primary);
+        foreach (EventHandler<CadSubobjectSelectionChangedEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception exception) when (IsRecoverable(exception))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"Subobject selection observer failed after formal state changed: {exception}");
+            }
+        }
+    }
 }

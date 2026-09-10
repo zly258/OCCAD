@@ -71,14 +71,14 @@ public sealed class CadPreselectionManager
 
         if (Current == next) return;
         Current = next;
-        Changed?.Invoke(this, new CadPreselectionChangedEventArgs(next));
+        PublishChanged(next);
     }
 
     public void Clear()
     {
         if (Current is null) return;
         Current = null;
-        Changed?.Invoke(this, new CadPreselectionChangedEventArgs(null));
+        PublishChanged(null);
     }
 
     private void DocumentChanged(object? sender, CadDocumentChangedEventArgs args)
@@ -106,4 +106,30 @@ public sealed class CadPreselectionManager
         if (Current is { } current && !CanKeep(current))
             Clear();
     }
+
+    private void PublishChanged(CadPreselection? value)
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        var args = new CadPreselectionChangedEventArgs(value);
+        foreach (EventHandler<CadPreselectionChangedEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"Preselection observer failed after hover state changed: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 }

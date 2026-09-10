@@ -1,4 +1,3 @@
-using System.Drawing;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Input;
@@ -32,10 +31,10 @@ internal sealed class CadViewportController : IDisposable
     private readonly CadWorkspace _workspace;
     private readonly OcctAvaloniaViewport _viewport;
     private readonly CadPointerMoveScheduler _pointerMoves;
+    private readonly CadSelectionWindow _selectionWindow;
     private bool _shiftMiddleRotating;
     private bool _middleNavigating;
     private bool _selectionGesture;
-    private bool _selectionRectangleVisible;
     private int _selectionStartX;
     private int _selectionStartY;
     private int _selectionCurrentX;
@@ -50,6 +49,7 @@ internal sealed class CadViewportController : IDisposable
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         _viewport = viewport ?? throw new ArgumentNullException(nameof(viewport));
+        _selectionWindow = new CadSelectionWindow(_workspace);
         _pointerMoves = new CadPointerMoveScheduler(
             dispatcher ?? throw new ArgumentNullException(nameof(dispatcher)),
             ProcessPointer);
@@ -70,6 +70,7 @@ internal sealed class CadViewportController : IDisposable
     public void AttachEngine(OcctEngine engine)
     {
         ArgumentNullException.ThrowIfNull(engine);
+        _selectionWindow.AttachEngine(engine);
         engine.SetAutomaticHighlight(
             _workspace.Tools.ActiveTool?.InteractionPolicy.PreselectionEnabled != false);
     }
@@ -85,6 +86,7 @@ internal sealed class CadViewportController : IDisposable
         _workspace.Tools.ToolChanged -= ToolChanged;
         _workspace.Tools.ToolUpdated -= ToolUpdated;
         CancelSelectionGesture();
+        _selectionWindow.Dispose();
         _pointerMoves.Dispose();
         _viewport.Cursor = Cursor.Default;
     }
@@ -390,28 +392,21 @@ internal sealed class CadViewportController : IDisposable
 
     private void UpdateSelectionRectangle()
     {
-        if (_workspace.Engine is not { IsInitialized: true } engine)
-            return;
-
         var threshold = Math.Max(3, _viewport.RectangleSelectionThreshold);
         if (Math.Abs(_selectionCurrentX - _selectionStartX) < threshold &&
             Math.Abs(_selectionCurrentY - _selectionStartY) < threshold)
         {
-            HideSelectionRectangle(engine);
+            _selectionWindow.Clear();
             return;
         }
 
         var crossing = _selectionCurrentX < _selectionStartX;
-        engine.ShowSelectionRectangle(
-            Math.Min(_selectionStartX, _selectionCurrentX),
-            Math.Min(_selectionStartY, _selectionCurrentY),
-            Math.Max(_selectionStartX, _selectionCurrentX),
-            Math.Max(_selectionStartY, _selectionCurrentY),
-            crossing ? Color.ForestGreen : Color.CornflowerBlue,
-            crossing ? Color.FromArgb(48, 70, 150, 70) : Color.FromArgb(42, 80, 120, 210),
-            0.74,
-            1.0);
-        _selectionRectangleVisible = true;
+        _selectionWindow.Show(
+            _selectionStartX,
+            _selectionStartY,
+            _selectionCurrentX,
+            _selectionCurrentY,
+            crossing);
     }
 
     private void CompleteSelectionGesture()
@@ -422,18 +417,18 @@ internal sealed class CadViewportController : IDisposable
         var ex = _selectionCurrentX;
         var ey = _selectionCurrentY;
         var operation = SelectionOperation(_selectionModifiers);
-        var rectangle = _selectionRectangleVisible;
+        var rectangle = _selectionWindow.IsVisible;
         _selectionGesture = false;
 
         if (engine is not { IsInitialized: true })
         {
-            _selectionRectangleVisible = false;
+            _selectionWindow.Clear();
             return;
         }
 
         if (rectangle)
         {
-            HideSelectionRectangle(engine);
+            _selectionWindow.Clear();
             var crossing = ex < sx;
             if (_workspace.Selection.Scope == CadSelectionScope.Subobject)
             {
@@ -544,6 +539,7 @@ internal sealed class CadViewportController : IDisposable
     private void PointerExited(object? sender, PointerEventArgs input)
     {
         _pointerMoves.Clear();
+        CancelSelectionGesture();
         _workspace.ClearPointerObservation();
         _workspace.Preselection.Clear();
         CoordinateCleared?.Invoke(this, EventArgs.Empty);
@@ -552,23 +548,8 @@ internal sealed class CadViewportController : IDisposable
 
     private void CancelSelectionGesture()
     {
-        if (_workspace.Engine is { IsInitialized: true } engine)
-            HideSelectionRectangle(engine);
+        _selectionWindow.Clear();
         _selectionGesture = false;
-    }
-
-    private void HideSelectionRectangle(OcctEngine engine)
-    {
-        if (!_selectionRectangleVisible)
-            return;
-        try
-        {
-            engine.HideSelectionRectangle();
-        }
-        catch (InvalidOperationException)
-        {
-        }
-        _selectionRectangleVisible = false;
     }
 
     private void RefreshDrawingPointer(OcctInputModifiers modifiers)

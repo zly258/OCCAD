@@ -2,7 +2,7 @@ namespace OCCAD;
 
 /// <summary>
 /// UI-independent application composition root. It owns one CAD workspace,
-/// one document session and one application settings store.
+/// one document session, one command session, and one application settings store.
 /// </summary>
 public sealed class CadApplicationCore : IDisposable
 {
@@ -18,19 +18,23 @@ public sealed class CadApplicationCore : IDisposable
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Workspace = new CadWorkspace();
+        Commands = new CadCommandManager(Workspace);
         Documents = new CadDocumentSession(Workspace);
         _settingsBinding = Settings.Bind(Workspace);
     }
 
     public CadSettingsStore Settings { get; }
     public CadWorkspace Workspace { get; }
+    public CadCommandManager Commands { get; }
     public CadDocumentSession Documents { get; }
 
     public void LoadSettings(Stream stream)
     {
         ThrowIfDisposed();
+        // CadSettingsStore.Load is transactional and publishes each effective
+        // replacement through the binding. A second Refresh pass would duplicate
+        // application and could mask which setting caused validation failure.
         Settings.Load(stream);
-        _settingsBinding.Refresh();
     }
 
     public void SaveSettings(Stream stream)

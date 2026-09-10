@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-
 namespace OCCAD;
 
 public enum CadCommandResultKind
@@ -22,31 +20,21 @@ public readonly record struct CadCommandResult(
     public IReadOnlyList<object?> MessageArguments { get; init; } = [];
 }
 
+/// <summary>
+/// One command-line session for one application Core. CadApplicationCore owns
+/// the instance so every frontend shares command history, repeat state, and
+/// tool input without static workspace lookup or service-locator behavior.
+/// </summary>
 public sealed class CadCommandManager
 {
     private const int HistoryLimit = 100;
-    private static readonly ConditionalWeakTable<CadWorkspace, CadCommandManager>
-        WorkspaceManagers = new();
 
     private readonly CadWorkspace _workspace;
     private readonly List<string> _history = [];
 
-    private CadCommandManager(CadWorkspace workspace)
+    internal CadCommandManager(CadWorkspace workspace)
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
-    }
-
-    /// <summary>
-    /// Returns the shared command session for a workspace. UI, automation and
-    /// other front ends should use this entry point when command history and
-    /// repeat/completion state must be consistent across surfaces.
-    /// </summary>
-    public static CadCommandManager ForWorkspace(CadWorkspace workspace)
-    {
-        ArgumentNullException.ThrowIfNull(workspace);
-        return WorkspaceManagers.GetValue(
-            workspace,
-            static value => new CadCommandManager(value));
     }
 
     public IReadOnlyList<string> History => _history;
@@ -54,7 +42,9 @@ public sealed class CadCommandManager
     public IEnumerable<string> Complete(string prefix)
     {
         var normalized = prefix?.Trim() ?? string.Empty;
-        return _workspace.Actions.Commands.SelectMany(command => command.Aliases.Append(command.Id)).Distinct(StringComparer.OrdinalIgnoreCase)
+        return _workspace.Actions.Commands
+            .SelectMany(command => command.Aliases.Append(command.Id))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(value => value.StartsWith(normalized, StringComparison.OrdinalIgnoreCase))
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase);
     }
@@ -124,7 +114,10 @@ public sealed class CadCommandManager
                 input);
     }
 
-    private bool TryExecuteToolInput(CadTool tool, string input, out CadCommandResult result)
+    private bool TryExecuteToolInput(
+        CadTool tool,
+        string input,
+        out CadCommandResult result)
     {
         if (EqualsAny(input, "ESC", "CANCEL"))
         {
@@ -163,10 +156,13 @@ public sealed class CadCommandManager
             return true;
         }
 
-        if (input.Equals("O", StringComparison.OrdinalIgnoreCase) && tool.CurrentStep.InputKind == CadToolInputKind.Point)
+        if (input.Equals("O", StringComparison.OrdinalIgnoreCase) &&
+            tool.CurrentStep.InputKind == CadToolInputKind.Point)
         {
             _workspace.Tools.BeginOffsetInput();
-            result = Result(CadCommandResultKind.InputApplied, input,
+            result = Result(
+                CadCommandResultKind.InputApplied,
+                input,
                 message: "Pick offset base point, then enter the relative displacement.",
                 messageKey: "Cad.Command.OffsetOrigin");
             return true;
@@ -196,7 +192,10 @@ public sealed class CadCommandManager
         return false;
     }
 
-    private bool TryPoint(CadTool tool, string input, out CadCommandResult result)
+    private bool TryPoint(
+        CadTool tool,
+        string input,
+        out CadCommandResult result)
     {
         if (tool.CurrentStep.InputKind != CadToolInputKind.Point ||
             !LooksLikePointInput(input))
@@ -218,7 +217,10 @@ public sealed class CadCommandManager
         input.Contains('<', StringComparison.Ordinal) ||
         input.StartsWith('@');
 
-    private bool TryPrecision(CadTool tool, string input, out CadCommandResult result)
+    private bool TryPrecision(
+        CadTool tool,
+        string input,
+        out CadCommandResult result)
     {
         var parts = input.Split(
             [' ', '\t'],
@@ -294,7 +296,8 @@ public sealed class CadCommandManager
     }
 
     private static bool EqualsAny(string value, params string[] candidates) =>
-        candidates.Any(candidate => value.Equals(candidate, StringComparison.OrdinalIgnoreCase));
+        candidates.Any(candidate =>
+            value.Equals(candidate, StringComparison.OrdinalIgnoreCase));
 
     private static CadCommandResult Result(
         CadCommandResultKind kind,

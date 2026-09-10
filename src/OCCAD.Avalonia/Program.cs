@@ -67,8 +67,12 @@ internal sealed class App : Application
             exception is IOException or
             UnauthorizedAccessException or
             InvalidDataException or
+            ArgumentException or
             System.Text.Json.JsonException)
         {
+            // CadSettingsStore.Load rolls back the store and bound runtime state
+            // before validation failures escape. A malformed local preference
+            // must not prevent the CAD application from starting.
             System.Diagnostics.Debug.WriteLine(
                 $"OCCAD settings load skipped: {exception.Message}");
         }

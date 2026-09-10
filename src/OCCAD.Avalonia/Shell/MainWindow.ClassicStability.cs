@@ -23,8 +23,10 @@ public sealed partial class MainWindow
         CadLanguageManager.Changed += LanguageChanged;
         CadLanguageManager.Changed += ClassicLanguageChanged;
 
-        _workspace.Tools.ToolChanged += StableToolChanged;
-        _workspace.Tools.ToolUpdated += StableToolUpdated;
+        // ToolChanged/ToolUpdated UI refresh already belongs to the main shell
+        // and CadWorkspaceEvents projection. Stability only owns the additional
+        // coordinate-driven live-value synchronization; subscribing here as well
+        // rebuilt the same parameter surface multiple times per stage change.
         _viewportInteraction.CoordinateChanged += StableCoordinateChanged;
         _viewport.PreviewKeyInput += StablePreviewKeyInput;
 
@@ -35,8 +37,6 @@ public sealed partial class MainWindow
         {
             CadLanguageManager.Changed -= ClassicLanguageChanging;
             CadLanguageManager.Changed -= ClassicLanguageChanged;
-            _workspace.Tools.ToolChanged -= StableToolChanged;
-            _workspace.Tools.ToolUpdated -= StableToolUpdated;
             _viewportInteraction.CoordinateChanged -= StableCoordinateChanged;
             _viewport.PreviewKeyInput -= StablePreviewKeyInput;
         };
@@ -49,18 +49,6 @@ public sealed partial class MainWindow
     {
         MoveClassicToolOptionsToBottom();
         ApplyLivePreviewParameterValues(_workspace.Tools.ActiveTool);
-    }
-
-    private void StableToolChanged(object? sender, CadToolChangedEventArgs e)
-    {
-        MoveClassicToolOptionsToBottom();
-        ApplyLivePreviewParameterValues(e.Tool);
-    }
-
-    private void StableToolUpdated(object? sender, CadToolChangedEventArgs e)
-    {
-        MoveClassicToolOptionsToBottom();
-        ApplyLivePreviewParameterValues(e.Tool);
     }
 
     private void StableCoordinateChanged(object? sender, CadCoordinateChangedEventArgs e)
@@ -81,7 +69,6 @@ public sealed partial class MainWindow
             return;
 
         RefreshClassicToolOptions();
-        MoveClassicToolOptionsToBottom();
         ApplyLivePreviewParameterValues(tool);
     }
 

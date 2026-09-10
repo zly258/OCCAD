@@ -58,9 +58,7 @@ public sealed partial class MainWindow
                 e.Key == Key.Z &&
                 (modifiers & KeyModifiers.Shift) == 0)
             {
-                _workspace.Undo();
-                ShowStatusFeedback(null);
-                RefreshActionUi();
+                _ = ExecuteHistoryAsync(undo: true);
                 e.Handled = true;
                 return;
             }
@@ -69,9 +67,7 @@ public sealed partial class MainWindow
                 (e.Key == Key.Y ||
                  e.Key == Key.Z && (modifiers & KeyModifiers.Shift) != 0))
             {
-                _workspace.Redo();
-                ShowStatusFeedback(null);
-                RefreshActionUi();
+                _ = ExecuteHistoryAsync(undo: false);
                 e.Handled = true;
                 return;
             }

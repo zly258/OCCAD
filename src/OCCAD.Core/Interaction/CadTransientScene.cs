@@ -36,32 +36,67 @@ public sealed class CadTransientScene
 
     public void ClearOwner(long owner)
     {
-        Exception? failure = null;
-        try
-        {
-            Clear(_channels.Values.Where(c =>
-                c.Lifetime == CadTransientLifetime.Tool &&
-                c.Owner == owner));
-        }
-        catch (Exception exception)
-        {
-            failure = exception;
-        }
-        finally
-        {
-            foreach (var channel in _channels.Values.Where(c =>
-                         c.Lifetime == CadTransientLifetime.Tool &&
-                         c.Owner == owner))
-            {
-                channel.Owner = 0;
-            }
+        if (owner == 0)
+            return;
 
+        var owned = _channels.Values
+            .Where(c =>
+                c.Lifetime == CadTransientLifetime.Tool &&
+                c.Owner == owner)
+            .ToArray();
+
+        if (owned.Length == 0)
+        {
             if (CurrentToolOwner == owner)
                 CurrentToolOwner = 0;
+            return;
         }
 
-        if (failure is not null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+        List<Exception> failures = [];
+        ClearPass(owned, failures);
+
+        // A native viewer operation can fail after partially clearing its
+        // presentation. Retry only channels that still report live state before
+        // releasing ownership. This keeps stale preview/grip/snap objects tied to
+        // the originating Tool instead of silently transferring them to the next
+        // session.
+        var remaining = Remaining(owned, failures);
+        if (remaining.Length > 0)
+        {
+            ClearPass(remaining, failures);
+            remaining = Remaining(remaining, failures);
+        }
+
+        var remainingSet = remaining.ToHashSet();
+        foreach (var channel in owned)
+        {
+            if (!remainingSet.Contains(channel))
+                channel.Owner = 0;
+        }
+
+        if (remaining.Length == 0)
+        {
+            if (CurrentToolOwner == owner)
+                CurrentToolOwner = 0;
+
+            if (failures.Count > 0)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"Transient owner {owner} cleanup recovered after {failures.Count} failure(s)." +
+                    Environment.NewLine + string.Join(Environment.NewLine, failures));
+            }
+            return;
+        }
+
+        if (failures.Count == 0)
+        {
+            failures.Add(new InvalidOperationException(
+                $"Transient owner {owner} still owns: {string.Join(", ", remaining.Select(static channel => channel.Kind))}."));
+        }
+
+        throw new AggregateException(
+            $"Transient owner {owner} cleanup is incomplete; ownership was retained for retry.",
+            failures);
     }
 
     public void ClearToolState() => Clear(_channels.Values.Where(c => c.Lifetime == CadTransientLifetime.Tool));
@@ -87,12 +122,51 @@ public sealed class CadTransientScene
     private static void Clear(IEnumerable<Channel> channels)
     {
         List<Exception> failures = [];
+        ClearPass(channels.ToArray(), failures);
+        if (failures.Count > 0)
+            throw new AggregateException(failures);
+    }
+
+    private static void ClearPass(
+        IEnumerable<Channel> channels,
+        ICollection<Exception> failures)
+    {
         foreach (var channel in channels.ToArray())
         {
-            try { channel.Clear(); }
-            catch (Exception error) { failures.Add(new InvalidOperationException($"Transient channel {channel.Kind} failed to clear.", error)); }
+            try
+            {
+                channel.Clear();
+            }
+            catch (Exception error)
+            {
+                failures.Add(new InvalidOperationException(
+                    $"Transient channel {channel.Kind} failed to clear.",
+                    error));
+            }
         }
-        if (failures.Count > 0) throw new AggregateException(failures);
+    }
+
+    private static Channel[] Remaining(
+        IEnumerable<Channel> channels,
+        ICollection<Exception> failures)
+    {
+        List<Channel> remaining = [];
+        foreach (var channel in channels)
+        {
+            try
+            {
+                if (channel.HasState())
+                    remaining.Add(channel);
+            }
+            catch (Exception error)
+            {
+                failures.Add(new InvalidOperationException(
+                    $"Transient channel {channel.Kind} failed to report cleanup state.",
+                    error));
+                remaining.Add(channel);
+            }
+        }
+        return remaining.ToArray();
     }
 
     private static bool IsRecoverableCleanupFailure(Exception exception)

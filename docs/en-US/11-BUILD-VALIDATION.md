@@ -47,13 +47,7 @@ Override with `OCCTCSHARPBRIDGE_SDK` when required.
 
 ## 3. Runtime
 
-When the Bridge SDK is a flat runtime and does not contain a complete OCCT runtime, run with:
-
-```powershell
-.\run.ps1 -OcctRoot D:\tools\occt-vc144-64
-```
-
-or configure `OCCT_ROOT` / `CASROOT`.
+A portable Bridge SDK is preferred because the runtime and OCCT resources are copied with the application. When using a flat Bridge SDK without bundled OCCT resources, set `OCCT_ROOT` / `CASROOT` in the process environment before launching OCCAD. The repository does not provide or require a separate `run.ps1` wrapper.
 
 `OCCT resources: False` does not automatically mean the build contract is invalid. Compilation/Bridge contract and final runtime-resource configuration are separate concerns.
 
@@ -65,6 +59,8 @@ Linux uses:
 ./build.sh
 ```
 
+The current Linux contract requires the managed assemblies and Bridge metadata at the SDK root plus the portable runtime layout under `portable/runtime` and `portable/occt`. A second flat `libOcctNative.so` at the SDK root is not required.
+
 Linux is useful for cross-platform compilation/runtime checks but does not replace Windows initial-release acceptance.
 
 ## 5. Initial release feature surface
@@ -74,6 +70,8 @@ Linux is useful for cross-platform compilation/runtime checks but does not repla
 3D and curves: Box, Cylinder, Cone, Frustum, Sphere, Ellipsoid, Torus, Helix.
 
 Modeling: Extrude, Revolve, Sweep, Loft.
+
+Modify: Move and Delete are exposed in the Classic Shell. Copy / Rotate / Scale / Mirror remain Core infrastructure until dedicated interactive Tools are completed and validated.
 
 Interaction infrastructure: Entity/Subobject Selection, Preselection, Window/Crossing, Snap, Grip, XY/YZ/XZ WorkPlane, ORTHO, POLAR, Preview, Tracking, Precision Input, Layer, Property, History/Transaction, persistence/exchange entry points.
 
@@ -184,7 +182,7 @@ Verify that:
 - Avalonia native FluentTheme is used;
 - the top contains Menu plus no more than two high-frequency Toolbar rows;
 - Toolbar row 1 contains Undo/Redo, current Layer, frequent views, Fill, and display modes;
-- Toolbar row 2 contains only frequent 2D / 3D / Feature commands;
+- Toolbar row 2 contains only frequent 2D / Modify / 3D / Feature commands;
 - New/Open/Save and language switching remain in Menu rather than duplicating toolbar space;
 - no Ribbon, legacy CleanShell, grouped three-row command surface, or Floating Tool Panel appears;
 - the Tool parameter strip is fixed directly above the status strip;

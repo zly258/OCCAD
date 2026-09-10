@@ -47,15 +47,9 @@ C:\Program Files\OcctCSharpBridge\SDK\3.0\win-x64
 
 ## 3. Runtime
 
-如果 Bridge SDK 是 flat runtime 且不携带完整 OCCT runtime，运行时需要：
+优先使用带 portable runtime 的 Bridge SDK，由构建输出携带 runtime 与 OCCT resources。若使用不携带完整 OCCT resources 的 flat Bridge SDK，启动 OCCAD 前在进程环境中设置 `OCCT_ROOT` / `CASROOT`。仓库当前不提供、也不依赖额外的 `run.ps1` 包装脚本。
 
-```powershell
-.\run.ps1 -OcctRoot D:\tools\occt-vc144-64
-```
-
-或设置 `OCCT_ROOT` / `CASROOT`。
-
-`OCCT resources: False` 并不自动表示 build 无效；要区分 compile/link contract 与最终 runtime resource 配置。
+`OCCT resources: False` 并不自动表示 build 无效；要区分 compile/Bridge contract 与最终 runtime resource 配置。
 
 ## 4. Linux 构建
 
@@ -64,6 +58,8 @@ Linux 使用：
 ```bash
 ./build.sh
 ```
+
+当前 Linux 合同为：SDK 根目录提供 managed assemblies 与 Bridge metadata，native runtime 与 OCCT resources 位于 `portable/runtime` 和 `portable/occt`。不再额外要求 SDK 根目录存在第二份 flat `libOcctNative.so`。
 
 Linux 用于跨平台编译/运行验证，不替代 Windows 初版产品验收。
 
@@ -74,6 +70,8 @@ Linux 用于跨平台编译/运行验证，不替代 Windows 初版产品验收�
 三维与曲线：Box、Cylinder、Cone、Frustum、Sphere、Ellipsoid、Torus、Helix。
 
 建模：Extrude、Revolve、Sweep、Loft。
+
+修改：当前 Classic Shell 已暴露 Move 和 Delete；Copy / Rotate / Scale / Mirror 暂时只保留 Core 基础能力，独立交互 Tool 完成并验收后再进入产品面。
 
 交互基础设施：Entity/Subobject Selection、Preselection、Window/Crossing、Snap、Grip、XY/YZ/XZ WorkPlane、ORTHO、POLAR、Preview、Tracking、Precision Input、Layer、Property、History/Transaction、Persistence/Exchange entry points。
 
@@ -190,7 +188,7 @@ Grip 至少验证 marker、hot、drag preview、valid commit、invalid input 不
 - Avalonia 原生 FluentTheme；
 - 顶部只保留 Menu + 最多两行高频 Toolbar；
 - Toolbar 第一行包含撤销/重做、当前图层、常用视图、充满和显示模式；
-- Toolbar 第二行只保留常用 2D / 3D / Feature；
+- Toolbar 第二行只保留常用 2D / 修改 / 3D / Feature；
 - New/Open/Save 和语言切换不重复占用 Toolbar，仍通过 Menu 使用；
 - 不出现 Ribbon、旧 CleanShell、三行分组命令区或 Floating Tool Panel；
 - Tool 参数条固定在底部状态栏上方；

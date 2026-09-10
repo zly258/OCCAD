@@ -21,27 +21,50 @@ foreach ($name in @('OcctNet.dll','OcctNet.Avalonia.dll','bridge-contract.json',
 }
 
 $flatNative = Join-Path $bridgeSdk 'OcctNative.dll'
-$runtimeDirectory = Join-Path $bridgeSdk 'runtime'
-$runtimeNative = Join-Path $runtimeDirectory 'OcctNative.dll'
-if (-not (Test-Path -LiteralPath $flatNative -PathType Leaf) -and
-    -not (Test-Path -LiteralPath $runtimeNative -PathType Leaf)) {
-    throw "Installed OcctCSharpBridge SDK contains neither flat nor portable OcctNative.dll: $bridgeSdk"
+$nestedPortableRoot = Join-Path $bridgeSdk 'portable'
+$portableRoot = if (Test-Path -LiteralPath (Join-Path $nestedPortableRoot 'package-manifest.json') -PathType Leaf) {
+    $nestedPortableRoot
+} elseif (Test-Path -LiteralPath (Join-Path $bridgeSdk 'package-manifest.json') -PathType Leaf) {
+    $bridgeSdk
+} else {
+    $null
+}
+$portableRuntime = if ($null -ne $portableRoot) {
+    Join-Path $portableRoot 'runtime'
+} else {
+    $null
+}
+$portableNative = if ($null -ne $portableRuntime) {
+    Join-Path $portableRuntime 'OcctNative.dll'
+} else {
+    $null
 }
 
-$runtime = if (Test-Path -LiteralPath $runtimeNative -PathType Leaf) {
-    $runtimeDirectory
+$hasFlatNative = Test-Path -LiteralPath $flatNative -PathType Leaf
+$hasPortableNative =
+    $null -ne $portableNative -and
+    (Test-Path -LiteralPath $portableNative -PathType Leaf)
+if (-not $hasFlatNative -and -not $hasPortableNative) {
+    throw "Installed OcctCSharpBridge SDK contains neither flat OcctNative.dll nor portable/runtime/OcctNative.dll: $bridgeSdk"
 }
-else {
+
+$runtime = if ($hasPortableNative) {
+    $portableRuntime
+} else {
     $bridgeSdk
 }
 $runtimeCount = @(Get-ChildItem -LiteralPath $runtime -Filter '*.dll' -File -ErrorAction SilentlyContinue).Count
-$runtimeLayout = if ([string]::Equals($runtime, $bridgeSdk, [StringComparison]::OrdinalIgnoreCase)) {
+$runtimeLayout = if ($hasPortableNative) {
+    'portable/runtime'
+} else {
     'flat'
 }
-else {
-    'runtime-subdir'
+$resourceRoot = if ($null -ne $portableRoot) {
+    Join-Path $portableRoot 'occt\resources'
+} else {
+    Join-Path $bridgeSdk 'occt\resources'
 }
-$hasResources = Test-Path -LiteralPath (Join-Path $bridgeSdk 'occt\resources') -PathType Container
+$hasResources = Test-Path -LiteralPath $resourceRoot -PathType Container
 
 $bridgeManifestPath = Join-Path $bridgeSdk 'bridge-manifest.json'
 $bridgeManifest = Get-Content -LiteralPath $bridgeManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -62,11 +85,11 @@ Write-Host "[build] Bridge SDK:     $bridgeSdk"
 Write-Host "[build] Bridge source:  $bridgeSourceCommit"
 Write-Host "[build] Bridge runtime: $runtime ($runtimeCount DLLs, $runtimeLayout)"
 Write-Host "[build] OCCT resources: $hasResources"
-if ($runtimeLayout -eq 'runtime-subdir') {
+if ($hasPortableNative) {
     Write-Host '[build] Direct EXE:     portable runtime will be copied beside the application.'
 }
 else {
-    Write-Host '[build] Direct EXE:     flat Bridge SDK; build is valid. Run with -OcctRoot <path> or set OCCT_ROOT/CASROOT.' -ForegroundColor Yellow
+    Write-Host '[build] Direct EXE:     flat Bridge SDK; build is valid. Use .\run.ps1 -OcctRoot <path> or set OCCT_ROOT/CASROOT when the OCCT runtime is external.' -ForegroundColor Yellow
 }
 
 & dotnet build $solution -c $Configuration -p:Platform=x64 --nologo

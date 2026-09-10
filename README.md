@@ -25,13 +25,13 @@ Core layers include Document / Entity / Layer, Tool / Action / Transaction / His
 OCCAD has one classic CAD shell:
 
 ```text
-Menu: File | Draw | Model | View | Window | Language
+Menu: File | Draw | Model | Modify | View | Window | Language
 
 Toolbar Row 1
 Undo Redo | Current Layer | Top Front Right Iso Fill | Wireframe Shaded
 
 Toolbar Row 2
-Line Polyline Rectangle Circle Arc Polygon | Box Cylinder Sphere Extrude Revolve
+Line Polyline Rectangle Circle Arc Polygon | Move Delete | Box Cylinder Sphere Extrude Revolve
 
 Model Tree | CAD Viewport | Layers / Properties
 
@@ -113,6 +113,8 @@ Ellipse methods: Center+Axes, Axis Endpoints+Minor Axis.
 
 Features: Extrude, Revolve, Sweep, Loft.
 
+Modify: Move and Delete are exposed in the current shell. Copy / Rotate / Scale / Mirror remain transaction-level Core capabilities until dedicated interactive Tools are completed and validated.
+
 Views: Top / Bottom / Front / Back / Left / Right, Iso NE/NW/SE/SW, Fill (`view.fit`), Wireframe, Shaded.
 
 ## Architecture
@@ -143,7 +145,7 @@ Linux:
 ./build.sh
 ```
 
-If the Bridge SDK does not provide a complete portable runtime, configure `OCCT_ROOT` / `CASROOT` or pass the OCCT root through the run script.
+Linux validation uses the current portable Bridge SDK layout (`portable/runtime` + `portable/occt`). Windows accepts the installed SDK layout supported by `build.ps1`.
 
 The repository currently does not maintain a separate Test project. Validation order is:
 

@@ -29,6 +29,7 @@ Menu
 ├─ 文件
 ├─ 绘图
 ├─ 建模
+├─ 修改
 ├─ 视图
 ├─ 窗口
 └─ 语言
@@ -37,7 +38,7 @@ Toolbar Row 1
 撤销 重做 | 当前图层 | 上 前 右 轴测 充满 | 线框 着色
 
 Toolbar Row 2
-直线 多段线 矩形 圆 圆弧 正多边形 | 长方体 圆柱体 球体 拉伸 旋转
+直线 多段线 矩形 圆 圆弧 正多边形 | 移动 删除 | 长方体 圆柱体 球体 拉伸 旋转
 
 Model Tree | CAD Viewport | Layers / Properties
 
@@ -118,6 +119,8 @@ Ellipse：Center+Axes、Axis Endpoints+Minor Axis。
 
 Feature：Extrude、Revolve、Sweep、Loft。
 
+修改：当前 Shell 已暴露 Move 和 Delete；Copy / Rotate / Scale / Mirror 目前仅保留 Core 事务级能力，待独立交互 Tool 完成并验收后再进入产品面。
+
 视图：Top / Bottom / Front / Back / Left / Right、Iso NE/NW/SE/SW、充满（`view.fit`）、Wireframe、Shaded。
 
 ## 架构
@@ -148,7 +151,7 @@ Linux：
 ./build.sh
 ```
 
-如 Bridge SDK 未提供完整 portable runtime，需要设置 `OCCT_ROOT` / `CASROOT` 或按运行脚本提供 OCCT 路径。
+Linux 按当前 Bridge portable SDK 布局（`portable/runtime` + `portable/occt`）进行校验；Windows 按 `build.ps1` 支持的已安装 SDK 布局校验。
 
 当前项目不维护独立 Test 项目。验证顺序为：
 

@@ -64,9 +64,22 @@ function Show-LogTail {
     Get-Content -LiteralPath $Path -Tail 100
 }
 
-$appDirectory = Join-Path $root "src\OCCAD.Avalonia\bin\x64\$Configuration\net10.0"
+# The same launcher is used from the repository and from a published package.
+# A package contains OCCAD.exe beside this script; otherwise use the normal
+# development build output selected by -Configuration.
+$packageExecutable = Join-Path $root 'OCCAD.exe'
+$isPublishedPackage = Test-Path -LiteralPath $packageExecutable -PathType Leaf
+$appDirectory = if ($isPublishedPackage) {
+    $root
+}
+else {
+    Join-Path $root "src\OCCAD.Avalonia\bin\x64\$Configuration\net10.0"
+}
 $executable = Join-Path $appDirectory 'OCCAD.exe'
 if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
+    if ($isPublishedPackage) {
+        throw "Published OCCAD executable was not found: $executable"
+    }
     throw "OCCAD executable was not found: $executable. Run '.\build.ps1' first."
 }
 

@@ -8,7 +8,6 @@ SELF_CONTAINED=true
 CREATE_ARCHIVE=true
 DEFAULT_SDK_ROOT="${HOME:-}/.local/share/OcctCSharpBridge/SDK/3.0/linux-x64"
 BRIDGE_SDK="${OCCTCSHARPBRIDGE_SDK:-${DEFAULT_SDK_ROOT}}"
-PORTABLE_ROOT="${BRIDGE_SDK}/portable"
 PROJECT="${ROOT_DIR}/src/OCCAD.Avalonia/OCCAD.Avalonia.csproj"
 PACKAGE_NAME="OCCAD-linux-x64"
 
@@ -47,10 +46,20 @@ case "$(uname -m)" in x86_64|amd64) ;; *) fail "Linux x64 is required; detected 
 require_command dotnet
 require_command tar
 
-for name in OcctNet.dll OcctNet.Avalonia.dll bridge-contract.json bridge-manifest.json libOcctNative.so; do
+# Managed assemblies and Bridge metadata live at the SDK root. Support both an
+# SDK/portable package and an SDK root that is itself the portable package.
+for name in OcctNet.dll OcctNet.Avalonia.dll bridge-contract.json bridge-manifest.json; do
     [[ -f "${BRIDGE_SDK}/${name}" ]] || fail "Installed OcctCSharpBridge SDK is missing '${name}' at '${BRIDGE_SDK}'. Run OcctCSharpBridge ./publish.sh or set OCCTCSHARPBRIDGE_SDK."
 done
-[[ -f "${PORTABLE_ROOT}/package-manifest.json" ]] || fail "Installed SDK is missing portable/package-manifest.json: ${PORTABLE_ROOT}"
+
+if [[ -f "${BRIDGE_SDK}/portable/package-manifest.json" ]]; then
+    PORTABLE_ROOT="${BRIDGE_SDK}/portable"
+elif [[ -f "${BRIDGE_SDK}/package-manifest.json" ]]; then
+    PORTABLE_ROOT="${BRIDGE_SDK}"
+else
+    fail "Installed SDK has no portable package manifest under '${BRIDGE_SDK}/portable' or '${BRIDGE_SDK}'."
+fi
+
 [[ -f "${PORTABLE_ROOT}/runtime/libOcctNative.so" ]] || fail "Installed SDK is missing portable/runtime/libOcctNative.so: ${PORTABLE_ROOT}"
 [[ -d "${PORTABLE_ROOT}/occt/resources" ]] || fail "Installed SDK is missing portable OCCT resources: ${PORTABLE_ROOT}/occt/resources"
 
@@ -115,5 +124,6 @@ if [[ "${CREATE_ARCHIVE}" == true ]]; then
 fi
 
 log "Bridge SDK: ${BRIDGE_SDK}"
+log "Portable:   ${PORTABLE_ROOT}"
 log "Package:    ${PACKAGE_DIR}"
 log "Run:        ${PACKAGE_DIR}/run.sh"

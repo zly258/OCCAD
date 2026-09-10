@@ -5,8 +5,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIGURATION="${1:-Release}"
 DEFAULT_SDK_ROOT="${HOME:-}/.local/share/OcctCSharpBridge/SDK/3.0/linux-x64"
 BRIDGE_SDK="${OCCTCSHARPBRIDGE_SDK:-${DEFAULT_SDK_ROOT}}"
-PORTABLE_ROOT="${BRIDGE_SDK}/portable"
-RUNTIME_ROOT="${PORTABLE_ROOT}/runtime"
 SOLUTION="${ROOT_DIR}/OCCAD.sln"
 APP_DIR="${ROOT_DIR}/src/OCCAD.Avalonia/bin/x64/${CONFIGURATION}/net10.0"
 
@@ -23,12 +21,21 @@ require_command dotnet
 require_command git
 
 # Managed assemblies and SDK metadata live at the SDK root. Native OCCT runtime
-# is validated from the portable layout below; requiring a second flat native
-# library here rejects otherwise valid current SDK installations.
+# lives in a portable package. Support both an SDK/portable package and an SDK
+# root that is itself the portable package, matching Directory.Build.props.
 for name in OcctNet.dll OcctNet.Avalonia.dll bridge-contract.json bridge-manifest.json; do
     [[ -f "${BRIDGE_SDK}/${name}" ]] || fail "Installed OcctCSharpBridge SDK is missing '${name}' at '${BRIDGE_SDK}'. Run OcctCSharpBridge ./publish.sh or set OCCTCSHARPBRIDGE_SDK."
 done
-[[ -f "${PORTABLE_ROOT}/package-manifest.json" ]] || fail "Installed SDK is missing portable/package-manifest.json: ${PORTABLE_ROOT}"
+
+if [[ -f "${BRIDGE_SDK}/portable/package-manifest.json" ]]; then
+    PORTABLE_ROOT="${BRIDGE_SDK}/portable"
+elif [[ -f "${BRIDGE_SDK}/package-manifest.json" ]]; then
+    PORTABLE_ROOT="${BRIDGE_SDK}"
+else
+    fail "Installed SDK has no portable package manifest under '${BRIDGE_SDK}/portable' or '${BRIDGE_SDK}'."
+fi
+RUNTIME_ROOT="${PORTABLE_ROOT}/runtime"
+
 [[ -f "${RUNTIME_ROOT}/libOcctNative.so" ]] || fail "Installed SDK is missing portable/runtime/libOcctNative.so: ${RUNTIME_ROOT}"
 [[ -d "${PORTABLE_ROOT}/occt/resources" ]] || fail "Installed SDK is missing portable OCCT resources: ${PORTABLE_ROOT}/occt/resources"
 compgen -G "${RUNTIME_ROOT}/libTKernel.so*" >/dev/null || fail "Installed SDK portable runtime is missing TKernel: ${RUNTIME_ROOT}"

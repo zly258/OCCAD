@@ -29,37 +29,39 @@ $portableRoot = if (Test-Path -LiteralPath (Join-Path $nestedPortableRoot 'packa
 } else {
     $null
 }
-$portableRuntime = if ($null -ne $portableRoot) {
+
+$usesPortableRuntime = $null -ne $portableRoot
+$portableRuntime = if ($usesPortableRuntime) {
     Join-Path $portableRoot 'runtime'
 } else {
     $null
 }
-$portableNative = if ($null -ne $portableRuntime) {
+$portableNative = if ($usesPortableRuntime) {
     Join-Path $portableRuntime 'OcctNative.dll'
 } else {
     $null
 }
 
-$hasFlatNative = Test-Path -LiteralPath $flatNative -PathType Leaf
-$hasPortableNative =
-    $null -ne $portableNative -and
-    (Test-Path -LiteralPath $portableNative -PathType Leaf)
-if (-not $hasFlatNative -and -not $hasPortableNative) {
-    throw "Installed OcctCSharpBridge SDK contains neither flat OcctNative.dll nor portable/runtime/OcctNative.dll: $bridgeSdk"
+if ($usesPortableRuntime) {
+    if (-not (Test-Path -LiteralPath $portableNative -PathType Leaf)) {
+        throw "Installed portable OcctCSharpBridge SDK is missing runtime/OcctNative.dll: $portableRoot"
+    }
+} elseif (-not (Test-Path -LiteralPath $flatNative -PathType Leaf)) {
+    throw "Installed flat OcctCSharpBridge SDK is missing OcctNative.dll: $bridgeSdk"
 }
 
-$runtime = if ($hasPortableNative) {
+$runtime = if ($usesPortableRuntime) {
     $portableRuntime
 } else {
     $bridgeSdk
 }
 $runtimeCount = @(Get-ChildItem -LiteralPath $runtime -Filter '*.dll' -File -ErrorAction SilentlyContinue).Count
-$runtimeLayout = if ($hasPortableNative) {
+$runtimeLayout = if ($usesPortableRuntime) {
     'portable/runtime'
 } else {
     'flat'
 }
-$resourceRoot = if ($null -ne $portableRoot) {
+$resourceRoot = if ($usesPortableRuntime) {
     Join-Path $portableRoot 'occt\resources'
 } else {
     Join-Path $bridgeSdk 'occt\resources'
@@ -85,7 +87,7 @@ Write-Host "[build] Bridge SDK:     $bridgeSdk"
 Write-Host "[build] Bridge source:  $bridgeSourceCommit"
 Write-Host "[build] Bridge runtime: $runtime ($runtimeCount DLLs, $runtimeLayout)"
 Write-Host "[build] OCCT resources: $hasResources"
-if ($hasPortableNative) {
+if ($usesPortableRuntime) {
     Write-Host '[build] Direct EXE:     portable runtime will be copied beside the application.'
 }
 else {

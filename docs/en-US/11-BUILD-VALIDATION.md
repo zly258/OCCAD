@@ -47,7 +47,13 @@ Override with `OCCTCSHARPBRIDGE_SDK` when required.
 
 ## 3. Runtime
 
-A portable Bridge SDK is preferred because the runtime and OCCT resources are copied with the application. When using a flat Bridge SDK without bundled OCCT resources, set `OCCT_ROOT` / `CASROOT` in the process environment before launching OCCAD. The repository does not provide or require a separate `run.ps1` wrapper.
+A portable Bridge SDK is preferred because the runtime and OCCT resources are copied with the application. The repository provides `run.ps1` as the supported Windows launch wrapper. It automatically uses the portable runtime when present; for a flat Bridge SDK or missing bundled OCCT resources, pass the OCCT root once or configure the environment:
+
+```powershell
+.\run.ps1 -OcctRoot D:\tools\occt-vc144-64
+```
+
+Alternatively set `OCCT_ROOT` / `CASROOT` before launch. `run.ps1` also configures the native search path and reports the application log when startup fails.
 
 `OCCT resources: False` does not automatically mean the build contract is invalid. Compilation/Bridge contract and final runtime-resource configuration are separate concerns.
 

@@ -47,7 +47,13 @@ C:\Program Files\OcctCSharpBridge\SDK\3.0\win-x64
 
 ## 3. Runtime
 
-优先使用带 portable runtime 的 Bridge SDK，由构建输出携带 runtime 与 OCCT resources。若使用不携带完整 OCCT resources 的 flat Bridge SDK，启动 OCCAD 前在进程环境中设置 `OCCT_ROOT` / `CASROOT`。仓库当前不提供、也不依赖额外的 `run.ps1` 包装脚本。
+优先使用带 portable runtime 的 Bridge SDK，由构建输出携带 runtime 与 OCCT resources。仓库提供 `run.ps1` 作为 Windows 标准启动入口：存在 portable runtime 时自动使用；若为 flat Bridge SDK，或输出未携带完整 OCCT resources，可指定一次 OCCT 根目录：
+
+```powershell
+.\run.ps1 -OcctRoot D:\tools\occt-vc144-64
+```
+
+也可以在启动前设置 `OCCT_ROOT` / `CASROOT`。`run.ps1` 同时负责 native 搜索路径配置，并在启动失败时输出 OCCAD 日志尾部，便于定位运行时问题。
 
 `OCCT resources: False` 并不自动表示 build 无效；要区分 compile/Bridge contract 与最终 runtime resource 配置。
 

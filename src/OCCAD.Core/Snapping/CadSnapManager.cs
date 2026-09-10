@@ -82,6 +82,7 @@ public sealed class CadSnapManager
             _enabled = value;
             if (!value)
                 ResetCandidateState();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -97,6 +98,7 @@ public sealed class CadSnapManager
 
             _modes = normalized;
             ResetCandidateState();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -130,14 +132,25 @@ public sealed class CadSnapManager
         {
             if (!double.IsFinite(value) || value <= 0)
                 throw new ArgumentOutOfRangeException(nameof(value));
+            if (_pixelTolerance.Equals(value))
+                return;
+
             _pixelTolerance = value;
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
     public int MarkerSize
     {
         get => _presenter.MarkerSize;
-        set => _presenter.MarkerSize = value;
+        set
+        {
+            if (_presenter.MarkerSize == value)
+                return;
+
+            _presenter.MarkerSize = value;
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     public Color MarkerColor
@@ -156,6 +169,7 @@ public sealed class CadSnapManager
     public int CurrentCandidateIndex => _currentCandidateIndex;
 
     public event EventHandler? CurrentChanged;
+    public event EventHandler? SettingsChanged;
 
     public void AttachEngine(OcctEngine engine)
     {

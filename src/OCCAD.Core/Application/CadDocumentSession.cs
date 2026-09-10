@@ -46,6 +46,7 @@ public sealed class CadDocumentSession
     {
         ArgumentNullException.ThrowIfNull(stream);
         CadDocumentSerializer.Save(_workspace, stream);
+        stream.Flush();
         _workspace.MarkSaved();
         if (!string.IsNullOrWhiteSpace(displayName))
             SetDisplayName(displayName.Trim());

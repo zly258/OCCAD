@@ -29,7 +29,11 @@ public sealed class CadGripManager
         {
             if (!double.IsFinite(value) || value <= 0)
                 throw new ArgumentOutOfRangeException(nameof(value));
+            if (_pixelTolerance.Equals(value))
+                return;
+
             _pixelTolerance = value;
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -48,6 +52,8 @@ public sealed class CadGripManager
             {
                 RebuildMarkers();
             }
+
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -61,6 +67,7 @@ public sealed class CadGripManager
             : null;
 
     public event EventHandler? HotChanged;
+    public event EventHandler? SettingsChanged;
 
     public void AttachEngine(OcctEngine engine)
     {

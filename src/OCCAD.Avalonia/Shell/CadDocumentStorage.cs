@@ -58,7 +58,6 @@ internal sealed class CadDocumentStorage(CadApplicationCore application) : IDisp
         }
 
         _application.Documents.Save(stream, file.Name);
-        await stream.FlushAsync();
         ReplaceCurrentFile(file);
     }
 

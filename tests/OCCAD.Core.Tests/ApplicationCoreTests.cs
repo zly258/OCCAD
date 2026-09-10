@@ -33,6 +33,47 @@ public sealed class ApplicationCoreTests
     }
 
     [TestMethod]
+    public void RuntimeDraftingAndSnapChangesPersistBackToStore()
+    {
+        using var app = new CadApplicationCore();
+
+        app.Workspace.Snap.Enabled = false;
+        app.Workspace.Snap.MarkerSize = 23;
+        app.Workspace.Drafting.OrthogonalTrackingEnabled = true;
+
+        Assert.IsFalse(app.Settings.Get(CadSettingKeys.SnapEnabled, true));
+        Assert.AreEqual(23, app.Settings.Get(CadSettingKeys.SnapSize, 0));
+        Assert.IsTrue(app.Settings.Get(CadSettingKeys.OrthogonalTrackingEnabled, false));
+        Assert.IsFalse(app.Settings.Get(CadSettingKeys.PolarTrackingEnabled, true));
+    }
+
+    [TestMethod]
+    public void ConflictingTrackingPreferencesNormalizeToEffectiveCoreState()
+    {
+        var settings = new CadSettingsStore();
+        settings.Set(CadSettingKeys.OrthogonalTrackingEnabled, true);
+        settings.Set(CadSettingKeys.PolarTrackingEnabled, true);
+
+        using var app = new CadApplicationCore(settings);
+
+        Assert.IsFalse(app.Workspace.Drafting.OrthogonalTrackingEnabled);
+        Assert.IsTrue(app.Workspace.Drafting.PolarTrackingEnabled);
+        Assert.IsFalse(app.Settings.Get(CadSettingKeys.OrthogonalTrackingEnabled, true));
+        Assert.IsTrue(app.Settings.Get(CadSettingKeys.PolarTrackingEnabled, false));
+    }
+
+    [TestMethod]
+    public void LegacyNewActionCannotBypassDocumentSession()
+    {
+        using var app = new CadApplicationCore();
+        var action = app.Workspace.Actions.Find("file.new");
+
+        Assert.IsNotNull(action);
+        Assert.IsFalse(action.CanExecute());
+        Assert.IsFalse(app.Workspace.Actions.Execute("file.new"));
+    }
+
+    [TestMethod]
     public void DocumentSessionRoundTripsAndTracksSavedState()
     {
         var path = Path.Combine(

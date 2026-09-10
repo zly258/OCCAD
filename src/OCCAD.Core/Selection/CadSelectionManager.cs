@@ -76,8 +76,12 @@ public sealed class CadSelectionManager
         {
             if (value is < 0 or > 100)
                 throw new ArgumentOutOfRangeException(nameof(value));
+            if (_pixelTolerance == value)
+                return;
+
             _pixelTolerance = value;
             _presenter.SetPixelTolerance(value);
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -124,6 +128,7 @@ public sealed class CadSelectionManager
     public event EventHandler<CadSelectionChangedEventArgs>? Changed;
     public event EventHandler? Cleared;
     public event EventHandler? FilterChanged;
+    public event EventHandler? SettingsChanged;
 
     public void SetScope(
         CadSelectionScope scope,

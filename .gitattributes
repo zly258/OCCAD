@@ -1,0 +1,19 @@
+* text=auto
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.7z binary
+*.dll binary
+*.lib binary
+*.exe binary
+*.pdb binary
+*.so binary
+
+# Binary SDK metadata is hashed byte-for-byte by bridge-manifest.json.
+# Keep Git from rewriting line endings for every platform RID after hashes are generated.
+dist/*/*.json binary

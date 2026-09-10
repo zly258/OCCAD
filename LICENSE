@@ -1,0 +1,37 @@
+OcctCSharpBridge License Notice
+
+Copyright (C) 2026 zly258
+
+OcctCSharpBridge is licensed under the GNU Lesser General Public License
+version 2.1 (LGPL-2.1), with the additional OcctCSharpBridge Exception 1.0.
+
+The complete GNU LGPL version 2.1 text is provided in:
+
+  LICENSE_LGPL_21.txt
+
+The additional permission that applies specifically to OcctCSharpBridge is
+provided in:
+
+  OcctCSharpBridge_LGPL_EXCEPTION.txt
+
+The two files above form the license terms for OcctCSharpBridge and should be
+read together.
+
+The OcctCSharpBridge Exception permits applications to use OcctCSharpBridge
+through .NET assembly references, dynamic linking, P/Invoke, or equivalent
+runtime linking without requiring the application itself to be licensed under
+the GNU LGPL solely because of that use. Such applications may be distributed
+under terms of their choice, including proprietary terms, provided the GNU
+LGPL obligations for OcctCSharpBridge itself are satisfied.
+
+Commercial use is permitted under these terms. No separate commercial
+authorization is required merely to use OcctCSharpBridge in a commercial
+application in compliance with this license.
+
+Open CASCADE Technology (OCCT) and other third-party components are not
+relicensed by this notice. They remain subject to their own licenses. OCCT is
+distributed under its own GNU LGPL version 2.1 terms with the Open CASCADE
+exception.
+
+This software is provided without warranty to the extent permitted by the GNU
+LGPL version 2.1.

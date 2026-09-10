@@ -1,0 +1,11 @@
+﻿global using Application = System.Windows.Application;
+global using FrameworkElement = System.Windows.FrameworkElement;
+global using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+global using TextBox = System.Windows.Controls.TextBox;
+global using CheckBox = System.Windows.Controls.CheckBox;
+global using ComboBox = System.Windows.Controls.ComboBox;
+global using Button = System.Windows.Controls.Button;
+global using UniformGrid = System.Windows.Controls.Primitives.UniformGrid;
+global using ToggleButton = System.Windows.Controls.Primitives.ToggleButton;
+global using Cursors = System.Windows.Input.Cursors;
+global using HorizontalAlignment = System.Windows.HorizontalAlignment;

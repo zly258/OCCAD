@@ -1,0 +1,266 @@
+﻿using System.Runtime.ExceptionServices;
+using OcctNet;
+
+namespace OCCAD;
+
+public enum CadInteractionMode
+{
+    Normal,
+    Drawing
+}
+
+public sealed class CadToolChangedEventArgs(CadTool? tool) : EventArgs
+{
+    public CadTool? Tool { get; } = tool;
+}
+
+public sealed class CadToolManager
+{
+    private readonly CadToolRegistry _registry;
+    private readonly CadToolContext _context;
+
+    public CadToolManager(CadWorkspace workspace, CadToolRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        _context = new CadToolContext(workspace);
+    }
+
+    public CadTool? ActiveTool { get; private set; }
+
+    public CadInteractionMode Mode =>
+        ActiveTool is null ? CadInteractionMode.Normal : CadInteractionMode.Drawing;
+
+    public event EventHandler<CadToolChangedEventArgs>? ToolChanged;
+    public event EventHandler<CadToolChangedEventArgs>? ToolUpdated;
+
+    public void Register<TTool>(string id)
+        where TTool : CadTool, new()
+    {
+        _registry.Register<TTool>(id);
+    }
+
+    public bool IsRegistered(string id)
+    {
+        return _registry.Contains(id);
+    }
+
+    public bool Activate(string id)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        if (!_registry.TryCreate(id, out var tool) || tool is null)
+            return false;
+
+        CancelCurrent();
+        SetActive(tool);
+        return true;
+    }
+
+    public bool CanChangeDrawingPlane =>
+        !_context.WorkPlane.IsPlaneLocked &&
+        (ActiveTool is null || ActiveTool is CadDrawingTool { Stage: 0 });
+
+    public bool TryChangeDrawingPlane(CadWorkPlanePreset preset)
+    {
+        if (!Enum.IsDefined(preset)) throw new ArgumentOutOfRangeException(nameof(preset));
+        if (!CanChangeDrawingPlane) return false;
+
+        var tool = ActiveTool;
+        var origin = _context.WorkPlane.Origin;
+        // Recreate the first-point tool so every cached axis uses the new frame.
+        // Preserve panel values, including the method before its dependent dimensions.
+        var parameters = tool?.ParameterPanel?.Parameters.Select(parameter =>
+            (parameter.Id, Value: parameter switch
+            {
+                CadChoiceToolParameterDescriptor value => value.Value,
+                CadBooleanToolParameterDescriptor value => value.Value.ToString(),
+                CadIntegerToolParameterDescriptor value => value.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                CadDoubleToolParameterDescriptor value => value.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
+                CadOptionalDoubleToolParameterDescriptor value => value.Value?.ToString("R", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+                _ => throw new NotSupportedException($"Unsupported tool parameter: {parameter.Id}")
+            })).ToArray() ?? [];
+        if (tool is not null) CancelCurrent();
+        _context.WorkPlane.SetPreset(preset, origin);
+        _context.Snap.Clear();
+        _context.Tracking.Clear();
+        if (tool is not null)
+        {
+            Activate(tool.Id);
+            foreach (var parameter in parameters)
+                if (!ActiveTool!.TrySetParameter(parameter.Id, parameter.Value))
+                    throw new InvalidOperationException($"Unable to restore tool parameter: {parameter.Id}");
+        }
+        return true;
+    }
+    public void BeginGripEdit(CadGripPoint grip)
+    {
+        CancelCurrent();
+        SetActive(new GripEditTool(grip));
+    }
+
+    public void CompleteCurrent()
+    {
+        var tool = ActiveTool;
+        if (tool is null) return;
+
+        DeactivateActiveTool(tool, canceled: false);
+    }
+
+    public bool CancelCurrent()
+    {
+        var tool = ActiveTool;
+        if (tool is null)
+        {
+            _context.Workspace.Preview.Clear();
+            _context.Workspace.Tracking.Clear();
+            _context.Workspace.Snap.Clear();
+            _context.Workspace.Snap.Active = false;
+            _context.Workspace.WorkPlane.Deactivate();
+            return false;
+        }
+
+        DeactivateActiveTool(tool, canceled: true);
+        return true;
+    }
+
+    public bool HandlePointer(OcctPointerInputEventArgs input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        _context.Workspace.ObservePointer(input.X, input.Y);
+
+        var tool = ActiveTool;
+        if (tool is null) return false;
+
+        return tool.HandlePointer(input);
+    }
+
+    public bool CommitCurrentStage()
+    {
+        var tool = ActiveTool;
+        return tool?.CommitCurrentStage() == true;
+    }
+
+    public bool FinishCurrent()
+    {
+        var tool = ActiveTool;
+        return tool?.Finish() == true;
+    }
+
+    public bool StepBackCurrent()
+    {
+        var tool = ActiveTool;
+        return tool?.StepBack() == true;
+    }
+
+    public bool HandleSecondaryAction()
+    {
+        var tool = ActiveTool;
+        if (tool is null)
+            return false;
+
+        if (tool.State == CadToolState.WaitForSelect)
+            return CommitCurrentStage();
+
+        if (tool.CanFinish && FinishCurrent())
+            return true;
+
+        return CancelCurrent();
+    }
+
+    public bool HandleKey(OcctKeyInputEventArgs input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        if (input.Kind == OcctKeyInputKind.Pressed &&
+            input.Key == OcctKey.Escape)
+        {
+            CancelCurrent();
+            return true;
+        }
+
+        if (input.Kind == OcctKeyInputKind.Pressed &&
+            input.Key == OcctKey.Backspace &&
+            ActiveTool is { CanStepBack: true })
+        {
+            return StepBackCurrent();
+        }
+
+        if (input.Kind == OcctKeyInputKind.Pressed && input.Key == OcctKey.Enter &&
+            ActiveTool is { State: CadToolState.Drawing, CanFinish: true })
+            return FinishCurrent();
+        return ActiveTool?.HandleKey(input) == true;
+    }
+
+    private void SetActive(CadTool tool)
+    {
+        _context.Workspace.Grips.Clear();
+        try
+        {
+            tool.Activate(_context);
+        }
+        catch (Exception activationFailure)
+        {
+            Exception? cleanupFailure = null;
+            try
+            {
+                tool.Deactivate(canceled: true);
+            }
+            catch (Exception exception)
+            {
+                cleanupFailure = exception;
+            }
+
+            RestoreSelectionGrips();
+
+            if (cleanupFailure is not null)
+                throw new AggregateException(
+                    "Tool activation and cleanup both failed.",
+                    activationFailure,
+                    cleanupFailure);
+
+            ExceptionDispatchInfo.Capture(activationFailure).Throw();
+            return;
+        }
+
+        ActiveTool = tool;
+        tool.Updated += ActiveToolUpdated;
+        ToolChanged?.Invoke(this, new CadToolChangedEventArgs(tool));
+    }
+
+    private void DeactivateActiveTool(CadTool tool, bool canceled)
+    {
+        tool.Updated -= ActiveToolUpdated;
+        try
+        {
+            tool.Deactivate(canceled);
+        }
+        finally
+        {
+            ActiveTool = null;
+            try
+            {
+                RestoreSelectionGrips();
+            }
+            finally
+            {
+                ToolChanged?.Invoke(
+                    this,
+                    new CadToolChangedEventArgs(null));
+            }
+        }
+    }
+
+    private void ActiveToolUpdated(object? sender, EventArgs e)
+    {
+        if (sender is not CadTool tool || !ReferenceEquals(tool, ActiveTool))
+            return;
+
+        PublishToolUpdated(tool);
+    }
+
+    private void PublishToolUpdated(CadTool tool) =>
+        ToolUpdated?.Invoke(this, new CadToolChangedEventArgs(tool));
+
+    private void RestoreSelectionGrips() =>
+        _context.Workspace.Grips.Show(_context.Workspace.Selection.Selected);
+}

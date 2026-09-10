@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>OCCAD</RootNamespace>
+    <OcctBridgeDistRoot Condition="'$(OcctBridgeDistRoot)' == ''">$(MSBuildThisFileDirectory)..\..\external\OcctCSharpBridge\win-x64</OcctBridgeDistRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="OcctNet">
+      <HintPath>$(OcctBridgeDistRoot)\OcctNet.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="ValidateCadBridgeSdk" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(OcctBridgeDistRoot)\OcctNet.dll')" Text="OcctNet.dll is missing. Run .\build.ps1 -SyncBridge -BridgeBranch main once." />
+    <Error Condition="!Exists('$(OcctBridgeDistRoot)\bridge-contract.json')" Text="bridge-contract.json is missing. Run .\build.ps1 -SyncBridge -BridgeBranch main once." />
+  </Target>
+</Project>

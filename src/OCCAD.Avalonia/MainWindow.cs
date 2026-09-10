@@ -17,6 +17,9 @@ public sealed partial class MainWindow : Window
 {
     private readonly CadWorkspace _workspace = new();
 
+    // Legacy menu state remains source-compatible until the action/shortcut
+    // helpers are split out of MainWindow.Menu.cs, but it is no longer built
+    // or attached to the visual tree.
     private readonly Menu _mainMenu = new();
     private readonly ComboBox _layerCombo = new();
     private readonly ToggleButton _planeXy = new();
@@ -106,8 +109,9 @@ public sealed partial class MainWindow : Window
 
         ApplyApplicationSettingsToCore();
         ConfigureViewport();
+        ConfigureShellControls();
         CadDiagnostics.Trace(
-            "MainWindow viewport configured.");
+            "MainWindow viewport and shell controls configured.");
 
         Content = BuildShell();
         CadDiagnostics.Trace(
@@ -137,7 +141,6 @@ public sealed partial class MainWindow : Window
             "MainWindow controllers created.");
 
         WireEvents();
-        BuildMenu();
         RefreshAll();
         UpdateWindowTitle();
 
@@ -177,17 +180,8 @@ public sealed partial class MainWindow : Window
             Background = CadTheme.WindowBrush
         };
 
-        _mainMenu.Classes.Add("cad-menu");
-        _mainMenu.Background = CadTheme.Toolbar;
-        _mainMenu.BorderBrush = CadTheme.Border;
-        _mainMenu.BorderThickness = new Thickness(0, 0, 0, 1);
-        DockPanel.SetDock(_mainMenu, Dock.Top);
-        root.Children.Add(_mainMenu);
-
-        var toolbar = BuildToolbar();
-        DockPanel.SetDock(toolbar, Dock.Top);
-        root.Children.Add(toolbar);
-
+        // Ribbon is inserted by ApplyRibbon() before the window is shown.
+        // The shell itself no longer creates the legacy Menu or toolbar.
         var status = BuildStatusBar();
         DockPanel.SetDock(status, Dock.Bottom);
         root.Children.Add(status);
@@ -201,33 +195,11 @@ public sealed partial class MainWindow : Window
         return root;
     }
 
-    private Control BuildToolbar()
+    private void ConfigureShellControls()
     {
-        var panel = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 1,
-            Margin = new Thickness(5, 1),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-
-        panel.Children.Add(new TextBlock
-        {
-            Text = "WP",
-            Foreground = CadTheme.Muted,
-            FontWeight = FontWeight.SemiBold,
-            FontSize = CadTheme.SmallFontSize,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(6, 0, 3, 0)
-        });
-
         ConfigurePlaneButton(_planeXy, "XY", CadWorkPlanePreset.XY);
         ConfigurePlaneButton(_planeYz, "YZ", CadWorkPlanePreset.YZ);
         ConfigurePlaneButton(_planeXz, "XZ", CadWorkPlanePreset.XZ);
-        panel.Children.Add(_planeXy);
-        panel.Children.Add(_planeYz);
-        panel.Children.Add(_planeXz);
-        panel.Children.Add(ToolbarSeparator());
 
         _layerCombo.Width = 150;
         _layerCombo.Classes.Add("cad-input");
@@ -239,8 +211,6 @@ public sealed partial class MainWindow : Window
 
             _workspace.SetCurrentLayer(layer);
         };
-        panel.Children.Add(_layerCombo);
-        panel.Children.Add(ToolbarSeparator());
 
         ConfigureToggle(_snapToggle);
         _snapToggle.IsCheckedChanged += (_, _) =>
@@ -251,7 +221,6 @@ public sealed partial class MainWindow : Window
                 _workspace.Snap.Clear();
             RefreshInteractionUi();
         };
-        panel.Children.Add(_snapToggle);
 
         ConfigureToggle(_orthoToggle);
         _orthoToggle.IsCheckedChanged += (_, _) =>
@@ -262,7 +231,6 @@ public sealed partial class MainWindow : Window
             _workspace.Tracking.Clear();
             RefreshInteractionUi();
         };
-        panel.Children.Add(_orthoToggle);
 
         ConfigureToggle(_polarToggle);
         _polarToggle.IsCheckedChanged += (_, _) =>
@@ -272,15 +240,6 @@ public sealed partial class MainWindow : Window
                 _polarToggle.IsChecked == true;
             _workspace.Tracking.Clear();
             RefreshInteractionUi();
-        };
-        panel.Children.Add(_polarToggle);
-
-        return new Border
-        {
-            Background = CadTheme.Toolbar,
-            BorderBrush = CadTheme.Border,
-            BorderThickness = new Thickness(0, 0, 0, 1),
-            Child = panel
         };
     }
 

@@ -37,9 +37,6 @@ public sealed partial class MainWindow
 
     private void RefreshLanguageUi()
     {
-        if (!IsRibbonApplied)
-            BuildMenu();
-
         if (_modelHeaderText is not null)
             _modelHeaderText.Text = UiText("Cad.Text.Model", "Model");
         if (_layerHeaderText is not null)

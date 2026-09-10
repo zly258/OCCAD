@@ -186,7 +186,6 @@ public sealed class ExtrudeTool :
         }
 
         RefreshPreview();
-        NotifyUpdated();
         return true;
     }
 

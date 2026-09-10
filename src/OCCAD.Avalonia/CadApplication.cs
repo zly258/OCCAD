@@ -49,10 +49,9 @@ public sealed class CadApplication : Application
             CadDiagnostics.Trace("Constructing MainWindow.");
 
             var window = new MainWindow();
-            // The visible shell is a native Avalonia CAD ribbon plus the
-            // viewport/dock workspace and persistent command/status surfaces.
-            // Legacy menu/toolbar controls are retained only long enough for
-            // compatibility state wiring and are removed before the window is shown.
+            // The shell is Ribbon-first. Refinement passes attach status,
+            // floating-tool and property surfaces to the same workspace state;
+            // no legacy Menu/toolbar is constructed before the window is shown.
             window.ApplyRibbon();
             window.ApplyUiRefinement();
             window.ApplyFloatingToolPanel();

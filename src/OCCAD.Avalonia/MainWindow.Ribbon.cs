@@ -24,22 +24,10 @@ public sealed partial class MainWindow
         if (_ribbonApplied || Content is not DockPanel root)
             return;
 
-        var legacyToolbar = root.Children
-            .OfType<Border>()
-            .FirstOrDefault(border =>
-                border.Child is StackPanel panel &&
-                panel.Children.Contains(_snapToggle));
-
-        // Layer selection belongs to Home. Drafting toggles intentionally stay
-        // attached to the legacy toolbar until CommandStatus moves them to the
-        // status bar; this prevents Ribbon language rebuilds from stealing the
-        // persistent SNAP/ORTHO/POLAR controls back from the status surface.
+        // The shell is Ribbon-first. Layer selection is hosted by Home while
+        // drafting/work-plane controls are hosted by the status surface.
         DetachRibbonControl(_layerCombo);
-
-        root.Children.Remove(_mainMenu);
         ReleaseLegacyMenuState();
-        if (legacyToolbar is not null)
-            root.Children.Remove(legacyToolbar);
 
         _ribbonHost = new Border
         {
@@ -166,13 +154,16 @@ public sealed partial class MainWindow
                 RibbonGroup(
                     "Cad.Text.Modeling",
                     "Model",
-                    RibbonAction("solid.box", "Cad.Text.Box", "Box"),
-                    RibbonAction("solid.cylinder", "Cad.Text.Cylinder", "Cylinder"),
-                    RibbonAction("solid.cone", "Cad.Text.Cone", "Cone"),
-                    RibbonAction("solid.frustum", "Cad.Text.Frustum", "Frustum"),
-                    RibbonAction("solid.sphere", "Cad.Text.Sphere", "Sphere"),
-                    RibbonAction("solid.ellipsoid", "Cad.Text.Ellipsoid", "Ellipsoid"),
-                    RibbonAction("solid.torus", "Cad.Text.Torus", "Torus"),
+                    RibbonActionMenu(
+                        "Cad.Text.Primitives",
+                        "Primitives",
+                        new("solid.box", "Cad.Text.Box", "Box"),
+                        new("solid.cylinder", "Cad.Text.Cylinder", "Cylinder"),
+                        new("solid.cone", "Cad.Text.Cone", "Cone"),
+                        new("solid.frustum", "Cad.Text.Frustum", "Frustum"),
+                        new("solid.sphere", "Cad.Text.Sphere", "Sphere"),
+                        new("solid.ellipsoid", "Cad.Text.Ellipsoid", "Ellipsoid"),
+                        new("solid.torus", "Cad.Text.Torus", "Torus")),
                     RibbonAction("curve.helix", "Cad.Text.Helix", "Helix"),
                     RibbonAction("feature.extrude", "Cad.Text.Extrude", "Extrude"))),
 

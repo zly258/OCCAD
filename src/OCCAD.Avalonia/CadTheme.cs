@@ -21,6 +21,8 @@ internal static class CadTheme
     public const double ToolPanelWidth = 276.0;
     public const double PropertyLabelWidth = 92.0;
     public const double ToolLabelWidth = 92.0;
+    public const double DialogButtonWidth = 72.0;
+    public const double DialogPadding = 10.0;
 
     public static readonly IBrush WindowBrush = Brush("#DDE1E5");
     public static readonly IBrush Surface = Brush("#FAFAFA");
@@ -58,6 +60,7 @@ internal static class CadTheme
             Setters =
             {
                 new Setter(Window.BackgroundProperty, WindowBrush),
+                new Setter(Window.FontSizeProperty, FontSize),
                 new Setter(
                     Window.FontFamilyProperty,
                     FontFamily.Parse(
@@ -79,6 +82,7 @@ internal static class CadTheme
             Setters =
             {
                 new Setter(Button.MinHeightProperty, ControlHeight),
+                new Setter(Button.FontSizeProperty, FontSize),
                 new Setter(Button.PaddingProperty, new Thickness(6, 0)),
                 new Setter(Button.MarginProperty, new Thickness(1)),
                 new Setter(Button.BackgroundProperty, Brushes.Transparent),
@@ -104,6 +108,7 @@ internal static class CadTheme
             Setters =
             {
                 new Setter(ToggleButton.MinHeightProperty, ControlHeight),
+                new Setter(ToggleButton.FontSizeProperty, FontSize),
                 new Setter(ToggleButton.PaddingProperty, new Thickness(6, 0)),
                 new Setter(ToggleButton.MarginProperty, new Thickness(1)),
                 new Setter(ToggleButton.BackgroundProperty, Brushes.Transparent),
@@ -118,6 +123,7 @@ internal static class CadTheme
             Setters =
             {
                 new Setter(TextBox.MinHeightProperty, ControlHeight),
+                new Setter(TextBox.FontSizeProperty, FontSize),
                 new Setter(TextBox.PaddingProperty, new Thickness(5, 0)),
                 new Setter(TextBox.BackgroundProperty, Surface),
                 new Setter(TextBox.BorderBrushProperty, Border),
@@ -131,6 +137,7 @@ internal static class CadTheme
             Setters =
             {
                 new Setter(ComboBox.MinHeightProperty, ControlHeight),
+                new Setter(ComboBox.FontSizeProperty, FontSize),
                 new Setter(ComboBox.BackgroundProperty, Surface),
                 new Setter(ComboBox.BorderBrushProperty, Border),
                 new Setter(ComboBox.BorderThicknessProperty, new Thickness(1)),
@@ -143,8 +150,18 @@ internal static class CadTheme
             Setters =
             {
                 new Setter(MenuItem.MinHeightProperty, MenuHeight),
+                new Setter(MenuItem.FontSizeProperty, FontSize),
                 new Setter(MenuItem.PaddingProperty, new Thickness(7, 2)),
                 new Setter(MenuItem.ForegroundProperty, Text)
+            }
+        });
+
+        app.Styles.Add(new Style(x => x.OfType<CheckBox>())
+        {
+            Setters =
+            {
+                new Setter(CheckBox.FontSizeProperty, FontSize),
+                new Setter(CheckBox.ForegroundProperty, Text)
             }
         });
 

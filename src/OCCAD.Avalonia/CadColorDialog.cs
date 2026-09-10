@@ -118,7 +118,7 @@ internal sealed class CadColorDialog : Window
 
         var content = new StackPanel
         {
-            Margin = new Thickness(10),
+            Margin = new Thickness(CadTheme.DialogPadding),
             Spacing = 7
         };
         content.Children.Add(_table);
@@ -146,7 +146,7 @@ internal sealed class CadColorDialog : Window
         var button = new Button
         {
             Content = text,
-            MinWidth = 72,
+            MinWidth = CadTheme.DialogButtonWidth,
             HorizontalContentAlignment =
                 HorizontalAlignment.Center
         };

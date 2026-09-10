@@ -528,7 +528,7 @@ public sealed partial class MainWindow
     private static global::Avalonia.Controls.Separator MenuSeparator() =>
         new()
         {
-            Margin = new global::Avalonia.Thickness(8, 2),
+            Margin = new global::Avalonia.Thickness(6, 1),
             Background = CadTheme.Border
         };
 

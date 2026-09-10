@@ -51,7 +51,9 @@ public static class CadPropertyTransaction
             }
 
             descriptors[index] = descriptor;
-            anyChange |= !Equals(descriptor.GetValue(targets[index]), value);
+            anyChange |=
+                !Equals(descriptor.GetValue(targets[index]), value) ||
+                RequiresAppearanceOverride(targets[index], propertyName);
         }
 
         if (!anyChange)
@@ -70,7 +72,14 @@ public static class CadPropertyTransaction
             try
             {
                 for (var index = 0; index < targets.Length; index++)
-                    descriptors[index].SetValue(targets[index], value);
+                {
+                    ApplyAppearanceOverride(
+                        targets[index],
+                        propertyName);
+                    descriptors[index].SetValue(
+                        targets[index],
+                        value);
+                }
 
                 workspace.RecordEntityStateChange(
                     targets,
@@ -113,5 +122,33 @@ public static class CadPropertyTransaction
 
         error = null;
         return true;
+    }
+    private static bool RequiresAppearanceOverride(
+        CadEntity entity,
+        string propertyName) =>
+        propertyName switch
+        {
+            nameof(CadEntity.Color) => entity.ColorByLayer,
+            nameof(CadEntity.LineWidth) => entity.LineWidthByLayer,
+            nameof(CadEntity.LineStyle) => entity.LineStyleByLayer,
+            _ => false
+        };
+
+    private static void ApplyAppearanceOverride(
+        CadEntity entity,
+        string propertyName)
+    {
+        switch (propertyName)
+        {
+            case nameof(CadEntity.Color):
+                entity.ColorByLayer = false;
+                break;
+            case nameof(CadEntity.LineWidth):
+                entity.LineWidthByLayer = false;
+                break;
+            case nameof(CadEntity.LineStyle):
+                entity.LineStyleByLayer = false;
+                break;
+        }
     }
 }

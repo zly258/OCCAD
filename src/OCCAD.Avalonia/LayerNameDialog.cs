@@ -59,7 +59,7 @@ internal sealed class LayerNameDialog : Window
 
         var content = new StackPanel
         {
-            Margin = new Thickness(10),
+            Margin = new Thickness(CadTheme.DialogPadding),
             Spacing = 6
         };
         content.Children.Add(new TextBlock
@@ -92,7 +92,7 @@ internal sealed class LayerNameDialog : Window
         var button = new Button
         {
             Content = text,
-            MinWidth = 70,
+            MinWidth = CadTheme.DialogButtonWidth,
             HorizontalContentAlignment = HorizontalAlignment.Center
         };
         button.Classes.Add("cad-compact");

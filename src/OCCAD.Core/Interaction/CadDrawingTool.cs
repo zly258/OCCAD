@@ -99,10 +99,11 @@ public abstract class CadDrawingTool : CadTool
         if (entity is null)
             return;
 
-        // Never keep transient and document presentations alive in the same
-        // final frame.
-        Context.Preview.Clear();
+        // Keep the transient preview until the document/history commit
+        // succeeds. If presentation creation or history recording fails, the
+        // Tool remains active with its last valid preview.
         Context.AddEntity(entity.Duplicate());
+        Context.Preview.Clear();
         Context.Workspace.Tools.CompleteCurrent();
     }
 }

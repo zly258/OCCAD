@@ -485,7 +485,7 @@ public sealed partial class MainWindow : Window
         _dynamicHud.Background = CadTheme.Surface;
         _dynamicHud.BorderBrush = CadTheme.BorderStrong;
         _dynamicHud.BorderThickness = new Thickness(1);
-        _dynamicHud.CornerRadius = new CornerRadius(2);
+        _dynamicHud.CornerRadius = new CornerRadius(1);
         _dynamicHud.Child = _dynamicValue;
         overlay.Children.Add(_dynamicHud);
 
@@ -528,7 +528,7 @@ public sealed partial class MainWindow : Window
             Background = CadTheme.Toolbar,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
-            MinHeight = 22,
+            MinHeight = CadTheme.StatusHeight,
             Child = panel
         };
     }
@@ -825,7 +825,7 @@ public sealed partial class MainWindow : Window
     {
         text.MinWidth = minWidth;
         text.Margin = new Thickness(4, 0);
-        text.FontSize = 10.5;
+        text.FontSize = CadTheme.CaptionFontSize;
         text.VerticalAlignment = VerticalAlignment.Center;
         text.TextTrimming = TextTrimming.CharacterEllipsis;
         text.Foreground = CadTheme.Muted;

@@ -71,8 +71,8 @@ internal sealed class CadToolPanel : Border
 
         var header = new DockPanel
         {
-            Height = 24,
-            Background = CadTheme.Toolbar
+            Height = CadTheme.PanelHeaderHeight,
+            Background = CadTheme.Header
         };
         DockPanel.SetDock(_close, Dock.Right);
         header.Children.Add(_close);

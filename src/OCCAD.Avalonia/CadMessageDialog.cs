@@ -48,7 +48,7 @@ internal sealed class CadMessageDialog : Window
             Text = title,
             FontWeight =
                 global::Avalonia.Media.FontWeight.SemiBold,
-            FontSize = 11.5,
+            FontSize = CadTheme.FontSize,
             Foreground = CadTheme.Text,
             TextWrapping =
                 global::Avalonia.Media.TextWrapping.Wrap
@@ -91,7 +91,7 @@ internal sealed class CadMessageDialog : Window
         var body = new Grid
         {
             ColumnSpacing = 8,
-            Margin = new Thickness(12, 10, 12, 9)
+            Margin = new Thickness(CadTheme.DialogPadding)
         };
         body.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(3)));
@@ -117,7 +117,7 @@ internal sealed class CadMessageDialog : Window
             Background = CadTheme.Toolbar,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(10, 6),
+            Padding = new Thickness(CadTheme.DialogPadding, 6),
             Child = buttons
         };
 
@@ -223,7 +223,7 @@ internal sealed class CadMessageDialog : Window
         var button = new Button
         {
             Content = text,
-            MinWidth = 72,
+            MinWidth = CadTheme.DialogButtonWidth,
             HorizontalContentAlignment =
                 HorizontalAlignment.Center
         };

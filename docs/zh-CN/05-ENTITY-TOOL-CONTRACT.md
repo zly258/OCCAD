@@ -157,7 +157,7 @@ Validate current state
 → complete Tool
 ```
 
-禁止先删除 Preview/原对象，再尝试构造最终 Shape；这样失败会造成视觉和业务状态丢失。
+禁止先删除 Preview/原对象，再尝试构造或提交最终 Shape；提交失败时必须保留最后一个有效 Preview 和当前 Tool 状态。
 
 ## 11. Cancel / StepBack
 

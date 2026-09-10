@@ -68,7 +68,7 @@ internal sealed class CadErrorWindow : Window
             Content = CadLanguageManager.Text(
                 "Cad.Text.Continue",
                 "Continue"),
-            MinWidth = 76
+            MinWidth = CadTheme.DialogButtonWidth
         };
         close.Classes.Add("cad-compact");
         close.Classes.Add("cad-primary");
@@ -79,7 +79,7 @@ internal sealed class CadErrorWindow : Window
             Content = CadLanguageManager.Text(
                 "Cad.Text.Exit",
                 "Exit"),
-            MinWidth = 88
+            MinWidth = CadTheme.DialogButtonWidth
         };
         exit.Classes.Add("cad-compact");
         exit.Click += (_, _) =>
@@ -98,7 +98,7 @@ internal sealed class CadErrorWindow : Window
 
         var root = new Grid
         {
-            Margin = new Thickness(12),
+            Margin = new Thickness(CadTheme.DialogPadding),
             RowDefinitions = new RowDefinitions(
                 "Auto,Auto,*,Auto,Auto")
         };

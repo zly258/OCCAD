@@ -86,6 +86,9 @@ public static class CadPropertyCatalog
             "Feature" => 40,
             "Display" => 50,
             "Annotation" => 60,
+            "Measurement" => 70,
+            "State" => 80,
+            "Source" => 90,
             _ => 100
         };
 

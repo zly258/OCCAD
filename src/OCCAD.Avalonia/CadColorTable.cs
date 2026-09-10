@@ -109,8 +109,8 @@ internal sealed class CadColorTable : UserControl
             var button = new Button
             {
                 Tag = color,
-                MinWidth = 26,
-                MinHeight = 24,
+                MinWidth = 24,
+                MinHeight = CadTheme.ControlHeight,
                 Padding = new Thickness(0),
                 Margin = new Thickness(0),
                 Background =

@@ -152,7 +152,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
                         "Cad.Text.SelectionInitial",
                         "Selection: 0"),
                     Foreground = CadTheme.Muted,
-                    Margin = new Thickness(6)
+                    Margin = new Thickness(5)
                 });
                 return;
             }
@@ -175,28 +175,28 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 Text = title,
                 FontWeight = FontWeight.SemiBold,
                 Foreground = CadTheme.Text,
-                Margin = new Thickness(6, 4, 6, 3)
+                Margin = new Thickness(5, 3, 5, 2)
             });
 
             if (_subobject is { } subobject)
                 AddSubobjectDetails(subobject);
 
             var groups = CommonProperties(targets)
-                .GroupBy(slot => LocalizeCategory(slot.Descriptor.Category))
-                .OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase);
+                .GroupBy(slot => slot.Descriptor.Category);
 
             foreach (var group in groups)
             {
+                var groupTitle = LocalizeCategory(group.Key);
                 _host.Children.Add(new Border
                 {
                     Background = CadTheme.Toolbar,
                     BorderBrush = CadTheme.Border,
                     BorderThickness = new Thickness(0, 1, 0, 0),
-                    Padding = new Thickness(5, 2),
+                    Padding = new Thickness(4, 1),
                     Margin = new Thickness(0),
                     Child = new TextBlock
                     {
-                        Text = group.Key,
+                        Text = groupTitle,
                         FontWeight = FontWeight.SemiBold,
                         Foreground = CadTheme.Text
                     }
@@ -223,27 +223,24 @@ internal sealed class CadPropertyInspectorController : IDisposable
         if (targets.Count == 0)
             return [];
 
-        var first = BrowsableProperties(targets[0])
-            .ToDictionary(descriptor => descriptor.Name, StringComparer.Ordinal);
+        var common = BrowsableProperties(targets[0])
+            .ToList();
 
         foreach (var target in targets.Skip(1))
         {
             var current = BrowsableProperties(target)
-                .ToDictionary(descriptor => descriptor.Name, StringComparer.Ordinal);
+                .ToDictionary(
+                    descriptor => descriptor.Name,
+                    StringComparer.Ordinal);
 
-            foreach (var name in first.Keys.ToArray())
-            {
-                if (!current.TryGetValue(name, out var descriptor) ||
-                    descriptor.PropertyType != first[name].PropertyType)
-                    first.Remove(name);
-            }
+            common.RemoveAll(descriptor =>
+                !current.TryGetValue(descriptor.Name, out var other) ||
+                other.PropertyType != descriptor.PropertyType);
         }
 
-        return first.Values
-            .OrderBy(descriptor => descriptor.Category)
-            .ThenBy(descriptor => descriptor.Order)
-            .ThenBy(descriptor => descriptor.DisplayName)
-            .Select(descriptor => new PropertySlot(descriptor, targets))
+        return common
+            .Select(descriptor =>
+                new PropertySlot(descriptor, targets))
             .ToArray();
     }
 
@@ -440,7 +437,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
             Background = CadTheme.Toolbar,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(5, 2),
+            Padding = new Thickness(4, 1),
             Margin = new Thickness(0),
             Child = new TextBlock
             {
@@ -463,12 +460,12 @@ internal sealed class CadPropertyInspectorController : IDisposable
     {
         var row = new Grid
         {
-            ColumnSpacing = 5,
-            Margin = new Thickness(5, 0)
+            ColumnSpacing = 4,
+            Margin = new Thickness(4, 0)
         };
         row.ColumnDefinitions.Add(
             new ColumnDefinition(
-                new GridLength(94)));
+                new GridLength(CadTheme.PropertyLabelWidth)));
         row.ColumnDefinitions.Add(
             new ColumnDefinition(
                 new GridLength(
@@ -548,10 +545,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
     {
         var row = new Grid
         {
-            ColumnSpacing = 5,
-            Margin = new Thickness(5, 0)
+            ColumnSpacing = 4,
+            Margin = new Thickness(4, 0)
         };
-        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(94)));
+        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(CadTheme.PropertyLabelWidth)));
         row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
 
         var label = new TextBlock
@@ -562,7 +559,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
             Foreground = CadTheme.Text,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            FontSize = 11.0
+            FontSize = CadTheme.FontSize
         };
         if (!string.IsNullOrWhiteSpace(slot.Descriptor.Description))
         {
@@ -593,6 +590,27 @@ internal sealed class CadPropertyInspectorController : IDisposable
             return CreateLayerEditor(value as string, isMixed);
         if (descriptor.IsReadOnly)
             return ReadOnlyValue(descriptor, value, isMixed);
+
+        var byLayerProperty = descriptor.Name switch
+        {
+            nameof(CadEntity.Color) =>
+                nameof(CadEntity.ColorByLayer),
+            nameof(CadEntity.LineStyle) =>
+                nameof(CadEntity.LineStyleByLayer),
+            nameof(CadEntity.LineWidth) =>
+                nameof(CadEntity.LineWidthByLayer),
+            _ => null
+        };
+        if (byLayerProperty is not null &&
+            _entities.Length > 0)
+        {
+            return CreateByLayerEditor(
+                slot,
+                byLayerProperty,
+                value,
+                isMixed);
+        }
+
         if (semantic == CadValueSemantic.Boolean)
             return CreateBooleanEditor(slot, value, isMixed);
         if (semantic is CadValueSemantic.Enum or CadValueSemantic.Choice)
@@ -603,6 +621,97 @@ internal sealed class CadPropertyInspectorController : IDisposable
             return CreateTextEditor(slot, value, isMixed);
 
         return ReadOnlyValue(descriptor, value, isMixed);
+    }
+
+    private Control CreateByLayerEditor(
+        PropertySlot slot,
+        string byLayerProperty,
+        object? value,
+        bool isMixed)
+    {
+        var flags = _entities
+            .Select(entity =>
+                TypeDescriptor
+                    .GetProperties(entity, true)
+                    .Find(
+                        byLayerProperty,
+                        ignoreCase: false)?
+                    .GetValue(entity) as bool?)
+            .ToArray();
+
+        var first = flags.FirstOrDefault();
+        var mixedByLayer =
+            flags.Any(flag => flag != first);
+
+        var byLayer = new CheckBox
+        {
+            Content = CadLanguageManager.Text(
+                "Cad.Text.ByLayer",
+                "ByLayer"),
+            IsThreeState = mixedByLayer,
+            IsChecked = mixedByLayer
+                ? null
+                : first == true,
+            VerticalAlignment =
+                VerticalAlignment.Center
+        };
+        ToolTip.SetTip(
+            byLayer,
+            CadLanguageManager.Text(
+                "Cad.Text.ByLayer",
+                "ByLayer"));
+        byLayer.IsCheckedChanged += (_, _) =>
+        {
+            if (_refreshing ||
+                byLayer.IsChecked is not { } next)
+                return;
+
+            ApplyHiddenEntityProperty(
+                byLayerProperty,
+                next);
+        };
+
+        Control valueEditor =
+            slot.Descriptor.Value.Semantic switch
+            {
+                CadValueSemantic.Color =>
+                    CreateColorEditor(
+                        slot,
+                        value,
+                        showByLayerText: false),
+                CadValueSemantic.Enum or
+                CadValueSemantic.Choice =>
+                    CreateEnumEditor(
+                        slot,
+                        value,
+                        isMixed),
+                _ when CanEditAsText(slot.Descriptor) =>
+                    CreateTextEditor(
+                        slot,
+                        value,
+                        isMixed),
+                _ =>
+                    ReadOnlyValue(
+                        slot.Descriptor,
+                        value,
+                        isMixed)
+            };
+
+        var grid = new Grid
+        {
+            ColumnSpacing = 4
+        };
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(GridLength.Auto));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(
+                new GridLength(
+                    1,
+                    GridUnitType.Star)));
+        grid.Children.Add(byLayer);
+        Grid.SetColumn(valueEditor, 1);
+        grid.Children.Add(valueEditor);
+        return grid;
     }
 
     private Control CreateLayerEditor(string? value, bool isMixed)
@@ -677,20 +786,35 @@ internal sealed class CadPropertyInspectorController : IDisposable
         return combo;
     }
 
-    private Control CreateColorEditor(PropertySlot slot, object? value)
+    private Control CreateColorEditor(
+        PropertySlot slot,
+        object? value,
+        bool showByLayerText = true)
     {
-        var drawing = value is DrawingColor color
-            ? color
-            : DrawingColor.LightGray;
+        var entityTargets = slot.Targets
+            .OfType<CadEntity>()
+            .ToArray();
+        var byLayer =
+            entityTargets.Length > 0 &&
+            entityTargets.All(entity => entity.ColorByLayer);
+        var drawing =
+            byLayer && entityTargets.Length > 0
+                ? _workspace.Document.ResolveAppearance(
+                    entityTargets[0]).Color
+                : value is DrawingColor color
+                    ? color
+                    : DrawingColor.LightGray;
         var button = new Button
         {
-            MinHeight = 22,
+            MinHeight = CadTheme.ControlHeight,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Left,
-            Padding = new Thickness(5, 1),
+            Padding = new Thickness(4, 0),
             Background = new SolidColorBrush(ToMediaColor(drawing)),
             Foreground = ColorTextBrush(drawing),
-            Content = $"#{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
+            Content = byLayer && showByLayerText
+                ? $"{CadLanguageManager.Text("Cad.Text.ByLayer", "ByLayer")} · #{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
+                : $"#{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
         };
         button.Classes.Add("cad-compact");
         ToolTip.SetTip(
@@ -842,6 +966,27 @@ internal sealed class CadPropertyInspectorController : IDisposable
             value = null;
             return false;
         }
+    }
+
+    private void ApplyHiddenEntityProperty(
+        string propertyName,
+        object value)
+    {
+        if (_entities.Length == 0)
+            return;
+
+        if (!CadPropertyTransaction.TryApply(
+                _workspace,
+                _entities,
+                propertyName,
+                value,
+                out var error) &&
+            error is not null)
+        {
+            ShowPropertyError(error);
+        }
+
+        Rebuild();
     }
 
     private void ApplyLayer(string layerName)

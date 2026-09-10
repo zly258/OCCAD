@@ -36,7 +36,7 @@ public sealed class CadImportedShapeEntity : CadEntity
     [Category("Source"), ReadOnly(true)]
     public string SourceName => _sourceName;
 
-    [Category("Source"), ReadOnly(true)]
+    [Browsable(false)]
     public long BrepBytes => _brep.LongLength;
 
     internal override OcctShape BuildShape(OcctEngine engine)

@@ -53,7 +53,22 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
                 Context.WorkPlane.YAxis);
         }
 
+        SuppressSourcePresentation();
         Context.Preview.Show(_preview);
+    }
+
+    protected override void OnDeactivated()
+    {
+        try
+        {
+            // Remove the transient edit copy before restoring the real
+            // document presentation so the two are never visible together.
+            Context.Preview.Clear();
+        }
+        finally
+        {
+            RestoreSourcePresentation();
+        }
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)

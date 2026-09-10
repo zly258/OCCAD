@@ -353,20 +353,15 @@ public abstract class CadTool
     {
         ArgumentNullException.ThrowIfNull(commit);
 
+        // Commit while the last valid replacement preview and source
+        // suppression are still intact. If the model/history mutation fails,
+        // the Tool remains visually usable and the user can retry or cancel.
         var sources = _replacementPreviewSources.ToArray();
-        _replacementPreviewSources.Clear();
+        commit();
 
-        try
-        {
-            // Remove transient geometry without restoring the source first.
-            // This prevents a one-frame source flash between preview and commit.
-            Context.Preview.Clear();
-            commit();
-        }
-        finally
-        {
-            RestoreReplacementPreviewSources(sources);
-        }
+        _replacementPreviewSources.Clear();
+        Context.Preview.Clear();
+        RestoreReplacementPreviewSources(sources);
     }
 
     private bool MatchesReplacementPreviewSources(
@@ -550,7 +545,6 @@ public sealed class CadToolContext(CadWorkspace workspace)
     public void AddEntity(CadEntity entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
-        Preview.Clear();
         Workspace.AddEntity(entity);
     }
 }

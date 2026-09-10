@@ -796,9 +796,9 @@ public sealed partial class MainWindow
                 .RenderScaling ?? 1.0;
         var x = pointer.X / scaling;
         var y = pointer.Y / scaling;
-        const double offset = 18;
+        const double offset = 14;
         const double estimatedWidth = 240;
-        const double estimatedHeight = 36;
+        const double estimatedHeight = 30;
 
         var maxLeft = Math.Max(
             8,

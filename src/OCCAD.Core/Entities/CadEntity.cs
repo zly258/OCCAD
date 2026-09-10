@@ -50,12 +50,14 @@ public abstract class CadEntity
     }
 
     [Category("General"), DisplayName("Type"), ReadOnly(true)]
+    [CadProperty(CadValueSemantic.Text, Order = 0)]
     public string EntityType => _entityType;
 
-    [Category("General"), ReadOnly(true)]
+    [Browsable(false)]
     public Guid Id { get; private set; } = Guid.NewGuid();
 
     [Category("General")]
+    [CadProperty(CadValueSemantic.Text, Order = 10)]
     public string Name
     {
         get => _name;
@@ -67,6 +69,7 @@ public abstract class CadEntity
     }
 
     [Category("General"), ReadOnly(true)]
+    [CadProperty(CadValueSemantic.Layer, Order = 20)]
     public string Layer
     {
         get => _layer;
@@ -78,24 +81,27 @@ public abstract class CadEntity
     }
 
     [Category("Display")]
+    [CadProperty(CadValueSemantic.Boolean, Order = 70)]
     public bool Visible { get => _visible; set => SetAppearance(ref _visible, value); }
 
-    [Category("Display")]
+    [Browsable(false)]
     public bool Selectable { get => _selectable; set => SetAppearance(ref _selectable, value); }
 
-    [Category("Display")]
+    [Browsable(false)]
     public bool ColorByLayer { get => _colorByLayer; set => SetAppearance(ref _colorByLayer, value); }
 
-    [Category("Display")]
+    [Browsable(false)]
     public bool LineWidthByLayer { get => _lineWidthByLayer; set => SetAppearance(ref _lineWidthByLayer, value); }
 
-    [Category("Display")]
+    [Browsable(false)]
     public bool LineStyleByLayer { get => _lineStyleByLayer; set => SetAppearance(ref _lineStyleByLayer, value); }
 
     [Category("Display")]
+    [CadProperty(CadValueSemantic.Color, Order = 30)]
     public Color Color { get => _color; set => SetAppearance(ref _color, value); }
 
     [Category("Display")]
+    [CadProperty(CadValueSemantic.Transparency, Order = 60)]
     public double Transparency
     {
         get => _transparency;
@@ -108,6 +114,7 @@ public abstract class CadEntity
     }
 
     [Category("Display")]
+    [CadProperty(CadValueSemantic.Length, Order = 50)]
     public double LineWidth
     {
         get => _lineWidth;
@@ -119,6 +126,7 @@ public abstract class CadEntity
     }
 
     [Category("Display")]
+    [CadProperty(CadValueSemantic.Enum, Order = 40)]
     public OcctLineStyle LineStyle
     {
         get => _lineStyle;
@@ -130,7 +138,7 @@ public abstract class CadEntity
         }
     }
 
-    [Category("Display")]
+    [Browsable(false)]
     public OcctDisplayMode DisplayMode
     {
         get => _displayMode;
@@ -141,13 +149,13 @@ public abstract class CadEntity
         }
     }
 
-    [Category("Transform"), ReadOnly(true)]
+    [Browsable(false)]
     public OcctPoint3d Position => _placement.Position;
 
     [Browsable(false)]
     public CadPlacement Placement => _placement;
 
-    [Category("Display")]
+    [Browsable(false)]
     public OcctMaterial Material
     {
         get => _material;

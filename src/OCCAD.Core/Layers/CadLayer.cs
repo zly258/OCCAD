@@ -48,12 +48,14 @@ public sealed class CadLayer
     }
 
     [Category("General"), ReadOnly(true)]
+    [CadProperty(CadValueSemantic.Text, Order = 0)]
     public string Name => _name;
 
     [Browsable(false)]
     public bool IsDefault => string.Equals(_name, "0", StringComparison.OrdinalIgnoreCase);
 
     [Category("Display")]
+    [CadProperty(CadValueSemantic.Color, Order = 10)]
     public Color Color
     {
         get => _color;
@@ -61,6 +63,7 @@ public sealed class CadLayer
     }
 
     [Category("Display")]
+    [CadProperty(CadValueSemantic.Length, Order = 30)]
     public double LineWidth
     {
         get => _lineWidth;
@@ -75,6 +78,7 @@ public sealed class CadLayer
     }
 
     [Category("Display")]
+    [CadProperty(CadValueSemantic.Enum, Order = 20)]
     public OcctLineStyle LineStyle
     {
         get => _lineStyle;
@@ -87,6 +91,7 @@ public sealed class CadLayer
     }
 
     [Category("State")]
+    [CadProperty(CadValueSemantic.Boolean, Order = 10)]
     public bool Visible
     {
         get => _visible;
@@ -94,6 +99,7 @@ public sealed class CadLayer
     }
 
     [Category("State")]
+    [CadProperty(CadValueSemantic.Boolean, Order = 20)]
     public bool Locked
     {
         get => _locked;

@@ -17,7 +17,7 @@ internal static class CadTheme
     public const double StatusHeight = 26.0;
     public const double SplitterThickness = 4.0;
     public const double ModelPanelWidth = 220.0;
-    public const double PropertyPanelWidth = 320.0;
+    public const double PropertyPanelWidth = 380.0;
     public const double PropertyLabelWidth = 120.0;
     public const double PropertyTitleHeight = 28.0;
     public const double PropertyRowHeight = 26.0;

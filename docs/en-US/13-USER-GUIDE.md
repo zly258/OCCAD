@@ -1,80 +1,56 @@
 # 13 User Guide
 
-## 1. Scope
+## 1. Main window
 
-This guide covers the OCCAD initial desktop release: build/run, shell, drafting, tool parameters, properties, layers, snap, grips, views, and persistence.
-
-Use [14 Feature Matrix](14-FEATURE-MATRIX.md) as the exact support reference.
-
-## 2. Build and run
-
-Windows:
-
-```powershell
-.\build.ps1
-```
-
-Linux:
-
-```bash
-./build.sh
-```
-
-If the Bridge SDK does not provide a complete portable runtime, configure `OCCT_ROOT` / `CASROOT` or the OCCT path required by the run script.
-
-## 3. Main shell
-
-The application has one classic CAD shell:
+OCCAD uses a classic CAD shell:
 
 ```text
 Menu
-Single-row Toolbar
-Active Tool Parameter Strip
+Toolbar Row 1
+Toolbar Row 2
 
 Model Tree | Viewport | Layers / Properties
 
+Fixed Tool Parameter Strip
 Operation Prompt | XY YZ XZ | SNAP ORTHO POLAR
 ```
 
-Ribbon and grouped three-row command surfaces are not part of the product baseline.
+The toolbar uses no more than two compact rows and contains only frequent commands. The complete command set remains available from Menu.
 
-## 4. Menu
+### Row 1
 
-### File
+```text
+Undo Redo | Current Layer | Top Front Right Iso Fill | Wireframe Shaded
+```
 
-New, Open, Save, Save As, Settings, Exit.
+### Row 2
 
-### Draw
+```text
+Line Polyline Rectangle Circle Arc Polygon | Box Cylinder Sphere Extrude Revolve
+```
 
-Point, Line, Polyline, Free Polygon, Regular Polygon, Rectangle, Circle, Arc, Ellipse, Spline.
+File operations and language switching stay in Menu.
 
-Circle / Arc / Ellipse / Regular Polygon construction variants are selected from submenus.
+## 2. Undo and Redo
 
-### Model
+- Toolbar: Undo / Redo;
+- `Ctrl+Z`: Undo;
+- `Ctrl+Y` or `Ctrl+Shift+Z`: Redo;
+- while a Tool is active, history commands are disabled until the command is completed or cancelled.
 
-Box, Cylinder, Cone, Frustum, Sphere, Ellipsoid, Torus, Helix, Extrude, Revolve, Sweep, Loft.
+Button state follows `CadHistory.CanUndo/CanRedo`.
 
-### View
+## 3. Views
 
-Top / Bottom / Front / Back / Left / Right, Iso NE/NW/SE/SW, Fit, Wireframe, Shaded.
+Frequent toolbar entries are Top, Front, Right, Iso, Fill, Wireframe, and Shaded.
 
-### Window
+`Fill` maps to internal action `view.fit` and fits the current model to the visible viewport. The complete orthographic and four-corner isometric set remains in the View menu.
 
-Controls visibility of Model Tree, Layers, and Properties.
+## 4. Tool parameter strip
 
-### Language
+The parameter strip is fixed immediately above the status strip and keeps stable height, so starting or leaving a Tool never changes viewport height.
 
-Switches `中文 / English`. Menu, Toolbar, parameter strip, panels, and prompts refresh and the preference is persisted.
-
-## 5. Toolbar
-
-The Toolbar is a single row of frequent commands. It may scroll horizontally when width is insufficient.
-
-The current Layer ComboBox is available from the top command area for choosing the creation layer.
-
-## 6. Tool parameter strip
-
-A Tool with `ParameterPanel` descriptors gets a visible parameter strip below the Toolbar. Tools without parameters hide the strip completely.
+When a Tool exposes parameters, real editors appear. With no parameters, the row stays present but empty.
 
 Regular Polygon example:
 
@@ -82,86 +58,68 @@ Regular Polygon example:
 Regular Polygon: Sides [6]  Mode [Inscribed]
 ```
 
-Sides accepts 3..360.
+Sides range is 3..360. Before center placement, the side count may also be typed directly and confirmed with Enter.
 
-Before placing the center, a side count can also be entered directly in the viewport and confirmed with Enter:
+Live synchronization rules:
 
-```text
-Start Regular Polygon
-→ type 8
-→ Enter
-→ place center
-→ place radius
-```
+- parameter editor changes write back to the active Tool;
+- observable Tool/Preview dimensions may refresh displayed values;
+- focused TextBox/ComboBox/CheckBox editors are not overwritten by live refresh.
 
-This creates an octagon.
+## 5. 2D drafting
 
-Existing parameterized tools such as Box, Cylinder, Cone, Frustum, Sphere, Ellipsoid, Torus, Helix, Ellipse, and Extrude use the same mechanism.
+Menu keeps the complete initial 2D set: Point, Line, Polyline, Free Polygon, Regular Polygon, Rectangle, Circle, Arc, Ellipse, and Spline.
 
-## 7. Free Polygon vs Regular Polygon
+Toolbar keeps frequent 2D commands only: Line, Polyline, Rectangle, Circle, Arc, Regular Polygon.
 
-Free Polygon is built by placing arbitrary vertices.
+### Free Polygon
 
-Regular Polygon uses:
+Specify arbitrary vertices point by point.
+
+### Regular Polygon
+
+Specify:
 
 1. side count;
 2. Inscribed/Circumscribed mode;
 3. center;
 4. radius.
 
-They are intentionally different tool semantics.
+## 6. 3D and Features
 
-## 8. Circle
+Menu keeps Box, Cylinder, Cone, Frustum, Sphere, Ellipsoid, Torus, Helix, Extrude, Revolve, Sweep, and Loft.
 
-Supported construction methods:
+Toolbar keeps frequent commands only: Box, Cylinder, Sphere, Extrude, Revolve.
 
-- Center + Radius;
-- Center + Diameter;
-- Two Points;
-- Three Points;
-- Point + Center.
+## 7. Work plane
 
-These entries reuse one Circle Tool.
+Bottom XY / YZ / XZ controls the real drafting work plane.
 
-## 9. Arc
+When switching during a Tool:
 
-Supported methods:
+- if the current stage allows it, switch immediately and refresh Snap/Tracking/Preview;
+- if the Tool owns a fixed temporary ToolPlane, step back to the nearest safe stage first, then switch;
+- already confirmed geometry is never reinterpreted onto a different plane.
 
-- Three Points;
-- Center → Start → End;
-- Start → Center → End;
-- Start → End → Center;
-- Start → End → Point;
-- Start → End → Tangent.
+## 8. Escape / Backspace / Enter
 
-## 10. Ellipse
+- `Esc`: cancel the active Tool and clear Entity / Subobject / Preselection state;
+- `Backspace`: step back the active Tool stage;
+- `Enter/Space`: submit the current valid stage or finish;
+- Preview, Snap, Tracking, and other transient state must clear after Commit/Cancel.
 
-Supported methods:
+## 9. PropertyGrid
 
-- Center + Axes;
-- Axis Endpoints + Minor Axis.
+Properties are driven by Core descriptors.
 
-## 11. Exact input
-
-Exact input is interpreted by the active Tool stage. Numeric meaning is not globally fixed; it follows the current Tool prompt/precision state.
-
-For example, Regular Polygon accepts an integer side count before center placement, then uses numeric input for radius/length-angle geometry after center placement.
-
-## 12. PropertyGrid
-
-Selecting entities populates Properties from Core descriptors.
-
-Rules:
-
-- numeric values are left aligned;
-- Layer uses a drop-down;
+- numeric editors are left aligned;
+- Layer uses ComboBox;
 - Boolean uses CheckBox;
-- Enum/Choice uses ComboBox;
-- Color uses the CAD ColorTable;
-- Measurement remains read-only;
-- categories are collapsible.
+- Enum/Choice use ComboBox;
+- Color uses OCCAD's custom ColorTable;
+- Measurement is read-only.
 
-Point / Vector / Normal use vertical component editing:
+Point / Vector / Normal use vertical input:
 
 ```text
 X  [ ... ]
@@ -169,54 +127,30 @@ Y  [ ... ]
 Z  [ ... ]
 ```
 
-`Normal` is editable for Circle / Arc / Ellipse / Rectangle / Regular Polygon through the real geometry and Undo/Redo transaction path.
+## 10. Layers
 
-## 13. Layers
+The Layers panel supports filtering, add, rename, removal of non-default layers, current layer, visibility, color, line style, line width, and locking.
 
-Layers supports filtering, creation, rename, removal of non-default layers, current layer, visibility, color, line style, line width, and lock state.
+Line Style and Line Width columns are widened so their ComboBox values remain readable; the right engineering panel is wider than the old layout.
 
 Default Layer `0` cannot be renamed or removed.
 
-## 14. Work plane
-
-The bottom strip provides XY / YZ / XZ work-plane switches.
-
-If an active Tool does not allow a plane change, OCCAD rejects the switch rather than changing geometric interpretation mid-tool.
-
-## 15. SNAP / ORTHO / POLAR
-
-The status strip provides real interaction toggles:
+## 11. SNAP / ORTHO / POLAR
 
 - SNAP: object snap;
 - ORTHO: orthogonal tracking;
 - POLAR: polar tracking.
 
-SNAP configuration includes Endpoint, Midpoint, Intersection, Center, Perpendicular, Tangent, Quadrant, Extension, Insertion, Node, Apparent Intersection, and Nearest.
+Snap, Grip, Preview, Tracking, and Selection Window are transient and are not serialized into Document/History.
 
-## 16. Grip and selection
+## 12. Save and Open
 
-Initial infrastructure includes Replace / Add / Remove / Toggle, Window / Crossing Selection, Entity/Subobject Selection, Preselection, Grip / Hot Grip, and Grip Edit Preview/Commit.
+Save/Open restores formal Document / Entity / Layer / Feature state. Preview, snap markers, grip markers, tracking guides, and other transient state are not persisted.
 
-Grip, Snap, Preview, Tracking, and Selection Window graphics are transient and do not enter Document/History.
+## 13. Definition of complete
 
-## 17. Status strip
+Source existence or Action registration is not enough. Validate the real chain:
 
-The left side shows the current operation prompt; the right side contains XY/YZ/XZ and SNAP/ORTHO/POLAR.
+`entry → parameters → prompt → preview → exact input → commit → property → grip/snap → save/open`
 
-The prompt region may be blank while idle.
-
-OCCAD does not permanently show Ready, Command: Ready, version text, XYZ coordinates, or a second command input.
-
-## 18. Save/Open
-
-Save and reopen should restore formal Document/Entity/Layer/Feature state.
-
-Preview, snap markers, grip markers, and tracking guides must never be persisted.
-
-## 19. Definition of complete
-
-A feature is not complete merely because an Entity/Tool/Action exists in source. Validate the real path:
-
-`Entry → Parameters → Prompt → Preview → Exact Input → Commit → Property → Grip/Snap → Save/Open`
-
-Commit/Cancel must also leave no preview or native transient residue.
+and verify that Commit/Cancel leaves no Preview or native transient residue.

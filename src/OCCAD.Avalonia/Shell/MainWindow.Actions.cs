@@ -54,6 +54,24 @@ public sealed partial class MainWindow
 
         if ((modifiers & KeyModifiers.Control) != 0)
         {
+            if (_workspace.Tools.ActiveTool is null &&
+                e.Key == Key.Z &&
+                (modifiers & KeyModifiers.Shift) == 0)
+            {
+                _workspace.History.Undo();
+                e.Handled = true;
+                return;
+            }
+
+            if (_workspace.Tools.ActiveTool is null &&
+                (e.Key == Key.Y ||
+                 e.Key == Key.Z && (modifiers & KeyModifiers.Shift) != 0))
+            {
+                _workspace.History.Redo();
+                e.Handled = true;
+                return;
+            }
+
             if (e.Key == Key.N)
             {
                 _ = NewDocumentAsync();

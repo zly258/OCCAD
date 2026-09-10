@@ -1,108 +1,64 @@
 # 13 用户指南
 
-## 1. 适用范围
+## 1. 主界面
 
-本文说明 OCCAD 初版桌面应用的构建、界面、绘图、参数输入、属性、图层、捕捉、夹点、视图和保存流程。
-
-完整支持状态以 [14 初版功能矩阵](14-FEATURE-MATRIX.md) 为准。
-
-## 2. 构建与运行
-
-Windows：
-
-```powershell
-.\build.ps1
-```
-
-Linux：
-
-```bash
-./build.sh
-```
-
-如 Bridge SDK 未提供完整 portable runtime，需要配置 `OCCT_ROOT` / `CASROOT` 或运行脚本要求的 OCCT 路径。
-
-## 3. 主界面
-
-当前只有一套经典 CAD Shell：
+OCCAD 当前使用经典 CAD Shell：
 
 ```text
 Menu
-Single-row Toolbar
-Active Tool Parameter Strip
+Toolbar Row 1
+Toolbar Row 2
 
 Model Tree | Viewport | Layers / Properties
 
+Fixed Tool Parameter Strip
 Operation Prompt | XY YZ XZ | SNAP ORTHO POLAR
 ```
 
-顶部不再使用 Ribbon 或三行分组命令区。
+Toolbar 最多两行，只放高频命令；完整命令仍通过 Menu 进入。
 
-## 4. Menu
+### 第一行
 
-### 文件
+```text
+撤销 重做 | 当前图层 | 上 前 右 轴测 充满 | 线框 着色
+```
 
-- 新建
-- 打开
-- 保存
-- 另存为
-- 设置
-- 退出
+### 第二行
 
-### 绘图
+```text
+直线 多段线 矩形 圆 圆弧 正多边形 | 长方体 圆柱体 球体 拉伸 旋转
+```
 
-- 点
-- 直线
-- 多段线
-- 自由多边形
-- 正多边形
-- 矩形
-- 圆
-- 圆弧
-- 椭圆
-- 样条
+文件操作和语言切换留在 Menu，不占用 Toolbar。
 
-Circle / Arc / Ellipse / Regular Polygon 的不同绘制方式通过二级菜单选择。
+## 2. 撤销与重做
 
-### 建模
+- Toolbar：撤销 / 重做；
+- `Ctrl+Z`：撤销；
+- `Ctrl+Y` 或 `Ctrl+Shift+Z`：重做；
+- 当前存在活动 Tool 时，撤销/重做暂时禁用，先完成或取消当前命令。
 
-- Box
-- Cylinder
-- Cone
-- Frustum
-- Sphere
-- Ellipsoid
-- Torus
-- Helix
-- Extrude
-- Revolve
-- Sweep
-- Loft
+按钮状态与 `CadHistory.CanUndo/CanRedo` 实时联动。
 
-### 视图
+## 3. 视图
 
-- Top / Bottom / Front / Back / Left / Right
-- Iso NE / NW / SE / SW
-- Fit
-- Wireframe / Shaded
+常用 Toolbar 入口：
 
-### 窗口
+- 上；
+- 前；
+- 右；
+- 轴测；
+- 充满；
+- 线框；
+- 着色。
 
-控制 Model Tree、Layers、Properties 的显示。
+“充满”对应内部 `view.fit`，用于让当前模型填充可视区域。完整正交视图和四个轴测方向仍可在“视图”Menu 中选择。
 
-### 语言
+## 4. Tool 参数条
 
-切换 `中文 / English`。切换后 Menu、Toolbar、参数条、Panel 和提示会刷新，并保存语言偏好。
+参数条固定在底部状态栏上方，始终保持稳定高度，因此启动或退出 Tool 不会让 Viewport 上下跳动。
 
-## 5. Toolbar
-
-Toolbar 只保留高频入口，为单行布局。空间不足时可横向滚动。
-
-当前图层 ComboBox 位于工具栏中，用于切换当前创建图层。
-
-## 6. Tool 参数条
-
-带参数的 Tool 启动后，Toolbar 下方会出现参数条；Tool 无参数时整条隐藏。
+有参数时显示真实参数编辑器；无参数时该行内容为空。
 
 例如正多边形：
 
@@ -110,90 +66,68 @@ Toolbar 只保留高频入口，为单行布局。空间不足时可横向滚动
 正多边形： 边数 [6]  方式 [内接]
 ```
 
-边数允许 3~360。
+边数允许 3~360。在指定圆心之前也可以直接键入边数并回车。
 
-在指定圆心之前，也可以直接在 Viewport 输入边数并回车。例如：
+参数联动规则：
 
-```text
-启动正多边形
-→ 输入 8
-→ Enter
-→ 指定圆心
-→ 指定半径
-```
+- 修改参数条 → 写回当前 Tool；
+- Tool/Preview 的实际尺寸变化 → 可反向刷新参数栏；
+- 正在输入或下拉选择的控件不会被实时刷新覆盖。
 
-得到八边形。
+## 5. 绘图
 
-Box、Cylinder、Cone、Frustum、Sphere、Ellipsoid、Torus、Helix、Ellipse、Extrude 等已有参数 Tool 使用同一参数机制。
+Menu 中保留完整二维入口：点、直线、多段线、自由多边形、正多边形、矩形、圆、圆弧、椭圆、样条。
 
-## 7. 自由多边形与正多边形
+Toolbar 只保留高频二维：直线、多段线、矩形、圆、圆弧、正多边形。
 
 ### 自由多边形
 
-逐点指定任意顶点，形成任意闭合 Polygon。
+逐点指定任意顶点形成 Polygon。
 
 ### 正多边形
 
-指定：
+依次确定：
 
 1. 边数；
-2. 内接/外切模式；
+2. 内接/外切；
 3. 圆心；
 4. 半径。
 
-两者是不同的 Tool 语义，不应混用。
+## 6. 三维与 Feature
 
-## 8. 圆
+Menu 中保留 Box、Cylinder、Cone、Frustum、Sphere、Ellipsoid、Torus、Helix、Extrude、Revolve、Sweep、Loft。
 
-支持：
+Toolbar 只保留高频：长方体、圆柱体、球体、拉伸、旋转。
 
-- 圆心 + 半径；
-- 圆心 + 直径；
-- 两点；
-- 三点；
-- 点 + 圆心。
+## 7. 工作平面
 
-这些入口复用同一个 Circle Tool，不复制几何实现。
+底部 XY / YZ / XZ 是真实绘图工作平面。
 
-## 9. 圆弧
+绘图过程中切换工作平面时：
 
-支持：
+- 如果当前阶段允许切换，立即切换并刷新 Snap/Tracking/Preview；
+- 如果当前 Tool 使用 fixed temporary ToolPlane，系统先 StepBack 到最近可安全切换的阶段，再切换；
+- 不允许把已经确认的几何阶段强行解释到另一个平面。
 
-- 三点；
-- 圆心 → 起点 → 终点；
-- 起点 → 圆心 → 终点；
-- 起点 → 终点 → 圆心；
-- 起点 → 终点 → 弧上点；
-- 起点 → 终点 → 切向。
+## 8. ESC / Backspace / Enter
 
-## 10. 椭圆
+- `Esc`：取消当前 Tool，同时清空 Entity / Subobject / Preselection；
+- `Backspace`：回退当前 Tool 阶段；
+- `Enter/Space`：提交当前有效输入或完成 Tool；
+- Commit/Cancel 后 Preview、Snap、Tracking 等 transient 必须清理。
 
-支持：
-
-- 中心 + 长短轴；
-- 轴端点 + 短轴。
-
-## 11. 精确输入
-
-绘图时，精确输入由当前 Tool 阶段解释。数字含义不是全局固定的，而是跟随 Tool 当前 Prompt/Precision 状态。
-
-例如正多边形在圆心前输入整数代表边数，圆心后则进入半径/长度角度输入阶段。
-
-## 12. PropertyGrid
+## 9. PropertyGrid
 
 选择实体后，右侧 Properties 显示 Core Descriptor 属性。
 
-规则：
-
-- 数值左对齐；
+- Numeric 左对齐；
 - Layer 使用下拉；
 - Boolean 使用勾选；
 - Enum/Choice 使用下拉；
-- Color 使用 ColorTable；
-- Measurement 只读；
-- 分类可折叠。
+- Color 使用自定义 ColorTable；
+- Measurement 只读。
 
-Point / Vector / Normal 为三行输入：
+Point / Vector / Normal 使用三行：
 
 ```text
 X  [ ... ]
@@ -201,81 +135,27 @@ Y  [ ... ]
 Z  [ ... ]
 ```
 
-Circle / Arc / Ellipse / Rectangle / Regular Polygon 的 `Normal` 可以修改，并走真实几何与 Undo/Redo 事务路径。
+## 10. Layers
 
-## 13. Layers
+Layers 面板支持过滤、新建、重命名、删除非默认层、当前层、显示/隐藏、颜色、线型、线宽和锁定。
 
-Layers 面板支持：
-
-- 过滤；
-- 新建；
-- 重命名；
-- 删除非默认层；
-- 当前层；
-- 显示/隐藏；
-- 颜色；
-- 线型；
-- 线宽；
-- 锁定。
+线型与线宽列已经加宽，ComboBox 应能显示完整值；右侧工程属性区整体也比旧布局更宽。
 
 默认 Layer `0` 不允许删除或重命名。
 
-## 14. 工作平面
-
-底部：
-
-- XY
-- YZ
-- XZ
-
-用于切换绘图工作平面。
-
-活动 Tool 不允许切换时，系统会拒绝切换而不是中途改变几何解释。
-
-## 15. SNAP / ORTHO / POLAR
-
-状态栏保留三个真实交互开关：
+## 11. SNAP / ORTHO / POLAR
 
 - SNAP：对象捕捉；
 - ORTHO：正交跟踪；
 - POLAR：极轴跟踪。
 
-SNAP 菜单可配置 Endpoint、Midpoint、Intersection、Center、Perpendicular、Tangent、Quadrant、Extension、Insertion、Node、Apparent Intersection、Nearest。
+Snap、Grip、Preview、Tracking、Selection Window 都属于 transient，不进入 Document/History。
 
-## 16. Grip / Selection
+## 12. 保存与打开
 
-初版基础设施包括：
+保存后再次打开，应恢复正式 Document / Entity / Layer / Feature 状态。Preview、Snap marker、Grip marker、Tracking guide 等 transient 不进入持久化。
 
-- Replace / Add / Remove / Toggle；
-- Window / Crossing Selection；
-- Entity / Subobject Selection；
-- Preselection；
-- Grip / Hot Grip；
-- Grip Edit Preview / Commit。
-
-Grip、Snap、Preview、Tracking、Selection Window 都属于 transient，不进入 Document/History。
-
-## 17. 状态栏
-
-底部左侧显示当前操作提示，右侧显示 XY/YZ/XZ 和 SNAP/ORTHO/POLAR。
-
-空闲时提示区可以为空。
-
-不显示永久：
-
-- Ready；
-- Command: Ready；
-- 版本信息；
-- 永久 XYZ 坐标；
-- 第二个命令输入框。
-
-## 18. 保存与打开
-
-保存后再次打开，应恢复正式 Document/Entity/Layer/Feature 状态。
-
-Preview、Snap marker、Grip marker、Tracking guide 等 transient 不应被持久化。
-
-## 19. 功能是否“完成”的判断
+## 13. 功能是否“完成”的判断
 
 不能因为源码中存在 Entity/Tool/Action 就认为功能完成。必须实际验证：
 

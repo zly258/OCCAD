@@ -145,6 +145,9 @@ internal static class CadCoreRegistration
         tools.Register<SweepTool>("sweep");
         tools.Register<LoftTool>("loft");
 
+        // Initial high-frequency edit surface.
+        tools.Register<MoveTool>("move");
+
         return tools;
     }
 
@@ -156,6 +159,7 @@ internal static class CadCoreRegistration
         RegisterViewActions(actions, workspace);
         Register2DActions(actions, workspace);
         Register3DActions(actions, workspace);
+        RegisterEditActions(actions, workspace);
     }
 
     private static void RegisterViewActions(CadActionManager actions, CadWorkspace workspace)
@@ -227,6 +231,12 @@ internal static class CadCoreRegistration
         actions.Register(new CadToolAction(workspace, "feature.revolve", "Revolve", "revolve"));
         actions.Register(new CadToolAction(workspace, "feature.sweep", "Sweep", "sweep"));
         actions.Register(new CadToolAction(workspace, "feature.loft", "Loft", "loft"));
+    }
+
+    private static void RegisterEditActions(CadActionManager actions, CadWorkspace workspace)
+    {
+        actions.Register(new CadToolAction(workspace, "edit.move", "Move", "move"));
+        actions.Register(new CadDeleteSelectionAction(workspace));
     }
 
     private static void RegisterToolVariant(

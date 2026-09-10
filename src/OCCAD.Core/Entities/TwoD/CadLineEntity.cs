@@ -85,7 +85,7 @@ public sealed class CadLineEntity : CadEntity
                 this,
                 1,
                 Midpoint(_start, _end),
-                Kind: CadGripKind.Center),
+                Kind: CadGripKind.Midpoint),
             new(
                 this,
                 2,

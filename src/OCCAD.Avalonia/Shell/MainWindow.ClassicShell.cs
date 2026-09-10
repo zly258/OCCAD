@@ -32,6 +32,8 @@ public sealed partial class MainWindow
     private MenuItem? _propertiesPanelMenuItem;
     private MenuItem? _chineseMenuItem;
     private MenuItem? _englishMenuItem;
+    private Button? _undoToolbarButton;
+    private Button? _redoToolbarButton;
 
     internal void ApplyClassicShell()
     {
@@ -208,7 +210,7 @@ public sealed partial class MainWindow
             Header = Label("视图", "View"),
             ItemsSource = new object[]
             {
-                ActionMenu("view.fit", Label("适合窗口", "Fit")),
+                ActionMenu("view.fit", Label("充满", "Fill")),
                 new Separator(),
                 ActionMenu("view.top", Label("上", "Top")),
                 ActionMenu("view.bottom", Label("下", "Bottom")),
@@ -259,44 +261,107 @@ public sealed partial class MainWindow
 
     private Control BuildClassicToolbar()
     {
-        var strip = new StackPanel
+        var firstRow = ToolbarRow();
+        _undoToolbarButton = UtilityToolbar(Label("撤销", "Undo"), () => ExecuteHistoryAsync(undo: true));
+        _redoToolbarButton = UtilityToolbar(Label("重做", "Redo"), () => ExecuteHistoryAsync(undo: false));
+        firstRow.Children.Add(_undoToolbarButton);
+        firstRow.Children.Add(_redoToolbarButton);
+        firstRow.Children.Add(ToolbarSeparator());
+
+        _layerCombo.Width = 160;
+        _layerCombo.Margin = new Thickness(0);
+        ToolTip.SetTip(_layerCombo, Label("当前图层", "Current Layer"));
+        firstRow.Children.Add(_layerCombo);
+        firstRow.Children.Add(ToolbarSeparator());
+
+        firstRow.Children.Add(ActionToolbar("view.top", Label("上", "Top")));
+        firstRow.Children.Add(ActionToolbar("view.front", Label("前", "Front")));
+        firstRow.Children.Add(ActionToolbar("view.right", Label("右", "Right")));
+        firstRow.Children.Add(ActionToolbar("view.iso.ne", Label("轴测", "Iso")));
+        firstRow.Children.Add(ActionToolbar("view.fit", Label("充满", "Fill")));
+        firstRow.Children.Add(ToolbarSeparator());
+        firstRow.Children.Add(ActionToolbar("display.wireframe", Label("线框", "Wireframe")));
+        firstRow.Children.Add(ActionToolbar("display.shaded", Label("着色", "Shaded")));
+
+        var secondRow = ToolbarRow();
+        secondRow.Children.Add(ActionToolbar("draw.line", Label("直线", "Line")));
+        secondRow.Children.Add(ActionToolbar("draw.polyline", Label("多段线", "Polyline")));
+        secondRow.Children.Add(ActionToolbar("draw.rectangle", Label("矩形", "Rectangle")));
+        secondRow.Children.Add(ActionToolbar("draw.circle.centerradius", Label("圆", "Circle")));
+        secondRow.Children.Add(ActionToolbar("draw.arc.threepoints", Label("圆弧", "Arc")));
+        secondRow.Children.Add(ActionToolbar("draw.regularpolygon.inscribed", Label("正多边形", "Polygon")));
+        secondRow.Children.Add(ToolbarSeparator());
+        secondRow.Children.Add(ActionToolbar("solid.box", Label("长方体", "Box")));
+        secondRow.Children.Add(ActionToolbar("solid.cylinder", Label("圆柱体", "Cylinder")));
+        secondRow.Children.Add(ActionToolbar("solid.sphere", Label("球体", "Sphere")));
+        secondRow.Children.Add(ActionToolbar("feature.extrude", Label("拉伸", "Extrude")));
+        secondRow.Children.Add(ActionToolbar("feature.revolve", Label("旋转", "Revolve")));
+
+        var host = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            Spacing = 0
+        };
+        host.Children.Add(ToolbarScroll(firstRow));
+        host.Children.Add(ToolbarScroll(secondRow));
+        return host;
+    }
+
+    private static StackPanel ToolbarRow() =>
+        new()
         {
             Orientation = Orientation.Horizontal,
             Spacing = 4,
-            Margin = new Thickness(4, 3),
+            Margin = new Thickness(4, 2),
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        strip.Children.Add(UtilityToolbar(Label("新建", "New"), async () => await NewDocumentAsync()));
-        strip.Children.Add(UtilityToolbar(Label("打开", "Open"), async () => await OpenDocumentAsync()));
-        strip.Children.Add(UtilityToolbar(Label("保存", "Save"), async () => await SaveDocumentAsync(saveAs: false)));
-
-        strip.Children.Add(ActionToolbar("draw.line", Label("直线", "Line")));
-        strip.Children.Add(ActionToolbar("draw.polyline", Label("多段线", "Polyline")));
-        strip.Children.Add(ActionToolbar("draw.regularpolygon.inscribed", Label("正多边形", "Polygon")));
-        strip.Children.Add(ActionToolbar("draw.rectangle", Label("矩形", "Rectangle")));
-        strip.Children.Add(ActionToolbar("draw.circle.centerradius", Label("圆", "Circle")));
-        strip.Children.Add(ActionToolbar("draw.arc.threepoints", Label("圆弧", "Arc")));
-
-        strip.Children.Add(ActionToolbar("solid.box", Label("长方体", "Box")));
-        strip.Children.Add(ActionToolbar("solid.cylinder", Label("圆柱体", "Cylinder")));
-        strip.Children.Add(ActionToolbar("feature.extrude", Label("拉伸", "Extrude")));
-        strip.Children.Add(ActionToolbar("feature.revolve", Label("旋转", "Revolve")));
-        strip.Children.Add(ActionToolbar("view.fit", Label("适合", "Fit")));
-
-        _layerCombo.Width = 150;
-        _layerCombo.Margin = new Thickness(4, 0, 0, 0);
-        ToolTip.SetTip(_layerCombo, Label("当前图层", "Current Layer"));
-        strip.Children.Add(_layerCombo);
-
-        strip.Children.Add(BuildLanguagePicker());
-
-        return new ScrollViewer
+    private static ScrollViewer ToolbarScroll(Control content) =>
+        new()
         {
-            Content = strip,
+            Content = content,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
+
+    private static Border ToolbarSeparator() =>
+        new()
+        {
+            Width = 1,
+            Height = 20,
+            Margin = new Thickness(4, 2),
+            Background = CadTheme.Border,
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false
+        };
+
+    private async Task ExecuteHistoryAsync(bool undo)
+    {
+        if (_workspace.Tools.ActiveTool is not null)
+            return;
+
+        try
+        {
+            _ = undo ? _workspace.History.Undo() : _workspace.History.Redo();
+            ShowStatusFeedback(null);
+        }
+        catch (Exception exception)
+            when (exception is not OutOfMemoryException and
+                  not StackOverflowException and
+                  not AccessViolationException)
+        {
+            CadDiagnostics.Report(exception, undo ? "Undo" : "Redo");
+            ShowStatusFeedback(exception.GetBaseException().Message);
+            await CadMessageDialog.ShowAsync(
+                this,
+                Label("历史操作失败", "History operation failed"),
+                exception.GetBaseException().Message,
+                kind: CadMessageDialogKind.Error);
+        }
+        finally
+        {
+            RefreshClassicShellActions();
+        }
     }
 
     private void BuildClassicToolOptionsSurface()
@@ -349,9 +414,8 @@ public sealed partial class MainWindow
                 };
                 check.IsCheckedChanged += (_, _) =>
                 {
-                    if (check.IsChecked is not { } value)
-                        return;
-                    ApplyToolParameter(tool, parameter.Id, value ? "true" : "false");
+                    if (check.IsChecked is { } value)
+                        ApplyToolParameter(tool, parameter.Id, value ? "true" : "false");
                 };
                 return check;
             }
@@ -558,32 +622,6 @@ public sealed partial class MainWindow
         return item;
     }
 
-    private ComboBox BuildLanguagePicker()
-    {
-        var combo = new ComboBox
-        {
-            Width = 96,
-            Margin = new Thickness(4, 0, 0, 0),
-            ItemsSource = new[] { "中文", "English" },
-            SelectedIndex = CadLanguageManager.CurrentLanguage.Equals(
-                "zh-CN", StringComparison.OrdinalIgnoreCase) ? 0 : 1
-        };
-        ToolTip.SetTip(combo, Label("界面语言", "Language"));
-        combo.SelectionChanged += (_, _) =>
-        {
-            if (combo.SelectedIndex < 0)
-                return;
-
-            var language = combo.SelectedIndex == 0 ? "zh-CN" : "en-US";
-            if (CadLanguageManager.CurrentLanguage.Equals(language, StringComparison.OrdinalIgnoreCase))
-                return;
-
-            CadLanguageManager.Apply(language);
-            SaveInteractionPreferences();
-        };
-        return combo;
-    }
-
     private void TrackClassicAction(string id, Control control)
     {
         if (!_classicActionControls.TryGetValue(id, out var controls))
@@ -603,7 +641,32 @@ public sealed partial class MainWindow
                 control.IsEnabled = enabled;
         }
 
+        RefreshClassicHistoryButtons();
         RefreshClassicPanelState();
+    }
+
+    private void RefreshClassicHistoryButtons()
+    {
+        var neutral = _workspace.Tools.ActiveTool is null;
+        if (_undoToolbarButton is not null)
+        {
+            _undoToolbarButton.IsEnabled = neutral && _workspace.History.CanUndo;
+            ToolTip.SetTip(
+                _undoToolbarButton,
+                _workspace.History.CanUndo && !string.IsNullOrWhiteSpace(_workspace.History.UndoName)
+                    ? $"{Label("撤销", "Undo")}: {_workspace.History.UndoName}"
+                    : Label("撤销", "Undo"));
+        }
+
+        if (_redoToolbarButton is not null)
+        {
+            _redoToolbarButton.IsEnabled = neutral && _workspace.History.CanRedo;
+            ToolTip.SetTip(
+                _redoToolbarButton,
+                _workspace.History.CanRedo && !string.IsNullOrWhiteSpace(_workspace.History.RedoName)
+                    ? $"{Label("重做", "Redo")}: {_workspace.History.RedoName}"
+                    : Label("重做", "Redo"));
+        }
     }
 
     private void RefreshClassicPanelState()

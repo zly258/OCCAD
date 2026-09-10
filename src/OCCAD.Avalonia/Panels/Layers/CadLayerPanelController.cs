@@ -198,14 +198,14 @@ internal sealed class CadLayerPanelController : IDisposable
 
     private static void ConfigureLayerColumns(Grid grid)
     {
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(26)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(28)));
         grid.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(28)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(32)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(56)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(48)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(28)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(30)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(36)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(84)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(70)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(30)));
     }
 
     private static void AddHeader(

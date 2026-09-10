@@ -2,21 +2,21 @@
 
 ## 1. Unified chain
 
-Mouse, keyboard, Precision, Snap, Tracking, and Grip input flow through Workspace and the active Tool. MainWindow only triggers commands and presents state; it does not directly mutate Entity geometry.
+Mouse, keyboard, Precision, Snap, Tracking, and Grip input flow through Workspace and the active Tool. MainWindow triggers commands and presents state; it does not directly mutate Entity geometry.
 
 ```text
-Toolbar / Shortcut / Direct Input
-       ↓
+Menu / Toolbar / Shortcut / Direct Input
+              ↓
 CadActionManager / CadCommandManager
-       ↓
-Action / CadTool / PrecisionInput
-       ↓
-ResolvePoint / Tool State / Preview
-       ↓
-Document / History Commit
+              ↓
+CadToolManager / CadTool / Precision Input
+              ↓
+ResolvePoint / WorkPlane / Tool State / Preview
+              ↓
+Transaction / Document / History
 ```
 
-The initial release has no permanent command-input box. The active Tool prompt is shown in the bottom status strip. Exact numeric and coordinate input remains available through transient direct keyboard entry while a Tool is active.
+The initial release has no permanent command-input box. The active Tool prompt is shown in the bottom status strip, and Tool parameters live in the fixed strip immediately above it.
 
 ## 2. Tool lifecycle
 
@@ -29,50 +29,87 @@ Rules:
 - activating a new Tool cancels the current Tool first;
 - activation clears Preselection, Subobject state, and Grip state;
 - every Tool owns its transient/preview lifecycle;
-- Esc = Cancel; when transient direct text exists, the input surface may clear that text before command cancellation;
-- Backspace = StepBack when no transient direct text is being edited;
-- Enter/Space use the shared ToolManager acceptance/finish rule; Enter commits a pending direct-input value first;
+- Backspace = StepBack;
+- Enter/Space use the shared ToolManager acceptance/finish rule;
 - right-click finishes when meaningful and otherwise cancels;
 - Complete/Cancel must restore neutral interaction state;
 - Point steps never reuse stale/off-viewport pointer coordinates.
 
-These behavior semantics are aligned with the OCCTBIM-Source Tool/ToolManager interaction model. OCCAD keeps its stricter Transaction, transient ownership, observer isolation, and Neutral State contracts rather than copying the older viewer-driven architecture.
+### Escape
+
+`Esc` is an application-level CAD cancel operation, not only a local Tool key handler:
+
+```text
+Cancel active Tool
+      ↓
+Clear Entity Selection
+Clear Subobject Selection
+Clear Preselection
+      ↓
+Clear Snap / Tracking
+      ↓
+Return focus to Viewport
+```
+
+The final semantics must be the same whether focus is in the viewport, a Tool parameter editor, or another normal main-window control.
 
 ## 3. Direct precision input
 
 Removing the permanent CommandLine must never remove precise CAD input.
 
-When a Tool is active, keyboard text is collected by the lightweight direct-input surface and displayed inline with the bottom Tool prompt. The UI does not parse geometry itself; it forwards the final text to the shared `CadCommandManager`, which delegates to `CadToolManager` and `CadPrecisionInputManager`.
+When a Tool is active, keyboard text may be collected by the lightweight transient direct-input path and displayed with the current operation prompt. The UI does not own geometry parsing; confirmed text is delegated to the shared command/precision pipeline.
 
-Supported Core forms include:
+Supported Core forms include finite length/angle/factor values, coordinate input, polar input, `parameter=value` Tool parameters, and command options supported by the active Tool.
 
-- finite length / angle / factor values when the active stage accepts them;
-- absolute or relative point text such as coordinate pairs/triples;
-- polar point input supported by `CadCoordinateInputParser`;
-- `parameter=value` Tool parameters;
-- existing command options such as Offset / Finish / StepBack where the active Tool supports them.
-
-Direct input is transient state only. It is cleared when the Tool or Tool stage changes and never becomes Document, History, or Entity state by itself.
+Direct input is transient state only. It never becomes Document, History, or Entity state by itself.
 
 ## 4. Work plane
 
 `WorkPlane` is the formal geometric plane for Tool point input, not a decorative UI guide.
 
-- a Tool may lock a work plane for a stage;
-- users cannot override a Tool-fixed plane;
-- switching XY/YZ/XZ clears Snap/Tracking and rebuilds Preview;
-- Tool completion/cancel must call the equivalent `EndToolPlane()` cleanup;
+XY / YZ / XZ requests must go through `CadToolManager.TryChangeDrawingPlane()` so buttons, shortcuts, and future integrations share one policy.
+
+Rules:
+
+- when there is no fixed temporary construction plane, apply the requested preset immediately;
+- when the active Tool is in a fixed temporary construction-plane stage, Core steps back through `StepBackCurrent()` to the nearest stage that permits a plane change, then applies the preset;
+- a locked user plane or fixed Grip plane still blocks the request;
+- changing the plane clears Snap and Tracking;
+- the active Tool receives `OnWorkPlaneChanged()` and rebuilds preview from the last valid pointer when possible;
+- planar Tools that cache Normal/XAxis/YAxis must refresh those cached vectors;
+- Tool completion/cancel ends the Tool plane;
 - active work-plane state must not leak after Tool completion.
 
-## 5. Point resolution
+A fixed height/local-axis construction stage must never be silently rotated in place because that would mix already accepted points with later points from a different coordinate frame.
+
+## 5. Tool parameters and live values
+
+`CadTool.ParameterPanel` is the single source for the parameter UI.
+
+Bidirectional flow:
+
+```text
+Editor commit → tool.TrySetParameter() → Tool state → Preview
+Preview/Tool update → measurable actual value → Editor display
+```
+
+Requirements:
+
+- UI code does not mutate Tool private fields;
+- real preview dimensions take precedence over provisional mouse text for display;
+- a focused TextBox/ComboBox/CheckBox is never replaced by automatic refresh;
+- the parameter strip reserves a fixed bottom row and never resizes the viewport when Tool parameters appear/disappear;
+- ToolChanged/ToolUpdated rebuild UI from the current Tool instead of preserving a second parameter-state model.
+
+## 6. Point resolution
 
 Unified point-resolution chain:
 
-`Screen → View Ray / Active WorkPlane → Object Snap → Tracking → Axis/Angle/Length Constraint → Final World Point`
+`Screen → View Ray / Effective WorkPlane → Object Snap → Tracking → Axis/Angle/Length Constraint → Final World Point`
 
 Tools do not reimplement XY projection, polar math, or lock precedence.
 
-## 6. Snap / selection
+## 7. Snap / selection
 
 Entities provide semantic Snap candidates; SnapManager owns candidate collection, screen tolerance, depth, type priority, hysteresis, and temporary modes.
 
@@ -82,9 +119,10 @@ Selection, Preselection, and SubobjectSelection remain separate:
 - right-to-left box = Crossing;
 - hidden, locked, or non-selectable entities do not enter formal Selection;
 - activating a normal drawing Tool clears Grip state;
-- Tool completion restores Grips from current Selection.
+- Tool completion restores Grips from current Selection;
+- `Esc` explicitly clears Entity, Subobject, and Preselection state.
 
-## 7. Grip transaction
+## 8. Grip transaction
 
 Grip editing is preview-transactional:
 
@@ -92,31 +130,29 @@ Grip editing is preview-transactional:
 
 PointerMove never mutates the persistent Entity.
 
-## 8. Preview / commit
+## 9. Preview / commit
 
 Preview never belongs to Document, Selection, or History.
 
-Normal commit:
+Create-style commit boundary:
 
-`Validate → Document/History mutation → Clear Preview → Complete Tool`
+`Validate → Clear/Suppress Preview → Persistent mutation → Complete Tool → Install History → Redraw`
 
-Pointer-driven intermediate geometry is provisional. `ArgumentException`, `InvalidOperationException`, `ArithmeticException`, and OCCT `OcctException` failures produced by an intermediate preview sample clear Preview/Snap/Tracking and keep the active Tool alive. Final commit failures are not hidden or reported as successful.
+If the persistent mutation fails while the Tool can still continue, the last valid preview may be restored. Once the Tool has completed, the system must never manufacture a state where committed geometry and an obsolete preview coexist.
 
-This prevents Revolve, Sweep, Loft, and similar tools from terminating merely because a temporary mouse position is geometrically unsolvable.
+Pointer-driven intermediate geometry is provisional. `ArgumentException`, `InvalidOperationException`, `ArithmeticException`, and preview-stage `OcctException` failures may clear Preview/Snap/Tracking and keep the active Tool alive. Final commit failures are propagated and never reported as successful.
 
-## 9. Entity / Tool / Action consistency
+## 10. Entity / Tool / Action consistency
 
 The product surface must keep the following chain consistent:
 
-`Entity Registry ↔ Tool Registry ↔ Action Registry ↔ Toolbar ↔ Model Tree`
+`Entity Registry ↔ Tool Registry ↔ Action Registry ↔ Menu/Toolbar ↔ Model Tree`
 
 The UI and Model Tree must not maintain a second stale Entity whitelist. Internal persistence helpers such as `Path` are not ordinary user-visible model nodes.
 
-A Tool Action is executable only when the OCCT engine is initialized and the target Tool is actually registered. A visible toolbar button must never be an optimistic placeholder.
-
 The initial release intentionally does not restore Move / Copy / Rotate / Scale / Mirror / Array / Trim / Extend / Fillet / Chamfer edit commands, and the Model Tree does not expose Delete.
 
-## 10. Property / Layer
+## 11. Property / Layer
 
 Entity property edits use:
 
@@ -124,10 +160,10 @@ Entity property edits use:
 
 Layer edits follow the same Core-owned transaction rule. Direct Color / LineStyle / LineWidth edits disable the corresponding ByLayer flag, and ByLayer changes are history-recorded.
 
-## 11. Prompt / error boundaries
+## 12. Prompt / error boundaries
 
-- the current Tool prompt is shown in the bottom operation-status area;
-- pending direct keyboard text is appended to that prompt rather than displayed in a permanent command bar;
+- the current Tool prompt is shown in the bottom status area;
+- transient direct keyboard text may be shown with that prompt rather than in a permanent command bar;
 - idle prompt state is blank, with no `Ready` or `Command: Ready` text;
 - recoverable Preview failures do not raise a fatal error dialog;
 - property, layer, and file-operation failures remain explicit;

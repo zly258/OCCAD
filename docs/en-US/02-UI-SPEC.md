@@ -2,83 +2,84 @@
 
 ## 1. Single UI baseline
 
-The OCCAD initial release has one shell only: **classic CAD Menu + single-row Toolbar + fixed bottom Tool parameter strip + status strip**.
+The OCCAD initial release has one shell only: **classic CAD Menu + up to two compact Toolbar rows + a fixed bottom Tool parameter strip**.
 
 Do not restore or run in parallel:
 
 - Ribbon;
-- legacy CleanShell/Ribbon compatibility layers;
-- grouped three-row command surfaces;
+- grouped three-row command surface;
 - a second Toolbar;
 - Floating Tool Panel;
 - permanent Dynamic HUD;
 - permanent bottom Command Input;
 - placeholder commands added only for visual completeness.
 
-The UI exposes only functionality that is registered and reaches a real Core path.
+The UI exposes only functionality that reaches a real Core path.
 
 ## 2. Main window
 
 ```text
 MainWindow
-├─ Menu
-│  ├─ File
-│  ├─ Draw
-│  ├─ Model
-│  ├─ View
-│  ├─ Window
-│  └─ Language
-├─ Single-row Toolbar
+├─ Menu: File | Draw | Model | View | Window | Language
+├─ Toolbar Row 1
+│  └─ Undo / Redo | Layer | Views / Fill | Display mode
+├─ Toolbar Row 2
+│  └─ frequent 2D | frequent 3D / Feature
 ├─ Workspace
 │  ├─ Model Tree
 │  ├─ CAD Viewport
 │  └─ Layers / Properties
-├─ Fixed Tool Parameter Strip   ← fixed height; content follows active Tool
+├─ Fixed Active Tool Parameter Strip
 └─ Status Strip
    ├─ Current Operation Prompt
    └─ XY / YZ / XZ / SNAP / ORTHO / POLAR
 ```
 
-The Tool parameter strip is docked immediately above the status strip. Its row height does not change when commands start, change stage, or finish, so the viewport does not jump vertically.
+The toolbar may use one or two rows. The current baseline uses two compact high-frequency rows. The Tool parameter strip stays immediately above the status strip with stable height so the viewport does not move when tools change.
 
 ## 3. Theme rules
 
-The application uses Avalonia 12 native `FluentTheme`. OCCAD does not maintain a second global control skin.
+The application uses Avalonia 12 native `FluentTheme`. `DensityStyle.Compact` is not enabled and OCCAD does not register global Button/TextBox/ComboBox/TreeView skins.
 
-`CadTheme` may contain only:
+`CadTheme` may contain panel/property/status layout metrics, CAD-scene visuals for Viewport/Overlay/Snap/Grip, and colors or separators needed by CAD table-style surfaces.
 
-- layout metrics for panel/property/status surfaces;
-- CAD-scene colors required by Viewport, Overlay, Snap, Grip, etc.;
-- borders/spacing required by CAD table-style surfaces.
-
-Standard Button / TextBox / ComboBox / CheckBox / Menu controls use native Fluent states. Historical global classes such as `cad-input`, `cad-compact`, and `cad-primary` must not be reintroduced.
-
-The custom ColorTable remains because it is a CAD business control rather than decorative application theming.
+The custom ColorTable remains because it is a CAD business control.
 
 ## 4. Menu
 
 Top-level categories are File, Draw, Model, View, Window, and Language.
 
-Command families with multiple construction methods use submenus and reuse one Tool implementation rather than duplicating geometry logic.
+Command families with multiple construction methods use submenus and reuse shared Tool implementations. File operations and language switching remain in Menu rather than consuming high-frequency toolbar space.
 
 ## 5. Toolbar
 
-The Toolbar is one row of frequent commands; it is not a surface for flattening every command.
+The toolbar contains only frequent commands.
+
+Current recommended layout:
+
+```text
+Row 1
+Undo Redo | Current Layer | Top Front Right Iso Fill | Wireframe Shaded
+
+Row 2
+Line Polyline Rectangle Circle Arc Polygon | Box Cylinder Sphere Extrude Revolve
+```
 
 Requirements:
 
-- single row;
-- horizontal scrolling when width is insufficient;
-- no functional icons in the current phase;
+- no more than two rows;
+- horizontal scrolling is allowed per row when width is insufficient;
+- no functional icons;
 - short text labels;
-- native Button controls;
-- no forced custom background/border scheme;
-- current Layer ComboBox may appear near the end;
-- language switching may use Menu or ComboBox but must not maintain separate language state.
+- native Button / ComboBox controls;
+- do not restore New/Open/Save/Language as toolbar buttons;
+- Undo/Redo track `CadHistory.CanUndo/CanRedo`;
+- Undo/Redo are disabled while a Tool is active;
+- `view.fit` is presented to users as `Fill`.
 
-## 6. Fixed Tool parameter strip
+## 6. Active Tool parameter strip
 
-`CadTool.ParameterPanel` is the single parameter source. The surface is docked at the bottom rather than repeatedly inserted into the top shell.
+The strip is fixed above the bottom status strip. When the active Tool has no parameters, the row remains but its contents are empty, preventing viewport height changes.
 
 Descriptor mapping:
 
@@ -91,58 +92,39 @@ Choice         → ComboBox
 String         → TextBox
 ```
 
-Editors call `tool.TrySetParameter()`; UI code must not mutate Tool internals directly.
+Editors call `tool.TrySetParameter()`; UI code does not mutate Tool internals directly.
 
-Parameter synchronization is bidirectional:
+Live parameter rules:
 
-1. **UI → Tool**: confirmed edits update the active Tool and refresh preview;
-2. **Tool/Preview → UI**: measurable preview values update the editor, except an editor that currently owns focus is never overwritten.
+- editor changes write back to the active Tool;
+- observable Tool/Preview dimensions may refresh displayed values;
+- focused editors are never overwritten by live refresh;
+- Tool and language changes rebind the strip to current state.
 
-Live dimensions that must remain covered include:
+Regular Polygon example:
 
-- Circle: Radius / Diameter;
-- Rectangle: Width / Height;
-- Ellipse: Major Radius / Minor Radius;
-- Box: Length / Width / Height;
-- Cylinder: Radius / Height.
+```text
+Regular Polygon: Sides [6]  Mode [Inscribed]
+```
 
-The strip must never resize the viewport as Tool parameter availability changes.
+Sides range is 3..360. Before center placement, a side count may also be typed directly and confirmed with Enter.
 
 ## 7. Model Tree
 
-- narrow left panel;
-- native TextBox filtering;
-- native TreeView;
-- no decorative entity icons;
-- entity types come from `CadEntityRegistry`;
-- internal persistence helpers such as `Path` are hidden from normal browsing;
-- selection stays synchronized with Workspace Selection;
-- initial context menu: Properties, Show/Hide, Lock/Unlock, Rename only.
+Use a native TextBox filter and TreeView, no decorative entity icons, entity types from `CadEntityRegistry`, hidden internal persistence helpers such as `Path`, and synchronization with Workspace Selection.
 
 ## 8. Layers
 
-- upper-right panel;
 - filter/new/rename/remove use native controls;
 - default Layer cannot be renamed or removed;
 - current layer, visibility, color, line style, line width, and lock state bind to real Layer state;
+- Line Style and Line Width columns must be wide enough to display ComboBox content rather than a single clipped character;
+- the right engineering panel is widened accordingly while Name continues to consume remaining width;
 - color cells and ColorTable may retain CAD-specific visuals.
 
 ## 9. PropertyGrid
 
-PropertyGrid is driven by Core descriptors.
-
-Requirements:
-
-- Property / Value two-column layout;
-- labels and values left aligned;
-- numeric editors left aligned;
-- categories use native `Expander`;
-- mixed values are explicit;
-- Layer uses ComboBox;
-- Boolean uses CheckBox;
-- Enum/Choice uses ComboBox;
-- Color uses OCCAD ColorTable/Color Dialog;
-- Measurement remains read-only.
+PropertyGrid is driven by Core descriptors. Labels and values are left aligned; categories use native `Expander`; Layer uses ComboBox; Boolean uses CheckBox; Enum/Choice use ComboBox; Color uses OCCAD ColorTable/Color Dialog; Measurement stays read-only.
 
 Point / Vector / Normal use vertical component editing:
 
@@ -152,60 +134,22 @@ Y  [ ... ]
 Z  [ ... ]
 ```
 
-Planar `Normal` remains editable for Circle / Arc / Ellipse / Rectangle / Regular Polygon through the real geometry/transaction path.
+## 10. Viewport and views
 
-## 10. Viewport
+Dark viewport by default, lower-left triedron retained, ViewCube disabled by default, transient CAD visuals only during their lifecycle, `view.fit` presented as Fill, and Preview/transients cleared after Commit/Cancel.
 
-- dark by default;
-- lower-left triedron retained;
-- ViewCube disabled by default;
-- Snap / Grip / Preview / Tracking / Selection Window exist only during relevant lifecycles;
-- no permanent version, OCCT, Ready, or help watermark;
-- Preview/transients must be cleared after Commit/Cancel.
+## 11. Status strip
 
-## 11. Status Strip
-
-The bottom status strip contains the current operation prompt, XY / YZ / XZ, SNAP, ORTHO, and POLAR. The prompt region may be blank while idle.
-
-Do not permanently show Ready, Command: Ready, version text, XYZ coordinates, duplicated WorkPlane/Drafting captions, or another command input.
+The bottom strip contains only the current operation prompt plus XY / YZ / XZ / SNAP / ORTHO / POLAR. Do not permanently show Ready, version text, permanent coordinates, duplicated WorkPlane/Drafting captions, or another command input.
 
 ## 12. Dialogs
 
-Dialogs use native Fluent Button/TextBox/ComboBox controls. OCCAD does not maintain a separate decorative MessageBox skin system.
-
-Rules:
-
-- action captions are horizontally and vertically centered;
-- Settings label columns use a shared content-sized `Auto` width so the longest current-language label determines the label column;
-- value columns consume remaining width;
-- fixed label widths must not create large empty gaps or clip long Chinese/English text;
-- CAD business controls such as ColorTable may keep their required custom visuals.
+Dialogs use native Fluent controls. Button content is centered horizontally and vertically. Settings-style forms use an auto-sized shared label column plus a value column that consumes remaining width.
 
 ## 13. Localization
 
-- supported languages: `zh-CN` and `en-US`;
-- Action/Tool IDs never change with language;
-- UI text uses localization keys;
-- language changes refresh Menu, Toolbar, Tool parameter strip, panels, and operation prompt;
-- the parameter strip must retain a single Visual Parent during shell rebuilds;
-- the preference is persisted.
+Support `zh-CN` and `en-US`; Action/Tool IDs never change with language; language changes refresh Menu, Toolbar, parameter strip, panels, and status prompt; preference is persisted.
 
 ## 14. UI acceptance
 
-At minimum validate:
-
-1. Entity / Tool / Action registration is consistent;
-2. Menu/Toolbar entry works;
-3. Tool parameter strip remains fixed at the bottom without viewport jumps;
-4. parameter edits and real preview values stay synchronized without interrupting focused editing;
-5. prompt, preview, and exact input are correct;
-6. `Esc` cancels the Tool and clears formal selection state;
-7. XY/YZ/XZ behaves consistently in 2D and staged 3D Tools;
-8. Property editing, Snap, Grip, and Selection work correctly;
-9. long Chinese/English Settings labels size correctly and all dialog action captions are centered;
-10. Save/Open restores the result;
-11. Commit/Cancel leaves no native transient;
-12. 125% / 150% DPI layouts remain usable;
-13. actual Windows/Linux build and manual interaction validation succeed before completion is claimed.
-
-Source existence or Action registration alone does not prove product completion.
+A feature is complete only when its entry is real, required parameters are visible, Prompt/Preview/Exact Input work, Commit/Cancel return to neutral, Property editing works, Snap/Grip/Selection behave correctly, Save/Open restores formal state, no native transient remains, and actual Windows/Linux builds plus manual interaction validation succeed.

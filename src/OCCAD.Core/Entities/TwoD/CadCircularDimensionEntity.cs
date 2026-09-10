@@ -84,7 +84,7 @@ public sealed class CadCircularDimensionEntity : CadEntity
     {
         var leader = _center + _direction * (_radius + _offset);
         var side = _normal.Cross(_direction);
-        var plane = side.TryNormalize(out var yAxis)
+        CadGripWorkPlane? plane = side.TryNormalize(out var yAxis)
             ? new CadGripWorkPlane(_center, _direction, yAxis)
             : null;
         return

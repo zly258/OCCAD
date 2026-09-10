@@ -13,7 +13,7 @@ public abstract class CadDrawingTool : CadTool
 
     protected override bool CanCommitCurrentStageCore => true;
 
-    protected bool CancelOnRightClick(OcctPointerInputEventArgs input)
+    protected new bool CancelOnRightClick(OcctPointerInputEventArgs input)
     {
         if (input.Kind != OcctPointerInputKind.Pressed ||
             input.Button != OcctPointerButton.Right)
@@ -58,9 +58,10 @@ public abstract class CadDrawingTool : CadTool
         Context.Preview.Show(entity);
     }
 
-    protected void RefreshPreviewFromLastPointer()
+    protected void RefreshPreviewFromLastPointer(bool useCurrentPointer = true)
     {
-        if (!IsActive ||
+        if (!useCurrentPointer ||
+            !IsActive ||
             Context.Workspace.Tools.ActiveTool != this ||
             Context.Workspace.LastPointerPosition is not { } pointer)
             return;

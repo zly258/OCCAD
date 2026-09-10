@@ -95,7 +95,8 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
             return true;
 
         _keepSource = keepSource;
-        RefreshPreviewFromLastPointer();
+        if (Context.Workspace.LastPointerPosition is { } pointer)
+            RefreshPreviewFromLastPointer(pointer);
         NotifyUpdated();
         return true;
     }

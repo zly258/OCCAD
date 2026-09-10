@@ -122,7 +122,8 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
             return true;
         }
 
-        RefreshPreviewFromLastPointer();
+        if (Context.Workspace.LastPointerPosition is { } pointer)
+            RefreshPreviewFromLastPointer(pointer);
         return true;
     }
 

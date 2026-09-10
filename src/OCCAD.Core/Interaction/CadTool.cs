@@ -182,6 +182,15 @@ public abstract class CadTool
     public virtual bool HandlePointer(OcctPointerInputEventArgs input) => false;
     public virtual bool HandleKey(OcctKeyInputEventArgs input) => false;
 
+    protected bool CancelOnRightClick(OcctPointerInputEventArgs input)
+    {
+        if (input.Kind != OcctPointerInputKind.Pressed ||
+            input.Button != OcctPointerButton.Right)
+            return false;
+
+        return Context.Workspace.Tools.HandleSecondaryAction();
+    }
+
     protected void SetStage(int stage, string message, CadPrecisionInputKind precisionInputs = CadPrecisionInputKind.None)
     {
         if (stage < 0) throw new ArgumentOutOfRangeException(nameof(stage));

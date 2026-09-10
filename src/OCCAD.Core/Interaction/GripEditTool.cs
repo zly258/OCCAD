@@ -248,13 +248,11 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
             size,
             Color.FromArgb(255, 245, 178, 35));
 
-        var marker = engine.AddPointPixmap(
+        var createdMarker = engine.AddPointPixmap(
             point,
             size,
             size,
             _dragMarkerPixels);
-        if (marker is not { } createdMarker)
-            return;
 
         _dragMarker = createdMarker;
         engine.SetObjectSelectable(createdMarker, false);

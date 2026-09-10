@@ -149,7 +149,7 @@ public sealed class CadAngleDimensionEntity : CadEntity
         var bisector = Bisector();
         var normal = Normal;
         var side = normal.Cross(bisector);
-        var radiusPlane = side.TryNormalize(out var yAxis)
+        CadGripWorkPlane? radiusPlane = side.TryNormalize(out var yAxis)
             ? new CadGripWorkPlane(_vertex, bisector, yAxis)
             : null;
 

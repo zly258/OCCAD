@@ -1,0 +1,14 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    <sys:String x:Key="Cad.Text.InvalidCoordinate">坐标格式无效。</sys:String>
+    <sys:String x:Key="Cad.Text.PointRejected">当前工具无法接受该点。</sys:String>
+    <sys:String x:Key="Cad.Text.InvalidPrecisionValue">请输入有效的精确值。</sys:String>
+    <sys:String x:Key="Cad.Text.PrecisionRejected">当前工具不接受该精确值。</sys:String>
+    <sys:String x:Key="Cad.Text.InvalidParameterValue">当前参数值无效。</sys:String>
+    <sys:String x:Key="Cad.Text.InvalidNumericValue">请输入有效数值。</sys:String>
+    <sys:String x:Key="Cad.Text.NumericOutOfRange">数值超出允许范围。</sys:String>
+    <sys:String x:Key="Cad.Text.NumericRangeBetween">{0} ≤ 数值 ≤ {1}</sys:String>
+    <sys:String x:Key="Cad.Text.NumericRangeMinimum">数值 ≥ {0}</sys:String>
+    <sys:String x:Key="Cad.Text.NumericRangeMaximum">数值 ≤ {0}</sys:String>
+</ResourceDictionary>

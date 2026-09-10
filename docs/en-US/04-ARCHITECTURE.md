@@ -4,34 +4,50 @@
 
 ```text
 Presentation — OCCAD.Avalonia
+  MainWindow / Menu / Toolbar / Panels / Dialogs / CommandLine / StatusBar
         ↓
-Application Core — CadApplicationCore
-  Settings / Command Session / Document Session
+Application & Interaction — OCCAD.Core
+  Workspace / ActionManager / ToolManager / Selection / Snap / Tracking / Grip / Preview
         ↓
-CAD Workspace — OCCAD.Core
-  Document / Entity / Layer / Action / Tool / Selection / Snap / Grip / Preview / History
+Domain — OCCAD.Core
+  Document / Entity / Layer / History / Registry / Persistence
         ↓
-OcctNet / OcctNet.Avalonia / OcctCSharpBridge / OCCT
+Geometry & Viewer Bridge
+  OcctNet / OcctNet.Avalonia / OcctCSharpBridge / OCCT
 ```
 
-Dependency direction is `Avalonia → Core → OcctNet`. Avalonia does not create a parallel CAD session or state container.
+Dependency direction is `Avalonia → Core → OcctNet`.
 
 ## Ownership
 
-`CadApplicationCore` is the application composition root. It uniquely owns `CadSettingsStore`, `CadCommandManager`, `CadDocumentSession`, and one `CadWorkspace`. `CadWorkspace` composes CAD model and interaction services; it is not a global service locator.
+`CadWorkspace` is the session composition root. Document is the sole persistent Entity owner and final appearance resolver.
 
-Document is the sole persistent Entity owner and final appearance resolver. Entity owns stable identity/type, valid geometry, `LayerId`, appearance override values + ByLayer flags, placement, Snap/Grip semantics, duplicate/restore/transform behavior, and persistence state. Viewer objects are derived presentation only.
+Entity owns stable identity/type, valid geometry, layer, appearance override values + ByLayer flags, placement, Snap/Grip semantics, duplicate/restore/transform behavior, and persistence state.
+
+Viewer objects are derived presentation only.
+
+## Appearance
+
+Document resolves effective Color, LineStyle, LineWidth, visibility, and selectability from Entity + Layer state.
 
 ## Property / Layer transaction
 
-`CadPropertyCatalog` / `CadPropertyDescriptor` / `CadValueDescriptor` define semantic property metadata. `TypeDescriptor` is only a CLR adapter. `CadPropertyTransaction` applies Entity edits atomically. Layer mutations stay in Core transaction/history; Avalonia does not implement a second rollback/history path.
+`CadPropertyCatalog` / `CadPropertyDescriptor` / `CadValueDescriptor` define semantic property metadata. `TypeDescriptor` is only a CLR adapter.
 
-## Command / Action / Tool
+`CadPropertyTransaction` applies Entity edits atomically and handles explicit appearance override semantics. Layer mutations are centralized on `CadWorkspace`; Avalonia does not implement a second rollback/history path.
 
-`CadCommandManager` is one application-owned command-line session and no longer uses a static Workspace lookup table. Action is the stable user-operation entry. Tool owns Step/Stage, Prompt, InputKind, InteractionPolicy, precision input, WorkPlane strategy, parameters, Preview, Finish/Cancel/StepBack. Frontends submit commands/input without owning a second command history or Tool state.
+## Tool / Action
+
+Action is the stable instantaneous command entry. Tool owns Step/Stage, Prompt, InputKind, InteractionPolicy, precision reference/input, WorkPlane strategy, parameters, Preview, Finish/Cancel/StepBack.
+
+`CadToolContext` exposes Core services but does not hide Preview cleanup inside model mutation methods.
 
 ## Transient state / redraw
 
-Native presentation for Selection, Preselection, SubobjectSelection, Grip, Snap, Tracking, Preview, and Window/Crossing selection rectangles is managed by Core owners and participates in the `CadTransientScene` lifecycle. Tool completion, cancellation, switching, or failure must return to neutral state; viewer/presentation state is never authoritative model data.
+Selection, Preselection, SubobjectSelection, Grip, Snap, Tracking, Preview, selection rectangle, and HUD have separate lifecycles.
 
-Viewer batching/redraw follows the Bridge display-batch contract; OCCAD does not add redundant Redraw calls when Bridge already schedules one. `OCCTBIM-Source/release-1.0` validates responsibility boundaries and behavior and is not copied structurally, including its Qt, singleton, or database implementation.
+Transient preview/source suppression is cleaned after successful model/history mutation or Tool cancellation/deactivation.
+
+Viewer batching/redraw follows the Bridge display-batch contract; OCCAD does not add redundant Redraw calls when Bridge already schedules one.
+
+`OCCTBIM-Source` is used to validate responsibility boundaries and behavior, not copied structurally.

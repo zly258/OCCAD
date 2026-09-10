@@ -12,13 +12,6 @@ Entity 定义 Snap/Grip 语义。SnapManager 只选择候选，GripManager 只�
 ## Tool
 每个 Tool 定义 ID/Name、State/Stage、InputKind、Prompt、PrecisionInputs、InteractionPolicy、SnapResolvePolicy、PrecisionReference、WorkPlane、Parameters、Preview、Finish/Cancel/StepBack。UI 不根据 Stage 数字复制业务逻辑。
 
-### Tool 参数
-`CadTool.ParameterSchema` 是当前 Tool Stage 下参数的唯一、UI 无关契约。前端只负责渲染 Schema，不维护第二套参数模型，也不根据界面状态推断隐藏的 Tool 状态。
-
-所有外部参数修改统一经过 `CadTool.TrySetParameter(id, value)`。命令输入、Action 预设、桌面 UI、脚本以及后续 MCP 适配层共用同一个入口；参数 ID 如果不在当前 `ParameterSchema` 中，会在进入具体 Tool 实现前直接拒绝。
-
-Schema 可以随 Stage 改变：参数在当前阶段失效时，应从 Schema 中移除，而不是继续暴露可写兼容入口。Core 不再提供框架相关的 `ParameterPanel` 契约。
-
 ## Preview / Commit
 Preview 更新失败保留上一帧有效值。普通 Commit：validate → finalize Entity → apply layer/appearance → Document/History → clear Preview → complete Tool。可能失败的 mutation 前不能先清 Preview。`CadToolContext.AddEntity` 只负责模型 Add。
 

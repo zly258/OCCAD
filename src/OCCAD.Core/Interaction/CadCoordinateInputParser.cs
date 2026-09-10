@@ -17,21 +17,13 @@ public readonly record struct CadCoordinateInput(
     double? AngleDegrees = null);
 
 /// <summary>
-/// Parses AutoCAD-style point input in the active drawing-plane/UCS frame.
-/// Absolute and relative input deliberately use the same effective frame so
-/// typed coordinates remain correct after XY/XZ/YZ or custom plane changes.
-/// Supported forms include:
+/// Parses AutoCAD-style point input in the active work-plane/UCS frame.
+/// Supported forms:
 /// 100,200
 /// 100,200,50
-/// #100,200
 /// @500,0
 /// @500,300,25
-/// 1000&lt;30
-/// #1000&lt;30
 /// @1000&lt;30
-///
-/// A semicolon may be used as the Cartesian component separator. This keeps
-/// precise input usable with cultures where comma is the decimal separator.
 /// </summary>
 public static class CadCoordinateInputParser
 {
@@ -50,8 +42,6 @@ public static class CadCoordinateInputParser
         var relative = value.StartsWith('@');
         if (relative || value.StartsWith('#'))
             value = value[1..].Trim();
-        if (value.Length == 0)
-            return false;
 
         if (value.Contains('<', StringComparison.Ordinal))
             return TryParsePolar(value, reference, workPlane, relative, out input);
@@ -59,7 +49,7 @@ public static class CadCoordinateInputParser
         if (!TryParseCartesian(value, out var x, out var y, out var z, out var hasZ))
             return false;
 
-        var frame = workPlane.EffectivePlane;
+        var frame = relative ? workPlane.EffectivePlane : workPlane.UserPlane;
         if (!frame.XAxis.Cross(frame.YAxis).TryNormalize(out var normal))
             return false;
 
@@ -97,8 +87,7 @@ public static class CadCoordinateInputParser
     {
         input = default;
         var separator = value.IndexOf('<');
-        if (separator <= 0 || separator >= value.Length - 1 ||
-            value.LastIndexOf('<') != separator)
+        if (separator <= 0 || separator >= value.Length - 1)
             return false;
 
         if (!TryDouble(value[..separator], out var distance) || distance <= 0.0)
@@ -106,16 +95,11 @@ public static class CadCoordinateInputParser
         if (!TryDouble(value[(separator + 1)..], out var angleDegrees))
             return false;
 
-        var frame = workPlane.EffectivePlane;
-        if (!frame.XAxis.TryNormalize(out var xAxis) ||
-            !frame.YAxis.TryNormalize(out var yAxis) ||
-            !xAxis.Cross(yAxis).TryNormalize(out _))
-            return false;
-
+        var frame = relative ? workPlane.EffectivePlane : workPlane.UserPlane;
         var radians = angleDegrees * Math.PI / 180.0;
         var direction =
-            xAxis * Math.Cos(radians) +
-            yAxis * Math.Sin(radians);
+            frame.XAxis * Math.Cos(radians) +
+            frame.YAxis * Math.Sin(radians);
         var point = (relative ? reference : frame.Origin) + direction * distance;
         if (!point.IsFinite)
             return false;
@@ -138,12 +122,9 @@ public static class CadCoordinateInputParser
         x = y = z = 0.0;
         hasZ = false;
 
-        var separator = value.Contains(';', StringComparison.Ordinal)
-            ? ';'
-            : ',';
-        var parts = value.Split(separator, StringSplitOptions.TrimEntries);
-        if (parts.Length is not (2 or 3) ||
-            parts.Any(string.IsNullOrWhiteSpace))
+        var parts = value
+            .Split(',', StringSplitOptions.TrimEntries);
+        if (parts.Length is not (2 or 3))
             return false;
 
         if (!TryDouble(parts[0], out x) || !TryDouble(parts[1], out y))

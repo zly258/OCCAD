@@ -1,0 +1,142 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    <!-- Continuous 2D drawing -->
+    <sys:String x:Key="Cad.Precision.polyline.1.Length">线段长度</sys:String>
+    <sys:String x:Key="Cad.Precision.polyline.1.Angle">线段角度</sys:String>
+    <sys:String x:Key="Cad.Precision.polygon.1.Length">边长</sys:String>
+    <sys:String x:Key="Cad.Precision.polygon.1.Angle">边方向</sys:String>
+    <sys:String x:Key="Cad.Precision.spline.1.Length">下一拟合点距离</sys:String>
+    <sys:String x:Key="Cad.Precision.spline.1.Angle">下一拟合点角度</sys:String>
+
+    <!-- Regular polygon -->
+    <sys:String x:Key="Cad.Parameter.regularpolygon.sides">边数</sys:String>
+    <sys:String x:Key="Cad.Parameter.regularpolygon.mode">方式</sys:String>
+    <sys:String x:Key="Cad.Precision.regularpolygon.1.Length">半径</sys:String>
+    <sys:String x:Key="Cad.Precision.regularpolygon.1.Angle">起始角度</sys:String>
+
+    <!-- Ellipse -->
+    <sys:String x:Key="Cad.Parameter.ellipse.Method">绘制方式</sys:String>
+    <sys:String x:Key="Cad.Parameter.ellipse.MajorRadius">长轴半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.ellipse.MinorRadius">短轴半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.ellipse.Angle">长轴角度</sys:String>
+    <sys:String x:Key="Cad.Prompt.Ellipse.AxisFirst">椭圆：指定长轴第一个端点 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Ellipse.AxisSecond">椭圆：指定长轴第二个端点 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Ellipse.InvalidMinor">椭圆：短轴半径必须大于 0 且不能超过长轴半径。</sys:String>
+
+    <!-- Text -->
+    <sys:String x:Key="Cad.Parameter.text.Text">文字内容</sys:String>
+    <sys:String x:Key="Cad.Parameter.text.Height">文字高度</sys:String>
+    <sys:String x:Key="Cad.Parameter.text.Angle">旋转角度</sys:String>
+    <sys:String x:Key="Cad.Parameter.text.Font">字体</sys:String>
+
+    <!-- Box -->
+    <sys:String x:Key="Cad.Parameter.box.Length">长度</sys:String>
+    <sys:String x:Key="Cad.Parameter.box.Width">宽度</sys:String>
+    <sys:String x:Key="Cad.Parameter.box.Height">高度</sys:String>
+    <sys:String x:Key="Cad.Parameter.box.Angle">底面旋转角度</sys:String>
+    <sys:String x:Key="Cad.Precision.box.1.Length">底面对角线长度</sys:String>
+    <sys:String x:Key="Cad.Precision.box.1.Angle">底面对角线角度</sys:String>
+    <sys:String x:Key="Cad.Precision.box.2.Length">高度</sys:String>
+
+    <!-- Cylinder -->
+    <sys:String x:Key="Cad.Parameter.cylinder.Radius">半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.cylinder.Height">高度</sys:String>
+    <sys:String x:Key="Cad.Precision.cylinder.1.Length">半径</sys:String>
+    <sys:String x:Key="Cad.Precision.cylinder.2.Length">高度</sys:String>
+
+    <!-- Cone -->
+    <sys:String x:Key="Cad.Parameter.cone.BaseRadius">底面半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.cone.Height">高度</sys:String>
+    <sys:String x:Key="Cad.Precision.cone.1.Length">底面半径</sys:String>
+    <sys:String x:Key="Cad.Precision.cone.2.Length">高度</sys:String>
+
+    <!-- Sphere -->
+    <sys:String x:Key="Cad.Parameter.sphere.Radius">半径</sys:String>
+    <sys:String x:Key="Cad.Precision.sphere.1.Length">半径</sys:String>
+
+    <!-- Frustum -->
+    <sys:String x:Key="Cad.Parameter.frustum.BaseRadius">底面半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.frustum.Height">高度</sys:String>
+    <sys:String x:Key="Cad.Parameter.frustum.TopRadius">顶面半径</sys:String>
+    <sys:String x:Key="Cad.Precision.frustum.1.Length">底面半径</sys:String>
+    <sys:String x:Key="Cad.Precision.frustum.2.Length">高度</sys:String>
+    <sys:String x:Key="Cad.Precision.frustum.3.Length">顶面半径</sys:String>
+
+    <!-- Torus -->
+    <sys:String x:Key="Cad.Parameter.torus.MajorRadius">主半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.torus.TubeRadius">管半径</sys:String>
+    <sys:String x:Key="Cad.Precision.torus.1.Length">主半径</sys:String>
+    <sys:String x:Key="Cad.Precision.torus.2.Length">管半径</sys:String>
+
+    <!-- Ellipsoid -->
+    <sys:String x:Key="Cad.Parameter.ellipsoid.XRadius">X 半轴</sys:String>
+    <sys:String x:Key="Cad.Parameter.ellipsoid.YRadius">Y 半轴</sys:String>
+    <sys:String x:Key="Cad.Parameter.ellipsoid.ZRadius">Z 半轴</sys:String>
+    <sys:String x:Key="Cad.Parameter.ellipsoid.Angle">方向角</sys:String>
+    <sys:String x:Key="Cad.Precision.ellipsoid.1.Length">X 半轴</sys:String>
+    <sys:String x:Key="Cad.Precision.ellipsoid.1.Angle">方向角</sys:String>
+    <sys:String x:Key="Cad.Precision.ellipsoid.2.Length">Y 半轴</sys:String>
+    <sys:String x:Key="Cad.Precision.ellipsoid.3.Length">Z 半轴</sys:String>
+
+    <!-- Helix -->
+    <sys:String x:Key="Cad.Parameter.helix.Radius">半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.helix.StartAngle">起始角度</sys:String>
+    <sys:String x:Key="Cad.Parameter.helix.Pitch">螺距</sys:String>
+    <sys:String x:Key="Cad.Parameter.helix.Turns">圈数</sys:String>
+    <sys:String x:Key="Cad.Precision.helix.1.Length">半径</sys:String>
+    <sys:String x:Key="Cad.Precision.helix.1.Angle">起始角度</sys:String>
+
+    <!-- Extrude -->
+    <sys:String x:Key="Cad.Parameter.extrude.Height">拉伸高度</sys:String>
+    <sys:String x:Key="Cad.Parameter.extrude.Reverse">反向</sys:String>
+    <sys:String x:Key="Cad.Precision.extrude.1.Length">拉伸高度</sys:String>
+
+    <!-- Linear dimension -->
+    <sys:String x:Key="Cad.Parameter.lengthdimension.TextHeight">文字高度</sys:String>
+    <sys:String x:Key="Cad.Parameter.lengthdimension.ArrowSize">箭头大小</sys:String>
+    <sys:String x:Key="Cad.Parameter.lengthdimension.Font">字体</sys:String>
+    <sys:String x:Key="Cad.Precision.lengthdimension.1.Length">第二点距离</sys:String>
+    <sys:String x:Key="Cad.Precision.lengthdimension.1.Angle">第二点角度</sys:String>
+    <sys:String x:Key="Cad.Precision.lengthdimension.2.Length">标注线偏移</sys:String>
+
+    <!-- Angular dimension -->
+    <sys:String x:Key="Cad.Parameter.angledimension.TextHeight">文字高度</sys:String>
+    <sys:String x:Key="Cad.Parameter.angledimension.ArrowSize">箭头大小</sys:String>
+    <sys:String x:Key="Cad.Parameter.angledimension.Font">字体</sys:String>
+    <sys:String x:Key="Cad.Precision.angledimension.1.Length">第一射线长度</sys:String>
+    <sys:String x:Key="Cad.Precision.angledimension.1.Angle">第一射线角度</sys:String>
+    <sys:String x:Key="Cad.Precision.angledimension.2.Length">第二射线长度</sys:String>
+    <sys:String x:Key="Cad.Precision.angledimension.2.Angle">第二射线角度</sys:String>
+    <sys:String x:Key="Cad.Precision.angledimension.3.Length">标注弧半径</sys:String>
+    <sys:String x:Key="Cad.Prompt.AngleDimension.Vertex">角度尺寸：指定顶点 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.AngleDimension.FirstRay">角度尺寸：指定第一射线上的点 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.AngleDimension.SecondRay">角度尺寸：指定第二射线上的点 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.AngleDimension.Line">角度尺寸：指定尺寸弧半径 [Backspace 返回，Esc 取消]</sys:String>
+
+    <!-- Radius / diameter dimension -->
+    <sys:String x:Key="Cad.Text.CircularDimension">圆尺寸标注</sys:String>
+    <sys:String x:Key="Cad.ToolPanel.circulardimension.Title">圆尺寸标注</sys:String>
+    <sys:String x:Key="Cad.Parameter.circulardimension.Kind">标注类型</sys:String>
+    <sys:String x:Key="Cad.Parameter.circulardimension.Kind.Radius">半径标注</sys:String>
+    <sys:String x:Key="Cad.Parameter.circulardimension.Kind.Diameter">直径标注</sys:String>
+    <sys:String x:Key="Cad.Parameter.circulardimension.TextHeight">文字高度</sys:String>
+    <sys:String x:Key="Cad.Parameter.circulardimension.ArrowSize">箭头大小</sys:String>
+    <sys:String x:Key="Cad.Parameter.circulardimension.Font">字体</sys:String>
+    <sys:String x:Key="Cad.Precision.circulardimension.1.Length">半径</sys:String>
+    <sys:String x:Key="Cad.Precision.circulardimension.1.Angle">方向角</sys:String>
+    <sys:String x:Key="Cad.Precision.circulardimension.2.Length">引线距离</sys:String>
+    <sys:String x:Key="Cad.Precision.circulardimension.2.Angle">引线角度</sys:String>
+    <sys:String x:Key="Cad.Prompt.CircularDimension.Center">圆尺寸标注：指定圆心 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.CircularDimension.Radius">圆尺寸标注：指定圆上一点 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.CircularDimension.Position">圆尺寸标注：指定标注位置 [Backspace 返回，Esc 取消]</sys:String>
+
+    <!-- Arc prompts used by the multi-method tool -->
+    <sys:String x:Key="Cad.Prompt.Arc.Center">圆弧：指定圆心 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Arc.Start">圆弧：指定起点 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Arc.End">圆弧：指定终点 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Arc.CenterForEndpoints">圆弧：指定圆心所在侧及位置 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Arc.PointOnArc">圆弧：指定圆弧上的一点 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Arc.Tangent">圆弧：指定起点切线方向 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Arc.Invalid">圆弧：当前输入无法确定有效圆弧。</sys:String>
+</ResourceDictionary>

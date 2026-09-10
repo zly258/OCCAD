@@ -25,6 +25,11 @@ internal sealed class CadPointerMoveScheduler : IDisposable
     public void Post(OcctPointerInputEventArgs input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        if (input.Kind != OcctPointerInputKind.Moved)
+            throw new ArgumentException(
+                "Only pointer-move events can be coalesced.",
+                nameof(input));
+
         _pending = input;
         if (!_timer.IsEnabled)
             _timer.Start();

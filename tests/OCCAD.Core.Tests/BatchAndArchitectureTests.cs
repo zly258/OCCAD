@@ -30,7 +30,7 @@ public sealed class BatchAndArchitectureTests
         Assert.IsFalse(w.IsModified);
         CollectionAssert.AreEqual(new CadEntity[] { kept, removed }, w.Document.Entities.ToArray());
         Assert.AreEqual(CadPlacement.Identity, kept.Placement);
-        Assert.AreEqual(CadLayer.DefaultId, kept.LayerId);
+        Assert.AreEqual("0", kept.Layer);
         Assert.HasCount(1, w.Layers.Layers);
         Assert.IsTrue(w.Redo());
         Assert.AreSame(layer, w.Layers.Current);
@@ -143,17 +143,15 @@ public sealed class BatchAndArchitectureTests
     [TestMethod]
     public void CommandAndPropertyDescriptorsAreAuthoritative()
     {
-        using var application = new CadApplicationCore();
-        var w = application.Workspace;
+        using var w = new CadWorkspace();
         Assert.AreEqual("draw.line", w.Actions.ResolveCommand("L")!.Id);
         Assert.AreEqual("line", w.Actions.ResolveCommand("LINE")!.ToolId);
         Assert.IsTrue(w.Actions.Describe("draw.line")!.Repeatable);
         Assert.AreEqual("Ctrl+Z", w.Actions.Describe("edit.undo")!.Shortcut);
-        CollectionAssert.Contains(application.Commands.Complete("LI").ToArray(), "LINE");
+        CollectionAssert.Contains(CadCommandManager.ForWorkspace(w).Complete("LI").ToArray(), "LINE");
         var line = new CadLineEntity(default, new(10, 0, 0));
         var properties = CadPropertyCatalog.Describe(line);
-        var layer = properties.Single(p => p.Name == nameof(CadEntity.LayerId));
-        Assert.AreEqual("Layer", layer.DisplayName);
+        var layer = properties.Single(p => p.Name == "Layer");
         Assert.AreEqual(CadPropertyEditorKind.Layer, layer.Editor);
         w.AddLayer("Review");
         CollectionAssert.Contains(layer.GetChoices(w).ToArray(), "Review");

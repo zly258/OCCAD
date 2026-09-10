@@ -28,7 +28,7 @@ public abstract class CadEntity
 {
     private readonly string _entityType;
     private string _name;
-    private string _layerId = CadLayer.DefaultId;
+    private string _layer = "0";
     private bool _visible = true;
     private bool _selectable = true;
     private bool _colorByLayer = true;
@@ -71,13 +71,13 @@ public abstract class CadEntity
 
     [Category("General"), DisplayName("Layer")]
     [CadProperty(CadValueSemantic.Layer, Order = 20)]
-    public string LayerId
+    public string Layer
     {
-        get => _layerId;
+        get => _layer;
         set
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(value);
-            SetMetadata(ref _layerId, value.Trim());
+            SetMetadata(ref _layer, value.Trim());
         }
     }
 
@@ -249,132 +249,195 @@ public abstract class CadEntity
             nameof(Placement));
     }
 
-    public void ScalePlacement(
-        OcctPoint3d center,
-        double factor)
-    {
-        if (!center.IsFinite)
-            throw new ArgumentOutOfRangeException(nameof(center));
-        ValidatePositive(factor, nameof(factor));
-
+    public void ResetPlacement() =>
         SetPlacement(
-            _placement.ScaleWorld(center, factor),
+            CadPlacement.Identity,
             nameof(Placement));
-    }
 
-    public OcctPoint3d ToWorldPoint(OcctPoint3d point)
-    {
-        ValidatePoint(point, nameof(point));
-        return _placement.Transform.TransformPoint(point);
-    }
+    public OcctPoint3d ToWorldPoint(OcctPoint3d point) =>
+        _placement.ToWorldPoint(point);
 
-    public OcctVector3d ToWorldVector(OcctVector3d vector)
-    {
-        ValidateDisplacement(vector);
-        return _placement.Transform.TransformVector(vector);
-    }
+    public OcctVector3d ToWorldVector(OcctVector3d vector) =>
+        _placement.ToWorldVector(vector);
 
-    public OcctPoint3d ToLocalPoint(OcctPoint3d point)
-    {
-        ValidatePoint(point, nameof(point));
-        return _placement.InverseTransform.TransformPoint(point);
-    }
+    public OcctPoint3d ToLocalPoint(OcctPoint3d point) =>
+        _placement.ToLocalPoint(point);
 
-    public OcctVector3d ToLocalVector(OcctVector3d vector)
-    {
-        ValidateDisplacement(vector);
-        return _placement.InverseTransform.TransformVector(vector);
-    }
+    public OcctVector3d ToLocalVector(OcctVector3d vector) =>
+        _placement.ToLocalVector(vector);
 
-    public IReadOnlyList<CadSnapPoint> GetWorldSnapPoints()
+    internal IReadOnlyList<CadSnapPoint> GetWorldSnapPoints()
     {
-        var transform = _placement.Transform;
-        return GetSnapPoints()
-            .Select(snap => snap with
-            {
-                Position = transform.TransformPoint(snap.Position)
-            })
+        var local = GetSnapPoints();
+        if (_placement.IsIdentity)
+            return local;
+
+        return local
+            .Select(TransformSnapPoint)
             .ToArray();
     }
+
+    internal IReadOnlyList<CadGripPoint> GetWorldGripPoints()
+    {
+        var local = GetGripPoints();
+        if (_placement.IsIdentity)
+            return local;
+
+        return local
+            .Select(TransformGripPoint)
+            .ToArray();
+    }
+
+    internal void MoveWorldGrip(
+        int index,
+        OcctPoint3d targetPoint) =>
+        MoveGrip(
+            index,
+            _placement.ToLocalPoint(targetPoint));
 
     internal IReadOnlyList<CadSnapCurve> GetWorldPrecisionSnapCurves(
         CadWorkPlane workPlane)
     {
         ArgumentNullException.ThrowIfNull(workPlane);
-
         if (_placement.IsIdentity)
             return GetPrecisionSnapCurves(workPlane);
 
-        var snapshot = CreateWorldGeometrySnapshot();
-        return snapshot.GetPrecisionSnapCurves(workPlane);
+        var localPlane = new CadWorkPlane();
+        localPlane.SetCustom(
+            _placement.ToLocalPoint(workPlane.Origin),
+            _placement.ToLocalVector(workPlane.XAxis),
+            _placement.ToLocalVector(workPlane.YAxis));
+        return GetPrecisionSnapCurves(localPlane);
     }
 
-    public IReadOnlyList<CadGripPoint> GetWorldGripPoints()
+    internal void ScaleFromWorld(
+        OcctPoint3d center,
+        double factor) =>
+        Scale(
+            _placement.ToLocalPoint(center),
+            factor);
+
+    internal void RestoreGeometrySnapshot(
+        CadEntity snapshot)
     {
-        var transform = _placement.Transform;
-        return GetGripPoints()
-            .Select(grip => grip with
-            {
-                Position = transform.TransformPoint(grip.Position)
-            })
-            .ToArray();
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (snapshot.GetType() != GetType())
+            throw new ArgumentException(
+                "Snapshot type does not match.",
+                nameof(snapshot));
+
+        _placement = snapshot._placement;
+        RestoreGeometry(snapshot);
     }
 
-    public void MoveWorldGrip(int index, OcctPoint3d targetPoint)
-    {
-        ValidatePoint(targetPoint, nameof(targetPoint));
-        MoveGrip(index, ToLocalPoint(targetPoint));
-    }
+    internal void RestorePlacement(CadPlacement placement) =>
+        SetPlacement(placement, nameof(Placement));
 
-    public CadEntity CreateWorldGeometrySnapshot()
+    internal CadEntity CreateWorldGeometrySnapshot()
     {
         var snapshot = Duplicate();
-        if (_placement.IsIdentity)
-            return snapshot;
-
-        snapshot.ApplyPlacementToGeometry(_placement);
-        snapshot.SetPlacementDirect(CadPlacement.Identity);
+        snapshot.BakePlacementIntoGeometry();
         return snapshot;
     }
 
-    public T CreateWorldGeometrySnapshot<T>()
+    internal T CreateWorldGeometrySnapshot<T>()
         where T : CadEntity =>
-        CreateWorldGeometrySnapshot() is T value
-            ? value
-            : throw new InvalidOperationException(
-                $"Expected world geometry snapshot of type {typeof(T).Name}.");
+        (T)CreateWorldGeometrySnapshot();
 
-    public void ApplyPlacementToGeometry(CadPlacement placement)
+    internal void BakePlacementIntoGeometry()
     {
-        if (placement.IsIdentity)
+        if (_placement.IsIdentity)
             return;
 
-        var transform = placement.Transform;
-        if (placement.Scale <= 0.0 ||
-            !double.IsFinite(placement.Scale))
-            throw new InvalidOperationException(
-                "Entity placement contains an invalid scale.");
+        var placement = _placement;
+        var xAxis =
+            placement.ToWorldVector(
+                OcctVector3d.UnitX);
+        var yAxis =
+            placement.ToWorldVector(
+                OcctVector3d.UnitY);
+        var zAxis =
+            placement.ToWorldVector(
+                OcctVector3d.UnitZ);
 
-        Scale(OcctPoint3d.Origin, placement.Scale);
+        _placement = CadPlacement.Identity;
 
         if (CadTransformMath.TryGetAxisAngle(
-                transform.TransformVector(OcctVector3d.UnitX),
-                transform.TransformVector(OcctVector3d.UnitY),
-                transform.TransformVector(OcctVector3d.UnitZ),
+                xAxis,
+                yAxis,
+                zAxis,
                 out var axis,
-                out var angleDegrees))
+                out var angleDegrees) &&
+            Math.Abs(angleDegrees) > 1e-10)
         {
-            Rotate(OcctPoint3d.Origin, axis, angleDegrees);
+            Rotate(
+                OcctPoint3d.Origin,
+                axis,
+                angleDegrees);
         }
 
-        Translate(placement.Position - OcctPoint3d.Origin);
+        var transform = placement.Transform;
+        var translation = new OcctVector3d(
+            transform.M03,
+            transform.M13,
+            transform.M23);
+        if (translation.LengthSquared > 1e-24)
+            Translate(translation);
     }
 
-    internal void RestorePlacement(CadPlacement placement)
+    public void RestoreState(CadEntity snapshot)
     {
-        if (!placement.IsFinite)
-            throw new ArgumentOutOfRangeException(nameof(placement));
-        SetPlacement(placement, nameof(Placement));
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (snapshot.GetType() != GetType())
+            throw new ArgumentException("Snapshot type does not match.", nameof(snapshot));
+
+        var previous = Duplicate();
+        var metadataChanged = _name != snapshot._name || _layer != snapshot._layer;
+        var appearanceChanged =
+            _visible != snapshot._visible ||
+            _selectable != snapshot._selectable ||
+            _colorByLayer != snapshot._colorByLayer ||
+            _lineWidthByLayer != snapshot._lineWidthByLayer ||
+            _lineStyleByLayer != snapshot._lineStyleByLayer ||
+            _color != snapshot._color ||
+            !_transparency.Equals(snapshot._transparency) ||
+            !_lineWidth.Equals(snapshot._lineWidth) ||
+            _lineStyle != snapshot._lineStyle ||
+            _displayMode != snapshot._displayMode ||
+            _material != snapshot._material;
+
+        try
+        {
+            ApplyBaseState(snapshot);
+            RestoreGeometry(snapshot);
+
+            if (metadataChanged)
+                Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Metadata, nameof(RestoreState)));
+            if (appearanceChanged)
+                Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Appearance, nameof(RestoreState)));
+        }
+        catch (Exception failure)
+        {
+            try
+            {
+                ApplyBaseState(previous);
+                RestoreGeometry(previous);
+
+                if (metadataChanged)
+                    Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Metadata, nameof(RestoreState)));
+                if (appearanceChanged)
+                    Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Appearance, nameof(RestoreState)));
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Entity state apply and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
+            throw;
+        }
     }
 
     protected T CopyPropertiesTo<T>(
@@ -383,38 +446,105 @@ public abstract class CadEntity
         where T : CadEntity
     {
         ArgumentNullException.ThrowIfNull(target);
-        target._name = _name;
-        target._layerId = _layerId;
-        target._visible = _visible;
-        target._selectable = _selectable;
-        target._colorByLayer = _colorByLayer;
-        target._lineWidthByLayer = _lineWidthByLayer;
-        target._lineStyleByLayer = _lineStyleByLayer;
-        target._color = _color;
-        target._transparency = _transparency;
-        target._lineWidth = _lineWidth;
-        target._lineStyle = _lineStyle;
-        target._displayMode = _displayMode;
-        target._material = _material;
-        target._placement = copyPlacement
-            ? _placement
-            : CadPlacement.Identity;
+        target.Name = Name;
+        target.Layer = Layer;
+        target.Visible = Visible;
+        target.Selectable = Selectable;
+        target.ColorByLayer = ColorByLayer;
+        target.LineWidthByLayer = LineWidthByLayer;
+        target.LineStyleByLayer = LineStyleByLayer;
+        target.Color = Color;
+        target.Transparency = Transparency;
+        target.LineWidth = LineWidth;
+        target.LineStyle = LineStyle;
+        target.DisplayMode = DisplayMode;
+        target.Material = Material;
+        if (copyPlacement)
+            target._placement = _placement;
         return target;
     }
 
-    protected bool SetMetadata<T>(
-        ref T field,
-        T value,
-        [CallerMemberName] string? propertyName = null)
+    private CadSnapPoint TransformSnapPoint(CadSnapPoint point)
     {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-            return false;
+        CadSnapWorkPlane? workPlane = point.WorkPlane is { } plane
+            ? new CadSnapWorkPlane(
+                _placement.ToWorldPoint(plane.Origin),
+                _placement.ToWorldVector(plane.XAxis).Normalized(),
+                _placement.ToWorldVector(plane.YAxis).Normalized(),
+                plane.LockPlane,
+                plane.LockedAngleDegrees)
+            : null;
 
-        RaiseChanging(CadEntityChangeKind.Metadata, propertyName);
-        field = value;
-        RaiseChanged(CadEntityChangeKind.Metadata, propertyName);
-        return true;
+        return point with
+        {
+            Position = _placement.ToWorldPoint(point.Position),
+            WorkPlane = workPlane
+        };
     }
+
+    private CadGripPoint TransformGripPoint(CadGripPoint point)
+    {
+        CadGripWorkPlane? workPlane = point.WorkPlane is { } plane
+            ? new CadGripWorkPlane(
+                _placement.ToWorldPoint(plane.Origin),
+                _placement.ToWorldVector(plane.XAxis).Normalized(),
+                _placement.ToWorldVector(plane.YAxis).Normalized(),
+                plane.LockPlane,
+                plane.LockedAngleDegrees)
+            : null;
+
+        return point with
+        {
+            Position = _placement.ToWorldPoint(point.Position),
+            WorkPlane = workPlane,
+            ConstraintOrigin = point.ConstraintOrigin is { } origin
+                ? _placement.ToWorldPoint(origin)
+                : null
+        };
+    }
+
+    private void SetPlacement(
+        CadPlacement value,
+        string propertyName)
+    {
+        if (_placement == value)
+            return;
+
+        Changing?.Invoke(
+            this,
+            new CadEntityChangingEventArgs(
+                CadEntityChangeKind.Geometry,
+                propertyName));
+
+        var previous = _placement;
+        _placement = value;
+        try
+        {
+            RaiseGeometryChanged(propertyName);
+        }
+        catch
+        {
+            _placement = previous;
+            throw;
+        }
+    }
+
+    protected static void ValidateDisplacement(OcctVector3d displacement)
+    {
+        if (!double.IsFinite(displacement.X) ||
+            !double.IsFinite(displacement.Y) ||
+            !double.IsFinite(displacement.Z))
+            throw new ArgumentOutOfRangeException(nameof(displacement), "Displacement must be finite.");
+    }
+
+    protected static OcctPoint3d Translated(OcctPoint3d point, OcctVector3d displacement) =>
+        new(point.X + displacement.X, point.Y + displacement.Y, point.Z + displacement.Z);
+
+    protected void RaiseGeometryChanging([CallerMemberName] string? propertyName = null) =>
+        Changing?.Invoke(this, new CadEntityChangingEventArgs(CadEntityChangeKind.Geometry, propertyName));
+
+    protected void RaiseGeometryChanged([CallerMemberName] string? propertyName = null) =>
+        Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Geometry, propertyName));
 
     protected bool SetGeometry<T>(
         ref T field,
@@ -424,13 +554,40 @@ public abstract class CadEntity
         if (EqualityComparer<T>.Default.Equals(field, value))
             return false;
 
-        RaiseGeometryChanging(propertyName);
+        Changing?.Invoke(
+            this,
+            new CadEntityChangingEventArgs(
+                CadEntityChangeKind.Geometry,
+                propertyName));
+
+        var previous = field;
         field = value;
-        RaiseGeometryChanged(propertyName);
-        return true;
+
+        try
+        {
+            RaiseGeometryChanged(propertyName);
+            return true;
+        }
+        catch
+        {
+            field = previous;
+            throw;
+        }
     }
 
-    protected bool SetAppearance<T>(
+    protected static void ValidateFinite(double value, string name)
+    {
+        if (!double.IsFinite(value))
+            throw new ArgumentOutOfRangeException(name, "Value must be finite.");
+    }
+
+    protected static void ValidatePositive(double value, string name)
+    {
+        if (!double.IsFinite(value) || value <= 0.0)
+            throw new ArgumentOutOfRangeException(name, "Value must be finite and greater than zero.");
+    }
+
+    private bool SetMetadata<T>(
         ref T field,
         T value,
         [CallerMemberName] string? propertyName = null)
@@ -438,78 +595,109 @@ public abstract class CadEntity
         if (EqualityComparer<T>.Default.Equals(field, value))
             return false;
 
-        RaiseChanging(CadEntityChangeKind.Appearance, propertyName);
-        field = value;
-        RaiseChanged(CadEntityChangeKind.Appearance, propertyName);
-        return true;
-    }
-
-    protected void RaiseGeometryChanging(
-        [CallerMemberName] string? propertyName = null) =>
-        RaiseChanging(CadEntityChangeKind.Geometry, propertyName);
-
-    protected void RaiseGeometryChanged(
-        [CallerMemberName] string? propertyName = null) =>
-        RaiseChanged(CadEntityChangeKind.Geometry, propertyName);
-
-    protected static void ValidatePoint(
-        OcctPoint3d point,
-        string parameterName)
-    {
-        if (!point.IsFinite)
-            throw new ArgumentOutOfRangeException(parameterName);
-    }
-
-    protected static void ValidateDisplacement(OcctVector3d displacement)
-    {
-        if (!displacement.IsFinite)
-            throw new ArgumentOutOfRangeException(nameof(displacement));
-    }
-
-    protected static void ValidatePositive(
-        double value,
-        string parameterName)
-    {
-        if (!double.IsFinite(value) || value <= 0.0)
-            throw new ArgumentOutOfRangeException(parameterName);
-    }
-
-    protected static void ValidateFinite(
-        double value,
-        string parameterName)
-    {
-        if (!double.IsFinite(value))
-            throw new ArgumentOutOfRangeException(parameterName);
-    }
-
-    private void SetPlacement(
-        CadPlacement value,
-        string propertyName)
-    {
-        if (!value.IsFinite)
-            throw new ArgumentOutOfRangeException(nameof(value));
-        if (_placement == value)
-            return;
-
-        RaiseGeometryChanging(propertyName);
-        _placement = value;
-        RaiseGeometryChanged(propertyName);
-    }
-
-    private void SetPlacementDirect(CadPlacement value) =>
-        _placement = value;
-
-    private void RaiseChanging(
-        CadEntityChangeKind kind,
-        string? propertyName) =>
         Changing?.Invoke(
             this,
-            new CadEntityChangingEventArgs(kind, propertyName));
+            new CadEntityChangingEventArgs(
+                CadEntityChangeKind.Metadata,
+                propertyName));
 
-    private void RaiseChanged(
-        CadEntityChangeKind kind,
-        string? propertyName) =>
-        Changed?.Invoke(
+        var previous = field;
+        field = value;
+        try
+        {
+            Changed?.Invoke(
+                this,
+                new CadEntityChangedEventArgs(
+                    CadEntityChangeKind.Metadata,
+                    propertyName));
+            return true;
+        }
+        catch (Exception failure)
+        {
+            field = previous;
+            try
+            {
+                Changed?.Invoke(
+                    this,
+                    new CadEntityChangedEventArgs(
+                        CadEntityChangeKind.Metadata,
+                        propertyName));
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Entity metadata apply and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
+            throw;
+        }
+    }
+
+    private bool SetAppearance<T>(
+        ref T field,
+        T value,
+        [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+            return false;
+
+        Changing?.Invoke(
             this,
-            new CadEntityChangedEventArgs(kind, propertyName));
+            new CadEntityChangingEventArgs(
+                CadEntityChangeKind.Appearance,
+                propertyName));
+
+        var previous = field;
+        field = value;
+        try
+        {
+            Changed?.Invoke(
+                this,
+                new CadEntityChangedEventArgs(
+                    CadEntityChangeKind.Appearance,
+                    propertyName));
+            return true;
+        }
+        catch (Exception failure)
+        {
+            field = previous;
+            try
+            {
+                Changed?.Invoke(
+                    this,
+                    new CadEntityChangedEventArgs(
+                        CadEntityChangeKind.Appearance,
+                        propertyName));
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Entity appearance apply and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
+            throw;
+        }
+    }
+
+    private void ApplyBaseState(CadEntity snapshot)
+    {
+        _name = snapshot._name;
+        _layer = snapshot._layer;
+        _visible = snapshot._visible;
+        _selectable = snapshot._selectable;
+        _colorByLayer = snapshot._colorByLayer;
+        _lineWidthByLayer = snapshot._lineWidthByLayer;
+        _lineStyleByLayer = snapshot._lineStyleByLayer;
+        _color = snapshot._color;
+        _transparency = snapshot._transparency;
+        _lineWidth = snapshot._lineWidth;
+        _lineStyle = snapshot._lineStyle;
+        _displayMode = snapshot._displayMode;
+        _material = snapshot._material;
+        _placement = snapshot._placement;
+    }
 }

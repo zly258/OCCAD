@@ -123,7 +123,7 @@ public sealed class CadEntityRegistry
     }
 
     public bool StateEquals(CadEntity left, CadEntity right) =>
-        left.Name == right.Name && left.LayerId == right.LayerId &&
+        left.Name == right.Name && left.Layer == right.Layer &&
         left.Visible == right.Visible && left.Selectable == right.Selectable &&
         left.Color == right.Color && left.ColorByLayer == right.ColorByLayer &&
         left.LineWidth == right.LineWidth && left.LineWidthByLayer == right.LineWidthByLayer &&

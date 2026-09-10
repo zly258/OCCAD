@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Text.Json.Nodes;
 using OcctNet;
 
@@ -144,6 +144,11 @@ public sealed class CadLineEntity : CadEntity
         CopyPropertiesTo(
             new CadPolylineEntity(points, closed: false));
 
+    internal CadPathEntity CreatePath(
+        IEnumerable<CadEntity> segments) =>
+        CopyPropertiesTo(
+            new CadPathEntity(segments));
+
     public override CadEntity Duplicate() => CopyPropertiesTo(new CadLineEntity(_start, _end));
 
     public override void RestoreGeometry(CadEntity snapshot)
@@ -191,6 +196,11 @@ public sealed class CadLineEntity : CadEntity
         var value = new OcctPoint3d(x, y, z);
         if (value.DistanceTo(_start) <= 1e-12) throw new ArgumentException("Line endpoints must be distinct.");
         SetGeometry(ref _end, value);
+    }
+
+    private static void ValidatePoint(OcctPoint3d point, string name)
+    {
+        if (!point.IsFinite) throw new ArgumentOutOfRangeException(name, "Point must be finite.");
     }
 
     private static OcctPoint3d Midpoint(OcctPoint3d a, OcctPoint3d b) =>

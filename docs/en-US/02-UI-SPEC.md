@@ -1,73 +1,81 @@
 # 02 UI Specification
 
-## Goal
+## Visual direction
 
-OCCAD uses `OCCTBIM-Source/release-1.0` as the CAD workflow reference without copying its Qt widgets or historical layout. The rule is: **preserve real CAD commands, reduce UI layers, prioritize viewport area, and keep one owner for each state**.
-
-## Fixed workspace
-
-The main window keeps only six persistent regions:
+OCCAD uses a compact industrial CAD shell:
 
 ```text
-┌──────────────────────────── Ribbon ────────────────────────────┐
-├──────── Model ────────┬──────────── Viewport ────────────┬─────┤
-│                       │                                   │Prop/│
-│                       │                                   │Layer│
-├───────────────────────┴───────────────────────────────────┴─────┤
-│ Command Line                                                   │
-├────────────────────────────────────────────────────────────────┤
-│ Status                                                         │
-└────────────────────────────────────────────────────────────────┘
+Ribbon
+┌──────────────┬──────────────────────────────┬─────────────────────┐
+│ Model        │          Viewport            │ Layer               │
+│              │   Floating Tool Panel        │ splitter            │
+│              │                              │ Property            │
+└──────────────┴──────────────────────────────┴─────────────────────┘
+Command Line
+Selection | Work Plane | SNAP ORTHO POLAR | XYZ
 ```
 
-- Ribbon: compact and low, rendering only actions backed by Core.
-- Model: entity browsing and selection only; it does not duplicate Property editing.
-- Viewport: the primary workspace with native navigation, ViewCube and Triedron.
-- Right Inspector: `Properties / Layers` share one tabbed column instead of two permanent stacked docks.
-- Command Line: the single complete prompt, command and exact-input entry point.
-- Status: selection, current layer, Snap, Ortho, Polar, WorkPlane and coordinates only.
+The viewport remains dominant. The application no longer constructs the legacy Menu, legacy Toolbar, or post-startup UI refinement shells.
 
-## UI that must stay removed until it has real product semantics
+## Theme contract
 
-Do not add the following without a backed workflow:
+`CadTheme` is the single visual-metric source. Major controls do not invent local typography, control height, radius, or panel width.
 
-- large brand/welcome/decorative header bands;
-- a second view toolbar or duplicated selection/view controls;
-- fake document tabs or a `+` tab without a real multi-document lifecycle;
-- a floating Tool Panel duplicating Command Line prompts;
-- permanent Log, Memory Monitor or Component docks;
-- buttons without a Core Action/Transaction;
-- placeholder commands, disabled fake menus or settings added only to resemble another CAD product.
+Baseline: 11 px main UI font, 10/10.5 px secondary text, 22 px compact controls, ~23–24 px headers, restrained light-gray surfaces, dark viewport, blue accent only for active/current state, low/no corner radius, thin separators, and a Segoe UI / Microsoft YaHei UI / CJK fallback font stack.
 
-## Ribbon
+The Ribbon uses native Avalonia controls only. Groups use a compact three-row layout. When horizontal space is insufficient the Ribbon scrolls instead of forcing the main window wider at 125% or 150% DPI.
 
-The ribbon follows Source command groups while deliberately reducing the surface:
+## Ribbon / Actions / Tool Panel
 
-- Home: Undo / Redo / Delete / Select / Measure;
-- Draw: Line / Polyline / Circle / Arc / Ellipse / Rectangle / Polygon / Spline;
-- 3D: Source primitives already implemented by OCCAD plus Extrude/Revolve/Sweep/Loft;
-- Modify: Move / Copy / Rotate / Scale / Mirror / Array / Offset / Trim / Extend / Fillet / Chamfer;
-- Annotate: CenterLine / Text / Dimension;
-- View: Fit / Orientation / Display / Hide / Isolate / ShowAll.
+Ribbon controls invoke registered Action IDs and never duplicate business logic. Real command families use one drop-down layer, such as Circle, Arc, Regular Polygon, Ellipse, and 3D Primitives.
 
-A button may be rendered only when a real action exists in `CadActionManager`. Core capabilities that exist but are not part of the current Source primary workflow may remain available to automation without being exposed in the default UI.
+`CadActionManager`, `CadToolManager`, and `CadCommandManager.ForWorkspace()` are the single state sources for Actions, Tools, and the command session. Ribbon, Command Line, and Floating Tool Panel are different input surfaces for the same Core state machine.
 
-## Property / Layer
+Stable Tool parameters such as Radius, Width, Height, Angle, and Factor belong in the Floating Tool Panel. The panel does not duplicate the full prompt. Parameter edits, precision input, Back, Accept, Finish, and Cancel directly operate on the active Tool and do not maintain a second parameter model.
 
-Property rows are described by `CadPropertyService` and committed through Core transactions. Avalonia does not directly mutate Entity fields. Stable Entity IDs are data-layer information and are hidden from the default inspector.
+## Model / Layer / Property
 
-Layer UI keeps only current layer, create, visibility, lock and necessary property editing. Entities reference layers by stable `LayerId`; names are editable display metadata.
+Model is on the left. Layer and Property are independent resizable panels stacked on the right.
 
-ByLayer is expressed by an explicit toggle. Direct Color / LineStyle / LineWidth editing is enabled only when the corresponding ByLayer flag is off.
+Layer columns are:
 
-## Visual rules
+```text
+Current | Name | V | C | Style | Width | L
+```
 
-- Use a compact light industrial shell and a dark viewport.
-- Default font and control dimensions must remain usable at both 100% and 125% scaling.
-- Do not depend on large icons to communicate commands; text remains readable and icons are optional when they add information.
-- Borders, separators and headers use low contrast; selection and active state use one blue accent.
-- Visual decoration must not reduce useful viewport area.
+The current layer uses an explicit `●/○` state. Only the Current column changes the current layer; clicking the name only inspects it. The default layer cannot be renamed or removed. Layer UI calls `CadWorkspace`; transactions, rollback, and history remain in Core.
 
-## Ownership boundary
+Property uses Core descriptors/editor semantics and supports categories, common-property multi-selection, mixed values, Layer, ByLayer, Color, Enum, Numeric, and Point/Vector X/Y/Z editing. Changes are committed through `CadPropertyTransaction`.
 
-Avalonia may render Core state, invoke Actions/Tools/Property/Layer transactions and forward input. It must not create a second Selection, Snap, Grip, WorkPlane, Preview, History, Layer or Entity state model.
+Appearance rows remain compact:
+
+```text
+Color      [ByLayer] [value]
+LineStyle  [ByLayer] [value]
+LineWidth  [ByLayer] [value]
+Transparency
+Visible
+```
+
+ByLayer booleans remain Core state but are not separate rows.
+
+## Prompt and status ownership
+
+- Command Line: the only full Tool prompt, typed command input, history/completion, results, and errors.
+- Floating Tool Panel: current step, exact coordinates, Length/Angle/Factor, Tool parameters, Back/Accept/Finish/Cancel.
+- Dynamic HUD: pointer-adjacent Length/Angle, SNAP, and ORTHO/POLAR tracking feedback.
+- StatusBar: Selection, Work Plane, SNAP/ORTHO/POLAR, and XYZ coordinates.
+
+Do not copy next-step Tool prompts, History, or Precision text back into the StatusBar.
+
+## Viewport / cursor / DPI
+
+`OcctAvaloniaViewport` is the only OCCT host. Drawing uses the hollow cross cursor. Snap aperture and Dynamic HUD remain screen-size stable. ViewCube is hidden and the lower-left triedron remains.
+
+Do not issue duplicate explicit redraws after Bridge operations that already request redraw. Render scaling, overlays, and native viewport input coordinates must remain aligned at common Windows scale values such as 125% and 150%.
+
+## Application preferences
+
+Long-lived viewport/interaction preferences are application state, not Document state. `Manage → Preferences...` edits and persists scene background, grip/snap marker sizes, grip/snap/selection pixel tolerances, mouse-wheel zoom sensitivity, and viewer display deviation/angle.
+
+Changing a preference applies immediately to the current viewport. Viewer display precision is presentation tessellation quality only and must never be presented as changing CAD model mathematical precision.

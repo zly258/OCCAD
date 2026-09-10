@@ -19,13 +19,32 @@ public readonly record struct CadSubobjectSelection(
     public CadSelectionReference Reference =>
         SubshapeReference.ToSelectionReference();
 
-    public bool IsSubshape =>
+    public bool IsValid =>
+        Entity is not null &&
         SubshapeIndex >= 0 &&
         SubshapeType != OcctShapeType.Shape;
 
-    public bool IsValid =>
-        Entity is not null &&
-        IsSubshape;
+    public bool TryGetPathSegment(
+        out CadPathSegmentInfo segment)
+    {
+        if (Entity is CadPathEntity path &&
+            SubshapeType == OcctShapeType.Edge &&
+            path.TryGetSegmentInfo(SubshapeIndex, out segment))
+        {
+            segment = segment with
+            {
+                Start = Entity.ToWorldPoint(segment.Start),
+                End = Entity.ToWorldPoint(segment.End),
+                Middle = segment.Middle is { } middle
+                    ? Entity.ToWorldPoint(middle)
+                    : null
+            };
+            return true;
+        }
+
+        segment = default;
+        return false;
+    }
 }
 
 public sealed class CadSubobjectSelectionChangedEventArgs(
@@ -38,18 +57,12 @@ public sealed class CadSubobjectSelectionChangedEventArgs(
     public CadSubobjectSelection? Primary { get; } = primary;
 }
 
-/// <summary>
-/// Owns formal subobject-selection semantics: selected items, primary item,
-/// selection operations and validity against the current selection policy.
-/// Native/stable topology reference work is delegated to
-/// <see cref="CadSubobjectReferenceService"/>.
-/// </summary>
 public sealed class CadSubobjectSelectionManager
 {
     private readonly CadDocument _document;
     private readonly CadSelectionManager _selection;
-    private readonly CadSubobjectReferenceService _references;
     private readonly List<CadSubobjectSelection> _selected = [];
+    private OcctEngine? _engine;
 
     public CadSubobjectSelectionManager(
         CadDocument document,
@@ -57,8 +70,6 @@ public sealed class CadSubobjectSelectionManager
     {
         _document = document ?? throw new ArgumentNullException(nameof(document));
         _selection = selection ?? throw new ArgumentNullException(nameof(selection));
-        _references = new CadSubobjectReferenceService(_document);
-
         _document.Changed += DocumentChanged;
         _selection.Changed += SelectionChanged;
         _selection.Cleared += SelectionCleared;
@@ -67,35 +78,59 @@ public sealed class CadSubobjectSelectionManager
 
     public IReadOnlyList<CadSubobjectSelection> Selected => _selected;
     public CadSubobjectSelection? Primary { get; private set; }
-    public IReadOnlyList<CadSelectionReference> References =>
-        _selected
-            .Select(static item => item.Reference)
-            .ToArray();
-    public CadSelectionReference? PrimaryReference =>
-        Primary?.Reference;
-
-    public event EventHandler<CadSubobjectSelectionChangedEventArgs>? Changed;
 
     public void AttachEngine(OcctEngine engine)
     {
-        _references.AttachEngine(engine);
+        ArgumentNullException.ThrowIfNull(engine);
+        if (!engine.IsInitialized)
+            throw new InvalidOperationException(
+                "The OCCT engine is not initialized.");
+
+        _engine = engine;
         StabilizeCurrentSelections();
     }
 
     public IReadOnlyList<CadSubshapeReference> CaptureReferences(
-        OcctEngine engine) =>
-        _references.CaptureReferences(
-            engine,
-            _selected);
+        OcctEngine engine)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+        return _selected
+            .Select(item =>
+                CadSubshapeReferenceResolver.Capture(
+                    engine,
+                    item))
+            .ToArray();
+    }
 
     public bool TryResolveReference(
         OcctEngine engine,
         CadSubshapeReference reference,
-        out CadSubshapeReference resolved) =>
-        _references.TryResolveReference(
-            engine,
-            reference,
-            out resolved);
+        out CadSubshapeReference resolved)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+
+        var entity =
+            _document.FindById(reference.EntityId);
+        if (entity is null ||
+            !CadSubshapeReferenceResolver.TryResolve(
+                engine,
+                entity,
+                reference,
+                out var index))
+        {
+            resolved = default;
+            return false;
+        }
+
+        resolved = new CadSubshapeReference(
+            entity.Id,
+            reference.ShapeType,
+            index,
+            reference.Fallback);
+        return true;
+    }
+
+    public event EventHandler<CadSubobjectSelectionChangedEventArgs>? Changed;
 
     public void Select(
         CadPreselection preselection,
@@ -103,13 +138,12 @@ public sealed class CadSubobjectSelectionManager
     {
         if (!preselection.IsSubshape)
         {
-            if (operation == CadSelectionOperation.Replace)
-                Clear();
+            if (operation == CadSelectionOperation.Replace) Clear();
             return;
         }
 
         Apply(
-            _references.Stabilize(
+            Stabilize(
                 new CadSubobjectSelection(
                     preselection.Entity,
                     preselection.SubshapeType,
@@ -125,52 +159,68 @@ public sealed class CadSubobjectSelectionManager
         if (!Enum.IsDefined(operation))
             throw new ArgumentOutOfRangeException(nameof(operation));
 
-        if (!item.IsValid)
-            return;
-
-        item = _references.Stabilize(item);
+        if (!item.IsValid) return;
+        item = Stabilize(item);
         var index = FindIndex(item);
-        var addsItem =
+        if (operation is CadSelectionOperation.Replace or CadSelectionOperation.Add ||
+            operation == CadSelectionOperation.Toggle && index < 0)
+        {
+            if (!_selection.CanSelectSubshape(item.Entity, item.SubshapeType) ||
+                item.SubshapeIndex < 0 ||
+                item.SubshapeType == OcctShapeType.Shape)
+                return;
+        }
+
+        var willAdd =
             operation is CadSelectionOperation.Replace or
                 CadSelectionOperation.Add ||
             operation == CadSelectionOperation.Toggle &&
             index < 0;
-
-        if (addsItem &&
-            !_selection.CanSelectSubshape(
-                item.Entity,
-                item.SubshapeType))
-            return;
-
-        if (addsItem &&
-            _selection.Selected.Count > 0)
+        if (willAdd && _selection.Selected.Count > 0)
         {
-            // Formal selection is one coherent scope at a time. A subobject
-            // keeps its owner entity as context but does not coexist with
-            // whole-entity formal selection.
+            // Formal selection is one coherent mode at a time. Subobject
+            // selection keeps its parent Entity context but does not coexist
+            // with whole-Entity selection.
             _selection.Apply(
                 Array.Empty<CadEntity>(),
                 CadSelectionOperation.Replace);
         }
 
-        var changed = operation switch
+        switch (operation)
         {
-            CadSelectionOperation.Replace => Replace(item),
-            CadSelectionOperation.Add => Add(item, index),
-            CadSelectionOperation.Remove => Remove(item, index),
-            CadSelectionOperation.Toggle => Toggle(item, index),
-            _ => false
-        };
+            case CadSelectionOperation.Replace:
+                _selected.Clear();
+                _selected.Add(item);
+                Primary = item;
+                break;
+            case CadSelectionOperation.Add:
+                if (index < 0) _selected.Add(item);
+                Primary = item;
+                break;
+            case CadSelectionOperation.Remove:
+                if (index >= 0) _selected.RemoveAt(index);
+                Primary = ResolvePrimary(Primary, item);
+                break;
+            case CadSelectionOperation.Toggle:
+                if (index >= 0)
+                {
+                    _selected.RemoveAt(index);
+                    Primary = ResolvePrimary(Primary, item);
+                }
+                else
+                {
+                    _selected.Add(item);
+                    Primary = item;
+                }
+                break;
+        }
 
-        if (changed)
-            RaiseChanged();
+        RaiseChanged();
     }
 
     public void Clear()
     {
-        if (_selected.Count == 0 && Primary is null)
-            return;
-
+        if (_selected.Count == 0 && Primary is null) return;
         _selected.Clear();
         Primary = null;
         RaiseChanged();
@@ -178,109 +228,32 @@ public sealed class CadSubobjectSelectionManager
 
     public void RefreshValidity()
     {
-        var changed = _selected.RemoveAll(item =>
-            !_selection.CanSelectSubshape(
-                item.Entity,
-                item.SubshapeType)) > 0;
-        if (!changed)
-            return;
+        var changed = _selected.RemoveAll(item => !_selection.CanSelectSubshape(item.Entity, item.SubshapeType)) > 0;
+        if (!changed) return;
 
-        if (Primary is { } primary &&
-            FindIndex(primary) < 0)
-        {
-            Primary = _selected.Count == 0
-                ? null
-                : _selected[^1];
-        }
-
+        if (Primary is { } primary && FindIndex(primary) < 0)
+            Primary = _selected.Count == 0 ? null : _selected[^1];
         RaiseChanged();
-    }
-
-    private bool Replace(CadSubobjectSelection item)
-    {
-        if (_selected.Count == 1 &&
-            SameLogicalSelection(_selected[0], item) &&
-            Primary is { } primary &&
-            SameLogicalSelection(primary, item))
-            return false;
-
-        _selected.Clear();
-        _selected.Add(item);
-        Primary = item;
-        return true;
-    }
-
-    private bool Add(
-        CadSubobjectSelection item,
-        int existingIndex)
-    {
-        if (existingIndex >= 0)
-        {
-            var primaryChanged =
-                Primary is not { } primary ||
-                !SameLogicalSelection(primary, item);
-            Primary = _selected[existingIndex];
-            return primaryChanged;
-        }
-
-        _selected.Add(item);
-        Primary = item;
-        return true;
-    }
-
-    private bool Remove(
-        CadSubobjectSelection item,
-        int existingIndex)
-    {
-        if (existingIndex < 0)
-            return false;
-
-        var removed = _selected[existingIndex];
-        _selected.RemoveAt(existingIndex);
-        Primary = ResolvePrimary(Primary, removed);
-        return true;
-    }
-
-    private bool Toggle(
-        CadSubobjectSelection item,
-        int existingIndex)
-    {
-        if (existingIndex >= 0)
-            return Remove(item, existingIndex);
-
-        _selected.Add(item);
-        Primary = item;
-        return true;
     }
 
     private int FindIndex(CadSubobjectSelection item) =>
         _selected.FindIndex(value =>
-            SameLogicalSelection(value, item));
-
-    private static bool SameLogicalSelection(
-        CadSubobjectSelection left,
-        CadSubobjectSelection right) =>
-        left.SubshapeReference.SameLogicalReference(
-            right.SubshapeReference);
+            value.SubshapeReference.SameLogicalReference(
+                item.SubshapeReference));
 
     private CadSubobjectSelection? ResolvePrimary(
         CadSubobjectSelection? current,
         CadSubobjectSelection removed)
     {
         if (current is { } value &&
-            SameLogicalSelection(value, removed))
-        {
-            return _selected.Count == 0
-                ? null
-                : _selected[^1];
-        }
+            value.SubshapeReference.SameLogicalReference(
+                removed.SubshapeReference))
+            return _selected.Count == 0 ? null : _selected[^1];
 
         return current;
     }
 
-    private void DocumentChanged(
-        object? sender,
-        CadDocumentChangedEventArgs args)
+    private void DocumentChanged(object? sender, CadDocumentChangedEventArgs args)
     {
         if (args.Kind == CadDocumentChangeKind.Reset)
         {
@@ -288,8 +261,7 @@ public sealed class CadSubobjectSelectionManager
             return;
         }
 
-        if (args.Kind == CadDocumentChangeKind.Removed &&
-            args.Entity is { } removed)
+        if (args.Kind == CadDocumentChangeKind.Removed && args.Entity is { } removed)
         {
             RemoveEntitySelections(removed);
             return;
@@ -306,20 +278,43 @@ public sealed class CadSubobjectSelectionManager
         RefreshValidity();
     }
 
+    private CadSubobjectSelection Stabilize(
+        CadSubobjectSelection item)
+    {
+        if (item.StableReference is not null ||
+            _engine is not { IsInitialized: true } engine ||
+            !item.IsValid)
+            return item;
+
+        try
+        {
+            var reference =
+                CadSubshapeReferenceResolver.Capture(
+                    engine,
+                    item);
+            return item with
+            {
+                StableReference = reference
+            };
+        }
+        catch (Exception exception)
+            when (IsRecoverable(exception))
+        {
+            return item;
+        }
+    }
+
     private void StabilizeCurrentSelections()
     {
         if (_selected.Count == 0)
             return;
 
-        var primaryReference =
-            Primary?.SubshapeReference;
         var changed = false;
-
         for (var index = 0;
              index < _selected.Count;
              index++)
         {
-            var next = _references.Stabilize(_selected[index]);
+            var next = Stabilize(_selected[index]);
             if (next == _selected[index])
                 continue;
 
@@ -327,22 +322,36 @@ public sealed class CadSubobjectSelectionManager
             changed = true;
         }
 
-        if (primaryReference is { } expected)
-            Primary = FindByReference(expected) ?? Primary;
+        if (Primary is { } primary)
+        {
+            var primaryIndex = _selected.FindIndex(item =>
+                item.SubshapeReference.SameLogicalReference(
+                    primary.SubshapeReference));
+            if (primaryIndex >= 0)
+                Primary = _selected[primaryIndex];
+        }
 
         if (changed)
             RaiseChanged();
     }
 
-    private void RefreshEntitySelections(CadEntity entity)
+    private void RefreshEntitySelections(
+        CadEntity entity)
     {
         var affected = _selected
             .Select((item, index) => (item, index))
             .Where(pair =>
                 ReferenceEquals(pair.item.Entity, entity))
             .ToArray();
+
         if (affected.Length == 0)
             return;
+
+        if (_engine is not { IsInitialized: true } engine)
+        {
+            RemoveEntitySelections(entity);
+            return;
+        }
 
         var primaryReference =
             Primary is { } primary &&
@@ -351,22 +360,57 @@ public sealed class CadSubobjectSelectionManager
                 : (CadSubshapeReference?)null;
 
         var remove = new List<int>();
-        var changed = false;
         foreach (var (item, index) in affected)
         {
-            if (!_references.TryRefresh(
-                    item,
-                    out var refreshed))
+            var reference = item.SubshapeReference;
+
+            if (entity is CadPathEntity &&
+                reference.ShapeType == OcctShapeType.Edge &&
+                reference.Index < ((CadPathEntity)entity).SegmentCount)
+            {
+                var pathPoint = PathRepresentativePoint(
+                    (CadPathEntity)entity,
+                    reference.Index);
+
+                _selected[index] = item with
+                {
+                    SubshapeIndex = reference.Index,
+                    Point = pathPoint,
+                    StableReference = reference
+                };
+                continue;
+            }
+
+            if (!CadSubshapeReferenceResolver.TryResolve(
+                    engine,
+                    entity,
+                    reference,
+                    out var resolvedIndex))
             {
                 remove.Add(index);
                 continue;
             }
 
-            if (refreshed != item)
+            var resolvedReference =
+                new CadSubshapeReference(
+                    entity.Id,
+                    reference.ShapeType,
+                    resolvedIndex,
+                    reference.Fallback);
+
+            var point = item.Point;
+            CadSubshapeReferenceResolver.TryGetRepresentativePoint(
+                engine,
+                entity,
+                resolvedReference,
+                out point);
+
+            _selected[index] = item with
             {
-                _selected[index] = refreshed;
-                changed = true;
-            }
+                SubshapeIndex = resolvedIndex,
+                Point = point,
+                StableReference = resolvedReference
+            };
         }
 
         for (var index = remove.Count - 1;
@@ -374,15 +418,19 @@ public sealed class CadSubobjectSelectionManager
              index--)
         {
             _selected.RemoveAt(remove[index]);
-            changed = true;
         }
 
         if (primaryReference is { } expected)
         {
-            Primary = FindByReference(expected) ??
-                (_selected.Count == 0
+            var primaryIndex =
+                _selected.FindIndex(item =>
+                    item.SubshapeReference
+                        .SameLogicalReference(expected));
+            Primary = primaryIndex >= 0
+                ? _selected[primaryIndex]
+                : _selected.Count == 0
                     ? null
-                    : _selected[^1]);
+                    : _selected[^1];
         }
         else if (Primary is { } current &&
                  !_selected.Contains(current))
@@ -392,35 +440,38 @@ public sealed class CadSubobjectSelectionManager
                 : _selected[^1];
         }
 
-        if (changed)
-            RaiseChanged();
+        RaiseChanged();
     }
 
-    private CadSubobjectSelection? FindByReference(
-        CadSubshapeReference reference)
+    private static OcctPoint3d PathRepresentativePoint(
+        CadPathEntity path,
+        int segmentIndex)
     {
-        var index = _selected.FindIndex(item =>
-            item.SubshapeReference.SameLogicalReference(reference));
-        return index >= 0
-            ? _selected[index]
-            : null;
+        if (!path.TryGetSegmentInfo(
+                segmentIndex,
+                out var segment))
+            return path.ToWorldPoint(path.Start);
+
+        var point = segment.Middle ??
+            new OcctPoint3d(
+                (segment.Start.X + segment.End.X) * 0.5,
+                (segment.Start.Y + segment.End.Y) * 0.5,
+                (segment.Start.Z + segment.End.Z) * 0.5);
+
+        return path.ToWorldPoint(point);
     }
+
+    private static bool IsRecoverable(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private void RemoveEntitySelections(CadEntity entity)
     {
-        var changed = _selected.RemoveAll(item =>
-            ReferenceEquals(item.Entity, entity)) > 0;
-        if (!changed)
-            return;
-
-        if (Primary is { } primary &&
-            ReferenceEquals(primary.Entity, entity))
-        {
-            Primary = _selected.Count == 0
-                ? null
-                : _selected[^1];
-        }
-
+        var changed = _selected.RemoveAll(item => ReferenceEquals(item.Entity, entity)) > 0;
+        if (!changed) return;
+        if (Primary is { } primary && ReferenceEquals(primary.Entity, entity))
+            Primary = _selected.Count == 0 ? null : _selected[^1];
         RaiseChanged();
     }
 
@@ -432,14 +483,9 @@ public sealed class CadSubobjectSelectionManager
             Clear();
     }
 
-    private void SelectionCleared(
-        object? sender,
-        EventArgs args) =>
-        Clear();
+    private void SelectionCleared(object? sender, EventArgs args) => Clear();
 
-    private void SelectionFilterChanged(
-        object? sender,
-        EventArgs args) =>
+    private void SelectionFilterChanged(object? sender, EventArgs args) =>
         RefreshValidity();
 
     private void RaiseChanged() =>

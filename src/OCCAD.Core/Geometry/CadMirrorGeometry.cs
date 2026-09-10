@@ -2,132 +2,50 @@ using OcctNet;
 
 namespace OCCAD;
 
-/// <summary>
-/// Creates detached mirrored geometry for entity types in the active OCCAD
-/// capability surface. Associative derived entities deliberately drop source
-/// references so a mirrored copy cannot keep reacting to an original host.
-/// </summary>
 internal static class CadMirrorGeometry
 {
-    public static CadEntity Create(
-        CadEntity entity,
-        OcctPoint3d origin,
-        OcctVector3d normal)
+    public static CadEntity Create(CadEntity entity, OcctPoint3d origin, OcctVector3d normal)
     {
-        ArgumentNullException.ThrowIfNull(entity);
-        if (!origin.IsFinite)
-            throw new ArgumentOutOfRangeException(nameof(origin));
-        if (!normal.TryNormalize(out var n))
-            throw new ArgumentOutOfRangeException(nameof(normal));
-
-        OcctPoint3d Point(OcctPoint3d point)
+        if (!origin.IsFinite) throw new ArgumentOutOfRangeException(nameof(origin));
+        if (!normal.TryNormalize(out var n)) throw new ArgumentOutOfRangeException(nameof(normal));
+        OcctPoint3d Point(OcctPoint3d p)
         {
-            var world = entity.ToWorldPoint(point);
-            return world - n * (2.0 * (world - origin).Dot(n));
+            var world = entity.ToWorldPoint(p);
+            return world - n * (2 * (world - origin).Dot(n));
         }
 
-        OcctVector3d Vector(OcctVector3d vector)
+        OcctVector3d Vector(OcctVector3d v)
         {
-            var world = entity.ToWorldVector(vector);
-            return world - n * (2.0 * world.Dot(n));
+            var world = entity.ToWorldVector(v);
+            return world - n * (2 * world.Dot(n));
         }
-
-        // Reflection flips handedness. Reverse reflected plane normals so curve
-        // winding remains consistent with the source entity convention.
-        OcctVector3d PlaneNormal(OcctVector3d vector) => Vector(vector) * -1.0;
-
+        OcctVector3d PlaneNormal(OcctVector3d v) => Vector(v) * -1;
         return entity switch
         {
-            CadPointEntity value =>
-                new CadPointEntity(Point(value.Point)),
-            CadLineEntity value =>
-                new CadLineEntity(Point(value.Start), Point(value.End)),
-            CadCenterLineEntity value =>
-                new CadCenterLineEntity(
-                    Point(value.Start),
-                    Point(value.End),
-                    value.StartExtend,
-                    value.EndExtend,
-                    value.ShowExtend),
-            CadCenterMarkEntity value =>
-                new CadCenterMarkEntity(
-                    Point(value.Center),
-                    PlaneNormal(value.Normal),
-                    value.Radius,
-                    value.CrossSizeFactor,
-                    value.CrossSpacingFactor,
-                    value.LeftExtend,
-                    value.RightExtend,
-                    value.TopExtend,
-                    value.BottomExtend,
-                    value.ShowExtend),
-            CadPolylineEntity value =>
-                new CadPolylineEntity(
-                    value.Points.Select(Point),
-                    value.Closed),
-            CadPolygonEntity value =>
-                new CadPolygonEntity(value.Points.Select(Point)),
-            CadRegularPolygonEntity value =>
-                new CadRegularPolygonEntity(
-                    Point(value.Center),
-                    PlaneNormal(value.Normal),
-                    Vector(value.XAxis),
-                    value.Radius,
-                    value.Sides),
-            CadRectangleEntity value =>
-                new CadRectangleEntity(
-                    Point(value.Center),
-                    Vector(value.XAxis),
-                    Vector(value.YAxis),
-                    value.Width,
-                    value.Height),
-            CadCircleEntity value =>
-                new CadCircleEntity(
-                    Point(value.Center),
-                    PlaneNormal(value.Normal),
-                    value.Radius),
-            CadArcEntity value =>
-                new CadArcEntity(
-                    Point(value.Start),
-                    Point(value.Middle),
-                    Point(value.End)),
-            CadEllipseEntity value =>
-                new CadEllipseEntity(
-                    Point(value.Center),
-                    PlaneNormal(value.Normal),
-                    Vector(value.XAxis),
-                    value.MajorRadius,
-                    value.MinorRadius),
-            CadSplineEntity value =>
-                new CadSplineEntity(
-                    value.FitPoints.Select(Point),
-                    value.Periodic,
-                    value.Tolerance),
-            CadBoxEntity value =>
-                new CadBoxEntity(
-                    Point(value.Origin) + Vector(value.ZAxis) * value.Height,
-                    Vector(value.XAxis),
-                    Vector(value.YAxis),
-                    Vector(value.ZAxis) * -1.0,
-                    value.Length,
-                    value.Width,
-                    value.Height),
-            CadCylinderEntity value =>
-                new CadCylinderEntity(
-                    Point(value.Origin),
-                    Vector(value.Axis),
-                    value.Radius,
-                    value.Height),
-            CadConeEntity value =>
-                new CadConeEntity(
-                    Point(value.Origin),
-                    Vector(value.Axis),
-                    value.Radius,
-                    value.Height),
-            CadSphereEntity value =>
-                new CadSphereEntity(Point(value.Center), value.Radius),
-            _ => throw new NotSupportedException(
-                $"Mirroring is not supported for entity type '{entity.EntityType}'.")
+            CadAngleDimensionEntity e => new CadAngleDimensionEntity(Point(e.Vertex), Vector(e.FirstDirection), Vector(e.SecondDirection), e.Radius, e.TextHeight, e.ArrowSize, e.FontName),
+            CadCircularDimensionEntity e => new CadCircularDimensionEntity(e.Kind, Point(e.Center), PlaneNormal(e.Normal), Vector(e.Direction), e.Radius, e.Offset, e.TextHeight, e.ArrowSize, e.FontName),
+            CadLengthDimensionEntity e => new CadLengthDimensionEntity(Point(e.Start), Point(e.End), PlaneNormal(e.Normal), e.Offset, e.TextHeight, e.ArrowSize, e.FontName),
+            CadTextEntity e => new CadTextEntity(e.Text, Point(e.InsertionPoint), PlaneNormal(e.Normal), Vector(e.XAxis), e.Height, e.AngleDegrees, e.FontName),
+            CadPointEntity e => new CadPointEntity(Point(e.Point)),
+            CadLineEntity e => new CadLineEntity(Point(e.Start), Point(e.End)),
+            CadPolylineEntity e => new CadPolylineEntity(e.Points.Select(Point), e.Closed),
+            CadPolygonEntity e => new CadPolygonEntity(e.Points.Select(Point)),
+            CadRegularPolygonEntity e => new CadRegularPolygonEntity(Point(e.Center), PlaneNormal(e.Normal), Vector(e.XAxis), e.Radius, e.Sides),
+            CadRectangleEntity e => new CadRectangleEntity(Point(e.Center), Vector(e.XAxis), Vector(e.YAxis), e.Width, e.Height),
+            CadCircleEntity e => new CadCircleEntity(Point(e.Center), PlaneNormal(e.Normal), e.Radius),
+            CadArcEntity e => new CadArcEntity(Point(e.Start), Point(e.Middle), Point(e.End)),
+            CadEllipseEntity e => new CadEllipseEntity(Point(e.Center), PlaneNormal(e.Normal), Vector(e.XAxis), e.MajorRadius, e.MinorRadius),
+            CadSplineEntity e => new CadSplineEntity(e.FitPoints.Select(Point), e.Periodic, e.Tolerance),
+            CadBoxEntity e => new CadBoxEntity(Point(e.Origin) + Vector(e.ZAxis) * e.Height,
+                Vector(e.XAxis), Vector(e.YAxis), Vector(e.ZAxis) * -1, e.Length, e.Width, e.Height),
+            CadCylinderEntity e => new CadCylinderEntity(Point(e.Origin), Vector(e.Axis), e.Radius, e.Height),
+            CadConeEntity e => new CadConeEntity(Point(e.Origin), Vector(e.Axis), e.Radius, e.Height),
+            CadFrustumEntity e => new CadFrustumEntity(Point(e.Origin), Vector(e.Axis), e.BaseRadius, e.TopRadius, e.Height),
+            CadSphereEntity e => new CadSphereEntity(Point(e.Center), e.Radius),
+            CadHelixEntity e => new CadHelixEntity(Point(e.Origin), PlaneNormal(e.Axis), Vector(e.XAxis), e.Radius, -e.Pitch, e.Turns),
+            CadEllipsoidEntity e => new CadEllipsoidEntity(Point(e.Center), Vector(e.XAxis), Vector(e.YAxis), PlaneNormal(e.ZAxis), e.XRadius, e.YRadius, e.ZRadius),
+            CadTorusEntity e => new CadTorusEntity(Point(e.Center), Vector(e.Axis), e.MajorRadius, e.MinorRadius),
+            _ => throw new NotSupportedException($"Mirroring is not supported for entity type '{entity.EntityType}'.")
         };
     }
 }

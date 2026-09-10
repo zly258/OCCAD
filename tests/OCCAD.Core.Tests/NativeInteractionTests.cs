@@ -130,6 +130,66 @@ public sealed class NativeInteractionTests
     }
 
     [TestMethod]
+    [DataRow("trim")]
+    [DataRow("extend")]
+    public void BoundaryToolsPreviewStepBackCommitAndUndo(string id)
+    {
+        using var scene = new NativeScene(); var w = scene.Workspace;
+        var boundary = new CadLineEntity(new(5, -20, 0), new(5, 20, 0));
+        var target = new CadLineEntity(default, new(id == "trim" ? 10 : 3, 0, 0));
+        w.Document.AddRange([boundary, target]);
+        w.Selection.Select(boundary);
+        w.Tools.Activate(id);
+        Hover(w, target, new(id == "trim" ? 8 : 3, 0, 0));
+        Assert.IsTrue(w.Preview.IsVisible);
+        Assert.HasCount(2, w.Document.Entities);
+        Assert.IsFalse(w.History.CanUndo);
+        Assert.IsTrue(w.Tools.StepBackCurrent());
+        Assert.IsFalse(w.Preview.HasTransient);
+        w.Selection.Select(boundary);
+        Assert.IsTrue(w.Tools.SubmitCurrent());
+        Hover(w, target, new(id == "trim" ? 8 : 3, 0, 0));
+        Click(w);
+        Assert.IsFalse(w.Preview.HasTransient);
+        Assert.IsTrue(w.History.CanUndo);
+        w.Tools.CancelCurrent(); w.Selection.Clear();
+        InteractionTests.AssertNeutral(w);
+        Assert.IsTrue(w.History.Undo());
+        Assert.IsFalse(w.History.CanUndo);
+        Assert.HasCount(2, w.Document.Entities);
+        Assert.AreEqual(2, scene.Engine.ObjectCount);
+        Assert.AreEqual(id == "trim" ? 10 : 3, target.End.X);
+        Assert.IsTrue(w.History.Redo());
+    }
+
+    [TestMethod]
+    [DataRow("fillet")]
+    [DataRow("chamfer")]
+    public void CornerToolsPreviewStepBackAndAtomicCommit(string id)
+    {
+        using var scene = new NativeScene(); var w = scene.Workspace;
+        var a = new CadLineEntity(default, new(100, 0, 0));
+        var b = new CadLineEntity(default, new(0, 100, 0));
+        w.Document.AddRange([a, b]); w.Tools.Activate(id);
+        Hover(w, a, new(50, 0, 0)); Click(w);
+        Assert.IsTrue(w.Preview.IsVisible, "First-curve feedback must survive stage change.");
+        Hover(w, b, new(0, 50, 0));
+        Assert.IsTrue(w.Preview.IsVisible);
+        Assert.IsFalse(w.History.CanUndo);
+        Assert.IsTrue(w.Tools.StepBackCurrent());
+        Assert.IsFalse(w.Preview.HasTransient);
+        Hover(w, a, new(50, 0, 0)); Click(w);
+        Hover(w, b, new(0, 50, 0)); Click(w);
+        InteractionTests.AssertNeutral(w);
+        Assert.IsTrue(w.History.CanUndo);
+        Assert.IsTrue(w.History.Undo());
+        Assert.IsFalse(w.History.CanUndo);
+        Assert.HasCount(2, w.Document.Entities);
+        Assert.AreEqual(2, scene.Engine.ObjectCount);
+        Assert.IsTrue(w.History.Redo());
+    }
+
+    [TestMethod]
     public void PointerFailureClearsReplacementOwnershipAndToolCanContinue()
     {
         using var scene = new NativeScene(); var w = scene.Workspace;
@@ -162,57 +222,39 @@ public sealed class NativeInteractionTests
         w.Tools.HandlePointer(new(OcctPointerInputKind.Moved, OcctPointerButton.None,
             OcctPointerButtons.None, screen.X, screen.Y, 0, OcctInputModifiers.None));
     }
+    private static void Hover(CadWorkspace w, CadEntity entity, OcctPoint3d point)
+    {
+        w.Preselection.Update(entity, new(entity.ViewerObject!, OcctShapeType.Shape, -1, point, 0, 0));
+        Move(w, point);
+    }
+    private static void Click(CadWorkspace w) => w.Tools.HandlePointer(new(
+        OcctPointerInputKind.Pressed, OcctPointerButton.Left, OcctPointerButtons.Left, 20, 20, 0, OcctInputModifiers.None));
 }
 
 internal sealed class NativeScene : IDisposable
 {
     private readonly nint _display;
     private readonly nuint _window;
-
-    public CadApplicationCore Application { get; }
     public OcctEngine Engine { get; }
-    public CadWorkspace Workspace => Application.Workspace;
-    public CadCommandManager Commands => Application.Commands;
+    public CadWorkspace Workspace { get; }
 
     public NativeScene()
     {
-        if (!OperatingSystem.IsLinux() ||
-            Environment.GetEnvironmentVariable("OCCAD_NATIVE_TESTS") != "1")
-        {
-            Assert.Inconclusive(
-                "Set OCCAD_NATIVE_TESTS=1 with an X11 display and the native SDK to run viewer tests.");
-        }
-
+        if (!OperatingSystem.IsLinux() || Environment.GetEnvironmentVariable("OCCAD_NATIVE_TESTS") != "1")
+            Assert.Inconclusive("Set OCCAD_NATIVE_TESTS=1 with an X11 display and the native SDK to run viewer tests.");
         XInitThreads();
         _display = XOpenDisplay(null);
         Assert.AreNotEqual(nint.Zero, _display, "An X11 display is required.");
-        _window = XCreateSimpleWindow(
-            _display,
-            XDefaultRootWindow(_display),
-            0,
-            0,
-            640,
-            480,
-            0,
-            0,
-            0);
-        XMapWindow(_display, _window);
-        XSync(_display, false);
-
-        Engine = new OcctEngine();
-        Engine.Initialize((nint)_window);
-        Application = new CadApplicationCore();
-        Workspace.AttachEngine(Engine);
+        _window = XCreateSimpleWindow(_display, XDefaultRootWindow(_display), 0, 0, 640, 480, 0, 0, 0);
+        XMapWindow(_display, _window); XSync(_display, false);
+        Engine = new OcctEngine(); Engine.Initialize((nint)_window);
+        Workspace = new CadWorkspace(); Workspace.AttachEngine(Engine);
     }
-
     public void Dispose()
     {
-        Application.Dispose();
-        Engine.Dispose();
-        XDestroyWindow(_display, _window);
-        XCloseDisplay(_display);
+        Workspace.Dispose(); Engine.Dispose();
+        XDestroyWindow(_display, _window); XCloseDisplay(_display);
     }
-
     [DllImport("libX11.so.6")] private static extern int XInitThreads();
     [DllImport("libX11.so.6")] private static extern nint XOpenDisplay(string? display);
     [DllImport("libX11.so.6")] private static extern nuint XDefaultRootWindow(nint display);

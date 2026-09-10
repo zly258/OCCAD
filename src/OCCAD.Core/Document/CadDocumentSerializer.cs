@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using OcctNet;
@@ -7,8 +7,7 @@ namespace OCCAD;
 
 public static class CadDocumentSerializer
 {
-    public const int CurrentVersion = 2;
-    private const int LegacyNameLayerVersion = 1;
+    public const int CurrentVersion = 1;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -100,7 +99,6 @@ public static class CadDocumentSerializer
         var layers = workspace.Layers.Layers
             .Select(static layer => new CadLayerFile
             {
-                Id = layer.Id,
                 Name = layer.Name,
                 ColorArgb = layer.Color.ToArgb(),
                 LineWidth = layer.LineWidth,
@@ -117,7 +115,7 @@ public static class CadDocumentSerializer
         return new CadDocumentFile
         {
             Version = CurrentVersion,
-            CurrentLayerId = workspace.Layers.Current.Id,
+            CurrentLayer = workspace.Layers.Current.Name,
             Layers = layers,
             Entities = entities
         };
@@ -137,7 +135,7 @@ public static class CadDocumentSerializer
             Type = descriptor.Id,
             Id = entity.Id,
             Name = entity.Name,
-            LayerId = entity.LayerId,
+            Layer = entity.Layer,
             Visible = entity.Visible,
             Selectable = entity.Selectable,
             ColorByLayer = entity.ColorByLayer,
@@ -158,81 +156,40 @@ public static class CadDocumentSerializer
         CadEntityRegistry registry,
         CadDocumentFile model)
     {
-        if (model.Version is not CurrentVersion and not LegacyNameLayerVersion)
+        if (model.Version != CurrentVersion)
             throw new InvalidDataException(
-                $"Unsupported CAD document version '{model.Version}'. Expected '{LegacyNameLayerVersion}' or '{CurrentVersion}'.");
+                $"Unsupported CAD document version '{model.Version}'. Expected '{CurrentVersion}'.");
 
-        var layers = PrepareLayers(
-            model,
-            out var layerIds,
-            out var layerNamesToIds);
-
-        var currentLayerId = ResolveCurrentLayerId(
-            model,
-            layerIds,
-            layerNamesToIds);
-
+        var layers = PrepareLayers(model, out var layerNames);
         var entityIds = new HashSet<Guid>();
         var entities = new List<CadEntity>(model.Entities?.Count ?? 0);
         foreach (var item in model.Entities ?? [])
-        {
-            entities.Add(
-                PrepareEntity(
-                    registry,
-                    item,
-                    model.Version,
-                    layerIds,
-                    layerNamesToIds,
-                    entityIds));
-        }
+            entities.Add(PrepareEntity(registry, item, layerNames, entityIds));
 
         return new PreparedDocument(
             layers,
-            currentLayerId,
+            model.CurrentLayer!.Trim(),
             entities);
     }
 
-    private static IReadOnlyList<PreparedLayer> PrepareLayers(
+    private static IReadOnlyList<CadLayerState> PrepareLayers(
         CadDocumentFile model,
-        out HashSet<string> layerIds,
-        out Dictionary<string, string> layerNamesToIds)
+        out HashSet<string> layerNames)
     {
         if (model.Layers is null || model.Layers.Count == 0)
             throw new InvalidDataException("CAD document must contain at least layer '0'.");
 
-        layerIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        layerNamesToIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var layers = new List<PreparedLayer>(model.Layers.Count);
-
+        layerNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var layers = new List<CadLayerState>(model.Layers.Count);
         foreach (var item in model.Layers)
         {
             if (item is null || string.IsNullOrWhiteSpace(item.Name))
                 throw new InvalidDataException("CAD document contains an unnamed layer.");
 
             var name = item.Name.Trim();
-            if (layerNamesToIds.ContainsKey(name))
+            if (!layerNames.Add(name))
                 throw new InvalidDataException(
                     $"CAD document contains duplicate layer '{name}'.");
-
-            string id;
-            if (model.Version == LegacyNameLayerVersion)
-            {
-                id = string.Equals(name, "0", StringComparison.OrdinalIgnoreCase)
-                    ? CadLayer.DefaultId
-                    : Guid.NewGuid().ToString("N");
-            }
-            else
-            {
-                if (string.IsNullOrWhiteSpace(item.Id))
-                    throw new InvalidDataException(
-                        $"Layer '{name}' has no stable id.");
-                id = item.Id.Trim();
-            }
-
-            if (!layerIds.Add(id))
-                throw new InvalidDataException(
-                    $"CAD document contains duplicate layer id '{id}'.");
-
             if (!double.IsFinite(item.LineWidth) || item.LineWidth <= 0.0)
                 throw new InvalidDataException(
                     $"Layer '{name}' has an invalid line width.");
@@ -241,55 +198,28 @@ public static class CadDocumentSerializer
                 throw new InvalidDataException(
                     $"Layer '{name}' has invalid line style '{item.LineStyle}'.");
 
-            layerNamesToIds.Add(name, id);
-            layers.Add(
-                new PreparedLayer(
-                    id,
-                    new CadLayerState(
-                        name,
-                        Color.FromArgb(item.ColorArgb),
-                        item.LineWidth,
-                        lineStyle,
-                        item.Visible,
-                        item.Locked)));
+            layers.Add(new CadLayerState(
+                name,
+                Color.FromArgb(item.ColorArgb),
+                item.LineWidth,
+                lineStyle,
+                item.Visible,
+                item.Locked));
         }
 
-        if (!layerNamesToIds.TryGetValue("0", out var defaultId) ||
-            !string.Equals(defaultId, CadLayer.DefaultId, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException(
-                "CAD document default layer must have name '0' and id '0'.");
+        if (!layerNames.Contains("0"))
+            throw new InvalidDataException("CAD document must contain default layer '0'.");
+        if (string.IsNullOrWhiteSpace(model.CurrentLayer) ||
+            !layerNames.Contains(model.CurrentLayer))
+            throw new InvalidDataException("CAD document current layer is invalid.");
 
         return layers;
-    }
-
-    private static string ResolveCurrentLayerId(
-        CadDocumentFile model,
-        HashSet<string> layerIds,
-        Dictionary<string, string> layerNamesToIds)
-    {
-        if (model.Version == LegacyNameLayerVersion)
-        {
-            if (string.IsNullOrWhiteSpace(model.CurrentLayer) ||
-                !layerNamesToIds.TryGetValue(model.CurrentLayer.Trim(), out var legacyId))
-                throw new InvalidDataException("CAD document current layer is invalid.");
-            return legacyId;
-        }
-
-        if (string.IsNullOrWhiteSpace(model.CurrentLayerId))
-            throw new InvalidDataException("CAD document current layer id is missing.");
-
-        var id = model.CurrentLayerId.Trim();
-        if (!layerIds.Contains(id))
-            throw new InvalidDataException("CAD document current layer id is invalid.");
-        return id;
     }
 
     private static CadEntity PrepareEntity(
         CadEntityRegistry registry,
         CadEntityFile? item,
-        int version,
-        HashSet<string> layerIds,
-        Dictionary<string, string> layerNamesToIds,
+        HashSet<string> layerNames,
         HashSet<Guid> ids)
     {
         if (item is null)
@@ -301,31 +231,11 @@ public static class CadDocumentSerializer
             throw new InvalidDataException($"Entity '{item.Id}' has no type.");
         if (string.IsNullOrWhiteSpace(item.Name))
             throw new InvalidDataException($"Entity '{item.Id}' has no name.");
+        if (string.IsNullOrWhiteSpace(item.Layer) || !layerNames.Contains(item.Layer))
+            throw new InvalidDataException(
+                $"Entity '{item.Id}' references unknown layer '{item.Layer}'.");
         if (item.Geometry is null)
             throw new InvalidDataException($"Entity '{item.Id}' has no geometry.");
-
-        string layerId;
-        if (version == LegacyNameLayerVersion)
-        {
-            if (string.IsNullOrWhiteSpace(item.Layer) ||
-                !layerNamesToIds.TryGetValue(item.Layer.Trim(), out var legacyLayerId))
-            {
-                throw new InvalidDataException(
-                    $"Entity '{item.Id}' references unknown layer '{item.Layer}'.");
-            }
-
-            layerId = legacyLayerId;
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(item.LayerId))
-                throw new InvalidDataException(
-                    $"Entity '{item.Id}' has no layer id.");
-            layerId = item.LayerId.Trim();
-            if (!layerIds.Contains(layerId))
-                throw new InvalidDataException(
-                    $"Entity '{item.Id}' references unknown layer id '{layerId}'.");
-        }
 
         CadEntityDescriptor descriptor;
         try
@@ -346,7 +256,7 @@ public static class CadDocumentSerializer
         var entity = registry.ReadGeometry(descriptor.Id, item.Geometry);
         entity.RestoreIdentity(item.Id);
         entity.Name = item.Name.Trim();
-        entity.LayerId = layerId;
+        entity.Layer = item.Layer.Trim();
         entity.Visible = item.Visible;
         entity.Selectable = item.Selectable;
         entity.ColorByLayer = item.ColorByLayer;
@@ -372,7 +282,8 @@ public static class CadDocumentSerializer
         {
             entity.RestorePlacement(
                 new CadPlacement(
-                    item.Placement ?? OcctTransform3d.Identity));
+                    item.Placement ??
+                    OcctTransform3d.Identity));
         }
         catch (ArgumentException exception)
         {
@@ -390,22 +301,19 @@ public static class CadDocumentSerializer
     {
         workspace.ResetDocument();
 
-        var defaultLayer = prepared.Layers.Single(layer =>
-            string.Equals(layer.Id, CadLayer.DefaultId, StringComparison.OrdinalIgnoreCase));
-        workspace.Layers.GetRequiredById(CadLayer.DefaultId).RestoreState(defaultLayer.State);
-
-        foreach (var preparedLayer in prepared.Layers)
+        var defaultState = prepared.Layers.Single(static layer =>
+            string.Equals(layer.Name, "0", StringComparison.OrdinalIgnoreCase));
+        workspace.Layers.GetRequired("0").RestoreState(defaultState);
+        foreach (var state in prepared.Layers)
         {
-            if (string.Equals(preparedLayer.Id, CadLayer.DefaultId, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(state.Name, "0", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var layer = workspace.Layers.AddWithId(
-                preparedLayer.Id,
-                preparedLayer.State.Name);
-            layer.RestoreState(preparedLayer.State);
+            var layer = workspace.Layers.Add(state.Name);
+            layer.RestoreState(state);
         }
 
-        workspace.Layers.SetCurrent(prepared.CurrentLayerId);
+        workspace.Layers.SetCurrent(prepared.CurrentLayer);
         workspace.Document.AddRange(prepared.Entities);
         workspace.History.Clear();
         workspace.Selection.Clear();
@@ -433,15 +341,13 @@ public static class CadDocumentSerializer
     private sealed class CadDocumentFile
     {
         public int Version { get; set; }
-        public string? CurrentLayerId { get; set; }
-        public string? CurrentLayer { get; set; }
+        public string? CurrentLayer { get; set; } = "0";
         public List<CadLayerFile>? Layers { get; set; } = [];
         public List<CadEntityFile>? Entities { get; set; } = [];
     }
 
     private sealed class CadLayerFile
     {
-        public string? Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public int ColorArgb { get; set; }
         public double LineWidth { get; set; }
@@ -455,7 +361,6 @@ public static class CadDocumentSerializer
         public string? Type { get; set; }
         public Guid Id { get; set; }
         public string? Name { get; set; }
-        public string? LayerId { get; set; }
         public string? Layer { get; set; }
         public bool Visible { get; set; } = true;
         public bool Selectable { get; set; } = true;
@@ -472,12 +377,8 @@ public static class CadDocumentSerializer
         public JsonObject? Geometry { get; set; }
     }
 
-    private sealed record PreparedLayer(
-        string Id,
-        CadLayerState State);
-
     private sealed record PreparedDocument(
-        IReadOnlyList<PreparedLayer> Layers,
-        string CurrentLayerId,
+        IReadOnlyList<CadLayerState> Layers,
+        string CurrentLayer,
         IReadOnlyList<CadEntity> Entities);
 }

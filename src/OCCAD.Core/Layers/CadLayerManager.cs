@@ -21,20 +21,14 @@ public sealed class CadLayerManagerChangedEventArgs(
     public string? PreviousName { get; } = previousName;
 }
 
-/// <summary>
-/// Canonical layer registry. Layer identity and display name are deliberately
-/// separate, matching the OCCTBIM-Source Layer/LayerManager contract.
-/// </summary>
 public sealed class CadLayerManager
 {
     private readonly List<CadLayer> _layers = [];
-    private readonly Dictionary<string, CadLayer> _layersById =
-        new(StringComparer.OrdinalIgnoreCase);
     private CadLayer _current;
 
     public CadLayerManager()
     {
-        _current = AddCore(CadLayer.DefaultId, "0");
+        _current = AddCore("0");
     }
 
     public IReadOnlyList<CadLayer> Layers => _layers;
@@ -47,23 +41,7 @@ public sealed class CadLayerManager
         var normalized = NormalizeName(name);
         EnsureUniqueName(normalized, except: null);
 
-        var layer = AddCore(CreateId(), normalized);
-        Changed?.Invoke(
-            this,
-            new CadLayerManagerChangedEventArgs(
-                CadLayerManagerChangeKind.Added,
-                layer));
-        return layer;
-    }
-
-    internal CadLayer AddWithId(string id, string name)
-    {
-        var normalizedId = NormalizeId(id);
-        var normalizedName = NormalizeName(name);
-        EnsureUniqueId(normalizedId);
-        EnsureUniqueName(normalizedName, except: null);
-
-        var layer = AddCore(normalizedId, normalizedName);
+        var layer = AddCore(normalized);
         Changed?.Invoke(
             this,
             new CadLayerManagerChangedEventArgs(
@@ -77,7 +55,7 @@ public sealed class CadLayerManager
         for (var index = 1; ; index++)
         {
             var name = $"Layer{index}";
-            if (TryGetByName(name) is not null) continue;
+            if (TryGet(name) is not null) continue;
 
             var layer = Add(name);
             SetCurrent(layer);
@@ -88,32 +66,16 @@ public sealed class CadLayerManager
     public string GenerateUniqueName(string baseName)
     {
         var normalized = NormalizeName(baseName);
-        if (TryGetByName(normalized) is null) return normalized;
+        if (TryGet(normalized) is null) return normalized;
 
         for (var index = 1; ; index++)
         {
             var candidate = $"{normalized}{index}";
-            if (TryGetByName(candidate) is null) return candidate;
+            if (TryGet(candidate) is null) return candidate;
         }
     }
 
-    /// <summary>
-    /// Compatibility resolver during the LayerId migration. Stable id wins;
-    /// display name is accepted only as a fallback.
-    /// </summary>
-    public CadLayer? TryGet(string reference)
-    {
-        var normalized = NormalizeName(reference);
-        return TryGetById(normalized) ?? TryGetByName(normalized);
-    }
-
-    public CadLayer? TryGetById(string id)
-    {
-        var normalized = NormalizeId(id);
-        return _layersById.GetValueOrDefault(normalized);
-    }
-
-    public CadLayer? TryGetByName(string name)
+    public CadLayer? TryGet(string name)
     {
         var normalized = NormalizeName(name);
         return _layers.FirstOrDefault(layer =>
@@ -123,20 +85,12 @@ public sealed class CadLayerManager
                 StringComparison.OrdinalIgnoreCase));
     }
 
-    public CadLayer GetRequired(string reference) =>
-        TryGet(reference) ??
-        throw new InvalidOperationException($"Layer '{reference}' does not exist.");
-
-    public CadLayer GetRequiredById(string id) =>
-        TryGetById(id) ??
-        throw new InvalidOperationException($"Layer id '{id}' does not exist.");
-
-    public CadLayer GetRequiredByName(string name) =>
-        TryGetByName(name) ??
+    public CadLayer GetRequired(string name) =>
+        TryGet(name) ??
         throw new InvalidOperationException($"Layer '{name}' does not exist.");
 
-    public void SetCurrent(string reference) =>
-        SetCurrent(GetRequired(reference));
+    public void SetCurrent(string name) =>
+        SetCurrent(GetRequired(name));
 
     public void SetCurrent(CadLayer layer)
     {
@@ -184,8 +138,7 @@ public sealed class CadLayerManager
             layer.Changed -= LayerChanged;
 
         _layers.Clear();
-        _layersById.Clear();
-        _current = AddCore(CadLayer.DefaultId, "0");
+        _current = AddCore("0");
         Changed?.Invoke(
             this,
             new CadLayerManagerChangedEventArgs(
@@ -193,31 +146,16 @@ public sealed class CadLayerManager
                 _current));
     }
 
-    internal void RestoreSnapshot(
-        IReadOnlyList<CadLayer> layers,
-        IReadOnlyList<CadLayerState> states,
-        CadLayer current)
+    internal void RestoreSnapshot(IReadOnlyList<CadLayer> layers,
+        IReadOnlyList<CadLayerState> states, CadLayer current)
     {
-        foreach (var layer in _layers)
-            layer.Changed -= LayerChanged;
-
+        foreach (var layer in _layers) layer.Changed -= LayerChanged;
         _layers.Clear();
-        _layersById.Clear();
         _layers.AddRange(layers);
-
-        for (var i = 0; i < layers.Count; i++)
-            layers[i].RenameCore(states[i].Name);
-        for (var i = 0; i < layers.Count; i++)
-            layers[i].RestoreState(states[i]);
-
-        foreach (var layer in _layers)
-        {
-            EnsureUniqueId(layer.Id);
-            _layersById.Add(layer.Id, layer);
-            layer.Changed += LayerChanged;
-        }
-
+        for (var i = 0; i < layers.Count; i++) layers[i].RenameCore(states[i].Name);
+        for (var i = 0; i < layers.Count; i++) layers[i].RestoreState(states[i]);
         _current = current;
+        foreach (var layer in _layers) layer.Changed += LayerChanged;
         Changed?.Invoke(this, new(CadLayerManagerChangeKind.Reset, current));
     }
 
@@ -236,11 +174,10 @@ public sealed class CadLayerManager
 
         var index = _layers.IndexOf(layer);
         if (ReferenceEquals(_current, layer))
-            SetCurrent(GetRequiredById(CadLayer.DefaultId));
+            SetCurrent(GetRequired("0"));
 
         layer.Changed -= LayerChanged;
         _layers.RemoveAt(index);
-        _layersById.Remove(layer.Id);
         Changed?.Invoke(
             this,
             new CadLayerManagerChangedEventArgs(
@@ -256,14 +193,12 @@ public sealed class CadLayerManager
             throw new InvalidOperationException(
                 "Layer already belongs to this manager.");
 
-        EnsureUniqueId(layer.Id);
         EnsureUniqueName(layer.Name, except: null);
         if (index < 0 || index > _layers.Count)
             throw new ArgumentOutOfRangeException(nameof(index));
 
         layer.Changed += LayerChanged;
         _layers.Insert(index, layer);
-        _layersById.Add(layer.Id, layer);
         Changed?.Invoke(
             this,
             new CadLayerManagerChangedEventArgs(
@@ -271,12 +206,11 @@ public sealed class CadLayerManager
                 layer));
     }
 
-    private CadLayer AddCore(string id, string name)
+    private CadLayer AddCore(string name)
     {
-        var layer = new CadLayer(this, id, name);
+        var layer = new CadLayer(this, name);
         layer.Changed += LayerChanged;
         _layers.Add(layer);
-        _layersById.Add(layer.Id, layer);
         return layer;
     }
 
@@ -301,13 +235,9 @@ public sealed class CadLayerManager
                 "Layer does not belong to this manager.");
     }
 
-    private void EnsureUniqueId(string id)
-    {
-        if (_layersById.ContainsKey(id))
-            throw new InvalidOperationException($"Layer id '{id}' already exists.");
-    }
-
-    private void EnsureUniqueName(string name, CadLayer? except)
+    private void EnsureUniqueName(
+        string name,
+        CadLayer? except)
     {
         var existing = _layers.FirstOrDefault(layer =>
             !ReferenceEquals(layer, except) &&
@@ -318,14 +248,6 @@ public sealed class CadLayerManager
         if (existing is not null)
             throw new InvalidOperationException(
                 $"Layer '{name}' already exists.");
-    }
-
-    private static string CreateId() => Guid.NewGuid().ToString("N");
-
-    private static string NormalizeId(string id)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(id);
-        return id.Trim();
     }
 
     private static string NormalizeName(string name)

@@ -356,6 +356,11 @@ public sealed class CadArcEntity : CadEntity
                     _sweepAngleDegrees),
                 -_sweepAngleDegrees));
 
+    internal CadPathEntity CreatePath(
+        IEnumerable<CadEntity> segments) =>
+        CopyPropertiesTo(
+            new CadPathEntity(segments));
+
     public override CadEntity Duplicate() =>
         CopyPropertiesTo(new CadArcEntity(
             _center,
@@ -526,6 +531,11 @@ public sealed class CadArcEntity : CadEntity
     {
         var value = angle % 360.0;
         return value < 0.0 ? value + 360.0 : value;
+    }
+
+    private static void ValidatePoint(OcctPoint3d value, string name)
+    {
+        if (!value.IsFinite) throw new ArgumentOutOfRangeException(name);
     }
 
     internal static JsonObject WriteGeometry(CadArcEntity entity) =>

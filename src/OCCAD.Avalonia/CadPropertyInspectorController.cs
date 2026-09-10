@@ -910,6 +910,13 @@ internal sealed class CadPropertyInspectorController : IDisposable
         bool isMixed)
     {
         var descriptor = slot.Descriptor;
+        if (descriptor.Value.Semantic is CadValueSemantic.Point or CadValueSemantic.Vector &&
+            (descriptor.PropertyType == typeof(OcctPoint3d) ||
+             descriptor.PropertyType == typeof(OcctVector3d)))
+        {
+            return CreatePointVectorEditor(slot, value, isMixed);
+        }
+
         var editor = new TextBox
         {
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -945,6 +952,120 @@ internal sealed class CadPropertyInspectorController : IDisposable
         };
         editor.LostFocus += (_, _) => Commit();
         return editor;
+    }
+
+    private Control CreatePointVectorEditor(
+        PropertySlot slot,
+        object? value,
+        bool isMixed)
+    {
+        double? x = null;
+        double? y = null;
+        double? z = null;
+        if (!isMixed)
+        {
+            switch (value)
+            {
+                case OcctPoint3d point:
+                    x = point.X;
+                    y = point.Y;
+                    z = point.Z;
+                    break;
+                case OcctVector3d vector:
+                    x = vector.X;
+                    y = vector.Y;
+                    z = vector.Z;
+                    break;
+            }
+        }
+
+        var xEditor = CoordinateEditor(x, isMixed);
+        var yEditor = CoordinateEditor(y, isMixed);
+        var zEditor = CoordinateEditor(z, isMixed);
+
+        var grid = new Grid
+        {
+            ColumnSpacing = 2,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        for (var index = 0; index < 3; index++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            grid.ColumnDefinitions.Add(
+                new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+        }
+
+        AddCoordinate("X", xEditor, 0);
+        AddCoordinate("Y", yEditor, 2);
+        AddCoordinate("Z", zEditor, 4);
+
+        void AddCoordinate(string label, TextBox editor, int column)
+        {
+            var caption = new TextBlock
+            {
+                Text = label,
+                Foreground = CadTheme.Muted,
+                FontSize = CadTheme.CaptionFontSize,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 0)
+            };
+            Grid.SetColumn(caption, column);
+            grid.Children.Add(caption);
+            Grid.SetColumn(editor, column + 1);
+            grid.Children.Add(editor);
+        }
+
+        bool TryCommit(bool rebuildOnInvalid)
+        {
+            if (_refreshing)
+                return false;
+
+            if (!CadValueTextConverter.TryParseFiniteDouble(xEditor.Text, out var nextX) ||
+                !CadValueTextConverter.TryParseFiniteDouble(yEditor.Text, out var nextY) ||
+                !CadValueTextConverter.TryParseFiniteDouble(zEditor.Text, out var nextZ))
+            {
+                if (rebuildOnInvalid)
+                    Rebuild();
+                return false;
+            }
+
+            object converted = slot.Descriptor.PropertyType == typeof(OcctPoint3d)
+                ? new OcctPoint3d(nextX, nextY, nextZ)
+                : new OcctVector3d(nextX, nextY, nextZ);
+            ApplyValue(slot, converted);
+            return true;
+        }
+
+        foreach (var editor in new[] { xEditor, yEditor, zEditor })
+        {
+            editor.KeyDown += (_, e) =>
+            {
+                if (e.Key != global::Avalonia.Input.Key.Enter)
+                    return;
+                _ = TryCommit(rebuildOnInvalid: true);
+                e.Handled = true;
+            };
+            editor.LostFocus += (_, _) =>
+                _ = TryCommit(rebuildOnInvalid: !isMixed);
+        }
+
+        return grid;
+
+        static TextBox CoordinateEditor(double? coordinate, bool mixed)
+        {
+            var editor = new TextBox
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Center,
+                Text = mixed || coordinate is null
+                    ? string.Empty
+                    : coordinate.Value.ToString("0.######", CultureInfo.CurrentCulture),
+                PlaceholderText = mixed ? "—" : null,
+                MinWidth = 36
+            };
+            editor.Classes.Add("cad-input");
+            return editor;
+        }
     }
 
     private static Control ReadOnlyValue(

@@ -36,6 +36,7 @@ public sealed partial class MainWindow
         DetachRibbonControl(_layerCombo);
 
         root.Children.Remove(_mainMenu);
+        ReleaseLegacyMenuState();
         if (legacyToolbar is not null)
             root.Children.Remove(legacyToolbar);
 
@@ -436,6 +437,20 @@ public sealed partial class MainWindow
     {
         if (_ribbonApplied)
             RebuildRibbon();
+    }
+
+    private void ReleaseLegacyMenuState()
+    {
+        _mainMenu.ItemsSource = null;
+        _actionItems.Clear();
+        _snapModeItems.Clear();
+        _polarItems.Clear();
+        _chineseMenu = null;
+        _englishMenu = null;
+        _modelPanelMenu = null;
+        _layerPanelMenu = null;
+        _propertyPanelMenu = null;
+        _toolPanelMenu = null;
     }
 
     private static void DetachRibbonControl(Control control)

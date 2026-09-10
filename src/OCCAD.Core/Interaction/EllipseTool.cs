@@ -26,33 +26,7 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
     public override string DisplayName => "Ellipse";
 
     public override CadToolPanelDescriptor ParameterPanel =>
-        new(
-            "Ellipse",
-            [
-                new CadChoiceToolParameterDescriptor(
-                    "Method",
-                    "Method",
-                    _method,
-                    [CenterMajorMinor, AxisEndpointsMinor]),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "MajorRadius",
-                    "Major Radius",
-                    _majorRadiusParameter,
-                    1e-9,
-                    double.MaxValue),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "MinorRadius",
-                    "Minor Radius",
-                    _minorRadiusParameter,
-                    1e-9,
-                    double.MaxValue),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "Angle",
-                    "Angle",
-                    _angleDegrees,
-                    -360000.0,
-                    360000.0)
-            ]);
+        new("Ellipse", BuildParameters());
 
     protected override bool CanStepBackCore => _points.Count > 0;
 
@@ -140,7 +114,7 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
 
         if (id.Equals("MajorRadius", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalPositive(value, out var major))
+            if (Stage > 1 || !TryOptionalPositive(value, out var major))
                 return false;
             if (major is { } majorValue &&
                 _minorRadiusParameter is { } minorValue &&
@@ -160,7 +134,7 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
         }
         else if (id.Equals("Angle", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalFinite(value, out _angleDegrees))
+            if (Stage > 1 || !TryOptionalFinite(value, out _angleDegrees))
                 return false;
         }
         else
@@ -199,6 +173,41 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
     }
 
     protected override void OnCanceled() => Reset();
+
+    private IReadOnlyList<CadToolParameterDescriptor> BuildParameters()
+    {
+        var parameters = new List<CadToolParameterDescriptor>(4);
+        if (Stage == 0)
+        {
+            parameters.Add(new CadChoiceToolParameterDescriptor(
+                "Method",
+                "Method",
+                _method,
+                [CenterMajorMinor, AxisEndpointsMinor]));
+        }
+        if (Stage <= 1)
+        {
+            parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+                "MajorRadius",
+                "Major Radius",
+                _majorRadiusParameter,
+                1e-9,
+                double.MaxValue));
+            parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+                "Angle",
+                "Angle",
+                _angleDegrees,
+                -360000.0,
+                360000.0));
+        }
+        parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
+            "MinorRadius",
+            "Minor Radius",
+            _minorRadiusParameter,
+            1e-9,
+            double.MaxValue));
+        return parameters;
+    }
 
     private bool AcceptPoint(OcctPoint3d point)
     {

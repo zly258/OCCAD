@@ -144,7 +144,9 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
     {
         if (_tool is null)
             return;
+
         _hiddenByUser = false;
+        Rebuild(_tool);
         SetPanelVisible(true);
     }
 
@@ -221,7 +223,7 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
                 CadLanguageManager.Text(tool.LocalizationKey, tool.DisplayName));
             _content.Children.Clear();
 
-            AddPrompt(tool);
+            AddStageHeader(tool);
             if (tool.CurrentStep.InputKind == CadToolInputKind.Point)
                 AddExactPointEditor(tool);
             AddPrecisionEditors(tool);
@@ -234,40 +236,25 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         }
     }
 
-    private void AddPrompt(CadTool tool)
+    private void AddStageHeader(CadTool tool)
     {
-        var prompt = tool.Prompt is { } activePrompt
-            ? CadLanguageManager.ToolPrompt(activePrompt)
-            : CadLanguageManager.Text(tool.LocalizationKey, tool.DisplayName);
         var step =
             $"{CadLanguageManager.Text("Cad.Text.Step", "Step")} {tool.Stage + 1}";
-
-        var panel = new StackPanel
-        {
-            Spacing = 2,
-            Margin = new Thickness(0, 0, 0, 5)
-        };
-        panel.Children.Add(new TextBlock
-        {
-            Text = step,
-            FontSize = CadTheme.CaptionFontSize,
-            Foreground = CadTheme.Muted
-        });
-        panel.Children.Add(new TextBlock
-        {
-            Text = prompt,
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = CadTheme.Text,
-            Margin = new Thickness(0, 0, 2, 0)
-        });
 
         _content.Children.Add(new Border
         {
             Background = CadTheme.PanelAlt,
             BorderBrush = CadTheme.Border,
-            BorderThickness = new Thickness(1),
-            Padding = new Thickness(6, 4),
-            Child = panel
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(6, 3),
+            Margin = new Thickness(0, 0, 0, 4),
+            Child = new TextBlock
+            {
+                Text = step,
+                FontSize = CadTheme.CaptionFontSize,
+                Foreground = CadTheme.Muted,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            }
         });
     }
 

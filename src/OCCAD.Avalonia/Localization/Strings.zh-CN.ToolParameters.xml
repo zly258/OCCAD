@@ -17,6 +17,10 @@
     <sys:String x:Key="Cad.Prompt.Ellipse.InvalidMinor">椭圆：短轴半径必须大于 0 且不能超过长轴半径。</sys:String>
 
     <!-- Box -->
+    <sys:String x:Key="Cad.Parameter.box.Length">长度</sys:String>
+    <sys:String x:Key="Cad.Parameter.box.Width">宽度</sys:String>
+    <sys:String x:Key="Cad.Parameter.box.Height">高度</sys:String>
+    <sys:String x:Key="Cad.Parameter.box.Angle">底面旋转角度</sys:String>
     <sys:String x:Key="Cad.Precision.box.1.Length">底面对角线长度</sys:String>
     <sys:String x:Key="Cad.Precision.box.1.Angle">底面对角线角度</sys:String>
     <sys:String x:Key="Cad.Precision.box.2.Length">高度</sys:String>

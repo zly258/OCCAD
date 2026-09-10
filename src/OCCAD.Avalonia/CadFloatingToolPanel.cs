@@ -617,8 +617,7 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
                 return;
 
             lastSubmittedText = text;
-            if (!ApplyParameter(tool, id, text))
-                editor.SelectAll();
+            _ = ApplyParameter(tool, id, text);
         }
 
         editor.KeyDown += (_, e) =>
@@ -644,6 +643,11 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         var version = _toolUpdateVersion;
         if (!tool.TrySetParameter(id, value))
         {
+            // The editor is only a projection of Tool state. If Core rejects
+            // the mutation, immediately rebuild from the authoritative
+            // ParameterPanel so checkboxes/choices/text cannot display a value
+            // that the Tool never accepted.
+            SetTool(tool, forceRebuild: true);
             ShowFeedback(
                 "Cad.Text.InvalidParameterValue",
                 "The parameter value is not valid for the current tool.");

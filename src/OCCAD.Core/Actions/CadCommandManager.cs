@@ -32,7 +32,7 @@ public sealed class CadCommandManager
     private readonly Dictionary<string, string> _aliases = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> _history = [];
 
-    public CadCommandManager(CadWorkspace workspace)
+    private CadCommandManager(CadWorkspace workspace)
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         RegisterDefaults();

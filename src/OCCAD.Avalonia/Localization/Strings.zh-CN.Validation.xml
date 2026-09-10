@@ -8,4 +8,7 @@
     <sys:String x:Key="Cad.Text.InvalidParameterValue">当前参数值无效。</sys:String>
     <sys:String x:Key="Cad.Text.InvalidNumericValue">请输入有效数值。</sys:String>
     <sys:String x:Key="Cad.Text.NumericOutOfRange">数值超出允许范围。</sys:String>
+    <sys:String x:Key="Cad.Text.NumericRangeBetween">{0} ≤ 数值 ≤ {1}</sys:String>
+    <sys:String x:Key="Cad.Text.NumericRangeMinimum">数值 ≥ {0}</sys:String>
+    <sys:String x:Key="Cad.Text.NumericRangeMaximum">数值 ≤ {0}</sys:String>
 </ResourceDictionary>

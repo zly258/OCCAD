@@ -81,8 +81,7 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
     {
         if (_first is { } first &&
             _width is { } width && width > 1e-9 &&
-            _height is { } height && height > 1e-9 &&
-            Context.Workspace.LastPointerPosition is null)
+            _height is { } height && height > 1e-9)
         {
             return AcceptPoint(
                 first + _xAxis * width + _yAxis * height);
@@ -220,19 +219,22 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
         if (_first is not { } first)
             return;
 
-        if (Context.Workspace.LastPointerPosition is { } pointer)
-        {
-            var point = Context.ResolvePoint(pointer.X, pointer.Y, first).Point;
-            UpdatePreview(first, point);
-            return;
-        }
-
+        // Fully specified dimensions are deterministic and must not depend on
+        // a stale pointer quadrant. Pointer direction is only a fallback while
+        // one or both dimensions are still unspecified.
         if (_width is { } width && width > 1e-9 &&
             _height is { } height && height > 1e-9)
         {
             UpdatePreview(
                 first,
                 first + _xAxis * width + _yAxis * height);
+            return;
+        }
+
+        if (Context.Workspace.LastPointerPosition is { } pointer)
+        {
+            var point = Context.ResolvePoint(pointer.X, pointer.Y, first).Point;
+            UpdatePreview(first, point);
         }
     }
 

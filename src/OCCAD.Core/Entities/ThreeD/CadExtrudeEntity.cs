@@ -4,9 +4,10 @@ using OcctNet;
 
 namespace OCCAD;
 
-public sealed class CadExtrudeEntity : CadEntity
+public sealed class CadExtrudeEntity : CadFeatureEntity
 {
     private CadEntity _profile;
+    private Guid? _profileSourceId;
     private OcctVector3d _vector;
 
     public CadExtrudeEntity(
@@ -24,6 +25,11 @@ public sealed class CadExtrudeEntity : CadEntity
 
     [Browsable(false)]
     public string ProfileType => _profile.EntityType;
+
+    public override IReadOnlyList<CadFeatureInputDescriptor> Inputs =>
+        _profileSourceId is { } sourceId
+            ? [SourceInput("Profile", _profile, sourceId)]
+            : [CapturedInput("Profile", _profile)];
 
     [Category("Geometry"), ReadOnly(true)]
     public int ProfileHoleCount =>
@@ -63,7 +69,33 @@ public sealed class CadExtrudeEntity : CadEntity
     [Category("Geometry"), ReadOnly(true)]
     public double VectorZ => _vector.Z;
 
-    internal override OcctShape BuildShape(OcctEngine engine)
+    internal void BindProfileSource(CadEntity source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (!CadPlanarProfileGeometry.IsSupported(source))
+            throw new ArgumentException(
+                "Extrude source must be a supported planar profile.",
+                nameof(source));
+
+        _profileSourceId = source.Id;
+    }
+
+    internal override bool RefreshSourceReferences(
+        CadDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (_profileSourceId is not { } sourceId ||
+            document.FindById(sourceId) is not { } source ||
+            !CadPlanarProfileGeometry.IsSupported(source))
+            return false;
+
+        _profile =
+            CadPlanarProfileGeometry.Snapshot(source);
+        RaiseGeometryChanged(nameof(Inputs));
+        return true;
+    }
+
+    protected override OcctShape BuildFeatureResult(OcctEngine engine)
     {
         var face =
             CadPlanarProfileGeometry.BuildFace(
@@ -149,11 +181,16 @@ public sealed class CadExtrudeEntity : CadEntity
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
-    public override CadEntity Duplicate() =>
-        CopyPropertiesTo(
-            new CadExtrudeEntity(
-                _profile,
-                _vector));
+    public override CadEntity Duplicate()
+    {
+        var copy = new CadExtrudeEntity(
+            _profile,
+            _vector)
+        {
+            _profileSourceId = _profileSourceId
+        };
+        return CopyPropertiesTo(copy);
+    }
 
     public override void RestoreGeometry(CadEntity snapshot)
     {
@@ -163,6 +200,7 @@ public sealed class CadExtrudeEntity : CadEntity
                 nameof(snapshot));
 
         _profile = value._profile.Duplicate();
+        _profileSourceId = value._profileSourceId;
         _vector = value._vector;
         RaiseGeometryChanged(nameof(RestoreGeometry));
     }
@@ -199,8 +237,9 @@ public sealed class CadExtrudeEntity : CadEntity
     }
 
     internal static JsonObject WriteGeometry(
-        CadExtrudeEntity entity) =>
-        new()
+        CadExtrudeEntity entity)
+    {
+        var data = new JsonObject
         {
             ["profile"] =
                 CadPlanarProfileGeometry.Write(entity._profile),
@@ -208,11 +247,24 @@ public sealed class CadExtrudeEntity : CadEntity
                 CadEntityJson.Vector(entity._vector)
         };
 
-    internal static CadExtrudeEntity ReadGeometry(JsonObject data) =>
-        new(
+        if (entity._profileSourceId is { } sourceId)
+            data["profileSourceId"] = JsonValue.Create(sourceId);
+
+        return data;
+    }
+
+    internal static CadExtrudeEntity ReadGeometry(JsonObject data)
+    {
+        var entity = new CadExtrudeEntity(
             CadPlanarProfileGeometry.Read(
                 data["profile"] as JsonObject ??
                 throw new FormatException(
                     "Extrude profile is missing.")),
             CadEntityJson.ReadVector(data, "vector"));
+        entity._profileSourceId =
+            ReadSourceId(
+                data,
+                "profileSourceId");
+        return entity;
+    }
 }

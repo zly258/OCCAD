@@ -85,7 +85,7 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
         Context.Workspace.ApplyGeneratedGeometryChange(
             [target],
             "Extend",
-            entity => entity.RestoreGeometry(replacement));
+            entity => entity.RestoreGeometrySnapshot(replacement));
         SetPromptLocalized(
             "Cad.Prompt.extend.Target",
             "Extend: click near the endpoint to extend [Esc cancel]");
@@ -107,9 +107,14 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
             Entities.Contains(hovered))
             return false;
 
-        var boundaries = Entities.ToArray();
+        var boundaries = Entities
+            .Select(static entity =>
+                entity.CreateWorldGeometrySnapshot())
+            .ToArray();
+        var working =
+            hovered.CreateWorldGeometrySnapshot();
 
-        switch (hovered)
+        switch (working)
         {
             case CadLineEntity line:
                 if (!CadLineEditGeometry.TryExtend(

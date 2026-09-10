@@ -10,6 +10,10 @@ public sealed class ExtrudeTool : CadSelectionTransformToolBase
     private bool _reverse;
 
     public override string Id => "extrude";
+    public override CadToolInputKind InputKind =>
+        State == CadToolState.WaitForSelect
+            ? CadToolInputKind.Selection
+            : CadToolInputKind.Confirmation;
     public override string DisplayName => "Extrude";
 
     public override CadToolPanelDescriptor ParameterPanel =>
@@ -158,8 +162,9 @@ public sealed class ExtrudeTool : CadSelectionTransformToolBase
             !CadPlanarProfileGeometry.IsSupported(Entities[0]))
             return false;
 
+        var source = Entities[0];
         var profile =
-            CadPlanarProfileGeometry.Snapshot(Entities[0]);
+            CadPlanarProfileGeometry.Snapshot(source);
         var normal =
             CadPlanarProfileGeometry.Normal(profile);
         var vector =
@@ -167,8 +172,9 @@ public sealed class ExtrudeTool : CadSelectionTransformToolBase
             (_height * (_reverse ? -1.0 : 1.0));
 
         entity = new CadExtrudeEntity(
-            profile,
+            source,
             vector);
+        entity.BindProfileSource(source);
         return true;
     }
 

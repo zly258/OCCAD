@@ -225,7 +225,7 @@ public sealed partial class MainWindow : Window
         _orthoToggle.IsCheckedChanged += (_, _) =>
         {
             if (_refreshingUi) return;
-            _workspace.WorkPlane.OrthogonalTrackingEnabled =
+            _workspace.Drafting.OrthogonalTrackingEnabled =
                 _orthoToggle.IsChecked == true;
             _workspace.Tracking.Clear();
             RefreshInteractionUi();
@@ -236,7 +236,7 @@ public sealed partial class MainWindow : Window
         _polarToggle.IsCheckedChanged += (_, _) =>
         {
             if (_refreshingUi) return;
-            _workspace.WorkPlane.PolarTrackingEnabled =
+            _workspace.Drafting.PolarTrackingEnabled =
                 _polarToggle.IsChecked == true;
             _workspace.Tracking.Clear();
             RefreshInteractionUi();
@@ -536,6 +536,8 @@ public sealed partial class MainWindow : Window
             Ui(RefreshSnapStatus);
         _workspace.WorkPlane.Changed += (_, _) =>
             Ui(WorkPlaneChanged);
+        _workspace.Drafting.Changed += (_, _) =>
+            Ui(DraftingChanged);
         _workspace.History.Changed += (_, _) =>
             Ui(UpdateHistoryUi);
         _workspace.Layers.Changed += (_, args) =>

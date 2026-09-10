@@ -4,10 +4,12 @@ using OcctNet;
 
 namespace OCCAD;
 
-public sealed class CadSweepEntity : CadEntity
+public sealed class CadSweepEntity : CadFeatureEntity
 {
     private CadEntity _profile;
     private CadEntity _path;
+    private Guid? _profileSourceId;
+    private Guid? _pathSourceId;
 
     public CadSweepEntity(
         CadEntity profile,
@@ -21,6 +23,16 @@ public sealed class CadSweepEntity : CadEntity
     [Browsable(false)]
     public string ProfileType => _profile.EntityType;
 
+    public override IReadOnlyList<CadFeatureInputDescriptor> Inputs =>
+    [
+        _profileSourceId is { } profileId
+            ? SourceInput("Profile", _profile, profileId)
+            : CapturedInput("Profile", _profile),
+        _pathSourceId is { } pathId
+            ? SourceInput("Path", _path, pathId)
+            : CapturedInput("Path", _path)
+    ];
+
     [Category("Geometry"), ReadOnly(true)]
     public int PathSegmentCount =>
         _path switch
@@ -31,7 +43,39 @@ public sealed class CadSweepEntity : CadEntity
             _ => 0
         };
 
-    internal override OcctShape BuildShape(OcctEngine engine)
+    internal void BindSources(CadEntity profile, CadEntity path)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(path);
+        if (!CadPlanarProfileGeometry.IsSupported(profile))
+            throw new ArgumentException("Sweep profile is invalid.", nameof(profile));
+        if (!IsPath(path))
+            throw new ArgumentException("Sweep path is invalid.", nameof(path));
+
+        _profileSourceId = profile.Id;
+        _pathSourceId = path.Id;
+    }
+
+    internal override bool RefreshSourceReferences(CadDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (_profileSourceId is not { } profileId ||
+            _pathSourceId is not { } pathId ||
+            document.FindById(profileId) is not { } profile ||
+            document.FindById(pathId) is not { } path ||
+            !CadPlanarProfileGeometry.IsSupported(profile) ||
+            !IsPath(path))
+            return false;
+
+        var nextProfile = CadPlanarProfileGeometry.Snapshot(profile);
+        var nextPath = SnapshotPath(path);
+        _profile = nextProfile;
+        _path = nextPath;
+        RaiseGeometryChanged(nameof(Inputs));
+        return true;
+    }
+
+    protected override OcctShape BuildFeatureResult(OcctEngine engine)
     {
         var spine = BuildSpine(engine);
         var profile =
@@ -111,11 +155,17 @@ public sealed class CadSweepEntity : CadEntity
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
-    public override CadEntity Duplicate() =>
-        CopyPropertiesTo(
-            new CadSweepEntity(
-                _profile,
-                _path));
+    public override CadEntity Duplicate()
+    {
+        var copy = new CadSweepEntity(
+            _profile,
+            _path)
+        {
+            _profileSourceId = _profileSourceId,
+            _pathSourceId = _pathSourceId
+        };
+        return CopyPropertiesTo(copy);
+    }
 
     public override void RestoreGeometry(CadEntity snapshot)
     {
@@ -126,6 +176,8 @@ public sealed class CadSweepEntity : CadEntity
 
         _profile = value._profile.Duplicate();
         _path = SnapshotPath(value._path);
+        _profileSourceId = value._profileSourceId;
+        _pathSourceId = value._pathSourceId;
         RaiseGeometryChanged(nameof(RestoreGeometry));
     }
 
@@ -164,18 +216,27 @@ public sealed class CadSweepEntity : CadEntity
     }
 
     internal static JsonObject WriteGeometry(
-        CadSweepEntity entity) =>
-        new()
+        CadSweepEntity entity)
+    {
+        var data = new JsonObject
         {
             ["profile"] =
                 CadPlanarProfileGeometry.Write(entity._profile),
             ["path"] = WritePath(entity._path)
         };
 
+        if (entity._profileSourceId is { } profileId)
+            data["profileSourceId"] = JsonValue.Create(profileId);
+        if (entity._pathSourceId is { } pathId)
+            data["pathSourceId"] = JsonValue.Create(pathId);
+
+        return data;
+    }
+
     internal static CadSweepEntity ReadGeometry(
         JsonObject data)
     {
-        return new CadSweepEntity(
+        var entity = new CadSweepEntity(
             CadPlanarProfileGeometry.Read(
                 data["profile"] as JsonObject ??
                 throw new FormatException(
@@ -184,6 +245,11 @@ public sealed class CadSweepEntity : CadEntity
                 data["path"] as JsonObject ??
                 throw new FormatException(
                     "Sweep path is missing.")));
+        entity._profileSourceId =
+            ReadSourceId(data, "profileSourceId");
+        entity._pathSourceId =
+            ReadSourceId(data, "pathSourceId");
+        return entity;
     }
 
     internal static bool IsPath(CadEntity entity) =>
@@ -197,23 +263,29 @@ public sealed class CadSweepEntity : CadEntity
             _ => false
         };
 
-    private static CadEntity SnapshotPath(CadEntity path) =>
-        path switch
+    private static CadEntity SnapshotPath(CadEntity path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        var working =
+            path.CreateWorldGeometrySnapshot();
+
+        return working switch
         {
             CadLineEntity line =>
                 new CadPathEntity([line]),
             CadArcEntity arc =>
                 new CadPathEntity([arc]),
             CadHelixEntity helix =>
-                helix.Duplicate(),
+                helix,
             CadPolylineEntity { Closed: false } polyline =>
-                polyline.Duplicate(),
+                polyline,
             CadPathEntity { Closed: false } mixed =>
-                mixed.Duplicate(),
+                mixed,
             _ => throw new ArgumentException(
                 "Sweep path must be a line, arc, helix, open polyline, or open path.",
                 nameof(path))
         };
+    }
 
     private static JsonObject WritePath(CadEntity path) =>
         path switch

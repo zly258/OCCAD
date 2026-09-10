@@ -10,6 +10,8 @@ public sealed class RevolveTool : CadSelectionTransformToolBase
 
     public override string Id => "revolve";
     public override string DisplayName => "Revolve";
+    public override CadToolInputKind InputKind =>
+        CadToolInputKind.Selection;
     public override CadToolInteractionPolicy InteractionPolicy =>
         base.InteractionPolicy with { PreselectionEnabled = true };
 
@@ -136,20 +138,26 @@ public sealed class RevolveTool : CadSelectionTransformToolBase
             })
             return false;
 
-        var profile =
-            CadPlanarProfileGeometry.Snapshot(Entities[0]);
+        var profile = Entities[0];
+        var axisStart =
+            axis.ToWorldPoint(axis.Start);
+        var axisEnd =
+            axis.ToWorldPoint(axis.End);
         var axisDirection =
             CadTransformMath.Between(
-                axis.Start,
-                axis.End);
+                axisStart,
+                axisEnd);
         if (!axisDirection.TryNormalize(out var direction))
             return false;
 
         entity = new CadRevolveEntity(
             profile,
-            axis.Start,
+            axisStart,
             direction,
             _angleDegrees);
+        entity.BindSources(
+            profile,
+            axis);
         return true;
     }
 

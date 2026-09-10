@@ -4,9 +4,10 @@ using OcctNet;
 
 namespace OCCAD;
 
-public sealed class CadLoftEntity : CadEntity
+public sealed class CadLoftEntity : CadFeatureEntity
 {
     private readonly List<CadEntity> _sections;
+    private readonly List<Guid?> _sectionSourceIds;
     private bool _makeSolid;
     private bool _ruled;
 
@@ -26,6 +27,12 @@ public sealed class CadLoftEntity : CadEntity
                 "Loft requires at least two wire sections.",
                 nameof(sections));
 
+        _sectionSourceIds =
+            Enumerable.Repeat<Guid?>(
+                null,
+                _sections.Count)
+            .ToList();
+
         _makeSolid = makeSolid;
         _ruled = ruled;
         DisplayMode = OcctDisplayMode.Shaded;
@@ -33,6 +40,68 @@ public sealed class CadLoftEntity : CadEntity
 
     [Category("Geometry"), ReadOnly(true)]
     public int SectionCount => _sections.Count;
+
+    public override IReadOnlyList<CadFeatureInputDescriptor> Inputs =>
+        _sections
+            .Select((section, index) =>
+                _sectionSourceIds[index] is { } sourceId
+                    ? SourceInput(
+                        $"Section{index + 1}",
+                        section,
+                        sourceId)
+                    : CapturedInput(
+                        $"Section{index + 1}",
+                        section))
+            .ToArray();
+
+    internal void BindSources(
+        IReadOnlyList<CadEntity> sections)
+    {
+        ArgumentNullException.ThrowIfNull(sections);
+        if (sections.Count != _sections.Count ||
+            sections.Any(section =>
+                !CadPlanarProfileGeometry.IsWireProfile(section)))
+        {
+            throw new ArgumentException(
+                "Loft source sections are invalid.",
+                nameof(sections));
+        }
+
+        for (var index = 0;
+             index < sections.Count;
+             index++)
+        {
+            _sectionSourceIds[index] =
+                sections[index].Id;
+        }
+    }
+
+    internal override bool RefreshSourceReferences(
+        CadDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (_sectionSourceIds.Any(static id => id is null))
+            return false;
+
+        var next = new List<CadEntity>(_sections.Count);
+        foreach (var sourceId in _sectionSourceIds)
+        {
+            var source =
+                document.FindById(sourceId!.Value);
+            if (source is null ||
+                !CadPlanarProfileGeometry.IsWireProfile(source))
+                return false;
+
+            next.Add(
+                CadPlanarProfileGeometry
+                    .WireProfileSnapshot(source));
+        }
+
+        _sections.Clear();
+        _sections.AddRange(next);
+        RaiseGeometryChanged(nameof(Inputs));
+        return true;
+    }
 
     [Category("Geometry")]
     public bool MakeSolid
@@ -48,7 +117,7 @@ public sealed class CadLoftEntity : CadEntity
         set => SetGeometry(ref _ruled, value);
     }
 
-    internal override OcctShape BuildShape(OcctEngine engine)
+    protected override OcctShape BuildFeatureResult(OcctEngine engine)
     {
         var wires = new List<OcctShape>(_sections.Count);
         try
@@ -123,12 +192,23 @@ public sealed class CadLoftEntity : CadEntity
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
-    public override CadEntity Duplicate() =>
-        CopyPropertiesTo(
-            new CadLoftEntity(
-                _sections,
-                _makeSolid,
-                _ruled));
+    public override CadEntity Duplicate()
+    {
+        var copy = new CadLoftEntity(
+            _sections,
+            _makeSolid,
+            _ruled);
+
+        for (var index = 0;
+             index < _sectionSourceIds.Count;
+             index++)
+        {
+            copy._sectionSourceIds[index] =
+                _sectionSourceIds[index];
+        }
+
+        return CopyPropertiesTo(copy);
+    }
 
     public override void RestoreGeometry(CadEntity snapshot)
     {
@@ -141,6 +221,9 @@ public sealed class CadLoftEntity : CadEntity
         _sections.AddRange(
             value._sections.Select(
                 CadPlanarProfileGeometry.WireProfileSnapshot));
+        _sectionSourceIds.Clear();
+        _sectionSourceIds.AddRange(
+            value._sectionSourceIds);
         _makeSolid = value._makeSolid;
         _ruled = value._ruled;
         RaiseGeometryChanged(nameof(RestoreGeometry));
@@ -178,11 +261,20 @@ public sealed class CadLoftEntity : CadEntity
     {
         var sections = new JsonArray();
         foreach (var section in entity._sections)
-            sections.Add(CadPlanarProfileGeometry.Write(section));
+            sections.Add(
+                CadPlanarProfileGeometry.Write(section));
+
+        var sourceIds = new JsonArray();
+        foreach (var sourceId in entity._sectionSourceIds)
+            sourceIds.Add(
+                sourceId is { } value
+                    ? JsonValue.Create(value)
+                    : null);
 
         return new JsonObject
         {
             ["sections"] = sections,
+            ["sectionSourceIds"] = sourceIds,
             ["makeSolid"] = entity._makeSolid,
             ["ruled"] = entity._ruled
         };
@@ -203,9 +295,25 @@ public sealed class CadLoftEntity : CadEntity
                         "Loft section is invalid.")))
             .ToArray();
 
-        return new CadLoftEntity(
+        var entity = new CadLoftEntity(
             sections,
             CadEntityJson.ReadBool(data, "makeSolid"),
             CadEntityJson.ReadBool(data, "ruled"));
+
+        if (data["sectionSourceIds"] is JsonArray sourceIds &&
+            sourceIds.Count == entity._sectionSourceIds.Count)
+        {
+            for (var index = 0;
+                 index < sourceIds.Count;
+                 index++)
+            {
+                entity._sectionSourceIds[index] =
+                    sourceIds[index] is null
+                        ? null
+                        : sourceIds[index]!.GetValue<Guid>();
+            }
+        }
+
+        return entity;
     }
 }

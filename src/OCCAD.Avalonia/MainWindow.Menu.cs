@@ -515,7 +515,7 @@ public sealed partial class MainWindow
             ToggleType = MenuItemToggleType.Radio,
             GroupName = "PolarIncrement",
             IsChecked = Math.Abs(
-                _workspace.WorkPlane.PolarIncrementDegrees -
+                _workspace.Drafting.PolarIncrementDegrees -
                 increment) <= 1e-12
         };
         item.Click += (_, _) =>
@@ -523,7 +523,7 @@ public sealed partial class MainWindow
             if (_refreshingUi)
                 return;
 
-            _workspace.WorkPlane.PolarIncrementDegrees = increment;
+            _workspace.Drafting.PolarIncrementDegrees = increment;
             _workspace.Tracking.Clear();
             RefreshInteractionUi();
         };

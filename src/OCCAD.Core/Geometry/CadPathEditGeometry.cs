@@ -28,7 +28,8 @@ internal static class CadPathEditGeometry
         var segmentIndex =
             position.SegmentIndex;
         var source =
-            path.Segments[segmentIndex];
+            CadPathEntity.SnapshotSegment(
+                path.Segments[segmentIndex]);
 
         CadEntity[] trimmed;
         switch (source)

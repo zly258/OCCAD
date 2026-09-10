@@ -4,7 +4,7 @@ using OcctNet;
 
 namespace OCCAD;
 
-public sealed class CadEdgeFilletEntity : CadEntity
+public sealed class CadEdgeFilletEntity : CadFeatureEntity
 {
     private CadEntity _source;
     private int[] _edgeIndices;
@@ -40,7 +40,10 @@ public sealed class CadEdgeFilletEntity : CadEntity
     [Browsable(false)]
     public IReadOnlyList<int> EdgeIndices => _edgeIndices;
 
-    internal override OcctShape BuildShape(OcctEngine engine)
+    public override IReadOnlyList<CadFeatureInputDescriptor> Inputs =>
+        [CapturedInput("Source", _source)];
+
+    protected override OcctShape BuildFeatureResult(OcctEngine engine)
     {
         var source = _source.BuildShape(engine);
         try

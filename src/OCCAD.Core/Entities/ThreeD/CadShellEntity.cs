@@ -4,7 +4,7 @@ using OcctNet;
 
 namespace OCCAD;
 
-public sealed class CadShellEntity : CadEntity
+public sealed class CadShellEntity : CadFeatureEntity
 {
     private CadEntity _source;
     private int _faceIndex;
@@ -38,7 +38,10 @@ public sealed class CadShellEntity : CadEntity
         }
     }
 
-    internal override OcctShape BuildShape(OcctEngine engine)
+    public override IReadOnlyList<CadFeatureInputDescriptor> Inputs =>
+        [CapturedInput("Source", _source)];
+
+    protected override OcctShape BuildFeatureResult(OcctEngine engine)
     {
         var source = _source.BuildShape(engine);
         try

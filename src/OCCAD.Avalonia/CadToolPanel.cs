@@ -320,8 +320,8 @@ internal sealed class CadToolPanel : Border
                 CadLanguageManager.Text(
                     $"Cad.Precision.{tool.Id}.{tool.Stage}.Length",
                     tool.PrecisionLengthLabel),
-                _workspace.WorkPlane.LengthLockEnabled
-                    ? _workspace.WorkPlane.LockedLength
+                _workspace.Drafting.LengthLockEnabled
+                    ? _workspace.Drafting.LockedLength
                     : null);
         }
 
@@ -332,8 +332,8 @@ internal sealed class CadToolPanel : Border
                 CadLanguageManager.Text(
                     $"Cad.Precision.{tool.Id}.{tool.Stage}.Angle",
                     tool.PrecisionAngleLabel),
-                _workspace.WorkPlane.AngleLockEnabled
-                    ? _workspace.WorkPlane.LockedAngleDegrees
+                _workspace.Drafting.AngleLockEnabled
+                    ? _workspace.Drafting.LockedAngleDegrees
                     : null);
         }
 
@@ -577,13 +577,13 @@ internal sealed class CadToolPanel : Border
 
             RefreshLockedEditor(
                 PrecisionLengthId,
-                _workspace.WorkPlane.LengthLockEnabled
-                    ? _workspace.WorkPlane.LockedLength
+                _workspace.Drafting.LengthLockEnabled
+                    ? _workspace.Drafting.LockedLength
                     : null);
             RefreshLockedEditor(
                 PrecisionAngleId,
-                _workspace.WorkPlane.AngleLockEnabled
-                    ? _workspace.WorkPlane.LockedAngleDegrees
+                _workspace.Drafting.AngleLockEnabled
+                    ? _workspace.Drafting.LockedAngleDegrees
                     : null);
             RefreshLockedEditor(
                 PrecisionFactorId,
@@ -735,13 +735,13 @@ internal sealed class CadToolPanel : Border
             switch (kind)
             {
                 case CadPrecisionInputKind.Length:
-                    _workspace.WorkPlane.LengthLockEnabled = false;
-                    _workspace.WorkPlane.LockedLength = 0;
+                    _workspace.Drafting.LengthLockEnabled = false;
+                    _workspace.Drafting.LockedLength = 0;
                     return true;
 
                 case CadPrecisionInputKind.Angle:
-                    _workspace.WorkPlane.AngleLockEnabled = false;
-                    _workspace.WorkPlane.LockedAngleDegrees = 0;
+                    _workspace.Drafting.AngleLockEnabled = false;
+                    _workspace.Drafting.LockedAngleDegrees = 0;
                     return true;
 
                 case CadPrecisionInputKind.Factor:

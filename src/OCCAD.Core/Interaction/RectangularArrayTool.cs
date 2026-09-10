@@ -12,6 +12,10 @@ public sealed class RectangularArrayTool : CadSelectionTransformToolBase
     private OcctVector3d _xAxis;
     private OcctVector3d _yAxis;
     public override string Id => "rectarray";
+    public override CadToolInputKind InputKind =>
+        State == CadToolState.WaitForSelect
+            ? CadToolInputKind.Selection
+            : CadToolInputKind.Confirmation;
     public override string DisplayName => "Rectangular Array";
     protected override bool CanFinishCore => State == CadToolState.Drawing &&
         CadRectangularArray.IsValid(Entities.Count, _columns, _rows, _columnSpacing, _rowSpacing);

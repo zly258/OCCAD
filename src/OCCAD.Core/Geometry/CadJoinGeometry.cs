@@ -17,18 +17,23 @@ internal static class CadJoinGeometry
         if (entities.Count < 2)
             return false;
 
-        if (entities.All(static entity => entity is CadArcEntity))
+        var working = entities
+            .Select(static entity =>
+                entity.CreateWorldGeometrySnapshot())
+            .ToArray();
+
+        if (working.All(static entity => entity is CadArcEntity))
             return TryJoinArcs(
-                entities.Cast<CadArcEntity>().ToArray(),
+                working.Cast<CadArcEntity>().ToArray(),
                 out result);
 
-        if (entities.All(
+        if (working.All(
                 static entity =>
                     entity is CadLineEntity or
                     CadPolylineEntity { Closed: false }))
-            return TryJoinLinear(entities, out result);
+            return TryJoinLinear(working, out result);
 
-        return TryJoinMixed(entities, out result);
+        return TryJoinMixed(working, out result);
     }
 
     private static bool TryJoinMixed(
@@ -164,14 +169,9 @@ internal static class CadJoinGeometry
         }
     }
 
-    private static CadEntity ReversePathSegment(CadEntity segment) =>
-        segment switch
-        {
-            CadLineEntity line => line.CreateLine(line.End, line.Start),
-            CadArcEntity arc => arc.ReversedCopy(),
-            _ => throw new InvalidOperationException(
-                "Path contains an unsupported segment.")
-        };
+    private static CadEntity ReversePathSegment(
+        CadPathSegment segment) =>
+        segment.Reverse().ToEntity();
 
     private static bool TryJoinLinear(
         IReadOnlyList<CadEntity> entities,

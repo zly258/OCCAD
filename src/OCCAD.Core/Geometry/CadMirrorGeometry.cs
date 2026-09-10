@@ -8,8 +8,17 @@ internal static class CadMirrorGeometry
     {
         if (!origin.IsFinite) throw new ArgumentOutOfRangeException(nameof(origin));
         if (!normal.TryNormalize(out var n)) throw new ArgumentOutOfRangeException(nameof(normal));
-        OcctPoint3d Point(OcctPoint3d p) => p - n * (2 * (p - origin).Dot(n));
-        OcctVector3d Vector(OcctVector3d v) => v - n * (2 * v.Dot(n));
+        OcctPoint3d Point(OcctPoint3d p)
+        {
+            var world = entity.ToWorldPoint(p);
+            return world - n * (2 * (world - origin).Dot(n));
+        }
+
+        OcctVector3d Vector(OcctVector3d v)
+        {
+            var world = entity.ToWorldVector(v);
+            return world - n * (2 * world.Dot(n));
+        }
         OcctVector3d PlaneNormal(OcctVector3d v) => Vector(v) * -1;
         return entity switch
         {

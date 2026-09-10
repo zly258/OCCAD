@@ -11,6 +11,10 @@ public sealed class ShellTool : CadTool
 
     public override string Id => "shell";
     public override string DisplayName => "Shell";
+    public override CadToolInputKind InputKind =>
+        _source is null
+            ? CadToolInputKind.Selection
+            : CadToolInputKind.Confirmation;
 
     public override CadToolPanelDescriptor ParameterPanel =>
         new(

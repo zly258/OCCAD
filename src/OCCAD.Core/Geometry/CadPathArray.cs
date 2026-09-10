@@ -27,8 +27,8 @@ internal static class CadPathArray
             foreach (var source in sources)
             {
                 var copy = source.Duplicate();
-                if (align && angle > 1e-9) copy.Rotate(reference, axis, angle);
-                copy.Translate(station.Point - reference);
+                if (align && angle > 1e-9) copy.RotatePlacement(reference, axis, angle);
+                copy.TranslatePlacement(station.Point - reference);
                 copies.Add(copy);
                 if (copies.Count == limit) return copies.ToArray();
             }

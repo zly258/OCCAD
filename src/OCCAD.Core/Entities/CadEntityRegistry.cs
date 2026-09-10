@@ -132,9 +132,10 @@ public sealed class CadEntityRegistry
         if (left.GetType() != right.GetType())
             return false;
 
-        return JsonNode.DeepEquals(
-            WriteGeometry(left),
-            WriteGeometry(right));
+        return left.Placement == right.Placement &&
+               JsonNode.DeepEquals(
+                   WriteGeometry(left),
+                   WriteGeometry(right));
     }
 
     private void RegisterCore(

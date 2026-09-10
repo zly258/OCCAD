@@ -7,15 +7,15 @@ public readonly record struct CadPrecisionInput(
 
 public sealed class CadPrecisionInputManager
 {
-    private readonly CadWorkPlane _workPlane;
+    private readonly CadDraftingSettings _drafting;
     private readonly CadTrackingManager _tracking;
 
     public CadPrecisionInputManager(
-        CadWorkPlane workPlane,
+        CadDraftingSettings drafting,
         CadTrackingManager tracking)
     {
-        _workPlane =
-            workPlane ?? throw new ArgumentNullException(nameof(workPlane));
+        _drafting =
+            drafting ?? throw new ArgumentNullException(nameof(drafting));
         _tracking =
             tracking ?? throw new ArgumentNullException(nameof(tracking));
     }
@@ -94,8 +94,8 @@ public sealed class CadPrecisionInputManager
                 nameof(value),
                 "Length must be finite and greater than zero.");
 
-        _workPlane.LockedLength = value;
-        _workPlane.LengthLockEnabled = true;
+        _drafting.LockedLength = value;
+        _drafting.LengthLockEnabled = true;
     }
 
     private void ApplyAngle(double value)
@@ -105,9 +105,9 @@ public sealed class CadPrecisionInputManager
                 nameof(value),
                 "Angle must be finite.");
 
-        _workPlane.AxisLockEnabled = false;
-        _workPlane.LockedAngleDegrees = value;
-        _workPlane.AngleLockEnabled = true;
+        _drafting.AxisLockEnabled = false;
+        _drafting.LockedAngleDegrees = value;
+        _drafting.AngleLockEnabled = true;
     }
 
     private void ApplyFactor(double value)
@@ -122,13 +122,13 @@ public sealed class CadPrecisionInputManager
 
     private void ClearLength()
     {
-        _workPlane.LengthLockEnabled = false;
-        _workPlane.LockedLength = 0.0;
+        _drafting.LengthLockEnabled = false;
+        _drafting.LockedLength = 0.0;
     }
 
     private void ClearAngle()
     {
-        _workPlane.AngleLockEnabled = false;
-        _workPlane.LockedAngleDegrees = 0.0;
+        _drafting.AngleLockEnabled = false;
+        _drafting.LockedAngleDegrees = 0.0;
     }
 }

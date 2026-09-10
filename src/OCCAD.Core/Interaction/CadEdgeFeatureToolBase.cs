@@ -18,6 +18,11 @@ public abstract class CadEdgeFeatureToolBase : CadTool
 
     protected double Value => _value;
 
+    public override CadToolInputKind InputKind =>
+        _source is null
+            ? CadToolInputKind.Selection
+            : CadToolInputKind.Confirmation;
+
     public override CadToolPanelDescriptor ParameterPanel =>
         new(
             DisplayName,

@@ -211,7 +211,7 @@ internal static class CadPrecisionSnapGeometry
             if (!document.IsEntitySelectable(entity))
                 continue;
 
-            result.AddRange(entity.GetPrecisionSnapCurves(workPlane));
+            result.AddRange(entity.GetWorldPrecisionSnapCurves(workPlane));
         }
 
         return result;

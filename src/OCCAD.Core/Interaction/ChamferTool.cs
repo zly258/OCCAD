@@ -81,7 +81,10 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
     {
         replacement = null!;
 
-        switch (source)
+        var working =
+            source.CreateWorldGeometrySnapshot();
+
+        switch (working)
         {
             case CadPolylineEntity polyline:
                 if (!CadPolylineChamferGeometry.TryChamfer(
@@ -136,11 +139,15 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
         out CadEntity[] replacements)
     {
         replacements = [];
-        if (second is not CadLineEntity line)
+        var first =
+            FirstLine.CreateWorldGeometrySnapshot<CadLineEntity>();
+        var next =
+            second.CreateWorldGeometrySnapshot();
+        if (next is not CadLineEntity line)
             return false;
 
         return CadLineCornerGeometry.TryChamfer(
-            FirstLine,
+            first,
             FirstPick,
             line,
             secondPick,

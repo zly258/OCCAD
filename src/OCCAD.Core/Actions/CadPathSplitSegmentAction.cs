@@ -45,7 +45,7 @@ public sealed class CadPathSplitSegmentAction(CadWorkspace workspace)
 
         path = value;
         segmentIndex = segment.Index;
-        point = primary.Point;
+        point = value.ToLocalPoint(primary.Point);
         return point.IsFinite;
     }
 }

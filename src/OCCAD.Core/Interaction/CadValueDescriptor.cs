@@ -1,3 +1,6 @@
+using System.Drawing;
+using OcctNet;
+
 namespace OCCAD;
 
 public enum CadValueSemantic
@@ -13,7 +16,11 @@ public enum CadValueSemantic
     Layer,
     Scale,
     Tolerance,
-    Transparency
+    Transparency,
+    Point,
+    Vector,
+    Color,
+    Enum
 }
 
 /// <summary>
@@ -95,6 +102,12 @@ public sealed record CadValueDescriptor
             return CadValueSemantic.Choice;
         if (valueType == typeof(bool))
             return CadValueSemantic.Boolean;
+        if (valueType == typeof(Color))
+            return CadValueSemantic.Color;
+        if (valueType == typeof(OcctPoint3d))
+            return CadValueSemantic.Point;
+        if (valueType == typeof(OcctVector3d))
+            return CadValueSemantic.Vector;
         if (valueType == typeof(string))
             return id.Equals(
                     "Layer",
@@ -102,7 +115,7 @@ public sealed record CadValueDescriptor
                 ? CadValueSemantic.Layer
                 : CadValueSemantic.Text;
         if (valueType.IsEnum)
-            return CadValueSemantic.Choice;
+            return CadValueSemantic.Enum;
         if (valueType == typeof(int) ||
             valueType == typeof(long))
             return CadValueSemantic.Integer;

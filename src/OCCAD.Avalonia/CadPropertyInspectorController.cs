@@ -239,12 +239,13 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         return first.Values
             .OrderBy(descriptor => descriptor.Category)
+            .ThenBy(descriptor => descriptor.Order)
             .ThenBy(descriptor => descriptor.DisplayName)
             .Select(descriptor => new PropertySlot(descriptor, targets))
             .ToArray();
     }
 
-    private static IEnumerable<PropertyDescriptor> BrowsableProperties(object target)
+    private static IEnumerable<CadPropertyDescriptor> BrowsableProperties(object target)
     {
         var hideOrientation = target is
             CadCircleEntity or
@@ -252,16 +253,14 @@ internal sealed class CadPropertyInspectorController : IDisposable
             CadEllipseEntity or
             CadRectangleEntity;
 
-        return TypeDescriptor
-            .GetProperties(target, true)
-            .Cast<PropertyDescriptor>()
+        return CadPropertyCatalog
+            .Describe(target)
             .Where(descriptor =>
-                descriptor.IsBrowsable &&
-                (!hideOrientation ||
-                 !string.Equals(
-                     descriptor.Category,
-                     "Orientation",
-                     StringComparison.OrdinalIgnoreCase)));
+                !hideOrientation ||
+                !string.Equals(
+                    descriptor.Category,
+                    "Orientation",
+                    StringComparison.OrdinalIgnoreCase));
     }
 
     private void AddSubobjectDetails(
@@ -565,7 +564,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         var label = new TextBlock
         {
             Text = CadLanguageManager.Text(
-                $"Cad.Property.{slot.Descriptor.Name}",
+                slot.Descriptor.Value.DisplayKey,
                 slot.Descriptor.DisplayName),
             Foreground = CadTheme.Text,
             VerticalAlignment = VerticalAlignment.Center,
@@ -591,19 +590,20 @@ internal sealed class CadPropertyInspectorController : IDisposable
     {
         var descriptor = slot.Descriptor;
         var value = slot.CommonValue(out var isMixed);
+        var semantic = descriptor.Value.Semantic;
         var isLayer =
-            descriptor.Name == nameof(CadEntity.Layer) &&
+            semantic == CadValueSemantic.Layer &&
             _entities.Length > 0;
 
         if (isLayer)
             return CreateLayerEditor(value as string, isMixed);
         if (descriptor.IsReadOnly)
             return ReadOnlyValue(descriptor, value, isMixed);
-        if (descriptor.PropertyType == typeof(bool))
+        if (semantic == CadValueSemantic.Boolean)
             return CreateBooleanEditor(slot, value, isMixed);
-        if (descriptor.PropertyType.IsEnum)
+        if (semantic is CadValueSemantic.Enum or CadValueSemantic.Choice)
             return CreateEnumEditor(slot, value, isMixed);
-        if (descriptor.PropertyType == typeof(DrawingColor))
+        if (semantic == CadValueSemantic.Color)
             return CreateColorEditor(slot, value);
         if (CanEditAsText(descriptor))
             return CreateTextEditor(slot, value, isMixed);
@@ -751,7 +751,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
     }
 
     private static Control ReadOnlyValue(
-        PropertyDescriptor descriptor,
+        CadPropertyDescriptor descriptor,
         object? value,
         bool isMixed) =>
         new TextBlock
@@ -762,7 +762,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
             TextTrimming = TextTrimming.CharacterEllipsis
         };
 
-    private static bool CanEditAsText(PropertyDescriptor descriptor)
+    private static bool CanEditAsText(CadPropertyDescriptor descriptor)
     {
         var converter = descriptor.Converter;
         return descriptor.PropertyType == typeof(string) ||
@@ -775,7 +775,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
     }
 
     private static string ConvertToText(
-        PropertyDescriptor descriptor,
+        CadPropertyDescriptor descriptor,
         object? value)
     {
         if (value is null)
@@ -799,7 +799,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
     }
 
     private static bool TryConvertFromText(
-        PropertyDescriptor descriptor,
+        CadPropertyDescriptor descriptor,
         string text,
         out object? value)
     {
@@ -822,8 +822,18 @@ internal sealed class CadPropertyInspectorController : IDisposable
                     return false;
                 }
 
+                if (!double.IsFinite(number) ||
+                    descriptor.Value.Minimum is { } minimum &&
+                    number < minimum ||
+                    descriptor.Value.Maximum is { } maximum &&
+                    number > maximum)
+                {
+                    value = null;
+                    return false;
+                }
+
                 value = number;
-                return double.IsFinite(number);
+                return true;
             }
 
             value = descriptor.Converter.ConvertFromString(
@@ -996,7 +1006,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
     private sealed record PropertySlot(
-        PropertyDescriptor Descriptor,
+        CadPropertyDescriptor Descriptor,
         IReadOnlyList<object> Targets)
     {
         public object? CommonValue(out bool isMixed)
@@ -1004,9 +1014,13 @@ internal sealed class CadPropertyInspectorController : IDisposable
             var first = Descriptor.GetValue(Targets[0]);
             for (var index = 1; index < Targets.Count; index++)
             {
-                var current = TypeDescriptor
-                    .GetProperties(Targets[index], true)
-                    .Find(Descriptor.Name, ignoreCase: false)
+                var current = CadPropertyCatalog
+                    .Describe(Targets[index])
+                    .FirstOrDefault(property =>
+                        string.Equals(
+                            property.Name,
+                            Descriptor.Name,
+                            StringComparison.Ordinal))
                     ?.GetValue(Targets[index]);
                 if (!Equals(first, current))
                 {

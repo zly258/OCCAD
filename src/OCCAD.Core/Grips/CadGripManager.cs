@@ -223,14 +223,14 @@ public sealed class CadGripManager
     {
         _grips.Clear();
         foreach (var entity in _entities)
-            _grips.AddRange(entity.GetGripPoints());
+            _grips.AddRange(entity.GetWorldGripPoints());
     }
 
     private void RefreshPositions()
     {
         var next = new List<CadGripPoint>();
         foreach (var entity in _entities)
-            next.AddRange(entity.GetGripPoints());
+            next.AddRange(entity.GetWorldGripPoints());
 
         if (_engine is not { IsInitialized: true } engine)
         {

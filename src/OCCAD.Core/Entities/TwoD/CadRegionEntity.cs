@@ -18,16 +18,21 @@ public sealed class CadRegionEntity : CadEntity
                 "Region outer boundary must be a closed planar profile.",
                 nameof(outer));
 
-        var values = holes?.ToArray() ?? Array.Empty<CadEntity>();
-        if (!CadPlanarProfileGeometry.AreCoplanar(outer, values))
+        var outerSnapshot =
+            outer.CreateWorldGeometrySnapshot();
+        var values = (holes?.ToArray() ?? Array.Empty<CadEntity>())
+            .Select(static hole =>
+                hole.CreateWorldGeometrySnapshot())
+            .ToArray();
+        if (!CadPlanarProfileGeometry.AreCoplanar(
+                outerSnapshot,
+                values))
             throw new ArgumentException(
                 "Region boundaries must be coplanar.",
                 nameof(holes));
 
-        _outer = outer.Duplicate();
-        _holes = values
-            .Select(static hole => hole.Duplicate())
-            .ToList();
+        _outer = outerSnapshot;
+        _holes = values.ToList();
         DisplayMode = OcctDisplayMode.Shaded;
     }
 

@@ -108,9 +108,14 @@ public sealed class TrimTool : CadSelectionTransformToolBase
             Entities.Contains(hovered))
             return false;
 
-        var boundaries = Entities.ToArray();
+        var boundaries = Entities
+            .Select(static entity =>
+                entity.CreateWorldGeometrySnapshot())
+            .ToArray();
+        var working =
+            hovered.CreateWorldGeometrySnapshot();
 
-        var success = hovered switch
+        var success = working switch
         {
             CadLineEntity line =>
                 CadLineEditGeometry.TryTrim(

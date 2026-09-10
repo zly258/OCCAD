@@ -13,6 +13,13 @@ public sealed class CircularArrayTool : CadSelectionTransformToolBase, ICadPoint
     private bool _rotate = true;
     public override string Id => "circlearray";
     public override string DisplayName => "Circular Array";
+    public override CadToolInputKind InputKind =>
+        State == CadToolState.WaitForSelect
+            ? CadToolInputKind.Selection
+            : _center is null ||
+              !_rotate && _reference is null
+                ? CadToolInputKind.Point
+                : CadToolInputKind.Confirmation;
     public override OcctPoint3d? PrecisionReferencePoint => _center;
     protected override bool CanCommitCurrentStageCore => State == CadToolState.Drawing && (_center is null || (!_rotate && _reference is null));
     protected override bool CanStepBackCore => _center is not null;

@@ -11,7 +11,7 @@ public enum CadBooleanKind
     Common
 }
 
-public sealed class CadBooleanEntity : CadEntity
+public sealed class CadBooleanEntity : CadFeatureEntity
 {
     private CadEntity _left;
     private CadEntity _right;
@@ -52,7 +52,13 @@ public sealed class CadBooleanEntity : CadEntity
     [Browsable(false)]
     public string RightType => _right.EntityType;
 
-    internal override OcctShape BuildShape(OcctEngine engine)
+    public override IReadOnlyList<CadFeatureInputDescriptor> Inputs =>
+    [
+        CapturedInput("Left", _left),
+        CapturedInput("Right", _right)
+    ];
+
+    protected override OcctShape BuildFeatureResult(OcctEngine engine)
     {
         var left = _left.BuildShape(engine);
         var right = _right.BuildShape(engine);

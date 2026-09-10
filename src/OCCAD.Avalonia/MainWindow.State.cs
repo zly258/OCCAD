@@ -443,6 +443,14 @@ public sealed partial class MainWindow
         _viewportInteraction.RefreshCurrentDrawingPointer();
     }
 
+    private void DraftingChanged()
+    {
+        _workspace.Tracking.Clear();
+        _toolPanel.SetTool(_workspace.Tools.ActiveTool);
+        RefreshInteractionUi();
+        _viewportInteraction.RefreshCurrentDrawingPointer();
+    }
+
     private void RefreshInteractionUi()
     {
         _refreshingUi = true;
@@ -456,21 +464,21 @@ public sealed partial class MainWindow
             _orthoToggle.Content =
                 UiText("Cad.Text.StatusOrtho", "ORTHO");
             _orthoToggle.IsChecked =
-                _workspace.WorkPlane
+                _workspace.Drafting
                     .OrthogonalTrackingEnabled;
 
             _polarToggle.Content = UiFormat(
                 "Cad.Text.StatusPolarValue",
                 "{0} {1:G}°",
                 UiText("Cad.Text.StatusPolar", "POLAR"),
-                _workspace.WorkPlane
+                _workspace.Drafting
                     .PolarIncrementDegrees);
             _polarToggle.IsChecked =
-                _workspace.WorkPlane.PolarTrackingEnabled;
+                _workspace.Drafting.PolarTrackingEnabled;
 
             var explicitDirectionLock =
-                _workspace.WorkPlane.AxisLockEnabled ||
-                _workspace.WorkPlane.AngleLockEnabled;
+                _workspace.Drafting.AxisLockEnabled ||
+                _workspace.Drafting.AngleLockEnabled;
             _orthoToggle.IsEnabled = !explicitDirectionLock;
             _polarToggle.IsEnabled = !explicitDirectionLock;
 
@@ -587,16 +595,16 @@ public sealed partial class MainWindow
 
         var values = new List<string>(3);
 
-        if (_workspace.WorkPlane.LengthLockEnabled)
+        if (_workspace.Drafting.LengthLockEnabled)
         {
             values.Add(
-                $"L={_workspace.WorkPlane.LockedLength:0.###}");
+                $"L={_workspace.Drafting.LockedLength:0.###}");
         }
 
-        if (_workspace.WorkPlane.AngleLockEnabled)
+        if (_workspace.Drafting.AngleLockEnabled)
         {
             values.Add(
-                $"A={_workspace.WorkPlane.LockedAngleDegrees:0.###}°");
+                $"A={_workspace.Drafting.LockedAngleDegrees:0.###}°");
         }
 
         if (_workspace.Precision.Factor is { } factor)

@@ -8,6 +8,10 @@ public sealed class LoftTool : CadSelectionTransformToolBase
     private bool _ruled;
 
     public override string Id => "loft";
+    public override CadToolInputKind InputKind =>
+        State == CadToolState.WaitForSelect
+            ? CadToolInputKind.Selection
+            : CadToolInputKind.Confirmation;
     public override string DisplayName => "Loft";
 
     public override CadToolPanelDescriptor ParameterPanel =>
@@ -142,6 +146,7 @@ public sealed class LoftTool : CadSelectionTransformToolBase
             Entities,
             _makeSolid,
             _ruled);
+        entity.BindSources(Entities);
         return true;
     }
 }

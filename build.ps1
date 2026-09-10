@@ -27,12 +27,20 @@ if ([string]::IsNullOrWhiteSpace($bridgeSourceCommit)) {
     throw "Installed OcctCSharpBridge SDK manifest does not contain sourceCommit: $bridgeManifestPath"
 }
 
+$occadSourceCommit = (& git -C $root rev-parse HEAD 2>$null)
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($occadSourceCommit)) {
+    $occadSourceCommit = 'unknown'
+} else {
+    $occadSourceCommit = $occadSourceCommit.Trim()
+}
+
+Write-Host "[build] OCCAD source:  $occadSourceCommit"
 Write-Host "[build] Bridge SDK:    $bridgeSdk"
 Write-Host "[build] Bridge source: $bridgeSourceCommit"
 
 & dotnet build $solution -c $Configuration -p:Platform=x64 --nologo
 if ($LASTEXITCODE -ne 0) {
-    throw "OCCAD build failed against Bridge SDK source $bridgeSourceCommit. Exit code: $LASTEXITCODE."
+    throw "OCCAD build failed. OCCAD source $occadSourceCommit; Bridge SDK source $bridgeSourceCommit. Exit code: $LASTEXITCODE."
 }
 
 Write-Host '[build] Completed.' -ForegroundColor Green

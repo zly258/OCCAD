@@ -30,7 +30,7 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
             if (input.Kind == OcctPointerInputKind.Moved)
             {
                 if (CadPathFilletGeometry.TryFillet(
-                        path,
+                        path.CreateWorldGeometrySnapshot(),
                         hit,
                         _radius,
                         Context.WorkPlane,
@@ -45,7 +45,7 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
                 input.Button == OcctPointerButton.Left)
             {
                 if (!CadPathFilletGeometry.TryFillet(
-                        path,
+                        path.CreateWorldGeometrySnapshot(),
                         hit,
                         _radius,
                         Context.WorkPlane,
@@ -88,8 +88,13 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
         OcctPoint3d secondPick,
         out CadEntity[] replacements)
     {
-        if (FirstEntity is CadLineEntity firstLine &&
-            second is CadLineEntity secondLine)
+        var first =
+            FirstEntity.CreateWorldGeometrySnapshot();
+        var next =
+            second.CreateWorldGeometrySnapshot();
+
+        if (first is CadLineEntity firstLine &&
+            next is CadLineEntity secondLine)
         {
             return CadLineCornerGeometry.TryFillet(
                 firstLine,
@@ -101,8 +106,8 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
                 out replacements);
         }
 
-        if (FirstEntity is CadLineEntity line &&
-            second is CadArcEntity arc)
+        if (first is CadLineEntity line &&
+            next is CadArcEntity arc)
         {
             return CadLineArcFilletGeometry.TryFillet(
                 line,
@@ -114,8 +119,8 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
                 out replacements);
         }
 
-        if (FirstEntity is CadArcEntity firstArc &&
-            second is CadLineEntity arcLine)
+        if (first is CadArcEntity firstArc &&
+            next is CadLineEntity arcLine)
         {
             return CadLineArcFilletGeometry.TryFillet(
                 arcLine,
@@ -127,8 +132,8 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
                 out replacements);
         }
 
-        if (FirstEntity is CadArcEntity firstArcEntity &&
-            second is CadArcEntity secondArcEntity)
+        if (first is CadArcEntity firstArcEntity &&
+            next is CadArcEntity secondArcEntity)
         {
             return CadArcArcFilletGeometry.TryFillet(
                 firstArcEntity,

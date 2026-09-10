@@ -282,7 +282,7 @@ internal sealed class CadGeometryHistoryEntry : ICadHistoryEntry
     private void Restore(IReadOnlyList<CadEntity> snapshots)
     {
         for (var index = 0; index < _targets.Length; index++)
-            _targets[index].RestoreGeometry(snapshots[index]);
+            _targets[index].RestoreGeometrySnapshot(snapshots[index]);
     }
 }
 

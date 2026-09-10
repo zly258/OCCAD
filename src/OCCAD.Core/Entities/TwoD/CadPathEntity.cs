@@ -7,22 +7,28 @@ namespace OCCAD;
 public sealed class CadPathEntity : CadEntity
 {
     private const double JoinTolerance = 1e-7;
-    private readonly List<CadEntity> _segments;
+    private readonly List<CadPathSegment> _segments;
 
     public CadPathEntity(
-        IEnumerable<CadEntity> segments) : base("Path")
+        IEnumerable<CadEntity> segments)
+        : this(
+            ConvertSegments(segments))
+    {
+    }
+
+    public CadPathEntity(
+        IEnumerable<CadPathSegment> segments)
+        : base("Path")
     {
         ArgumentNullException.ThrowIfNull(segments);
-        _segments = segments
-            .Select(SnapshotSegment)
-            .ToList();
-
+        _segments = segments.ToList();
         ValidateChain(_segments);
         DisplayMode = OcctDisplayMode.Wireframe;
     }
 
     [Browsable(false)]
-    public IReadOnlyList<CadEntity> Segments => _segments;
+    public IReadOnlyList<CadPathSegment> Segments =>
+        _segments;
 
     [Category("Geometry"), ReadOnly(true)]
     public int SegmentCount => _segments.Count;
@@ -33,36 +39,34 @@ public sealed class CadPathEntity : CadEntity
 
     [Browsable(false)]
     public OcctPoint3d Start =>
-        SegmentStart(_segments[0]);
+        _segments[0].Start;
 
     [Browsable(false)]
     public OcctPoint3d End =>
-        SegmentEnd(_segments[^1]);
+        _segments[^1].End;
 
     [Category("Measurement"), ReadOnly(true)]
     public double Length =>
         _segments.Sum(static segment =>
-            segment switch
-            {
-                CadLineEntity line => line.Length,
-                CadArcEntity arc => arc.ArcLength,
-                _ => 0.0
-            });
+            segment.Length);
 
     internal override OcctShape BuildShape(
         OcctEngine engine)
     {
         using var model = new OcctModelingSession();
-        var edges = new List<OcctModelShape>(_segments.Count);
+        var edges = new List<OcctModelShape>(
+            _segments.Count);
 
         foreach (var segment in _segments)
         {
             edges.Add(
                 segment switch
                 {
-                    CadLineEntity line =>
-                        model.MakeLine(line.Start, line.End),
-                    CadArcEntity arc =>
+                    CadLineSegment line =>
+                        model.MakeLine(
+                            line.Start,
+                            line.End),
+                    CadArcSegment arc =>
                         model.MakeArc(
                             arc.Start,
                             arc.Middle,
@@ -73,18 +77,23 @@ public sealed class CadPathEntity : CadEntity
         }
 
         var wire = model.MakeWire(edges);
-        return engine.CreateShapeFromModel(model, wire);
+        return engine.CreateShapeFromModel(
+            model,
+            wire);
     }
 
-    internal override IReadOnlyList<CadSnapCurve> GetPrecisionSnapCurves(
-        CadWorkPlane workPlane)
+    internal override IReadOnlyList<CadSnapCurve>
+        GetPrecisionSnapCurves(
+            CadWorkPlane workPlane)
     {
         ArgumentNullException.ThrowIfNull(workPlane);
 
         var result = new List<CadSnapCurve>();
         foreach (var segment in _segments)
         {
-            foreach (var curve in segment.GetPrecisionSnapCurves(workPlane))
+            var transient = segment.ToEntity();
+            foreach (var curve in transient
+                         .GetPrecisionSnapCurves(workPlane))
             {
                 result.Add(
                     curve with
@@ -102,7 +111,8 @@ public sealed class CadPathEntity : CadEntity
         int segmentIndex,
         out CadPathSegmentInfo info)
     {
-        if ((uint)segmentIndex >= (uint)_segments.Count)
+        if ((uint)segmentIndex >=
+            (uint)_segments.Count)
         {
             info = default;
             return false;
@@ -111,33 +121,41 @@ public sealed class CadPathEntity : CadEntity
         var segment = _segments[segmentIndex];
         info = segment switch
         {
-            CadLineEntity line => new CadPathSegmentInfo(
-                segmentIndex,
-                CadPathSegmentType.Line,
-                line.Start,
-                line.End,
-                line.Length),
-            CadArcEntity arc => new CadPathSegmentInfo(
-                segmentIndex,
-                CadPathSegmentType.Arc,
-                arc.Start,
-                arc.End,
-                arc.ArcLength,
-                arc.Middle,
-                arc.Radius),
+            CadLineSegment line =>
+                new CadPathSegmentInfo(
+                    segmentIndex,
+                    CadPathSegmentType.Line,
+                    line.Start,
+                    line.End,
+                    line.Length),
+
+            CadArcSegment arc =>
+                new CadPathSegmentInfo(
+                    segmentIndex,
+                    CadPathSegmentType.Arc,
+                    arc.Start,
+                    arc.End,
+                    arc.ArcLength,
+                    arc.Middle,
+                    arc.Radius),
+
             _ => default
         };
-        return segment is CadLineEntity or CadArcEntity;
+
+        return segment is
+            CadLineSegment or
+            CadArcSegment;
     }
 
-    public override IReadOnlyList<CadSnapPoint> GetSnapPoints()
+    public override IReadOnlyList<CadSnapPoint>
+        GetSnapPoints()
     {
         var result = new List<CadSnapPoint>();
-        for (var segmentIndex = 0;
-             segmentIndex < _segments.Count;
-             segmentIndex++)
+
+        foreach (var segment in _segments)
         {
-            foreach (var snap in _segments[segmentIndex].GetSnapPoints())
+            var transient = segment.ToEntity();
+            foreach (var snap in transient.GetSnapPoints())
             {
                 result.Add(
                     new CadSnapPoint(
@@ -152,7 +170,8 @@ public sealed class CadPathEntity : CadEntity
         return result;
     }
 
-    public override IReadOnlyList<CadGripPoint> GetGripPoints()
+    public override IReadOnlyList<CadGripPoint>
+        GetGripPoints()
     {
         var result = new List<CadGripPoint>
         {
@@ -163,10 +182,14 @@ public sealed class CadPathEntity : CadEntity
                 Kind: CadGripKind.Center)
         };
 
-        var vertexBindings = EditableVertexBindings();
+        var vertexBindings =
+            EditableVertexBindings();
+
         foreach (var binding in vertexBindings)
         {
-            var sourceGrip = ResolveConstraintGrip(binding);
+            var sourceGrip =
+                ResolveConstraintGrip(binding);
+
             result.Add(
                 new CadGripPoint(
                     this,
@@ -175,15 +198,23 @@ public sealed class CadPathEntity : CadEntity
                     sourceGrip?.WorkPlane,
                     sourceGrip?.ConstraintOrigin,
                     sourceGrip?.PrecisionInputs ??
-                        CadPrecisionInputKind.LengthAndAngle,
+                        CadPrecisionInputKind
+                            .LengthAndAngle,
                     CadGripKind.Vertex));
         }
 
         foreach (var binding in ArcMiddleBindings())
         {
-            var arc = (CadArcEntity)_segments[binding.SegmentIndex];
-            var sourceGrip = arc.GetGripPoints()
-                .First(static grip => grip.Index == 3);
+            var arc =
+                ((CadArcSegment)_segments[
+                    binding.SegmentIndex])
+                .AsArc();
+
+            var sourceGrip = arc
+                .GetGripPoints()
+                .First(static grip =>
+                    grip.Index == 3);
+
             result.Add(
                 new CadGripPoint(
                     this,
@@ -203,12 +234,17 @@ public sealed class CadPathEntity : CadEntity
         OcctPoint3d targetPoint)
     {
         if (!targetPoint.IsFinite)
-            throw new ArgumentOutOfRangeException(nameof(targetPoint));
+            throw new ArgumentOutOfRangeException(
+                nameof(targetPoint));
 
         if (index == 0)
         {
             var center = ApproximateCenter();
-            var displacement = CadTransformMath.Between(center, targetPoint);
+            var displacement =
+                CadTransformMath.Between(
+                    center,
+                    targetPoint);
+
             if (displacement.LengthSquared <= 1e-24)
                 return;
 
@@ -216,39 +252,57 @@ public sealed class CadPathEntity : CadEntity
             return;
         }
 
-        var vertexBindings = EditableVertexBindings();
+        var vertexBindings =
+            EditableVertexBindings();
         var vertexIndex = index - 1;
-        if ((uint)vertexIndex < (uint)vertexBindings.Count)
+
+        if ((uint)vertexIndex <
+            (uint)vertexBindings.Count)
         {
-            MoveVertexGrip(vertexBindings[vertexIndex], targetPoint);
+            MoveVertexGrip(
+                vertexBindings[vertexIndex],
+                targetPoint);
             return;
         }
 
         var arcBindings = ArcMiddleBindings();
-        var arcIndex = vertexIndex - vertexBindings.Count;
-        if ((uint)arcIndex >= (uint)arcBindings.Count)
-            throw new ArgumentOutOfRangeException(nameof(index));
+        var arcIndex =
+            vertexIndex - vertexBindings.Count;
 
-        MoveArcMiddleGrip(arcBindings[arcIndex], targetPoint);
+        if ((uint)arcIndex >=
+            (uint)arcBindings.Count)
+            throw new ArgumentOutOfRangeException(
+                nameof(index));
+
+        MoveArcMiddleGrip(
+            arcBindings[arcIndex],
+            targetPoint);
     }
 
     private void MoveVertexGrip(
         PathVertexBinding binding,
         OcctPoint3d targetPoint)
     {
-        var updated = _segments
-            .Select(SnapshotSegment)
-            .ToList();
-
+        var updated = _segments.ToList();
         var resolvedTarget = targetPoint;
-        var previousArcIndex = binding.PreviousSegmentIndex;
-        var nextArcIndex = binding.NextSegmentIndex;
+
+        var previousArcIndex =
+            binding.PreviousSegmentIndex;
+        var nextArcIndex =
+            binding.NextSegmentIndex;
 
         if (previousArcIndex is { } previousIndex &&
             nextArcIndex is { } nextIndex &&
-            updated[previousIndex] is CadArcEntity previousArc &&
-            updated[nextIndex] is CadArcEntity nextArc)
+            updated[previousIndex] is
+                CadArcSegment previousSegment &&
+            updated[nextIndex] is
+                CadArcSegment nextSegment)
         {
+            var previousArc =
+                previousSegment.AsArc();
+            var nextArc =
+                nextSegment.AsArc();
+
             if (!TryResolveArcArcJunction(
                     previousArc,
                     nextArc,
@@ -259,73 +313,113 @@ public sealed class CadPathEntity : CadEntity
                     "The two fixed arc circles do not have a valid common junction.");
             }
 
-            previousArc.MoveGrip(2, resolvedTarget);
-            nextArc.MoveGrip(1, resolvedTarget);
+            previousArc.MoveGrip(
+                2,
+                resolvedTarget);
+            nextArc.MoveGrip(
+                1,
+                resolvedTarget);
 
-            if (previousArc.End.DistanceTo(nextArc.Start) > JoinTolerance)
+            if (previousArc.End.DistanceTo(
+                    nextArc.Start) >
+                JoinTolerance)
             {
                 throw new InvalidOperationException(
                     "Arc junction solve did not preserve path continuity.");
             }
+
+            updated[previousIndex] =
+                CadPathSegment.FromEntity(
+                    previousArc,
+                    applyPlacement: false);
+            updated[nextIndex] =
+                CadPathSegment.FromEntity(
+                    nextArc,
+                    applyPlacement: false);
         }
-        else if (previousArcIndex is { } previousOnly &&
-                 updated[previousOnly] is CadArcEntity previousOnlyArc)
+        else if (
+            previousArcIndex is { } previousOnly &&
+            updated[previousOnly] is
+                CadArcSegment previousOnlySegment)
         {
-            previousOnlyArc.MoveGrip(2, resolvedTarget);
-            resolvedTarget = previousOnlyArc.End;
+            var previousOnlyArc =
+                previousOnlySegment.AsArc();
+            previousOnlyArc.MoveGrip(
+                2,
+                resolvedTarget);
+            resolvedTarget =
+                previousOnlyArc.End;
+            updated[previousOnly] =
+                CadPathSegment.FromEntity(
+                    previousOnlyArc,
+                    applyPlacement: false);
         }
-        else if (nextArcIndex is { } nextOnly &&
-                 updated[nextOnly] is CadArcEntity nextOnlyArc)
+        else if (
+            nextArcIndex is { } nextOnly &&
+            updated[nextOnly] is
+                CadArcSegment nextOnlySegment)
         {
-            nextOnlyArc.MoveGrip(1, resolvedTarget);
+            var nextOnlyArc =
+                nextOnlySegment.AsArc();
+            nextOnlyArc.MoveGrip(
+                1,
+                resolvedTarget);
             resolvedTarget = nextOnlyArc.Start;
+            updated[nextOnly] =
+                CadPathSegment.FromEntity(
+                    nextOnlyArc,
+                    applyPlacement: false);
         }
 
-        if (binding.PreviousSegmentIndex is { } previousLineIndex &&
-            updated[previousLineIndex] is CadLineEntity previousLine)
+        if (binding.PreviousSegmentIndex is
+                { } previousLineIndex &&
+            updated[previousLineIndex] is
+                CadLineSegment previousLine)
         {
             updated[previousLineIndex] =
-                previousLine.CreateLine(
+                new CadLineSegment(
                     previousLine.Start,
                     resolvedTarget);
         }
 
-        if (binding.NextSegmentIndex is { } nextLineIndex &&
-            updated[nextLineIndex] is CadLineEntity nextLine)
+        if (binding.NextSegmentIndex is
+                { } nextLineIndex &&
+            updated[nextLineIndex] is
+                CadLineSegment nextLine)
         {
             updated[nextLineIndex] =
-                nextLine.CreateLine(
+                new CadLineSegment(
                     resolvedTarget,
                     nextLine.End);
         }
 
-        ReplaceSegments(updated, nameof(MoveGrip));
+        ReplaceSegments(
+            updated,
+            nameof(MoveGrip));
     }
 
     private void MoveArcMiddleGrip(
         PathArcGripBinding binding,
         OcctPoint3d targetPoint)
     {
-        var updated = _segments
-            .Select(SnapshotSegment)
-            .ToList();
-        var arc = (CadArcEntity)updated[binding.SegmentIndex];
+        var updated = _segments.ToList();
+        var arc =
+            (CadArcSegment)updated[
+                binding.SegmentIndex];
 
-        // Reconstructing from fixed endpoints and the requested middle point is
-        // the Path-level constraint solve. The adjacent junctions remain exactly
-        // where they were; an invalid/collinear request is rejected by CadArcEntity
-        // and therefore by GripEditTool without changing the real Path.
         updated[binding.SegmentIndex] =
-            arc.CreateArc(
+            new CadArcSegment(
                 arc.Start,
                 targetPoint,
                 arc.End);
 
-        ReplaceSegments(updated, nameof(MoveGrip));
+        ReplaceSegments(
+            updated,
+            nameof(MoveGrip));
     }
 
     private void ReplaceSegments(
-        IReadOnlyList<CadEntity> updated,
+        IReadOnlyList<CadPathSegment> updated,
         string propertyName)
     {
         ValidateChain(updated);
@@ -337,78 +431,87 @@ public sealed class CadPathEntity : CadEntity
     private CadGripPoint? ResolveConstraintGrip(
         PathVertexBinding binding)
     {
-        if (binding.PreviousSegmentIndex is { } previousIndex &&
-            _segments[previousIndex] is CadArcEntity previousArc)
+        if (binding.PreviousSegmentIndex is
+                { } previousIndex &&
+            _segments[previousIndex] is
+                CadArcSegment previousArc)
         {
-            return previousArc.GetGripPoints()
-                .FirstOrDefault(static grip => grip.Index == 2);
+            return previousArc
+                .AsArc()
+                .GetGripPoints()
+                .FirstOrDefault(
+                    static grip =>
+                        grip.Index == 2);
         }
 
-        if (binding.NextSegmentIndex is { } nextIndex &&
-            _segments[nextIndex] is CadArcEntity nextArc)
+        if (binding.NextSegmentIndex is
+                { } nextIndex &&
+            _segments[nextIndex] is
+                CadArcSegment nextArc)
         {
-            return nextArc.GetGripPoints()
-                .FirstOrDefault(static grip => grip.Index == 1);
+            return nextArc
+                .AsArc()
+                .GetGripPoints()
+                .FirstOrDefault(
+                    static grip =>
+                        grip.Index == 1);
         }
 
         return null;
     }
 
-    private IReadOnlyList<PathVertexBinding> EditableVertexBindings()
+    private IReadOnlyList<PathVertexBinding>
+        EditableVertexBindings()
     {
-        var result = new List<PathVertexBinding>();
+        var result =
+            new List<PathVertexBinding>();
         var count = _segments.Count;
 
         if (!Closed)
         {
-            if (SupportsStartVertex(_segments[0]))
+            result.Add(
+                new PathVertexBinding(
+                    _segments[0].Start,
+                    PreviousSegmentIndex: null,
+                    NextSegmentIndex: 0));
+
+            for (var vertex = 1;
+                 vertex < count;
+                 vertex++)
             {
+                var previous =
+                    _segments[vertex - 1];
+                var next =
+                    _segments[vertex];
+
                 result.Add(
                     new PathVertexBinding(
-                        SegmentStart(_segments[0]),
-                        PreviousSegmentIndex: null,
-                        NextSegmentIndex: 0));
-            }
-
-            for (var vertex = 1; vertex < count; vertex++)
-            {
-                var previous = _segments[vertex - 1];
-                var next = _segments[vertex];
-
-                if (!SupportsSharedVertex(previous, next))
-                    continue;
-
-                result.Add(
-                    new PathVertexBinding(
-                        SegmentEnd(previous),
+                        previous.End,
                         vertex - 1,
                         vertex));
             }
 
-            if (SupportsEndVertex(_segments[^1]))
-            {
-                result.Add(
-                    new PathVertexBinding(
-                        SegmentEnd(_segments[^1]),
-                        count - 1,
-                        NextSegmentIndex: null));
-            }
+            result.Add(
+                new PathVertexBinding(
+                    _segments[^1].End,
+                    count - 1,
+                    NextSegmentIndex: null));
 
             return result;
         }
 
-        for (var vertex = 0; vertex < count; vertex++)
+        for (var vertex = 0;
+             vertex < count;
+             vertex++)
         {
-            var previousIndex = vertex == 0 ? count - 1 : vertex - 1;
-            var previous = _segments[previousIndex];
-            var next = _segments[vertex];
-
-            if (!SupportsSharedVertex(previous, next))
-                continue;
+            var previousIndex =
+                vertex == 0
+                    ? count - 1
+                    : vertex - 1;
 
             result.Add(
                 new PathVertexBinding(
-                    SegmentEnd(previous),
+                    _segments[previousIndex].End,
                     previousIndex,
                     vertex));
         }
@@ -416,28 +519,28 @@ public sealed class CadPathEntity : CadEntity
         return result;
     }
 
-    private IReadOnlyList<PathArcGripBinding> ArcMiddleBindings()
+    private IReadOnlyList<PathArcGripBinding>
+        ArcMiddleBindings()
     {
-        var result = new List<PathArcGripBinding>();
-        for (var index = 0; index < _segments.Count; index++)
+        var result =
+            new List<PathArcGripBinding>();
+
+        for (var index = 0;
+             index < _segments.Count;
+             index++)
         {
-            if (_segments[index] is CadArcEntity arc)
-                result.Add(new PathArcGripBinding(index, arc.Middle));
+            if (_segments[index] is
+                CadArcSegment arc)
+            {
+                result.Add(
+                    new PathArcGripBinding(
+                        index,
+                        arc.Middle));
+            }
         }
+
         return result;
     }
-
-    private static bool SupportsStartVertex(CadEntity segment) =>
-        segment is CadLineEntity or CadArcEntity;
-
-    private static bool SupportsEndVertex(CadEntity segment) =>
-        segment is CadLineEntity or CadArcEntity;
-
-    private static bool SupportsSharedVertex(
-        CadEntity previous,
-        CadEntity next) =>
-        previous is CadLineEntity or CadArcEntity &&
-        next is CadLineEntity or CadArcEntity;
 
     private static bool TryResolveArcArcJunction(
         CadArcEntity first,
@@ -446,74 +549,145 @@ public sealed class CadPathEntity : CadEntity
         out OcctPoint3d result)
     {
         result = default;
-        var firstNormal = first.Normal.Normalized();
-        var secondNormal = second.Normal.Normalized();
-        if (Math.Abs(CadTransformMath.Dot(firstNormal, secondNormal)) < 1.0 - 1e-8)
+
+        var firstNormal =
+            first.Normal.Normalized();
+        var secondNormal =
+            second.Normal.Normalized();
+
+        if (Math.Abs(
+                CadTransformMath.Dot(
+                    firstNormal,
+                    secondNormal)) <
+            1.0 - 1e-8)
             return false;
 
-        var centerDelta = CadTransformMath.Between(first.Center, second.Center);
-        var axial = CadTransformMath.Dot(centerDelta, firstNormal);
+        var centerDelta =
+            CadTransformMath.Between(
+                first.Center,
+                second.Center);
+        var axial =
+            CadTransformMath.Dot(
+                centerDelta,
+                firstNormal);
+
         if (Math.Abs(axial) > JoinTolerance)
             return false;
 
         var planar = new OcctVector3d(
-            centerDelta.X - firstNormal.X * axial,
-            centerDelta.Y - firstNormal.Y * axial,
-            centerDelta.Z - firstNormal.Z * axial);
-        var distanceSquared = planar.LengthSquared;
-        if (distanceSquared <= JoinTolerance * JoinTolerance)
+            centerDelta.X -
+                firstNormal.X * axial,
+            centerDelta.Y -
+                firstNormal.Y * axial,
+            centerDelta.Z -
+                firstNormal.Z * axial);
+
+        var distanceSquared =
+            planar.LengthSquared;
+
+        if (distanceSquared <=
+            JoinTolerance * JoinTolerance)
             return false;
 
-        var distance = Math.Sqrt(distanceSquared);
+        var distance =
+            Math.Sqrt(distanceSquared);
         var firstRadius = first.Radius;
         var secondRadius = second.Radius;
-        if (distance > firstRadius + secondRadius + JoinTolerance ||
-            distance < Math.Abs(firstRadius - secondRadius) - JoinTolerance)
+
+        if (distance >
+                firstRadius +
+                secondRadius +
+                JoinTolerance ||
+            distance <
+                Math.Abs(
+                    firstRadius -
+                    secondRadius) -
+                JoinTolerance)
             return false;
 
-        var direction = planar * (1.0 / distance);
+        var direction =
+            planar * (1.0 / distance);
+
         var along =
             (firstRadius * firstRadius -
              secondRadius * secondRadius +
              distanceSquared) /
             (2.0 * distance);
+
         var heightSquared =
-            firstRadius * firstRadius - along * along;
-        if (heightSquared < -JoinTolerance * JoinTolerance)
+            firstRadius * firstRadius -
+            along * along;
+
+        if (heightSquared <
+            -JoinTolerance * JoinTolerance)
             return false;
 
-        var height = Math.Sqrt(Math.Max(0.0, heightSquared));
-        var basePoint = first.Center + direction * along;
+        var height =
+            Math.Sqrt(
+                Math.Max(
+                    0.0,
+                    heightSquared));
+
+        var basePoint =
+            first.Center +
+            direction * along;
+
         if (height <= JoinTolerance)
         {
             result = basePoint;
             return result.IsFinite;
         }
 
-        var perpendicular = firstNormal.Cross(direction).Normalized();
-        var firstCandidate = basePoint + perpendicular * height;
-        var secondCandidate = basePoint - perpendicular * height;
-        result = firstCandidate.DistanceTo(target) <= secondCandidate.DistanceTo(target)
-            ? firstCandidate
-            : secondCandidate;
+        var perpendicular =
+            firstNormal
+                .Cross(direction)
+                .Normalized();
+
+        var firstCandidate =
+            basePoint +
+            perpendicular * height;
+        var secondCandidate =
+            basePoint -
+            perpendicular * height;
+
+        result =
+            firstCandidate.DistanceTo(target) <=
+            secondCandidate.DistanceTo(target)
+                ? firstCandidate
+                : secondCandidate;
+
         return result.IsFinite;
     }
 
     private OcctPoint3d ApproximateCenter()
     {
         var points = _segments
-            .SelectMany(static segment =>
-                segment switch
-                {
-                    CadLineEntity line => new[] { line.Start, line.End },
-                    CadArcEntity arc => new[] { arc.Start, arc.Middle, arc.End },
-                    _ => Array.Empty<OcctPoint3d>()
-                })
+            .SelectMany(
+                static segment =>
+                    segment switch
+                    {
+                        CadLineSegment line =>
+                            new[]
+                            {
+                                line.Start,
+                                line.End
+                            },
+                        CadArcSegment arc =>
+                            new[]
+                            {
+                                arc.Start,
+                                arc.Middle,
+                                arc.End
+                            },
+                        _ =>
+                            Array.Empty<OcctPoint3d>()
+                    })
             .ToArray();
 
         var x = 0.0;
         var y = 0.0;
         var z = 0.0;
+
         foreach (var point in points)
         {
             x += point.X;
@@ -532,69 +706,44 @@ public sealed class CadPathEntity : CadEntity
         int segmentIndex,
         OcctPoint3d point)
     {
-        if ((uint)segmentIndex >= (uint)_segments.Count)
-            throw new ArgumentOutOfRangeException(nameof(segmentIndex));
+        if ((uint)segmentIndex >=
+            (uint)_segments.Count)
+            throw new ArgumentOutOfRangeException(
+                nameof(segmentIndex));
         if (!point.IsFinite)
-            throw new ArgumentOutOfRangeException(nameof(point));
+            throw new ArgumentOutOfRangeException(
+                nameof(point));
 
-        var source = _segments[segmentIndex];
-        CadEntity first;
-        CadEntity second;
+        var source =
+            _segments[segmentIndex];
 
-        switch (source)
+        if (!source.TryClosestParameter(
+                point,
+                out var parameter) ||
+            parameter <= 1e-7 ||
+            parameter >= 1.0 - 1e-7)
         {
-            case CadLineEntity line:
-            {
-                var direction = line.End - line.Start;
-                var lengthSquared = direction.LengthSquared;
-                if (lengthSquared <= 1e-24)
-                    throw new InvalidOperationException(
-                        "The Path line segment is degenerate.");
-
-                var parameter = Math.Clamp(
-                    (point - line.Start).Dot(direction) / lengthSquared,
-                    0.0,
-                    1.0);
-                if (parameter <= 1e-7 ||
-                    parameter >= 1.0 - 1e-7)
-                {
-                    throw new InvalidOperationException(
-                        "Split point must be inside the Path segment.");
-                }
-
-                var splitPoint = line.Start + direction * parameter;
-                first = line.CreateLine(line.Start, splitPoint);
-                second = line.CreateLine(splitPoint, line.End);
-                break;
-            }
-
-            case CadArcEntity arc:
-            {
-                if (!arc.TryClosestParameter(point, out var parameter) ||
-                    parameter <= 1e-7 ||
-                    parameter >= 1.0 - 1e-7)
-                {
-                    throw new InvalidOperationException(
-                        "Split point must be inside the Path arc.");
-                }
-
-                first = arc.CopyWithParameterRange(0.0, parameter);
-                second = arc.CopyWithParameterRange(parameter, 1.0);
-                break;
-            }
-
-            default:
-                throw new InvalidOperationException(
-                    "Path contains an unsupported segment.");
+            throw new InvalidOperationException(
+                "Split point must be inside the Path segment.");
         }
 
-        var updated = _segments
-            .Select(SnapshotSegment)
-            .ToList();
+        var parts = source.Split(parameter);
+        if (parts.Count != 2)
+            throw new InvalidOperationException(
+                "Path segment split must return two segments.");
+
+        var updated = _segments.ToList();
         updated.RemoveAt(segmentIndex);
-        updated.Insert(segmentIndex, second);
-        updated.Insert(segmentIndex, first);
-        ReplaceSegments(updated, nameof(SplitSegment));
+        updated.Insert(
+            segmentIndex,
+            parts[1]);
+        updated.Insert(
+            segmentIndex,
+            parts[0]);
+
+        ReplaceSegments(
+            updated,
+            nameof(SplitSegment));
     }
 
     public void Reverse()
@@ -602,9 +751,14 @@ public sealed class CadPathEntity : CadEntity
         var updated = _segments
             .AsEnumerable()
             .Reverse()
-            .Select(ReverseSegment)
+            .Select(
+                static segment =>
+                    segment.Reverse())
             .ToArray();
-        ReplaceSegments(updated, nameof(Reverse));
+
+        ReplaceSegments(
+            updated,
+            nameof(Reverse));
     }
 
     public void Close()
@@ -612,56 +766,60 @@ public sealed class CadPathEntity : CadEntity
         if (Closed)
             return;
 
-        var updated = _segments
-            .Select(SnapshotSegment)
-            .ToList();
-        updated.Add(new CadLineEntity(End, Start));
-        ReplaceSegments(updated, nameof(Close));
+        var updated = _segments.ToList();
+        updated.Add(
+            new CadLineSegment(
+                End,
+                Start));
+
+        ReplaceSegments(
+            updated,
+            nameof(Close));
     }
 
     public void Open()
     {
         if (!Closed)
             return;
+
         if (_segments.Count <= 1)
             throw new InvalidOperationException(
                 "A closed Path requires at least two segments to open.");
 
         var updated = _segments
             .Take(_segments.Count - 1)
-            .Select(SnapshotSegment)
             .ToArray();
+
         if (updated.Length == 0 ||
-            SegmentStart(updated[0]).DistanceTo(SegmentEnd(updated[^1])) <= JoinTolerance)
+            updated[0].Start.DistanceTo(
+                updated[^1].End) <=
+            JoinTolerance)
         {
             throw new InvalidOperationException(
                 "The Path cannot be opened by removing its closing segment.");
         }
 
-        ReplaceSegments(updated, nameof(Open));
+        ReplaceSegments(
+            updated,
+            nameof(Open));
     }
-
-    private static CadEntity ReverseSegment(
-        CadEntity segment) =>
-        segment switch
-        {
-            CadLineEntity line =>
-                line.CreateLine(line.End, line.Start),
-            CadArcEntity arc =>
-                arc.CreateArc(arc.End, arc.Middle, arc.Start),
-            _ => throw new ArgumentException(
-                "Path segments must be lines or arcs.",
-                nameof(segment))
-        };
 
     internal CadPathEntity CopyWithSegments(
         IEnumerable<CadEntity> segments) =>
-        CopyPropertiesTo(new CadPathEntity(segments));
+        CopyPropertiesTo(
+            new CadPathEntity(segments));
+
+    internal CadPathEntity CopyWithSegments(
+        IEnumerable<CadPathSegment> segments) =>
+        CopyPropertiesTo(
+            new CadPathEntity(segments));
 
     public override CadEntity Duplicate() =>
-        CopyPropertiesTo(new CadPathEntity(_segments));
+        CopyPropertiesTo(
+            new CadPathEntity(_segments));
 
-    public override void RestoreGeometry(CadEntity snapshot)
+    public override void RestoreGeometry(
+        CadEntity snapshot)
     {
         if (snapshot is not CadPathEntity value)
             throw new ArgumentException(
@@ -669,15 +827,25 @@ public sealed class CadPathEntity : CadEntity
                 nameof(snapshot));
 
         _segments.Clear();
-        _segments.AddRange(value._segments.Select(SnapshotSegment));
-        RaiseGeometryChanged(nameof(RestoreGeometry));
+        _segments.AddRange(value._segments);
+        RaiseGeometryChanged(
+            nameof(RestoreGeometry));
     }
 
-    public override void Translate(OcctVector3d displacement)
+    public override void Translate(
+        OcctVector3d displacement)
     {
-        foreach (var segment in _segments)
-            segment.Translate(displacement);
-        RaiseGeometryChanged(nameof(Translate));
+        if (!displacement.IsFinite)
+            throw new ArgumentOutOfRangeException(
+                nameof(displacement));
+
+        ReplaceSegments(
+            _segments
+                .Select(segment =>
+                    segment.Translate(
+                        displacement))
+                .ToArray(),
+            nameof(Translate));
     }
 
     public override void Rotate(
@@ -685,9 +853,15 @@ public sealed class CadPathEntity : CadEntity
         OcctVector3d axis,
         double angleDegrees)
     {
-        foreach (var segment in _segments)
-            segment.Rotate(center, axis, angleDegrees);
-        RaiseGeometryChanged(nameof(Rotate));
+        ReplaceSegments(
+            _segments
+                .Select(segment =>
+                    segment.Rotate(
+                        center,
+                        axis,
+                        angleDegrees))
+                .ToArray(),
+            nameof(Rotate));
     }
 
     public override void Scale(
@@ -695,9 +869,15 @@ public sealed class CadPathEntity : CadEntity
         double factor)
     {
         CadTransformMath.ValidateScale(factor);
-        foreach (var segment in _segments)
-            segment.Scale(center, factor);
-        RaiseGeometryChanged(nameof(Scale));
+
+        ReplaceSegments(
+            _segments
+                .Select(segment =>
+                    segment.Scale(
+                        center,
+                        factor))
+                .ToArray(),
+            nameof(Scale));
     }
 
     internal static JsonObject WriteGeometry(
@@ -710,18 +890,33 @@ public sealed class CadPathEntity : CadEntity
             segments.Add(
                 segment switch
                 {
-                    CadLineEntity line =>
+                    CadLineSegment line =>
                         new JsonObject
                         {
                             ["type"] = "line",
-                            ["geometry"] = CadLineEntity.WriteGeometry(line)
+                            ["start"] =
+                                CadEntityJson.Point(
+                                    line.Start),
+                            ["end"] =
+                                CadEntityJson.Point(
+                                    line.End)
                         },
-                    CadArcEntity arc =>
+
+                    CadArcSegment arc =>
                         new JsonObject
                         {
                             ["type"] = "arc",
-                            ["geometry"] = CadArcEntity.WriteGeometry(arc)
+                            ["start"] =
+                                CadEntityJson.Point(
+                                    arc.Start),
+                            ["middle"] =
+                                CadEntityJson.Point(
+                                    arc.Middle),
+                            ["end"] =
+                                CadEntityJson.Point(
+                                    arc.End)
                         },
+
                     _ => throw new InvalidOperationException(
                         "Path contains an unsupported segment.")
                 });
@@ -738,30 +933,79 @@ public sealed class CadPathEntity : CadEntity
     {
         var values =
             data["segments"] as JsonArray ??
-            throw new FormatException("Path segments are missing.");
+            throw new FormatException(
+                "Path segments are missing.");
 
         var segments = values
-            .Select<JsonNode?, CadEntity>(node =>
+            .Select(node =>
             {
-                var item = node as JsonObject ??
-                    throw new FormatException("Path segment is invalid.");
-                var type = item["type"]?.GetValue<string>() ??
-                    throw new FormatException("Path segment type is missing.");
-                var geometry = item["geometry"] as JsonObject ??
-                    throw new FormatException("Path segment geometry is missing.");
+                var item =
+                    node as JsonObject ??
+                    throw new FormatException(
+                        "Path segment is invalid.");
+
+                var type =
+                    item["type"]?.GetValue<string>() ??
+                    throw new FormatException(
+                        "Path segment type is missing.");
+
+                // Accept both the new compact segment form and version-1
+                // nested entity geometry without a migration layer.
+                if (item["geometry"] is
+                    JsonObject legacyGeometry)
+                {
+                    return CadPathSegment.FromEntity(
+                        type.ToLowerInvariant() switch
+                        {
+                            "line" =>
+                                CadLineEntity.ReadGeometry(
+                                    legacyGeometry),
+                            "arc" =>
+                                CadArcEntity.ReadGeometry(
+                                    legacyGeometry),
+                            _ => throw new FormatException(
+                                $"Unsupported path segment type '{type}'.")
+                        },
+                        applyPlacement: false);
+                }
 
                 return type.ToLowerInvariant() switch
                 {
-                    "line" => CadLineEntity.ReadGeometry(geometry),
-                    "arc" => CadArcEntity.ReadGeometry(geometry),
+                    "line" =>
+                        new CadLineSegment(
+                            CadEntityJson.ReadPoint(
+                                item,
+                                "start"),
+                            CadEntityJson.ReadPoint(
+                                item,
+                                "end")),
+
+                    "arc" =>
+                        new CadArcSegment(
+                            CadEntityJson.ReadPoint(
+                                item,
+                                "start"),
+                            CadEntityJson.ReadPoint(
+                                item,
+                                "middle"),
+                            CadEntityJson.ReadPoint(
+                                item,
+                                "end")),
+
                     _ => throw new FormatException(
                         $"Unsupported path segment type '{type}'.")
                 };
             })
-            .Cast<CadEntity>()
             .ToArray();
 
         return new CadPathEntity(segments);
+    }
+
+    internal static CadEntity SnapshotSegment(
+        CadPathSegment segment)
+    {
+        ArgumentNullException.ThrowIfNull(segment);
+        return segment.ToEntity();
     }
 
     internal static CadEntity SnapshotSegment(
@@ -776,6 +1020,13 @@ public sealed class CadPathEntity : CadEntity
         };
 
     internal static OcctPoint3d SegmentStart(
+        CadPathSegment segment)
+    {
+        ArgumentNullException.ThrowIfNull(segment);
+        return segment.Start;
+    }
+
+    internal static OcctPoint3d SegmentStart(
         CadEntity segment) =>
         segment switch
         {
@@ -785,6 +1036,13 @@ public sealed class CadPathEntity : CadEntity
                 "Unsupported path segment.",
                 nameof(segment))
         };
+
+    internal static OcctPoint3d SegmentEnd(
+        CadPathSegment segment)
+    {
+        ArgumentNullException.ThrowIfNull(segment);
+        return segment.End;
+    }
 
     internal static OcctPoint3d SegmentEnd(
         CadEntity segment) =>
@@ -797,6 +1055,19 @@ public sealed class CadPathEntity : CadEntity
                 nameof(segment))
         };
 
+    private static IEnumerable<CadPathSegment>
+        ConvertSegments(
+            IEnumerable<CadEntity> segments)
+    {
+        ArgumentNullException.ThrowIfNull(segments);
+
+        return segments.Select(
+            static segment =>
+                CadPathSegment.FromEntity(
+                    segment,
+                    applyPlacement: true));
+    }
+
     private readonly record struct PathVertexBinding(
         OcctPoint3d Position,
         int? PreviousSegmentIndex,
@@ -807,17 +1078,21 @@ public sealed class CadPathEntity : CadEntity
         OcctPoint3d Position);
 
     private static void ValidateChain(
-        IReadOnlyList<CadEntity> segments)
+        IReadOnlyList<CadPathSegment> segments)
     {
         if (segments.Count == 0)
             throw new ArgumentException(
                 "Path requires at least one segment.",
                 nameof(segments));
 
-        for (var index = 1; index < segments.Count; index++)
+        for (var index = 1;
+             index < segments.Count;
+             index++)
         {
-            if (SegmentEnd(segments[index - 1])
-                    .DistanceTo(SegmentStart(segments[index])) >
+            if (segments[index - 1]
+                    .End
+                    .DistanceTo(
+                        segments[index].Start) >
                 JoinTolerance)
             {
                 throw new ArgumentException(

@@ -12,7 +12,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     public override OcctPoint3d? PrecisionReferencePoint => _center;
     protected override bool CanCommitCurrentStageCore => State == CadToolState.Drawing;
     protected override bool CanStepBackCore => _center is not null;
-    protected override bool CanFinishCore => _reference is not null && Context.WorkPlane.AngleLockEnabled;
+    protected override bool CanFinishCore => _reference is not null && Context.Workspace.Drafting.AngleLockEnabled;
 
     protected override void OnTransformStarted()
     {
@@ -63,7 +63,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     {
         if (_reference is null) return false;
         if (input.AngleDegrees is { } angle)
-            ShowEntityPreview(entity => entity.Rotate(_center!.Value, _normal, angle));
+            ShowEntityPreview(entity => entity.RotatePlacement(_center!.Value, _normal, angle));
         else Context.Preview.Clear();
         NotifyUpdated();
         return true;
@@ -72,7 +72,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     protected override bool OnFinish()
     {
         if (!CanFinish) return false;
-        Commit(Context.WorkPlane.LockedAngleDegrees);
+        Commit(Context.Workspace.Drafting.LockedAngleDegrees);
         return true;
     }
 
@@ -95,8 +95,8 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
 
     private bool Angle(OcctPoint3d point, out double angle)
     {
-        angle = Context.WorkPlane.LockedAngleDegrees;
-        if (Context.WorkPlane.AngleLockEnabled) return true;
+        angle = Context.Workspace.Drafting.LockedAngleDegrees;
+        if (Context.Workspace.Drafting.AngleLockEnabled) return true;
         if (!Direction(point, out var target)) return false;
         var reference = _reference!.Value;
         angle = Math.Atan2(_normal.Dot(reference.Cross(target)), reference.Dot(target)) * 180.0 / Math.PI;
@@ -106,7 +106,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     private void Preview(OcctPoint3d point)
     {
         if (Angle(point, out var angle))
-            ShowEntityPreview(entity => entity.Rotate(_center!.Value, _normal, angle));
+            ShowEntityPreview(entity => entity.RotatePlacement(_center!.Value, _normal, angle));
         else Context.Preview.Clear();
     }
 

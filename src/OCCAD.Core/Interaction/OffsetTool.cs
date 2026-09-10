@@ -144,7 +144,12 @@ public sealed class OffsetTool : CadSelectionTransformToolBase, ICadPointInputTo
         var result = new List<CadEntity>(Entities.Count);
         foreach (var entity in Entities)
         {
-            if (!TryCreateOffset(entity, sidePoint, out var offset))
+            var working =
+                entity.CreateWorldGeometrySnapshot();
+            if (!TryCreateOffset(
+                    working,
+                    sidePoint,
+                    out var offset))
             {
                 offsets = [];
                 return false;

@@ -26,7 +26,7 @@ internal static class CadSolidFeatureGeometry
 
     internal static CadEntity Snapshot(CadEntity entity) =>
         IsSolid(entity)
-            ? entity.Duplicate()
+            ? entity.CreateWorldGeometrySnapshot()
             : throw new ArgumentException(
                 "Entity is not a supported solid feature.",
                 nameof(entity));
@@ -120,7 +120,7 @@ internal static class CadSolidFeatureGeometry
 
     internal static OcctPoint3d ApproximateCenter(CadEntity entity)
     {
-        var snaps = entity.GetSnapPoints();
+        var snaps = entity.GetWorldSnapPoints();
         if (snaps.Count == 0)
             return OcctPoint3d.Origin;
 

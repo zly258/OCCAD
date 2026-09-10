@@ -40,6 +40,7 @@ public abstract class CadEntity
     private OcctLineStyle _lineStyle = OcctLineStyle.Solid;
     private OcctDisplayMode _displayMode = OcctDisplayMode.Shaded;
     private OcctMaterial _material = OcctMaterial.Plastified;
+    private CadPlacement _placement = CadPlacement.Identity;
 
     protected CadEntity(string name)
     {
@@ -140,6 +141,12 @@ public abstract class CadEntity
         }
     }
 
+    [Category("Transform"), ReadOnly(true)]
+    public OcctPoint3d Position => _placement.Position;
+
+    [Browsable(false)]
+    public CadPlacement Placement => _placement;
+
     [Category("Display")]
     public OcctMaterial Material
     {
@@ -196,13 +203,178 @@ public abstract class CadEntity
     public abstract void MoveGrip(int index, OcctPoint3d targetPoint);
 
     public CadEntity MirroredCopy(OcctPoint3d origin, OcctVector3d normal) =>
-        CopyPropertiesTo(CadMirrorGeometry.Create(this, origin, normal));
+        CopyPropertiesTo(
+            CadMirrorGeometry.Create(this, origin, normal),
+            copyPlacement: false);
 
     public abstract CadEntity Duplicate();
     public abstract void RestoreGeometry(CadEntity snapshot);
     public abstract void Translate(OcctVector3d displacement);
     public abstract void Rotate(OcctPoint3d center, OcctVector3d axis, double angleDegrees);
     public abstract void Scale(OcctPoint3d center, double factor);
+
+    public void TranslatePlacement(OcctVector3d displacement)
+    {
+        ValidateDisplacement(displacement);
+        SetPlacement(
+            _placement.TranslateWorld(displacement),
+            nameof(Placement));
+    }
+
+    public void RotatePlacement(
+        OcctPoint3d center,
+        OcctVector3d axis,
+        double angleDegrees)
+    {
+        if (!center.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(center));
+        if (!axis.TryNormalize(out var normal))
+            throw new ArgumentOutOfRangeException(nameof(axis));
+        ValidateFinite(angleDegrees, nameof(angleDegrees));
+
+        SetPlacement(
+            _placement.RotateWorld(
+                center,
+                normal,
+                angleDegrees),
+            nameof(Placement));
+    }
+
+    public void ResetPlacement() =>
+        SetPlacement(
+            CadPlacement.Identity,
+            nameof(Placement));
+
+    public OcctPoint3d ToWorldPoint(OcctPoint3d point) =>
+        _placement.ToWorldPoint(point);
+
+    public OcctVector3d ToWorldVector(OcctVector3d vector) =>
+        _placement.ToWorldVector(vector);
+
+    public OcctPoint3d ToLocalPoint(OcctPoint3d point) =>
+        _placement.ToLocalPoint(point);
+
+    public OcctVector3d ToLocalVector(OcctVector3d vector) =>
+        _placement.ToLocalVector(vector);
+
+    internal IReadOnlyList<CadSnapPoint> GetWorldSnapPoints()
+    {
+        var local = GetSnapPoints();
+        if (_placement.IsIdentity)
+            return local;
+
+        return local
+            .Select(TransformSnapPoint)
+            .ToArray();
+    }
+
+    internal IReadOnlyList<CadGripPoint> GetWorldGripPoints()
+    {
+        var local = GetGripPoints();
+        if (_placement.IsIdentity)
+            return local;
+
+        return local
+            .Select(TransformGripPoint)
+            .ToArray();
+    }
+
+    internal void MoveWorldGrip(
+        int index,
+        OcctPoint3d targetPoint) =>
+        MoveGrip(
+            index,
+            _placement.ToLocalPoint(targetPoint));
+
+    internal IReadOnlyList<CadSnapCurve> GetWorldPrecisionSnapCurves(
+        CadWorkPlane workPlane)
+    {
+        ArgumentNullException.ThrowIfNull(workPlane);
+        if (_placement.IsIdentity)
+            return GetPrecisionSnapCurves(workPlane);
+
+        var localPlane = new CadWorkPlane();
+        localPlane.SetCustom(
+            _placement.ToLocalPoint(workPlane.Origin),
+            _placement.ToLocalVector(workPlane.XAxis),
+            _placement.ToLocalVector(workPlane.YAxis));
+        return GetPrecisionSnapCurves(localPlane);
+    }
+
+    internal void ScaleFromWorld(
+        OcctPoint3d center,
+        double factor) =>
+        Scale(
+            _placement.ToLocalPoint(center),
+            factor);
+
+    internal void RestoreGeometrySnapshot(
+        CadEntity snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (snapshot.GetType() != GetType())
+            throw new ArgumentException(
+                "Snapshot type does not match.",
+                nameof(snapshot));
+
+        _placement = snapshot._placement;
+        RestoreGeometry(snapshot);
+    }
+
+    internal void RestorePlacement(CadPlacement placement) =>
+        SetPlacement(placement, nameof(Placement));
+
+    internal CadEntity CreateWorldGeometrySnapshot()
+    {
+        var snapshot = Duplicate();
+        snapshot.BakePlacementIntoGeometry();
+        return snapshot;
+    }
+
+    internal T CreateWorldGeometrySnapshot<T>()
+        where T : CadEntity =>
+        (T)CreateWorldGeometrySnapshot();
+
+    internal void BakePlacementIntoGeometry()
+    {
+        if (_placement.IsIdentity)
+            return;
+
+        var placement = _placement;
+        var xAxis =
+            placement.ToWorldVector(
+                OcctVector3d.UnitX);
+        var yAxis =
+            placement.ToWorldVector(
+                OcctVector3d.UnitY);
+        var zAxis =
+            placement.ToWorldVector(
+                OcctVector3d.UnitZ);
+
+        _placement = CadPlacement.Identity;
+
+        if (CadTransformMath.TryGetAxisAngle(
+                xAxis,
+                yAxis,
+                zAxis,
+                out var axis,
+                out var angleDegrees) &&
+            Math.Abs(angleDegrees) > 1e-10)
+        {
+            Rotate(
+                OcctPoint3d.Origin,
+                axis,
+                angleDegrees);
+        }
+
+        var transform = placement.Transform;
+        var translation = new OcctVector3d(
+            transform.M03,
+            transform.M13,
+            transform.M23);
+        if (translation.LengthSquared > 1e-24)
+            Translate(translation);
+    }
 
     public void RestoreState(CadEntity snapshot)
     {
@@ -259,7 +431,10 @@ public abstract class CadEntity
         }
     }
 
-    protected T CopyPropertiesTo<T>(T target) where T : CadEntity
+    protected T CopyPropertiesTo<T>(
+        T target,
+        bool copyPlacement = true)
+        where T : CadEntity
     {
         ArgumentNullException.ThrowIfNull(target);
         target.Name = Name;
@@ -275,7 +450,74 @@ public abstract class CadEntity
         target.LineStyle = LineStyle;
         target.DisplayMode = DisplayMode;
         target.Material = Material;
+        if (copyPlacement)
+            target._placement = _placement;
         return target;
+    }
+
+    private CadSnapPoint TransformSnapPoint(CadSnapPoint point)
+    {
+        var workPlane = point.WorkPlane is { } plane
+            ? new CadSnapWorkPlane(
+                _placement.ToWorldPoint(plane.Origin),
+                _placement.ToWorldVector(plane.XAxis).Normalized(),
+                _placement.ToWorldVector(plane.YAxis).Normalized(),
+                plane.LockPlane,
+                plane.LockedAngleDegrees)
+            : null;
+
+        return point with
+        {
+            Position = _placement.ToWorldPoint(point.Position),
+            WorkPlane = workPlane
+        };
+    }
+
+    private CadGripPoint TransformGripPoint(CadGripPoint point)
+    {
+        var workPlane = point.WorkPlane is { } plane
+            ? new CadGripWorkPlane(
+                _placement.ToWorldPoint(plane.Origin),
+                _placement.ToWorldVector(plane.XAxis).Normalized(),
+                _placement.ToWorldVector(plane.YAxis).Normalized(),
+                plane.LockPlane,
+                plane.LockedAngleDegrees)
+            : null;
+
+        return point with
+        {
+            Position = _placement.ToWorldPoint(point.Position),
+            WorkPlane = workPlane,
+            ConstraintOrigin = point.ConstraintOrigin is { } origin
+                ? _placement.ToWorldPoint(origin)
+                : null
+        };
+    }
+
+    private void SetPlacement(
+        CadPlacement value,
+        string propertyName)
+    {
+        if (_placement == value)
+            return;
+
+        Changing?.Invoke(
+            this,
+            new CadEntityChangingEventArgs(
+                CadEntityChangeKind.Geometry,
+                propertyName));
+
+        var previous = _placement;
+        _placement = value;
+        try
+        {
+            RaiseGeometryChanged(propertyName);
+        }
+        catch
+        {
+            _placement = previous;
+            throw;
+        }
     }
 
     protected static void ValidateDisplacement(OcctVector3d displacement)
@@ -447,5 +689,6 @@ public abstract class CadEntity
         _lineStyle = snapshot._lineStyle;
         _displayMode = snapshot._displayMode;
         _material = snapshot._material;
+        _placement = snapshot._placement;
     }
 }

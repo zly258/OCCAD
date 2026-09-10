@@ -62,4 +62,8 @@ public readonly record struct CadSelectionReference
             subshapeType,
             subshapeIndex);
     }
+
+    public static CadSelectionReference Subobject(
+        CadSubshapeReference reference) =>
+        reference.ToSelectionReference();
 }

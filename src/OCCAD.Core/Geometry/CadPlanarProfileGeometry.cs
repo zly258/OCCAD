@@ -42,16 +42,18 @@ internal static class CadPlanarProfileGeometry
 
         return entity switch
         {
-            CadRegionEntity region => region.OuterSnapshot(),
-            _ => entity.Duplicate()
+            CadRegionEntity region =>
+                region.CreateWorldGeometrySnapshot<CadRegionEntity>()
+                    .OuterSnapshot(),
+            _ => entity.CreateWorldGeometrySnapshot()
         };
     }
 
     internal static CadEntity Snapshot(CadEntity entity) =>
         entity switch
         {
-            CadRegionEntity region => region.Duplicate(),
-            _ when IsSource(entity) => entity.Duplicate(),
+            CadRegionEntity region => region.CreateWorldGeometrySnapshot(),
+            _ when IsSource(entity) => entity.CreateWorldGeometrySnapshot(),
             _ => throw new ArgumentException(
                 "Entity is not a supported planar profile.",
                 nameof(entity))
@@ -318,9 +320,9 @@ internal static class CadPlanarProfileGeometry
             .Select(segment =>
                 segment switch
                 {
-                    CadLineEntity line =>
+                    CadLineSegment line =>
                         model.MakeLine(line.Start, line.End),
-                    CadArcEntity arc =>
+                    CadArcSegment arc =>
                         model.MakeArc(
                             arc.Start,
                             arc.Middle,
@@ -357,9 +359,9 @@ internal static class CadPlanarProfileGeometry
                 .SelectMany(segment =>
                     segment switch
                     {
-                        CadLineEntity line =>
+                        CadLineSegment line =>
                             new[] { line.Start, line.End },
-                        CadArcEntity arc =>
+                        CadArcSegment arc =>
                             new[] { arc.Start, arc.Middle, arc.End },
                         _ => Array.Empty<OcctPoint3d>()
                     })
@@ -368,7 +370,7 @@ internal static class CadPlanarProfileGeometry
     private static OcctVector3d PathNormal(CadPathEntity path)
     {
         var arcNormals = path.Segments
-            .OfType<CadArcEntity>()
+            .OfType<CadArcSegment>()
             .Select(static arc => arc.Normal.Normalized())
             .ToArray();
 
@@ -429,9 +431,9 @@ internal static class CadPlanarProfileGeometry
                     .SelectMany(segment =>
                         segment switch
                         {
-                            CadLineEntity line =>
+                            CadLineSegment line =>
                                 new[] { line.Start, line.End },
-                            CadArcEntity arc =>
+                            CadArcSegment arc =>
                                 new[] { arc.Start, arc.Middle, arc.End },
                             _ => Array.Empty<OcctPoint3d>()
                         })

@@ -4,9 +4,11 @@ using OcctNet;
 
 namespace OCCAD;
 
-public sealed class CadRevolveEntity : CadEntity
+public sealed class CadRevolveEntity : CadFeatureEntity
 {
     private CadEntity _profile;
+    private Guid? _profileSourceId;
+    private Guid? _axisSourceId;
     private OcctPoint3d _axisPoint;
     private OcctVector3d _axisDirection;
     private double _angleDegrees;
@@ -36,6 +38,31 @@ public sealed class CadRevolveEntity : CadEntity
     [Browsable(false)]
     public string ProfileType => _profile.EntityType;
 
+    public override IReadOnlyList<CadFeatureInputDescriptor> Inputs
+    {
+        get
+        {
+            var result = new List<CadFeatureInputDescriptor>(2)
+            {
+                _profileSourceId is { } profileId
+                    ? SourceInput("Profile", _profile, profileId)
+                    : CapturedInput("Profile", _profile)
+            };
+
+            if (_axisSourceId is { } axisId)
+            {
+                result.Add(
+                    new CadFeatureInputDescriptor(
+                        "Axis",
+                        "Line",
+                        CadFeatureInputMode.SourceReference,
+                        axisId));
+            }
+
+            return result;
+        }
+    }
+
     [Category("Geometry"), ReadOnly(true)]
     public int ProfileHoleCount =>
         _profile is CadRegionEntity region
@@ -62,7 +89,52 @@ public sealed class CadRevolveEntity : CadEntity
         }
     }
 
-    internal override OcctShape BuildShape(OcctEngine engine)
+    internal void BindSources(
+        CadEntity profile,
+        CadLineEntity axis)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(axis);
+        if (!CadPlanarProfileGeometry.IsSupported(profile))
+            throw new ArgumentException(
+                "Revolve profile must be a supported planar profile.",
+                nameof(profile));
+
+        _profileSourceId = profile.Id;
+        _axisSourceId = axis.Id;
+    }
+
+    internal override bool RefreshSourceReferences(
+        CadDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (_profileSourceId is not { } profileId ||
+            _axisSourceId is not { } axisId ||
+            document.FindById(profileId) is not { } profile ||
+            document.FindById(axisId) is not CadLineEntity axis ||
+            !CadPlanarProfileGeometry.IsSupported(profile))
+            return false;
+
+        var axisStart =
+            axis.ToWorldPoint(axis.Start);
+        var axisEnd =
+            axis.ToWorldPoint(axis.End);
+        var direction =
+            CadTransformMath.Between(
+                axisStart,
+                axisEnd);
+        if (!direction.TryNormalize(out var normalized))
+            return false;
+
+        _profile =
+            CadPlanarProfileGeometry.Snapshot(profile);
+        _axisPoint = axisStart;
+        _axisDirection = normalized;
+        RaiseGeometryChanged(nameof(Inputs));
+        return true;
+    }
+
+    protected override OcctShape BuildFeatureResult(OcctEngine engine)
     {
         var face =
             CadPlanarProfileGeometry.BuildFace(
@@ -153,13 +225,19 @@ public sealed class CadRevolveEntity : CadEntity
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
-    public override CadEntity Duplicate() =>
-        CopyPropertiesTo(
-            new CadRevolveEntity(
-                _profile,
-                _axisPoint,
-                _axisDirection,
-                _angleDegrees));
+    public override CadEntity Duplicate()
+    {
+        var copy = new CadRevolveEntity(
+            _profile,
+            _axisPoint,
+            _axisDirection,
+            _angleDegrees)
+        {
+            _profileSourceId = _profileSourceId,
+            _axisSourceId = _axisSourceId
+        };
+        return CopyPropertiesTo(copy);
+    }
 
     public override void RestoreGeometry(CadEntity snapshot)
     {
@@ -169,6 +247,8 @@ public sealed class CadRevolveEntity : CadEntity
                 nameof(snapshot));
 
         _profile = value._profile.Duplicate();
+        _profileSourceId = value._profileSourceId;
+        _axisSourceId = value._axisSourceId;
         _axisPoint = value._axisPoint;
         _axisDirection = value._axisDirection;
         _angleDegrees = value._angleDegrees;
@@ -217,8 +297,9 @@ public sealed class CadRevolveEntity : CadEntity
     }
 
     internal static JsonObject WriteGeometry(
-        CadRevolveEntity entity) =>
-        new()
+        CadRevolveEntity entity)
+    {
+        var data = new JsonObject
         {
             ["profile"] =
                 CadPlanarProfileGeometry.Write(entity._profile),
@@ -229,8 +310,17 @@ public sealed class CadRevolveEntity : CadEntity
             ["angleDegrees"] = entity._angleDegrees
         };
 
-    internal static CadRevolveEntity ReadGeometry(JsonObject data) =>
-        new(
+        if (entity._profileSourceId is { } profileId)
+            data["profileSourceId"] = JsonValue.Create(profileId);
+        if (entity._axisSourceId is { } axisId)
+            data["axisSourceId"] = JsonValue.Create(axisId);
+
+        return data;
+    }
+
+    internal static CadRevolveEntity ReadGeometry(JsonObject data)
+    {
+        var entity = new CadRevolveEntity(
             CadPlanarProfileGeometry.Read(
                 data["profile"] as JsonObject ??
                 throw new FormatException(
@@ -238,4 +328,14 @@ public sealed class CadRevolveEntity : CadEntity
             CadEntityJson.ReadPoint(data, "axisPoint"),
             CadEntityJson.ReadVector(data, "axisDirection"),
             CadEntityJson.ReadDouble(data, "angleDegrees"));
+        entity._profileSourceId =
+            ReadSourceId(
+                data,
+                "profileSourceId");
+        entity._axisSourceId =
+            ReadSourceId(
+                data,
+                "axisSourceId");
+        return entity;
+    }
 }

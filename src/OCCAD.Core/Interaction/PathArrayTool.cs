@@ -14,6 +14,14 @@ public sealed class PathArrayTool : CadSelectionTransformToolBase, ICadPointInpu
     private bool _align = true;
     public override string Id => "patharray";
     public override string DisplayName => "Path Array";
+    public override CadToolInputKind InputKind =>
+        State == CadToolState.WaitForSelect
+            ? CadToolInputKind.Selection
+            : _path is null
+                ? CadToolInputKind.Selection
+                : _reference is null
+                    ? CadToolInputKind.Point
+                    : CadToolInputKind.Confirmation;
     protected override bool CanCommitCurrentStageCore => State == CadToolState.Drawing && _reference is null;
     protected override bool CanStepBackCore => _path is not null;
     protected override bool CanFinishCore => State == CadToolState.Drawing && _reference is not null && CopyCount() > 0;

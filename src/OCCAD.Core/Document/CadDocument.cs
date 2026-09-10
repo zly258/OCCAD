@@ -58,6 +58,7 @@ public sealed class CadDocument
     private readonly Dictionary<Guid, CadEntity> _entitiesById = [];
     private readonly Dictionary<long, CadEntity> _viewerObjects = [];
     private readonly List<CadDocumentChangedEventArgs> _pendingChanges = [];
+    private readonly HashSet<Guid> _featureRefreshStack = [];
     private readonly CadLayerManager _layers;
     private OcctEngine? _engine;
     private int _changeSetDepth;
@@ -272,7 +273,12 @@ public sealed class CadDocument
         {
             using var batch = engine.BeginDisplayBatch();
             if (args.Kind == CadEntityChangeKind.Geometry)
-                RebuildPresentation(entity);
+            {
+                if (args.PropertyName == nameof(CadEntity.Placement))
+                    ApplyPlacement(entity);
+                else
+                    RebuildPresentation(entity);
+            }
             else if (args.Kind == CadEntityChangeKind.Appearance ||
                      (args.Kind == CadEntityChangeKind.Metadata && args.PropertyName == nameof(CadEntity.Layer)))
                 ApplyAppearance(entity);
@@ -282,7 +288,67 @@ public sealed class CadDocument
             entity,
             args.Kind,
             args.PropertyName);
+
+        if (args.Kind == CadEntityChangeKind.Geometry)
+            RefreshDependentFeatures(entity.Id);
     }
+
+    private void RefreshDependentFeatures(Guid sourceEntityId)
+    {
+        var dependents = _entities
+            .OfType<CadFeatureEntity>()
+            .Where(feature =>
+                feature.Inputs.Any(input =>
+                    input.Mode ==
+                        CadFeatureInputMode.SourceReference &&
+                    input.SourceEntityId ==
+                        sourceEntityId))
+            .ToArray();
+
+        foreach (var feature in dependents)
+        {
+            if (!_featureRefreshStack.Add(feature.Id))
+                continue;
+
+            CadEntity? before = null;
+            try
+            {
+                before = feature.Duplicate();
+                feature.RefreshSourceReferences(this);
+            }
+            catch (Exception refreshFailure)
+                when (IsRecoverableFeatureRefreshFailure(
+                    refreshFailure))
+            {
+                if (before is null)
+                    continue;
+
+                try
+                {
+                    feature.RestoreGeometrySnapshot(before);
+                }
+                catch (Exception restoreFailure)
+                    when (IsRecoverableFeatureRefreshFailure(
+                        restoreFailure))
+                {
+                    throw new AggregateException(
+                        "Feature dependency refresh and rollback both failed.",
+                        refreshFailure,
+                        restoreFailure);
+                }
+            }
+            finally
+            {
+                _featureRefreshStack.Remove(feature.Id);
+            }
+        }
+    }
+
+    private static bool IsRecoverableFeatureRefreshFailure(
+        Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private void LayersChanged(object? sender, CadLayerManagerChangedEventArgs args)
     {
@@ -398,6 +464,7 @@ public sealed class CadDocument
         try
         {
             replacement = entity.BuildPresentation(engine);
+            ApplyPlacement(entity, replacement);
             ApplyAppearance(entity, replacement);
         }
         catch
@@ -440,7 +507,31 @@ public sealed class CadDocument
         var shape = entity.BuildPresentation(engine);
         entity.ViewerObject = shape;
         _viewerObjects[shape.Id] = entity;
+        ApplyPlacement(entity, shape);
         ApplyAppearance(entity);
+    }
+
+    private void ApplyPlacement(CadEntity entity)
+    {
+        if (_engine is null ||
+            entity.ViewerObject is not { } value)
+            return;
+
+        ApplyPlacement(entity, value);
+    }
+
+    private void ApplyPlacement(
+        CadEntity entity,
+        IOcctObject value)
+    {
+        var engine =
+            _engine ??
+            throw new InvalidOperationException(
+                "No engine is attached.");
+
+        engine.SetLocalTransformation(
+            value,
+            entity.Placement.Transform);
     }
 
     private void ApplyAppearance(CadEntity entity)

@@ -25,7 +25,11 @@ public readonly record struct CadToolStep(
     int Index,
     CadToolInputKind InputKind,
     CadPrecisionInputKind PrecisionInputs,
-    CadToolPrompt? Prompt);
+    CadToolPrompt? Prompt)
+{
+    public bool RequiresPointer =>
+        InputKind == CadToolInputKind.Point;
+}
 
 public readonly record struct CadToolInteractionPolicy(
     bool SelectionEnabled,
@@ -101,7 +105,7 @@ public abstract class CadTool
     public virtual bool CanCommitCurrentStage =>
         IsActive &&
         CanCommitCurrentStageCore &&
-        (InputKind != CadToolInputKind.Point ||
+        (!CurrentStep.RequiresPointer ||
          Context.Workspace.LastPointerPosition is not null);
     public bool CanCancel => IsActive;
     public bool CanFinish => IsActive && CanFinishCore;
@@ -144,6 +148,7 @@ public abstract class CadTool
         TryCleanup(Context.Tracking.Clear);
         TryCleanup(Context.Snap.Clear);
         TryCleanup(Context.Workspace.Precision.ResetFactor);
+        TryCleanup(Context.Workspace.Drafting.ResetTransientLocks);
         TryCleanup(() => Context.Selection.SetFilter(_previousSelectionFilter));
         TryCleanup(() => Context.Snap.Active = false);
         TryCleanup(Context.WorkPlane.EndToolPlane);
@@ -316,8 +321,8 @@ public abstract class CadTool
         if (!double.IsFinite(angleDegrees))
             throw new ArgumentOutOfRangeException(nameof(angleDegrees));
 
-        Context.WorkPlane.LockedAngleDegrees = angleDegrees;
-        Context.WorkPlane.AngleLockEnabled = true;
+        Context.Workspace.Drafting.LockedAngleDegrees = angleDegrees;
+        Context.Workspace.Drafting.AngleLockEnabled = true;
     }
 
     protected virtual bool CanCommitCurrentStageCore => false;
@@ -340,10 +345,10 @@ public abstract class CadTool
 
     private void ResetPrecisionLocks()
     {
-        Context.WorkPlane.LengthLockEnabled = false;
-        Context.WorkPlane.LockedLength = 0.0;
-        Context.WorkPlane.AngleLockEnabled = false;
-        Context.WorkPlane.LockedAngleDegrees = 0.0;
+        Context.Workspace.Drafting.LengthLockEnabled = false;
+        Context.Workspace.Drafting.LockedLength = 0.0;
+        Context.Workspace.Drafting.AngleLockEnabled = false;
+        Context.Workspace.Drafting.LockedAngleDegrees = 0.0;
         Context.Workspace.Precision.ResetFactor();
     }
 

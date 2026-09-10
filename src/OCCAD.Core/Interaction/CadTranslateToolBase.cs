@@ -106,6 +106,6 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
         var displacement =
             CadTransformMath.Between(BasePoint, target);
         ShowEntityPreview(
-            entity => entity.Translate(displacement));
+            entity => entity.TranslatePlacement(displacement));
     }
 }

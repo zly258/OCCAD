@@ -300,14 +300,14 @@ internal sealed class CadViewportInteractionController : IDisposable
                 return true;
 
             case OcctKey.F8:
-                _workspace.WorkPlane.OrthogonalTrackingEnabled =
-                    !_workspace.WorkPlane.OrthogonalTrackingEnabled;
+                _workspace.Drafting.OrthogonalTrackingEnabled =
+                    !_workspace.Drafting.OrthogonalTrackingEnabled;
                 _workspace.Tracking.Clear();
                 return true;
 
             case OcctKey.F10:
-                _workspace.WorkPlane.PolarTrackingEnabled =
-                    !_workspace.WorkPlane.PolarTrackingEnabled;
+                _workspace.Drafting.PolarTrackingEnabled =
+                    !_workspace.Drafting.PolarTrackingEnabled;
                 _workspace.Tracking.Clear();
                 return true;
 

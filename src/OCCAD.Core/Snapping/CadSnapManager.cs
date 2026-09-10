@@ -7,6 +7,7 @@ public sealed class CadSnapManager
 {
     private const int MarkerSize = 13;
     private const int MarkerDisplayPriority = 10;
+    private const double PriorityTieDistancePixels = 2.0;
     private const CadSnapType AllModes =
         CadSnapType.Endpoint |
         CadSnapType.Midpoint |
@@ -199,9 +200,29 @@ public sealed class CadSnapManager
 
             ranked.Sort(static (left, right) =>
             {
-                var result = left.Priority.CompareTo(right.Priority);
-                if (result != 0) return result;
-                result = left.DistanceSquared.CompareTo(right.DistanceSquared);
+                var leftDistance =
+                    Math.Sqrt(left.DistanceSquared);
+                var rightDistance =
+                    Math.Sqrt(right.DistanceSquared);
+
+                if (Math.Abs(leftDistance - rightDistance) >
+                    PriorityTieDistancePixels)
+                    return leftDistance.CompareTo(rightDistance);
+
+                var result =
+                    left.Priority.CompareTo(right.Priority);
+                if (result != 0)
+                    return result;
+
+                result =
+                    left.DepthDistanceSquared.CompareTo(
+                        right.DepthDistanceSquared);
+                if (result != 0)
+                    return result;
+
+                result =
+                    left.DistanceSquared.CompareTo(
+                        right.DistanceSquared);
                 return result != 0
                     ? result
                     : left.Order.CompareTo(right.Order);
@@ -262,6 +283,10 @@ public sealed class CadSnapManager
                         candidate.Value,
                         PriorityGroup(candidate.Value.Type),
                         distanceSquared,
+                        candidate.Value.Position
+                            .DistanceTo(queryPoint) *
+                        candidate.Value.Position
+                            .DistanceTo(queryPoint),
                         order++));
             }
         }
@@ -903,7 +928,7 @@ public sealed class CadSnapManager
         if (_snapPointCache.TryGetValue(entity, out var points))
             return points;
 
-        points = entity.GetSnapPoints();
+        points = entity.GetWorldSnapPoints();
         _snapPointCache[entity] = points;
         return points;
     }
@@ -952,6 +977,7 @@ public sealed class CadSnapManager
         CadSnapPoint Point,
         int Priority,
         double DistanceSquared,
+        double DepthDistanceSquared,
         int Order);
 
     private void SetCurrent(CadSnapPoint? value)

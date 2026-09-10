@@ -14,10 +14,14 @@ internal static class CadBreakGeometry
         out CadEntity[] replacements)
     {
         replacements = [];
-        if (!CadPlanarCurveIntersections.IsBoundaryOnPlane(entity, plane))
+        var working =
+            entity.CreateWorldGeometrySnapshot();
+        if (!CadPlanarCurveIntersections.IsBoundaryOnPlane(
+                working,
+                plane))
             return false;
 
-        return entity switch
+        return working switch
         {
             CadLineEntity line =>
                 TryBreakLine(

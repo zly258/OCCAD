@@ -29,8 +29,8 @@ internal static class CadCircularArray
             foreach (var source in sources)
             {
                 var copy = source.Duplicate();
-                if (rotateItems) copy.Rotate(center, normal, angle);
-                else copy.Translate(CadTransformMath.RotatePoint(reference!.Value, center, normal, angle) - reference.Value);
+                if (rotateItems) copy.RotatePlacement(center, normal, angle);
+                else copy.TranslatePlacement(CadTransformMath.RotatePoint(reference!.Value, center, normal, angle) - reference.Value);
                 copies.Add(copy);
                 if (copies.Count == limit) return copies.ToArray();
             }

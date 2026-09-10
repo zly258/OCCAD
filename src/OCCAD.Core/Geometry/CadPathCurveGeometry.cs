@@ -35,7 +35,9 @@ internal static class CadPathCurveGeometry
              index < path.Segments.Count;
              index++)
         {
-            var segment = path.Segments[index];
+            var segment =
+                CadPathEntity.SnapshotSegment(
+                    path.Segments[index]);
             double parameter;
             OcctPoint3d closest;
 
@@ -99,7 +101,8 @@ internal static class CadPathCurveGeometry
             0.0,
             1.0);
 
-        return path.Segments[position.SegmentIndex] switch
+        return CadPathEntity.SnapshotSegment(
+            path.Segments[position.SegmentIndex]) switch
         {
             CadLineEntity line =>
                 line.Start +
@@ -185,18 +188,19 @@ internal static class CadPathCurveGeometry
     }
 
     private static CadEntity CopySegmentRange(
-        CadEntity segment,
+        CadPathSegment segment,
         double start,
         double end)
     {
+        var entity =
+            CadPathEntity.SnapshotSegment(segment);
         if (start <= Tolerance &&
             end >= 1.0 - Tolerance)
         {
-            return CadPathEntity.SnapshotSegment(
-                segment);
+            return entity;
         }
 
-        return segment switch
+        return entity switch
         {
             CadLineEntity line =>
                 line.CreateLine(

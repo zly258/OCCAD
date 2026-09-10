@@ -64,6 +64,9 @@ public sealed class CadPreviewManager
             {
                 var shape = entity.BuildPresentation(engine);
                 nextShapes.Add(shape);
+                engine.SetLocalTransformation(
+                    shape,
+                    entity.Placement.Transform);
                 engine.SetObjectSelectable(shape, false);
                 engine.SetObjectColor(shape, entity.Color);
                 engine.SetObjectTransparency(

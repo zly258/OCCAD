@@ -59,7 +59,7 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
     {
         if (_referenceLength is null) return false;
         if (input.Factor is { } factor)
-            ShowEntityPreview(entity => entity.Scale(_center!.Value, factor));
+            ShowEntityPreview(entity => entity.ScaleFromWorld(_center!.Value, factor));
         else Context.Preview.Clear();
         NotifyUpdated();
         return true;
@@ -88,7 +88,7 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
     {
         var factor = Factor(point);
         if (double.IsFinite(factor) && factor > 1e-9)
-            ShowEntityPreview(entity => entity.Scale(_center!.Value, factor));
+            ShowEntityPreview(entity => entity.ScaleFromWorld(_center!.Value, factor));
         else Context.Preview.Clear();
     }
 

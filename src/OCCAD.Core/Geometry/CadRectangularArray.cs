@@ -32,7 +32,7 @@ internal static class CadRectangularArray
                 foreach (var source in sources)
                 {
                     var copy = source.Duplicate();
-                    copy.Translate(displacement);
+                    copy.TranslatePlacement(displacement);
                     copies.Add(copy);
                     if (copies.Count == limit) return copies.ToArray();
                 }

@@ -21,6 +21,16 @@ internal static class CadPlanarCurveIntersections
         ArgumentNullException.ThrowIfNull(boundary);
         ArgumentNullException.ThrowIfNull(plane);
 
+        if (!boundary.Placement.IsIdentity)
+        {
+            return WithLine(
+                start,
+                end,
+                boundary.CreateWorldGeometrySnapshot(),
+                plane,
+                targetSegment);
+        }
+
         if (!IsOnPlane(start, plane) ||
             !IsOnPlane(end, plane) ||
             !IsBoundaryOnPlane(boundary, plane))
@@ -44,7 +54,7 @@ internal static class CadPlanarCurveIntersections
                         segment => WithLine(
                             start,
                             end,
-                            segment,
+                            segment.ToEntity(),
                             plane,
                             targetSegment))),
             _ => Array.Empty<CadCurveIntersection>()
@@ -59,6 +69,15 @@ internal static class CadPlanarCurveIntersections
     {
         ArgumentNullException.ThrowIfNull(boundary);
         ArgumentNullException.ThrowIfNull(plane);
+
+        if (!boundary.Placement.IsIdentity)
+        {
+            return WithCircle(
+                center,
+                radius,
+                boundary.CreateWorldGeometrySnapshot(),
+                plane);
+        }
 
         if (!IsOnPlane(center, plane) ||
             radius <= Tolerance ||
@@ -85,7 +104,7 @@ internal static class CadPlanarCurveIntersections
                         segment => WithCircle(
                             center,
                             radius,
-                            segment,
+                            segment.ToEntity(),
                             plane))),
             _ => Array.Empty<OcctPoint3d>()
         };
@@ -93,8 +112,19 @@ internal static class CadPlanarCurveIntersections
 
     internal static bool IsBoundaryOnPlane(
         CadEntity entity,
-        CadWorkPlane plane) =>
-        entity switch
+        CadWorkPlane plane)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(plane);
+
+        if (!entity.Placement.IsIdentity)
+        {
+            return IsBoundaryOnPlane(
+                entity.CreateWorldGeometrySnapshot(),
+                plane);
+        }
+
+        return entity switch
         {
             CadLineEntity line =>
                 IsOnPlane(line.Start, plane) &&
@@ -107,9 +137,12 @@ internal static class CadPlanarCurveIntersections
                 IsCircleOnPlane(arc.Center, arc.Normal, plane),
             CadPathEntity path =>
                 path.Segments.All(
-                    segment => IsBoundaryOnPlane(segment, plane)),
+                    segment => IsBoundaryOnPlane(
+                        segment.ToEntity(),
+                        plane)),
             _ => false
         };
+    }
 
     internal static bool IsOnPlane(
         OcctPoint3d point,

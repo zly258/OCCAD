@@ -147,6 +147,7 @@ public static class CadDocumentSerializer
             LineStyle = entity.LineStyle.ToString(),
             DisplayMode = entity.DisplayMode.ToString(),
             Material = entity.Material.ToString(),
+            Placement = entity.Placement.Transform,
             Geometry = registry.WriteGeometry(entity)
         };
     }
@@ -276,6 +277,21 @@ public static class CadDocumentSerializer
             item.Material,
             "material",
             item.Id);
+
+        try
+        {
+            entity.RestorePlacement(
+                new CadPlacement(
+                    item.Placement ??
+                    OcctTransform3d.Identity));
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidDataException(
+                $"Entity '{item.Id}' has invalid placement.",
+                exception);
+        }
+
         return entity;
     }
 
@@ -357,6 +373,7 @@ public static class CadDocumentSerializer
         public string? LineStyle { get; set; } = nameof(OcctLineStyle.Solid);
         public string? DisplayMode { get; set; } = nameof(OcctDisplayMode.Shaded);
         public string? Material { get; set; } = nameof(OcctMaterial.Plastified);
+        public OcctTransform3d? Placement { get; set; }
         public JsonObject? Geometry { get; set; }
     }
 

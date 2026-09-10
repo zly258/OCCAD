@@ -6,6 +6,8 @@ public sealed class SweepTool : CadSelectionTransformToolBase
 {
     public override string Id => "sweep";
     public override string DisplayName => "Sweep";
+    public override CadToolInputKind InputKind =>
+        CadToolInputKind.Selection;
     public override CadToolInteractionPolicy InteractionPolicy =>
         base.InteractionPolicy with { PreselectionEnabled = true };
 
@@ -102,6 +104,9 @@ public sealed class SweepTool : CadSelectionTransformToolBase
             return false;
 
         entity = new CadSweepEntity(
+            Entities[0],
+            path);
+        entity.BindSources(
             Entities[0],
             path);
         return true;

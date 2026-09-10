@@ -8,6 +8,10 @@ public sealed class ShapeOffsetTool : CadSelectionTransformToolBase
     private double _offset = 2.0;
 
     public override string Id => "shapeoffset";
+    public override CadToolInputKind InputKind =>
+        State == CadToolState.WaitForSelect
+            ? CadToolInputKind.Selection
+            : CadToolInputKind.Confirmation;
     public override string DisplayName => "Shape Offset";
 
     public override CadToolPanelDescriptor ParameterPanel =>

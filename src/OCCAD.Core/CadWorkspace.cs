@@ -24,9 +24,10 @@ public sealed class CadWorkspace : IDisposable
         Subobjects = new CadSubobjectSelectionManager(Document, Selection);
         Preselection = new CadPreselectionManager(Document, Selection);
         WorkPlane = new CadWorkPlane();
+        Drafting = new CadDraftingSettings();
         Snap = new CadSnapManager(Document);
         Tracking = new CadTrackingManager();
-        Precision = new CadPrecisionInputManager(WorkPlane, Tracking);
+        Precision = new CadPrecisionInputManager(Drafting, Tracking);
         Preview = new CadPreviewManager();
         Grips = new CadGripManager();
         History = new CadHistory();
@@ -49,6 +50,7 @@ public sealed class CadWorkspace : IDisposable
     public CadSubobjectSelectionManager Subobjects { get; }
     public CadPreselectionManager Preselection { get; }
     public CadWorkPlane WorkPlane { get; }
+    public CadDraftingSettings Drafting { get; }
     public CadSnapManager Snap { get; }
     public CadTrackingManager Tracking { get; }
     public CadPrecisionInputManager Precision { get; }
@@ -359,7 +361,7 @@ public sealed class CadWorkspace : IDisposable
         ApplyGeometryChange(
             EditableEntities(entities),
             "Move",
-            entity => entity.Translate(displacement));
+            entity => entity.TranslatePlacement(displacement));
     }
 
     public void RotateEntities(IEnumerable<CadEntity> entities, OcctPoint3d center, OcctVector3d axis, double angleDegrees)
@@ -369,7 +371,13 @@ public sealed class CadWorkspace : IDisposable
         if (!axis.TryNormalize(out var normal)) throw new ArgumentOutOfRangeException(nameof(axis));
         if (!double.IsFinite(angleDegrees)) throw new ArgumentOutOfRangeException(nameof(angleDegrees));
         if (Math.Abs(angleDegrees % 360.0) <= 1e-12) return;
-        ApplyGeometryChange(EditableEntities(entities), "Rotate", entity => entity.Rotate(center, normal, angleDegrees));
+        ApplyGeometryChange(
+            EditableEntities(entities),
+            "Rotate",
+            entity => entity.RotatePlacement(
+                center,
+                normal,
+                angleDegrees));
     }
 
     public void ScaleEntities(IEnumerable<CadEntity> entities, OcctPoint3d center, double factor)
@@ -378,7 +386,12 @@ public sealed class CadWorkspace : IDisposable
         if (!center.IsFinite) throw new ArgumentOutOfRangeException(nameof(center));
         if (!double.IsFinite(factor) || factor <= 0.0) throw new ArgumentOutOfRangeException(nameof(factor));
         if (Math.Abs(factor - 1.0) <= 1e-12) return;
-        ApplyGeometryChange(EditableEntities(entities), "Scale", entity => entity.Scale(center, factor));
+        ApplyGeometryChange(
+            EditableEntities(entities),
+            "Scale",
+            entity => entity.ScaleFromWorld(
+                center,
+                factor));
     }
     public IReadOnlyList<CadEntity> CopyEntities(
         IEnumerable<CadEntity> entities,
@@ -394,7 +407,7 @@ public sealed class CadWorkspace : IDisposable
         if (copies.Length == 0) return copies;
 
         foreach (var copy in copies)
-            copy.Translate(displacement);
+            copy.TranslatePlacement(displacement);
 
         History.Execute(
             new CadAddEntitiesHistoryEntry(
@@ -445,7 +458,7 @@ public sealed class CadWorkspace : IDisposable
         else
         {
             var geometry = sources.Zip(copies).ToDictionary(pair => pair.First, pair => pair.Second);
-            ApplyGeometryChange(sources, "Mirror", entity => entity.RestoreGeometry(geometry[entity]));
+            ApplyGeometryChange(sources, "Mirror", entity => entity.RestoreGeometrySnapshot(geometry[entity]));
         }
         return keepSource ? copies : sources;
     }
@@ -605,11 +618,18 @@ public sealed class CadWorkspace : IDisposable
         CadTrackingResult? tracking = null;
         if (constraintOrigin is { } trackingOrigin)
         {
-            if (snap is null) tracking = WorkPlane.Track(trackingOrigin, point);
+            if (snap is null)
+                tracking = Drafting.Track(
+                    WorkPlane,
+                    trackingOrigin,
+                    point);
             if (tracking is { } tracked)
                 point = tracked.Point;
 
-            var constrained = WorkPlane.Constrain(trackingOrigin, point);
+            var constrained = Drafting.Constrain(
+                WorkPlane,
+                trackingOrigin,
+                point);
             if (snap is not null && constrained.DistanceTo(point) > 1e-9)
             {
                 // An explicit dimension wins over an incompatible object snap.
@@ -750,7 +770,7 @@ public sealed class CadWorkspace : IDisposable
         catch
         {
             for (var index = 0; index < targets.Length; index++)
-                targets[index].RestoreGeometry(before[index]);
+                targets[index].RestoreGeometrySnapshot(before[index]);
             throw;
         }
     }

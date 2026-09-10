@@ -29,11 +29,11 @@ internal static class CadPathOffsetGeometry
                 inputEdges.Add(
                     segment switch
                     {
-                        CadLineEntity line =>
+                        CadLineSegment line =>
                             model.MakeLine(
                                 line.Start,
                                 line.End),
-                        CadArcEntity arc =>
+                        CadArcSegment arc =>
                             model.MakeArc(
                                 arc.Start,
                                 arc.Middle,

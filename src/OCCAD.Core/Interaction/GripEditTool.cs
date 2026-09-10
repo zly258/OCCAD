@@ -110,7 +110,7 @@ public sealed class GripEditTool : CadTool
         {
             try
             {
-                _grip.Entity.RestoreGeometry(_preview);
+                _grip.Entity.RestoreGeometrySnapshot(_preview);
                 workspace.RecordGeometryChange(
                     _grip.Entity,
                     _before,
@@ -121,7 +121,7 @@ public sealed class GripEditTool : CadTool
                 failure = exception;
                 try
                 {
-                    _grip.Entity.RestoreGeometry(actualBefore);
+                    _grip.Entity.RestoreGeometrySnapshot(actualBefore);
                 }
                 catch (Exception restoreException) when (IsRecoverable(restoreException))
                 {
@@ -176,8 +176,8 @@ public sealed class GripEditTool : CadTool
             // indexed grips deterministic when a side/arc crosses its opposite
             // side and avoids cumulative drift from the previous preview frame.
             if (_before is not null)
-                _preview.RestoreGeometry(_before);
-            _preview.MoveGrip(_grip.Index, point);
+                _preview.RestoreGeometrySnapshot(_before);
+            _preview.MoveWorldGrip(_grip.Index, point);
             Context.Preview.Update(_preview);
             if (_invalidGrip)
             {
@@ -190,7 +190,7 @@ public sealed class GripEditTool : CadTool
         {
             try
             {
-                _preview.RestoreGeometry(snapshot);
+                _preview.RestoreGeometrySnapshot(snapshot);
                 Context.Preview.Update(_preview);
             }
             catch (Exception restoreException) when (IsRecoverable(restoreException))

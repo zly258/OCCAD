@@ -14,7 +14,8 @@ public sealed class CadArrayPath : IDisposable
 
     public static bool Supports(CadEntity entity) => entity is CadLineEntity or CadPolylineEntity or
         CadPolygonEntity or CadRegularPolygonEntity or CadRectangleEntity or CadCircleEntity or
-        CadArcEntity or CadEllipseEntity or CadSplineEntity or CadHelixEntity;
+        CadArcEntity or CadEllipseEntity or CadSplineEntity or CadHelixEntity or
+        CadPathEntity;
 
     public CadArrayPath(CadEntity entity)
     {
@@ -26,13 +27,14 @@ public sealed class CadArrayPath : IDisposable
                 ? new[] { shape } : _session.GetWireEdges(shape).ToArray();
             OcctPoint3d? previous = entity switch
             {
-                CadLineEntity e => e.Start,
-                CadPolylineEntity e => e.Points[0],
-                CadPolygonEntity e => e.Points[0],
-                CadRegularPolygonEntity e => e.VertexPoints[0],
-                CadRectangleEntity e => e.CornerPoints[0],
-                CadArcEntity e => e.Start,
-                CadSplineEntity e => e.FitPoints[0],
+                CadLineEntity e => entity.ToWorldPoint(e.Start),
+                CadPolylineEntity e => entity.ToWorldPoint(e.Points[0]),
+                CadPolygonEntity e => entity.ToWorldPoint(e.Points[0]),
+                CadRegularPolygonEntity e => entity.ToWorldPoint(e.VertexPoints[0]),
+                CadRectangleEntity e => entity.ToWorldPoint(e.CornerPoints[0]),
+                CadArcEntity e => entity.ToWorldPoint(e.Start),
+                CadSplineEntity e => entity.ToWorldPoint(e.FitPoints[0]),
+                CadPathEntity e => entity.ToWorldPoint(e.Start),
                 _ => null
             };
             OcctPoint3d? first = previous;
@@ -96,20 +98,53 @@ public sealed class CadArrayPath : IDisposable
         _segments.Clear();
     }
 
-    private OcctModelShape Build(CadEntity entity) => entity switch
+    private OcctModelShape Build(CadEntity entity)
     {
-        CadLineEntity e => _session.MakeLine(e.Start, e.End),
-        CadPolylineEntity e => _session.MakePolyline(e.Points, e.Closed),
-        CadPolygonEntity e => _session.MakePolyline(e.Points, true),
-        CadRegularPolygonEntity e => _session.MakePolyline(e.VertexPoints, true),
-        CadRectangleEntity e => _session.MakePolyline(e.CornerPoints, true),
-        CadCircleEntity e => _session.MakeCircle(e.Center, e.Normal, e.Radius),
-        CadArcEntity e => _session.MakeArc(e.Start, e.Middle, e.End),
-        CadEllipseEntity e => BuildEllipse(e),
-        CadSplineEntity e => _session.MakeInterpolatedBSpline(e.FitPoints, e.Periodic, e.Tolerance),
-        CadHelixEntity e => _session.MakeHelix(e.Radius, e.Pitch, e.Turns, e.Origin, e.Axis, e.XAxis),
-        _ => throw new ArgumentException("Select a curve or connected wire as the array path.", nameof(entity))
-    };
+        var shape = entity switch
+        {
+            CadLineEntity e => _session.MakeLine(e.Start, e.End),
+            CadPolylineEntity e => _session.MakePolyline(e.Points, e.Closed),
+            CadPolygonEntity e => _session.MakePolyline(e.Points, true),
+            CadRegularPolygonEntity e => _session.MakePolyline(e.VertexPoints, true),
+            CadRectangleEntity e => _session.MakePolyline(e.CornerPoints, true),
+            CadCircleEntity e => _session.MakeCircle(e.Center, e.Normal, e.Radius),
+            CadArcEntity e => _session.MakeArc(e.Start, e.Middle, e.End),
+            CadEllipseEntity e => BuildEllipse(e),
+            CadSplineEntity e => _session.MakeInterpolatedBSpline(e.FitPoints, e.Periodic, e.Tolerance),
+            CadHelixEntity e => _session.MakeHelix(e.Radius, e.Pitch, e.Turns, e.Origin, e.Axis, e.XAxis),
+            CadPathEntity e => BuildPath(e),
+            _ => throw new ArgumentException("Select a curve or connected wire as the array path.", nameof(entity))
+        };
+
+        return entity.Placement.IsIdentity
+            ? shape
+            : _session.Transform(
+                shape,
+                entity.Placement.Transform);
+    }
+
+    private OcctModelShape BuildPath(CadPathEntity path)
+    {
+        var edges = path.Segments
+            .Select(segment =>
+                segment switch
+                {
+                    CadLineSegment line =>
+                        _session.MakeLine(
+                            line.Start,
+                            line.End),
+                    CadArcSegment arc =>
+                        _session.MakeArc(
+                            arc.Start,
+                            arc.Middle,
+                            arc.End),
+                    _ => throw new InvalidOperationException(
+                        "Path contains an unsupported segment.")
+                })
+            .ToArray();
+
+        return _session.MakeWire(edges);
+    }
 
     private OcctModelShape BuildEllipse(CadEllipseEntity ellipse)
     {

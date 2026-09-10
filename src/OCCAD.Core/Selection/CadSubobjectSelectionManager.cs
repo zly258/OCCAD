@@ -8,11 +8,14 @@ public readonly record struct CadSubobjectSelection(
     int SubshapeIndex,
     OcctPoint3d Point)
 {
-    public CadSelectionReference Reference =>
-        CadSelectionReference.Subobject(
+    public CadSubshapeReference SubshapeReference =>
+        CadSubshapeReference.Create(
             Entity,
             SubshapeType,
             SubshapeIndex);
+
+    public CadSelectionReference Reference =>
+        SubshapeReference.ToSelectionReference();
 
     public bool IsValid =>
         Entity is not null &&
@@ -25,7 +28,17 @@ public readonly record struct CadSubobjectSelection(
         if (Entity is CadPathEntity path &&
             SubshapeType == OcctShapeType.Edge &&
             path.TryGetSegmentInfo(SubshapeIndex, out segment))
+        {
+            segment = segment with
+            {
+                Start = Entity.ToWorldPoint(segment.Start),
+                End = Entity.ToWorldPoint(segment.End),
+                Middle = segment.Middle is { } middle
+                    ? Entity.ToWorldPoint(middle)
+                    : null
+            };
             return true;
+        }
 
         segment = default;
         return false;
@@ -62,6 +75,46 @@ public sealed class CadSubobjectSelectionManager
 
     public IReadOnlyList<CadSubobjectSelection> Selected => _selected;
     public CadSubobjectSelection? Primary { get; private set; }
+
+    public IReadOnlyList<CadSubshapeReference> CaptureReferences(
+        OcctEngine engine)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+        return _selected
+            .Select(item =>
+                CadSubshapeReferenceResolver.Capture(
+                    engine,
+                    item))
+            .ToArray();
+    }
+
+    public bool TryResolveReference(
+        OcctEngine engine,
+        CadSubshapeReference reference,
+        out CadSubshapeReference resolved)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+
+        var entity =
+            _document.FindById(reference.EntityId);
+        if (entity is null ||
+            !CadSubshapeReferenceResolver.TryResolve(
+                engine,
+                entity,
+                reference,
+                out var index))
+        {
+            resolved = default;
+            return false;
+        }
+
+        resolved = new CadSubshapeReference(
+            entity.Id,
+            reference.ShapeType,
+            index,
+            reference.Fallback);
+        return true;
+    }
 
     public event EventHandler<CadSubobjectSelectionChangedEventArgs>? Changed;
 
@@ -167,14 +220,16 @@ public sealed class CadSubobjectSelectionManager
 
     private int FindIndex(CadSubobjectSelection item) =>
         _selected.FindIndex(value =>
-            value.Reference == item.Reference);
+            value.SubshapeReference.SameIdentity(
+                item.SubshapeReference));
 
     private CadSubobjectSelection? ResolvePrimary(
         CadSubobjectSelection? current,
         CadSubobjectSelection removed)
     {
         if (current is { } value &&
-            value.Reference == removed.Reference)
+            value.SubshapeReference.SameIdentity(
+                removed.SubshapeReference))
             return _selected.Count == 0 ? null : _selected[^1];
 
         return current;

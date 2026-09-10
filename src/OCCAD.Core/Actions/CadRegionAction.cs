@@ -29,9 +29,16 @@ public sealed class CadRegionAction(CadWorkspace workspace)
             .Where(entity => !ReferenceEquals(entity, outer))
             .ToArray();
 
+        var outerGeometry =
+            outer.CreateWorldGeometrySnapshot();
+        var holeGeometry = holes
+            .Select(static hole =>
+                hole.CreateWorldGeometrySnapshot())
+            .ToArray();
+
         if (!CadPlanarProfileGeometry.AreCoplanar(
-                outer,
-                holes))
+                outerGeometry,
+                holeGeometry))
         {
             throw new InvalidOperationException(
                 "Region outer and hole profiles must be coplanar.");

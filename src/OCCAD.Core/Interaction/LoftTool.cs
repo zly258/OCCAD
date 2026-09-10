@@ -30,7 +30,10 @@ public sealed class LoftTool : CadTool, ICadPointInputTool
                     _ruled)
             ]);
 
-    public override bool CanCommitCurrentStage => _sections.Count >= 2;
+    // Loft is a continuous selection tool. Pointer clicks keep adding sections;
+    // Enter/right-click finishes through CanFinish instead of treating the next
+    // pointer click as a commit request after the second section.
+    public override bool CanCommitCurrentStage => false;
 
     protected override void OnActivated()
     {
@@ -52,10 +55,16 @@ public sealed class LoftTool : CadTool, ICadPointInputTool
         if (input.Kind == OcctPointerInputKind.Pressed &&
             input.Button == OcctPointerButton.Right)
         {
-            if (_sections.Count >= 2)
-                return CommitLoft();
+            if (CanFinish)
+                return Context.Workspace.Tools.FinishCurrent();
 
             Context.Workspace.Tools.CancelCurrent();
+            return true;
+        }
+
+        if (input.Kind == OcctPointerInputKind.Moved)
+        {
+            RefreshHoverPreview();
             return true;
         }
 
@@ -64,40 +73,21 @@ public sealed class LoftTool : CadTool, ICadPointInputTool
             return false;
 
         if (Context.Workspace.Preselection.Current is not { Entity: var entity } ||
-            !CadPlanarProfileGeometry.IsWireProfile(entity))
+            !IsSelectableSection(entity))
             return false;
-
-        if (_sections.Contains(entity))
-            return true;
 
         _sections.Add(entity);
         Context.Workspace.Preselection.Clear();
-
-        RefreshPreview();
+        RefreshCommittedPreview();
 
         SetStageLocalized(
             _sections.Count,
             "Cad.Prompt.loft.NextSection",
             "Loft: select next cross section [Enter commit, Backspace undo, Esc cancel]");
-
         return true;
     }
 
-    public override bool HandleKey(OcctKeyInputEventArgs input)
-    {
-        if (input.Kind == OcctKeyInputKind.Pressed && input.Key == OcctKey.Enter)
-        {
-            if (_sections.Count >= 2)
-                return CommitLoft();
-        }
-
-        return base.HandleKey(input);
-    }
-
     public bool TryAcceptPoint(OcctPoint3d point) => false;
-
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        _sections.Count >= 2 && CommitLoft();
 
     protected override bool CanStepBackCore => _sections.Count > 0;
 
@@ -108,7 +98,7 @@ public sealed class LoftTool : CadTool, ICadPointInputTool
 
         _sections.RemoveAt(_sections.Count - 1);
         Context.Workspace.Preselection.Clear();
-        RefreshPreview();
+        RefreshCommittedPreview();
 
         if (_sections.Count == 0)
         {
@@ -151,12 +141,34 @@ public sealed class LoftTool : CadTool, ICadPointInputTool
             return false;
         }
 
-        RefreshPreview();
+        RefreshCommittedPreview();
         NotifyUpdated();
         return true;
     }
 
-    private void RefreshPreview()
+    private void RefreshHoverPreview()
+    {
+        if (Context.Workspace.Preselection.Current is not { Entity: var candidate } ||
+            !IsSelectableSection(candidate) ||
+            _sections.Count == 0)
+        {
+            RefreshCommittedPreview();
+            return;
+        }
+
+        var previewSections = _sections
+            .Append(candidate)
+            .ToArray();
+        if (previewSections.Length < 2)
+        {
+            Context.Preview.Clear();
+            return;
+        }
+
+        ShowPreview(previewSections);
+    }
+
+    private void RefreshCommittedPreview()
     {
         if (_sections.Count < 2)
         {
@@ -164,12 +176,17 @@ public sealed class LoftTool : CadTool, ICadPointInputTool
             return;
         }
 
+        ShowPreview(_sections);
+    }
+
+    private void ShowPreview(IEnumerable<CadEntity> sections)
+    {
         try
         {
-            var loft = new CadLoftEntity(_sections, _makeSolid, _ruled);
+            var loft = CreateLoft(sections);
             Context.Preview.Show(loft);
         }
-        catch
+        catch (Exception exception) when (IsRecoverablePreviewFailure(exception))
         {
             Context.Preview.Clear();
         }
@@ -180,30 +197,57 @@ public sealed class LoftTool : CadTool, ICadPointInputTool
         if (_sections.Count < 2)
             return false;
 
+        var loft = CreateLoft(_sections);
+        loft.BindSources(_sections);
+        var engine = Context.Engine;
+        Context.Preview.Clear();
         try
         {
-            var loft = new CadLoftEntity(_sections, _makeSolid, _ruled);
-            loft.BindSources(_sections);
-            Context.Preview.Clear();
-            Context.Workspace.AddGeneratedEntities([loft], "Loft");
-            Context.Workspace.Tools.CompleteCurrent();
-            return true;
+            CadTransaction.ApplyCreatedEntity(
+                Context.Workspace,
+                loft,
+                "Loft",
+                Context.Workspace.Tools.CompleteCurrent);
         }
         catch
         {
-            Context.Preview.Clear();
-            return false;
+            if (IsActive)
+                RefreshCommittedPreview();
+            throw;
         }
+
+        engine.Redraw();
+        return true;
     }
 
-    protected override void OnCanceled()
+    private CadLoftEntity CreateLoft(IEnumerable<CadEntity> sections)
     {
-        Context.Preview.Clear();
-        _sections.Clear();
-        Context.Workspace.Preselection.Clear();
+        var values = sections.ToArray();
+        if (values.Length < 2)
+            throw new InvalidOperationException("Loft requires at least two sections.");
+
+        var loft = new CadLoftEntity(values, _makeSolid, _ruled)
+        {
+            Layer = Context.Workspace.Layers.Current.Name
+        };
+        return loft;
     }
 
-    protected override void OnDeactivated()
+    private bool IsSelectableSection(CadEntity entity) =>
+        CadPlanarProfileGeometry.IsWireProfile(entity) &&
+        !_sections.Contains(entity);
+
+    private static bool IsRecoverablePreviewFailure(Exception exception) =>
+        exception is ArgumentException or
+        InvalidOperationException or
+        ArithmeticException or
+        OcctException;
+
+    protected override void OnCanceled() => ResetLoftState();
+
+    protected override void OnDeactivated() => ResetLoftState();
+
+    private void ResetLoftState()
     {
         Context.Preview.Clear();
         _sections.Clear();

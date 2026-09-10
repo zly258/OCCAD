@@ -1,42 +1,27 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
 using OCCAD;
 
 namespace OCCAD.Avalonia;
 
 public sealed partial class MainWindow
 {
-    private TextBlock? _draftingStatusLabel;
-
     private static void ConfigureStatusPlaneButton(
         global::Avalonia.Controls.Primitives.ToggleButton button)
     {
-        button.MinWidth = 30;
-        button.Height = 19;
-        button.Padding = new Thickness(5, 0);
-        button.Margin = new Thickness(0);
-        button.FontSize = CadTheme.CaptionFontSize;
+        button.MinWidth = 36;
+        button.Margin = new Thickness(1, 0);
     }
 
     private static void ConfigureStatusDraftingToggle(
         global::Avalonia.Controls.Primitives.ToggleButton button)
     {
         button.MinWidth = 58;
-        button.Height = 19;
-        button.Padding = new Thickness(5, 0);
-        button.Margin = new Thickness(0);
-        button.FontSize = CadTheme.CaptionFontSize;
+        button.Margin = new Thickness(1, 0);
     }
 
     private void RefreshCommandStatusLanguage()
     {
-        if (_draftingStatusLabel is not null)
-        {
-            _draftingStatusLabel.Text =
-                CadLanguageManager.Text("Cad.Text.Drafting", "Drafting") + ":";
-        }
-
         _snapToggle.ContextMenu = BuildSnapStatusMenu();
         _polarToggle.ContextMenu = BuildPolarStatusMenu();
 
@@ -100,10 +85,7 @@ public sealed partial class MainWindow
         menu.Opening += (_, _) =>
         {
             foreach (var entry in items)
-            {
-                entry.Item.IsChecked =
-                    (_workspace.Snap.Modes & entry.Mode) != 0;
-            }
+                entry.Item.IsChecked = (_workspace.Snap.Modes & entry.Mode) != 0;
         };
         return menu;
     }

@@ -1,79 +1,243 @@
 # 02 UI 规范
 
-## 总体方向
+## 1. 唯一界面基线
 
-OCCAD 使用紧凑工业 CAD 桌面壳：自定义 Ribbon + 左侧 Model + 中央 Viewport + 右侧 Layer/Property + 底部 Command Line + StatusBar + Viewport 内非模态浮动 Tool Panel。Viewport 始终占最大区域。
+OCCAD 初版只允许一套主界面：**经典 CAD Menu + 单行 Toolbar + 当前 Tool 参数条**。
 
-```text
-Ribbon
-┌──────────────┬──────────────────────────────┬─────────────────────┐
-│ Model        │          Viewport            │ Layer               │
-│              │   Floating Tool Panel        │ splitter            │
-│              │                              │ Property            │
-└──────────────┴──────────────────────────────┴─────────────────────┘
-Command Line
-Selection | Work Plane | SNAP ORTHO POLAR | XYZ
-```
+禁止恢复或并存：
 
-不再构造旧 Menu、旧 Toolbar 或启动后的 UI refinement 壳层。
+- Ribbon；
+- 三行分组命令区；
+- 第二套 Toolbar；
+- Floating Tool Panel；
+- 永久 Dynamic HUD；
+- 永久底部 Command Input；
+- 仅为了视觉完整而存在的占位命令。
 
-## Theme
+UI 只暴露已经注册且能进入真实 Core 路径的功能。
 
-`CadTheme` 是桌面 UI 视觉指标唯一来源。当前基线：主 UI 11 px；次要文字 10/10.5 px；紧凑控件 22 px；Header 约 23–24 px；浅灰工具/面板区域；深色 Viewport；蓝色仅用于 Current/Active；低/无圆角；细分隔线；Segoe UI / Microsoft YaHei UI / CJK fallback 字体栈。
-
-Ribbon 使用原生 Avalonia 控件，不依赖第三方 Ribbon。每个 Group 固定三行紧凑排列，横向空间不足时滚动，不允许在 125%/150% DPI 下把主窗口撑宽。
-
-## Ribbon / Action / Tool Panel
-
-Ribbon 只调用已注册 Action ID，不复制业务逻辑。真正的命令族使用一层下拉，例如 Circle、Arc、Regular Polygon、Ellipse 和 3D Primitives。
-
-`CadActionManager`、`CadToolManager`、`CadCommandManager.ForWorkspace()` 分别作为 Action、Tool、命令会话的唯一状态来源。Ribbon、Command Line 和 Floating Tool Panel 只是同一 Core 状态机的不同输入表面。
-
-稳定的 Tool 参数（Radius、Width、Height、Angle、Factor 等）进入 Floating Tool Panel。Tool Panel 不重复完整 Prompt；参数、精确输入、Back/Accept/Finish/Cancel 必须直接调用当前 Tool，不维护第二份参数状态。
-
-## Model / Layer / Property
-
-Model 位于左侧。Layer 与 Property 是右侧两个独立、可调整高度的面板，不是 Tab。
-
-Layer 表格字段为：
+## 2. 主窗口结构
 
 ```text
-当前 | 名称 | 显 | 色 | 线型 | 线宽 | 锁
+MainWindow
+├─ Menu
+│  ├─ 文件
+│  ├─ 绘图
+│  ├─ 建模
+│  ├─ 视图
+│  ├─ 窗口
+│  └─ 语言
+├─ Single-row Toolbar
+├─ Active Tool Parameter Strip   ← 当前 Tool 有参数时才显示
+├─ Workspace
+│  ├─ Model Tree
+│  ├─ CAD Viewport
+│  └─ Layers / Properties
+└─ Status Strip
+   ├─ Current Operation Prompt
+   └─ XY / YZ / XZ / SNAP / ORTHO / POLAR
 ```
 
-当前图层使用明确的 `●/○` 状态；只有“当前”列切换当前图层，点击名称只检查图层。默认层不能重命名或删除。Layer UI 只调用 `CadWorkspace`；事务、回滚、History 在 Core。
+## 3. 主题原则
 
-Property 使用 Core descriptor/editor 语义，支持分类、多选共同属性、Mixed Value、Layer、ByLayer、Color、Enum、Numeric、Point/Vector X/Y/Z 编辑，并通过 `CadPropertyTransaction` 提交修改。
+应用使用 Avalonia 12 原生 `FluentTheme`，不启用 `DensityStyle.Compact`，不注册 OCCAD 全局 Button/TextBox/ComboBox/TreeView 皮肤。
 
-外观行统一为：
+`CadTheme` 只允许保留：
+
+- Panel/Property/Status 等布局尺寸；
+- Viewport、Overlay、Snap/Grip 等 CAD 场景视觉；
+- CAD 表格式区域确有必要的颜色/分割线。
+
+普通控件必须优先使用原生 Fluent 状态。
+
+自定义 ColorTable 属于 CAD 业务控件，继续保留。
+
+## 4. Menu
+
+顶层分类固定为：
+
+- 文件；
+- 绘图；
+- 建模；
+- 视图；
+- 窗口；
+- 语言。
+
+Circle / Arc / Ellipse / Regular Polygon 等具有多种绘制方法的命令使用二级菜单，不复制 Tool 实现。
+
+例如：
 
 ```text
-颜色      [随层] [颜色值]
-线型      [随层] [线型]
-线宽      [随层] [数值]
-透明度
-可见
+绘图
+├─ 点
+├─ 直线
+├─ 多段线
+├─ 自由多边形
+├─ 正多边形
+│  ├─ 内接
+│  └─ 外切
+├─ 矩形
+├─ 圆
+├─ 圆弧
+├─ 椭圆
+└─ 样条
 ```
 
-三个 ByLayer bool 保留在 Core，但不单独占行。
+## 5. Toolbar
 
-## Prompt 与状态职责
+Toolbar 只是一行高频入口，不承担“把所有命令平铺出来”的职责。
 
-- Command Line：唯一完整 Tool Prompt、命令输入、历史/补全、执行结果和错误。
-- Floating Tool Panel：当前步骤、精确坐标、Length/Angle/Factor、Tool 参数、Back/Accept/Finish/Cancel。
-- Dynamic HUD：鼠标附近当前 Length/Angle、SNAP、ORTHO/POLAR tracking。
-- StatusBar：Selection、Work Plane、SNAP/ORTHO/POLAR、XYZ 坐标。
+要求：
 
-禁止把下一步 Tool Prompt、History 或 Precision 文本再复制到 StatusBar。
+- 单行；
+- 横向空间不足时允许水平滚动；
+- 不使用功能图标；
+- 文本短而明确；
+- 使用原生 Button；
+- 不强制统一自定义背景/边框；
+- 当前图层 ComboBox 可放在工具栏末端；
+- 语言切换可使用 ComboBox 或 Menu，不维护第二套语言状态。
 
-## Viewport / DPI
+## 6. 当前 Tool 参数条
 
-唯一 OCCT Host 是 `OcctAvaloniaViewport`。Drawing 使用中心留空十字；Snap aperture 与 Dynamic HUD 保持屏幕像素稳定。ViewCube 隐藏，左下角 Triedron 保留。
+这是初版必须存在的工程输入入口。
 
-Bridge 已 requestRedraw 的操作不再重复 Redraw。125%/150% 缩放下 RenderScaling、Overlay 与 native viewport input 坐标必须保持一致。
+当 `CadTool.ParameterPanel` 有参数时，Toolbar 下方显示参数条；没有参数时整条隐藏。
 
-## 应用首选项
+Descriptor 映射：
 
-长期用户视图/交互偏好属于 Application State，不属于 Document State。`管理 → 首选项...` 统一编辑并持久化场景背景、Grip/Snap Marker 大小、Grip/Snap/Selection 像素容差、鼠标滚轮缩放灵敏度和 Viewer deviation/angle。
+```text
+Integer        → TextBox
+Double         → TextBox
+OptionalDouble → TextBox
+Boolean        → CheckBox
+Choice         → ComboBox
+String         → TextBox
+```
 
-设置修改后立即应用到当前 Viewport。“场景显示精度”只表示 Presentation 离散质量，不能解释为修改 CAD 模型数学精度。
+输入必须调用 `tool.TrySetParameter()`，不能由 UI 直接修改 Tool 私有字段。
+
+### 正多边形
+
+```text
+正多边形： 边数 [6]  方式 [内接]
+```
+
+- 边数范围 3~360；
+- 模式为 Inscribed / Circumscribed；
+- 指定圆心前，可直接键入边数并回车；
+- 指定圆心后，数字输入重新属于当前半径/精确输入阶段。
+
+同一机制服务于 Box、Cylinder、Cone、Frustum、Sphere、Ellipsoid、Torus、Helix、Ellipse、Extrude 等已有参数 Tool。
+
+## 7. Model Tree
+
+- 左侧窄面板；
+- 原生 TextBox 过滤；
+- 原生 TreeView；
+- 不使用实体装饰图标；
+- Entity 类型来自 `CadEntityRegistry`；
+- 内部 `Path` 等持久化辅助实体不作为普通节点；
+- 节点与 Workspace Selection 同步；
+- 初版 ContextMenu 只保留 Properties、Show/Hide、Lock/Unlock、Rename。
+
+## 8. Layers
+
+- 右上区域；
+- 过滤、新建、重命名、删除使用原生控件；
+- 默认 Layer 不允许重命名/删除；
+- 当前层、可见性、颜色、线型、线宽、锁定均直接绑定真实 Layer 状态；
+- 颜色单元格和 ColorTable 可保留 CAD 专用视觉；
+- 不重新引入 `cad-input`、`cad-compact` 等全局样式类。
+
+## 9. PropertyGrid
+
+PropertyGrid 由 Core Descriptor 驱动。
+
+布局要求：
+
+- Property / Value 两列；
+- 标签和值左对齐；
+- Numeric 左对齐；
+- 分类使用原生 `Expander`；
+- Mixed Value 明确显示；
+- Layer 使用 ComboBox；
+- Boolean 使用 CheckBox；
+- Enum/Choice 使用 ComboBox；
+- Color 使用 OCCAD ColorTable/Color Dialog；
+- Measurement 只读。
+
+Point / Vector / Normal 必须纵向三行：
+
+```text
+X  [ ... ]
+Y  [ ... ]
+Z  [ ... ]
+```
+
+不得再使用横向 `X Y Z` 三输入框压缩布局。
+
+Circle / Arc / Ellipse / Rectangle / Regular Polygon 的 `Normal` 可编辑，并通过真实几何旋转/事务路径生效。
+
+## 10. Viewport
+
+- 默认深色；
+- 左下角 Triedron 保留；
+- ViewCube 默认关闭；
+- Snap / Grip / Preview / Tracking / Selection Window 只在对应生命周期出现；
+- 不显示永久版本号、OCCT 字样、Ready、帮助水印；
+- Preview/Transient 必须在 Commit/Cancel 后清理。
+
+## 11. Status Strip
+
+底部只显示：
+
+- 当前操作提示；
+- XY / YZ / XZ；
+- SNAP；
+- ORTHO；
+- POLAR。
+
+空闲时提示区域可以为空。
+
+禁止永久显示：
+
+- `Ready`；
+- `Command: Ready`；
+- 版本字符串；
+- 永久 XYZ 坐标；
+- 重复的 WorkPlane/Drafting 标题；
+- 第二个命令输入框。
+
+## 12. Dialog
+
+Dialog 使用原生 Fluent Button/TextBox/ComboBox，不建立单独“MessageBox 皮肤体系”。
+
+允许 CAD 业务型控件使用必要的自定义视觉，例如 ColorTable。
+
+## 13. 本地化
+
+- `zh-CN` / `en-US`；
+- Action/Tool ID 永远不随语言变化；
+- UI 文本通过 localization key；
+- 切换语言必须刷新 Menu、Toolbar、Tool 参数条、Panel 和状态提示；
+- 语言偏好写回应用设置。
+
+## 14. UI 验收
+
+一个功能只有同时满足以下条件才算“完成”：
+
+1. Entity / Tool / Action 注册一致；
+2. Menu/Toolbar 入口可用；
+3. 必要参数有可见输入入口；
+4. Prompt 明确；
+5. Preview 正确；
+6. 精确输入正确；
+7. Commit / Cancel 返回 neutral；
+8. Property 可正确修改；
+9. Snap / Grip / Selection 按预期工作；
+10. Save/Open 能恢复；
+11. 不产生 Native transient 残留；
+12. Windows/Linux 实际 build 和手工交互验证通过。
+
+“源码存在”或“Action 已注册”不能作为完成依据。

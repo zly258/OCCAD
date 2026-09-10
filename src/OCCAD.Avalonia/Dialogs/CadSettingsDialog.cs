@@ -1,4 +1,3 @@
-using System.Drawing;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
@@ -22,160 +21,98 @@ internal sealed class CadSettingsDialog : Window
     private readonly Button _backgroundButton = new();
     private DrawingColor _background;
 
-    private CadSettingsDialog(
-        CadApplicationSettings settings)
+    private CadSettingsDialog(CadApplicationSettings settings)
     {
-        Title = Text(
-            "Cad.Text.Preferences",
-            "Preferences");
+        Title = Text("Cad.Text.Preferences", "Preferences");
         Width = 470;
         MinWidth = 440;
         Height = 450;
         MinHeight = 410;
-        WindowStartupLocation =
-            WindowStartupLocation.CenterOwner;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
         CanResize = false;
         Background = CadTheme.Surface;
 
         ApplyValues(settings);
 
-        _backgroundButton.MinHeight =
-            CadTheme.ControlHeight;
-        _backgroundButton.HorizontalAlignment =
-            HorizontalAlignment.Stretch;
-        _backgroundButton.HorizontalContentAlignment =
-            HorizontalAlignment.Left;
-        _backgroundButton.Padding =
-            new Thickness(5, 0);
-        _backgroundButton.BorderBrush =
-            CadTheme.Border;
-        _backgroundButton.BorderThickness =
-            new Thickness(1);
-        _backgroundButton.Classes.Add("cad-compact");
-        _backgroundButton.Click +=
-            BackgroundButtonClick;
+        _backgroundButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _backgroundButton.HorizontalContentAlignment = HorizontalAlignment.Center;
+        _backgroundButton.VerticalContentAlignment = VerticalAlignment.Center;
+        _backgroundButton.Click += BackgroundButtonClick;
         RefreshBackgroundButton();
 
         var content = new StackPanel
         {
-            Spacing = 0
+            Spacing = 6
         };
+        Grid.SetIsSharedSizeScope(content, true);
 
         content.Children.Add(
             GroupHeader(
-                Text(
-                    "Cad.Settings.Scene",
-                    "Scene")));
+                Text("Cad.Settings.Scene", "Scene"),
+                topMargin: 0));
         content.Children.Add(
             Row(
-                Text(
-                    "Cad.Settings.SceneBackground",
-                    "Background"),
+                Text("Cad.Settings.SceneBackground", "Background"),
                 _backgroundButton));
         content.Children.Add(
             Row(
-                Text(
-                    "Cad.Settings.DisplayDeviation",
-                    "Display precision"),
+                Text("Cad.Settings.DisplayDeviation", "Display precision"),
                 _displayDeviation,
-                Text(
-                    "Cad.Settings.DisplayDeviationHint",
-                    "Smaller = finer")));
+                Text("Cad.Settings.DisplayDeviationHint", "Smaller = finer")));
         content.Children.Add(
             Row(
-                Text(
-                    "Cad.Settings.DisplayAngle",
-                    "Angular precision"),
+                Text("Cad.Settings.DisplayAngle", "Angular precision"),
                 _displayAngle,
                 "°"));
 
         content.Children.Add(
-            GroupHeader(
-                Text(
-                    "Cad.Settings.Interaction",
-                    "Interaction")));
+            GroupHeader(Text("Cad.Settings.Interaction", "Interaction")));
         content.Children.Add(
             Row(
-                Text(
-                    "Cad.Settings.GripSize",
-                    "Grip size"),
+                Text("Cad.Settings.GripSize", "Grip size"),
                 _gripSize,
                 "px"));
         content.Children.Add(
             Row(
-                Text(
-                    "Cad.Settings.GripTolerance",
-                    "Grip tolerance"),
+                Text("Cad.Settings.GripTolerance", "Grip tolerance"),
                 _gripTolerance,
                 "px"));
         content.Children.Add(
             Row(
-                Text(
-                    "Cad.Settings.SnapMarkerSize",
-                    "Snap marker size"),
+                Text("Cad.Settings.SnapMarkerSize", "Snap marker size"),
                 _snapMarkerSize,
                 "px"));
         content.Children.Add(
             Row(
-                Text(
-                    "Cad.Settings.SnapTolerance",
-                    "Snap tolerance"),
+                Text("Cad.Settings.SnapTolerance", "Snap tolerance"),
                 _snapTolerance,
                 "px"));
         content.Children.Add(
             Row(
-                Text(
-                    "Cad.Settings.SelectionTolerance",
-                    "Selection tolerance"),
+                Text("Cad.Settings.SelectionTolerance", "Selection tolerance"),
                 _selectionTolerance,
                 "px"));
         content.Children.Add(
             Row(
-                Text(
-                    "Cad.Settings.ZoomSensitivity",
-                    "Mouse zoom sensitivity"),
+                Text("Cad.Settings.ZoomSensitivity", "Mouse zoom sensitivity"),
                 _zoomSensitivity,
                 "0.1–5"));
 
-        var reset = new Button
-        {
-            Content = Text(
-                "Cad.Text.ResetDefaults",
-                "Reset Defaults"),
-            MinWidth = 96
-        };
-        reset.Classes.Add("cad-compact");
+        var reset = DialogButton(
+            Text("Cad.Text.ResetDefaults", "Reset Defaults"),
+            minWidth: 96);
         reset.Click += (_, _) =>
-            ApplyValues(
-                CadApplicationSettings.CreateDefault());
+            ApplyValues(CadApplicationSettings.CreateDefault());
 
-        var cancel = new Button
-        {
-            Content = Text(
-                "Cad.Text.Cancel",
-                "Cancel"),
-            MinWidth = CadTheme.DialogButtonWidth
-        };
-        cancel.Classes.Add("cad-compact");
-        cancel.Click += (_, _) =>
-            Close(null);
+        var cancel = DialogButton(Text("Cad.Text.Cancel", "Cancel"));
+        cancel.Click += (_, _) => Close(null);
 
-        var ok = new Button
-        {
-            Content = Text(
-                "Cad.Text.OK",
-                "OK"),
-            MinWidth = CadTheme.DialogButtonWidth
-        };
-        ok.Classes.Add("cad-compact");
-        ok.Classes.Add("cad-primary");
-        ok.Click += async (_, _) =>
-            await AcceptAsync();
+        var ok = DialogButton(Text("Cad.Text.OK", "OK"));
+        ok.Click += async (_, _) => await AcceptAsync();
 
         var buttons = new DockPanel
         {
             LastChildFill = false,
-            Background = CadTheme.PanelAlt,
             Margin = new Thickness(0)
         };
         DockPanel.SetDock(reset, Dock.Left);
@@ -184,7 +121,7 @@ internal sealed class CadSettingsDialog : Window
         var right = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 5
+            Spacing = 6
         };
         right.Children.Add(cancel);
         right.Children.Add(ok);
@@ -193,29 +130,23 @@ internal sealed class CadSettingsDialog : Window
 
         var footer = new Border
         {
-            Background = CadTheme.PanelAlt,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(10, 6),
+            Padding = new Thickness(CadTheme.DialogPadding, 8),
             Child = buttons
         };
 
-        var grid = new Grid();
-        grid.RowDefinitions.Add(
-            new RowDefinition(
-                new GridLength(
-                    1,
-                    GridUnitType.Star)));
-        grid.RowDefinitions.Add(
-            new RowDefinition(
-                GridLength.Auto));
+        var grid = new Grid
+        {
+            RowDefinitions = new RowDefinitions("*,Auto")
+        };
 
         var scroll = new ScrollViewer
         {
             Content = content,
             HorizontalScrollBarVisibility =
                 global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
-            Margin = new Thickness(10, 8, 10, 8)
+            Margin = new Thickness(CadTheme.DialogPadding, 10)
         };
         grid.Children.Add(scroll);
         Grid.SetRow(footer, 1);
@@ -231,11 +162,8 @@ internal sealed class CadSettingsDialog : Window
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(current);
 
-        var dialog =
-            new CadSettingsDialog(
-                current.Clone());
-        return dialog.ShowDialog<CadApplicationSettings?>(
-            owner);
+        var dialog = new CadSettingsDialog(current.Clone());
+        return dialog.ShowDialog<CadApplicationSettings?>(owner);
     }
 
     private async Task AcceptAsync()
@@ -253,9 +181,7 @@ internal sealed class CadSettingsDialog : Window
         {
             await CadMessageDialog.ShowAsync(
                 this,
-                Text(
-                    "Cad.Text.ErrorTitle",
-                    "OCCAD Error"),
+                Text("Cad.Text.ErrorTitle", "OCCAD Error"),
                 exception.GetBaseException().Message,
                 kind: CadMessageDialogKind.Error);
         }
@@ -265,10 +191,7 @@ internal sealed class CadSettingsDialog : Window
         object? sender,
         global::Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var value =
-            await CadColorDialog.ShowAsync(
-                this,
-                _background);
+        var value = await CadColorDialog.ShowAsync(this, _background);
         if (value is not { } color)
             return;
 
@@ -279,15 +202,13 @@ internal sealed class CadSettingsDialog : Window
     private void RefreshBackgroundButton()
     {
         _backgroundButton.Content =
-            CadApplicationSettings.ColorToHex(
-                _background);
+            CadApplicationSettings.ColorToHex(_background);
         var media = MediaColor.FromArgb(
             _background.A,
             _background.R,
             _background.G,
             _background.B);
-        _backgroundButton.Background =
-            new SolidColorBrush(media);
+        _backgroundButton.Background = new SolidColorBrush(media);
         _backgroundButton.Foreground =
             RelativeLuminance(_background) > 0.52
                 ? Brushes.Black
@@ -298,10 +219,10 @@ internal sealed class CadSettingsDialog : Window
         new()
         {
             SceneBackground =
-                CadApplicationSettings.ColorToHex(
-                    _background),
+                CadApplicationSettings.ColorToHex(_background),
             GripSize =
-                ParseInt(_gripSize,
+                ParseInt(
+                    _gripSize,
                     Text("Cad.Settings.GripSize", "Grip size")),
             GripTolerance =
                 ParseDouble(
@@ -333,56 +254,33 @@ internal sealed class CadSettingsDialog : Window
                     Text("Cad.Settings.DisplayAngle", "Display angle"))
         };
 
-    private void ApplyValues(
-        CadApplicationSettings value)
+    private void ApplyValues(CadApplicationSettings value)
     {
-        _background =
-            value.SceneBackgroundColor;
-        _gripSize.Text =
-            value.GripSize.ToString(
-                CultureInfo.CurrentCulture);
-        _gripTolerance.Text =
-            Format(value.GripTolerance);
+        _background = value.SceneBackgroundColor;
+        _gripSize.Text = value.GripSize.ToString(CultureInfo.CurrentCulture);
+        _gripTolerance.Text = Format(value.GripTolerance);
         _snapMarkerSize.Text =
-            value.SnapMarkerSize.ToString(
-                CultureInfo.CurrentCulture);
-        _snapTolerance.Text =
-            Format(value.SnapTolerance);
-        _zoomSensitivity.Text =
-            Format(value.ZoomSensitivity);
+            value.SnapMarkerSize.ToString(CultureInfo.CurrentCulture);
+        _snapTolerance.Text = Format(value.SnapTolerance);
+        _zoomSensitivity.Text = Format(value.ZoomSensitivity);
         _selectionTolerance.Text =
-            value.SelectionTolerance.ToString(
-                CultureInfo.CurrentCulture);
+            value.SelectionTolerance.ToString(CultureInfo.CurrentCulture);
         _displayDeviation.Text =
-            value.DisplayDeviationCoefficient
-                .ToString(
-                    "0.####",
-                    CultureInfo.CurrentCulture);
-        _displayAngle.Text =
-            Format(
-                value.DisplayDeviationAngleDegrees);
-        if (_backgroundButton is not null)
-            RefreshBackgroundButton();
+            value.DisplayDeviationCoefficient.ToString(
+                "0.####",
+                CultureInfo.CurrentCulture);
+        _displayAngle.Text = Format(value.DisplayDeviationAngleDegrees);
+        RefreshBackgroundButton();
     }
 
     private static Control GroupHeader(
-        string text) =>
-        new Border
+        string text,
+        double topMargin = 12) =>
+        new TextBlock
         {
-            MinHeight = CadTheme.PropertyCategoryHeaderHeight,
-            Background = CadTheme.Header,
-            BorderBrush = CadTheme.BorderStrong,
-            BorderThickness =
-                new Thickness(0, 1, 0, 1),
-            Padding = new Thickness(6, 0),
-            Margin = new Thickness(0, 5, 0, 0),
-            Child = new TextBlock
-            {
-                Text = text,
-                FontWeight = FontWeight.SemiBold,
-                VerticalAlignment =
-                    VerticalAlignment.Center
-            }
+            Text = text,
+            FontWeight = FontWeight.SemiBold,
+            Margin = new Thickness(0, topMargin, 0, 2)
         };
 
     private static Control Row(
@@ -390,53 +288,31 @@ internal sealed class CadSettingsDialog : Window
         Control editor,
         string? suffix = null)
     {
-        editor.VerticalAlignment =
-            VerticalAlignment.Center;
-        editor.HorizontalAlignment =
-            HorizontalAlignment.Stretch;
+        editor.VerticalAlignment = VerticalAlignment.Center;
+        editor.HorizontalAlignment = HorizontalAlignment.Stretch;
 
         var grid = new Grid
         {
-            MinHeight = CadTheme.PropertyRowHeight + 2,
-            ColumnSpacing = 0,
-            Margin = new Thickness(0)
+            ColumnSpacing = 8
         };
         grid.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(166)));
+            new ColumnDefinition(GridLength.Auto)
+            {
+                SharedSizeGroup = "SettingsLabels"
+            });
         grid.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(1)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(
-                    1,
-                    GridUnitType.Star)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                GridLength.Auto));
+            new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
 
         var labelText = new TextBlock
         {
             Text = label,
-            VerticalAlignment =
-                VerticalAlignment.Center,
-            Foreground = CadTheme.Text,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            Margin = new Thickness(5, 0)
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
         grid.Children.Add(labelText);
 
-        var separator = new Border
-        {
-            Width = 1,
-            Background = CadTheme.Border
-        };
-        Grid.SetColumn(separator, 1);
-        grid.Children.Add(separator);
-
-        editor.Margin = new Thickness(4, 0);
-        Grid.SetColumn(editor, 2);
+        Grid.SetColumn(editor, 1);
         grid.Children.Add(editor);
 
         if (!string.IsNullOrWhiteSpace(suffix))
@@ -444,39 +320,33 @@ internal sealed class CadSettingsDialog : Window
             var suffixText = new TextBlock
             {
                 Text = suffix,
-                Foreground = CadTheme.Muted,
-                VerticalAlignment =
-                    VerticalAlignment.Center,
-                Margin = new Thickness(1, 0, 5, 0)
+                VerticalAlignment = VerticalAlignment.Center
             };
-            Grid.SetColumn(suffixText, 3);
+            Grid.SetColumn(suffixText, 2);
             grid.Children.Add(suffixText);
         }
 
-        return new Border
-        {
-            Background = CadTheme.Surface,
-            BorderBrush = CadTheme.Border,
-            BorderThickness =
-                new Thickness(0, 0, 0, 1),
-            Child = grid
-        };
+        return grid;
     }
 
-    private static TextBox Input()
-    {
-        var value = new TextBox
+    private static TextBox Input() =>
+        new()
         {
-            HorizontalAlignment =
-                HorizontalAlignment.Stretch
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        value.Classes.Add("cad-input");
-        return value;
-    }
 
-    private static int ParseInt(
-        TextBox box,
-        string name)
+    private static Button DialogButton(
+        string text,
+        double? minWidth = null) =>
+        new()
+        {
+            Content = text,
+            MinWidth = minWidth ?? CadTheme.DialogButtonWidth,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center
+        };
+
+    private static int ParseInt(TextBox box, string name)
     {
         if (int.TryParse(
                 box.Text,
@@ -494,9 +364,7 @@ internal sealed class CadSettingsDialog : Window
                 name));
     }
 
-    private static double ParseDouble(
-        TextBox box,
-        string name)
+    private static double ParseDouble(TextBox box, string name)
     {
         if (double.TryParse(
                 box.Text,
@@ -521,23 +389,15 @@ internal sealed class CadSettingsDialog : Window
                 name));
     }
 
-    private static string Format(
-        double value) =>
-        value.ToString(
-            "0.###",
-            CultureInfo.CurrentCulture);
+    private static string Format(double value) =>
+        value.ToString("0.###", CultureInfo.CurrentCulture);
 
-    private static double RelativeLuminance(
-        DrawingColor color) =>
+    private static double RelativeLuminance(DrawingColor color) =>
         (0.2126 * color.R +
          0.7152 * color.G +
          0.0722 * color.B) /
         255.0;
 
-    private static string Text(
-        string key,
-        string fallback) =>
-        CadLanguageManager.Text(
-            key,
-            fallback);
+    private static string Text(string key, string fallback) =>
+        CadLanguageManager.Text(key, fallback);
 }

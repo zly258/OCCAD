@@ -3,7 +3,7 @@ using OcctNet;
 
 namespace OCCAD;
 
-public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
+public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool, ICadCommandOptionTool
 {
     private const int DefaultSides = 6;
     private const string InscribedMode = "Inscribed";
@@ -57,10 +57,36 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
         _sides = DefaultSides;
         _inscribed = true;
         _initialPlane = CaptureWorkPlaneFrame();
-        SetStageLocalized(
-            0,
-            "Cad.Prompt.RegularPolygon.Center",
-            "Regular Polygon: specify center [Esc cancel]");
+        SetCenterPrompt();
+    }
+
+    public bool TryExecuteOption(string input, out bool success, out string? message)
+    {
+        success = false;
+        message = null;
+
+        if (_center is not null)
+            return false;
+
+        var text = input?.Trim() ?? string.Empty;
+        if (!int.TryParse(
+                text,
+                NumberStyles.Integer,
+                CultureInfo.CurrentCulture,
+                out var sides))
+            return false;
+
+        if (sides < 3 || sides > 360)
+        {
+            message = "Regular polygon sides must be between 3 and 360.";
+            return true;
+        }
+
+        _sides = sides;
+        SetCenterPrompt();
+        success = true;
+        message = $"Sides: {_sides}";
+        return true;
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
@@ -131,7 +157,10 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
 
             _sides = sides;
             RefreshParameterDrivenPreview();
-            RefreshStagePrompt();
+            if (_center is null)
+                SetCenterPrompt();
+            else
+                RefreshStagePrompt();
             return true;
         }
 
@@ -174,10 +203,7 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
         _preview = null;
         Context.Preview.Clear();
         RestoreWorkPlaneFrame(_initialPlane);
-        SetStageLocalized(
-            0,
-            "Cad.Prompt.RegularPolygon.Center",
-            "Regular Polygon: specify center [Esc cancel]");
+        SetCenterPrompt();
         return true;
     }
 
@@ -262,6 +288,16 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
                    Context.Workspace,
                    center,
                    out point);
+    }
+
+    private void SetCenterPrompt()
+    {
+        SetStageLocalized(
+            0,
+            "Cad.Prompt.RegularPolygon.SidesCenter",
+            "Regular Polygon: enter sides <{0}> or specify center [Esc cancel]",
+            CadPrecisionInputKind.None,
+            _sides);
     }
 
     private void RefreshStagePrompt()

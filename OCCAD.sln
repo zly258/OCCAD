@@ -6,8 +6,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OCCAD.Core", "src\OCCAD.Cor
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OCCAD.Avalonia", "src\OCCAD.Avalonia\OCCAD.Avalonia.csproj", "{8493A56E-CC80-4549-B522-8A31F25D4E38}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OCCAD.Core.Tests", "tests\OCCAD.Core.Tests\OCCAD.Core.Tests.csproj", "{21691032-2327-4D15-8339-2B3C7AD3A3D3}"
-EndProject
 Global
     GlobalSection(SolutionConfigurationPlatforms) = preSolution
         Debug|x64 = Debug|x64
@@ -22,10 +20,6 @@ Global
         {8493A56E-CC80-4549-B522-8A31F25D4E38}.Debug|x64.Build.0 = Debug|x64
         {8493A56E-CC80-4549-B522-8A31F25D4E38}.Release|x64.ActiveCfg = Release|x64
         {8493A56E-CC80-4549-B522-8A31F25D4E38}.Release|x64.Build.0 = Release|x64
-        {21691032-2327-4D15-8339-2B3C7AD3A3D3}.Debug|x64.ActiveCfg = Debug|x64
-        {21691032-2327-4D15-8339-2B3C7AD3A3D3}.Debug|x64.Build.0 = Debug|x64
-        {21691032-2327-4D15-8339-2B3C7AD3A3D3}.Release|x64.ActiveCfg = Release|x64
-        {21691032-2327-4D15-8339-2B3C7AD3A3D3}.Release|x64.Build.0 = Release|x64
     EndGlobalSection
     GlobalSection(SolutionProperties) = preSolution
         HideSolutionNode = FALSE

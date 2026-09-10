@@ -23,20 +23,16 @@ public sealed partial class MainWindow
         if (!await ConfirmSaveChangesAsync())
             return;
 
-        if (!_workspace.Actions.Execute("file.new"))
-            return;
+        _workspace.ClearModel();
+        _workspace.ClearPointerObservation();
+        _workspace.Layers.Reset();
+        _workspace.History.Clear();
+        _workspace.MarkSaved();
 
         _documentFile = null;
         ResetDocumentUi(fit: false);
         UpdateWindowTitle();
-    }
-
-    private void ClearModel()
-    {
-        if (!_workspace.Actions.Execute("file.clear"))
-            return;
-
-        ResetDocumentUi(fit: false);
+        ShowStatusFeedback(null);
     }
 
     private async Task OpenDocumentAsync()
@@ -69,17 +65,13 @@ public sealed partial class MainWindow
 
         try
         {
-            await using var stream =
-                await file.OpenReadAsync();
-
-            CadDocumentSerializer.Load(
-                _workspace,
-                stream);
+            await using var stream = await file.OpenReadAsync();
+            CadDocumentSerializer.Load(_workspace, stream);
 
             _documentFile = file;
             ResetDocumentUi(fit: true);
             UpdateWindowTitle();
-            _commandLine.ShowFeedback(
+            ShowStatusFeedback(
                 UiFormat(
                     "Cad.Text.Opened",
                     "Opened {0}",
@@ -87,7 +79,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            _commandLine.ShowFeedback(exception.Message);
+            ShowStatusFeedback(exception.Message);
             await CadMessageDialog.ShowAsync(
                 this,
                 UiText(
@@ -98,8 +90,7 @@ public sealed partial class MainWindow
         }
     }
 
-    private async Task<bool> SaveDocumentAsync(
-        bool saveAs)
+    private async Task<bool> SaveDocumentAsync(bool saveAs)
     {
         var file = _documentFile;
 
@@ -132,8 +123,7 @@ public sealed partial class MainWindow
 
         try
         {
-            await using var stream =
-                await file.OpenWriteAsync();
+            await using var stream = await file.OpenWriteAsync();
 
             if (stream.CanSeek)
             {
@@ -141,16 +131,14 @@ public sealed partial class MainWindow
                 stream.SetLength(0);
             }
 
-            CadDocumentSerializer.Save(
-                _workspace,
-                stream);
+            CadDocumentSerializer.Save(_workspace, stream);
             await stream.FlushAsync();
 
             _documentFile = file;
             _workspace.MarkSaved();
             UpdateWindowTitle();
 
-            _commandLine.ShowFeedback(
+            ShowStatusFeedback(
                 UiFormat(
                     "Cad.Text.Saved",
                     "Saved {0}",
@@ -159,7 +147,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            _commandLine.ShowFeedback(exception.Message);
+            ShowStatusFeedback(exception.Message);
             await CadMessageDialog.ShowAsync(
                 this,
                 UiText(
@@ -168,99 +156,6 @@ public sealed partial class MainWindow
                 exception.Message,
                 kind: CadMessageDialogKind.Error);
             return false;
-        }
-    }
-
-    private static readonly FilePickerFileType ExchangeFileType =
-        new("Supported CAD Formats")
-        {
-            Patterns = ["*.step", "*.stp", "*.iges", "*.igs", "*.brep", "*.brp", "*.stl", "*.obj", "*.gltf", "*.glb"]
-        };
-
-    private async Task ImportDocumentAsync()
-    {
-        if (!StorageProvider.CanOpen)
-            return;
-
-        var files = await StorageProvider.OpenFilePickerAsync(
-            new FilePickerOpenOptions
-            {
-                Title = UiText("Cad.Text.Import", "Import"),
-                AllowMultiple = false,
-                FileTypeFilter = [ExchangeFileType, FilePickerFileTypes.All]
-            });
-
-        if (files.Count == 0)
-            return;
-
-        var file = files[0];
-        try
-        {
-            var localPath = file.Path.LocalPath;
-            var imported = await CadExchangeService.ImportAsync(localPath);
-            using (var transaction = _workspace.BeginTransaction($"Import {file.Name}"))
-            {
-                _workspace.AddEntity(imported);
-                transaction.Commit();
-            }
-            _workspace.Selection.Select(imported);
-            _workspace.Actions.Execute("view.fit");
-            _commandLine.ShowFeedback(UiFormat("Cad.Text.Imported", "Imported {0}", file.Name));
-        }
-        catch (Exception ex)
-        {
-            _commandLine.ShowFeedback(ex.Message);
-            await CadMessageDialog.ShowAsync(this, UiText("Cad.Text.Import", "Import"), ex.Message, kind: CadMessageDialogKind.Error);
-        }
-    }
-
-    private async Task ExportDocumentAsync()
-    {
-        if (!StorageProvider.CanSave)
-            return;
-
-        var targets = _workspace.Selection.Selected.Count > 0
-            ? _workspace.Selection.Selected
-            : _workspace.Document.Entities;
-
-        if (targets.Count == 0)
-        {
-            _commandLine.ShowFeedback("No entities to export.");
-            return;
-        }
-
-        var file = await StorageProvider.SaveFilePickerAsync(
-            new FilePickerSaveOptions
-            {
-                Title = UiText("Cad.Text.Export", "Export"),
-                DefaultExtension = "step",
-                SuggestedFileName = "Model.step",
-                FileTypeChoices =
-                [
-                    new FilePickerFileType("STEP (*.step;*.stp)") { Patterns = ["*.step", "*.stp"] },
-                    new FilePickerFileType("IGES (*.iges;*.igs)") { Patterns = ["*.iges", "*.igs"] },
-                    new FilePickerFileType("BREP (*.brep)") { Patterns = ["*.brep"] },
-                    new FilePickerFileType("STL (*.stl)") { Patterns = ["*.stl"] },
-                    new FilePickerFileType("OBJ (*.obj)") { Patterns = ["*.obj"] },
-                    new FilePickerFileType("glTF (*.gltf)") { Patterns = ["*.gltf"] },
-                    FilePickerFileTypes.All
-                ]
-            });
-
-        if (file is null)
-            return;
-
-        try
-        {
-            var localPath = file.Path.LocalPath;
-            var entity = _workspace.Selection.Primary ?? targets.First();
-            await CadExchangeService.ExportAsync(_workspace, entity, localPath);
-            _commandLine.ShowFeedback(UiFormat("Cad.Text.Exported", "Exported {0}", file.Name));
-        }
-        catch (Exception ex)
-        {
-            _commandLine.ShowFeedback(ex.Message);
-            await CadMessageDialog.ShowAsync(this, UiText("Cad.Text.Export", "Export"), ex.Message, kind: CadMessageDialogKind.Error);
         }
     }
 
@@ -303,15 +198,13 @@ public sealed partial class MainWindow
 
         return result switch
         {
-            CadDialogResult.Yes =>
-                await SaveDocumentAsync(saveAs: false),
+            CadDialogResult.Yes => await SaveDocumentAsync(saveAs: false),
             CadDialogResult.No => true,
             _ => false
         };
     }
 
-    protected override void OnClosing(
-        WindowClosingEventArgs e)
+    protected override void OnClosing(WindowClosingEventArgs e)
     {
         if (_closingConfirmed)
         {
@@ -328,8 +221,6 @@ public sealed partial class MainWindow
 
     protected override void OnClosed(EventArgs e)
     {
-        // Covers non-standard shutdown paths as well. Save is idempotent and
-        // intentionally happens before the workspace is disposed.
         if (!_disposed)
             SaveInteractionPreferences();
         DisposeWorkspace();
@@ -352,8 +243,7 @@ public sealed partial class MainWindow
             UiText(
                 "Cad.Text.Drawing",
                 "Drawing");
-        var modified =
-            _workspace.IsModified ? " *" : string.Empty;
+        var modified = _workspace.IsModified ? " *" : string.Empty;
         Title = $"OCCAD - {name}{modified}";
     }
 }

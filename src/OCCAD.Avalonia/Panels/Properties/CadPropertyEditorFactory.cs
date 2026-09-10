@@ -8,7 +8,19 @@ namespace OCCAD.Avalonia;
 /// </summary>
 internal static class CadPropertyEditorFactory
 {
-    public static CadPropertyEditorKind Resolve(CadPropertyDescriptor descriptor, bool entityContext) => descriptor.Editor;
+    public static CadPropertyEditorKind Resolve(CadPropertyDescriptor descriptor, bool entityContext)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        _ = entityContext;
+
+        // TextBox is the common industrial PropertyGrid value editor. Numeric
+        // descriptors still use Core numeric conversion/validation, but use the
+        // same left-aligned editing surface as string/point/vector values.
+        return descriptor.Editor == CadPropertyEditorKind.Numeric
+            ? CadPropertyEditorKind.Text
+            : descriptor.Editor;
+    }
+
     public static string? ByLayerProperty(CadPropertyDescriptor descriptor) => descriptor.ByLayerProperty;
 
     public static bool CanEditAsText(
@@ -49,5 +61,4 @@ internal static class CadPropertyEditorFactory
             text,
             out value);
     }
-
 }

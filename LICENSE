@@ -1,37 +1,80 @@
-OcctCSharpBridge License Notice
+OCCAD Non-Commercial License 1.0
 
-Copyright (C) 2026 zly258
+Copyright (c) 2026 zly258. All rights reserved.
 
-OcctCSharpBridge is licensed under the GNU Lesser General Public License
-version 2.1 (LGPL-2.1), with the additional OcctCSharpBridge Exception 1.0.
+1. Grant of permission
 
-The complete GNU LGPL version 2.1 text is provided in:
+Subject to the terms of this license, the copyright holder grants you a
+worldwide, royalty-free, non-exclusive, non-transferable license to use, copy,
+modify, compile, and run OCCAD for Non-Commercial Use.
 
-  LICENSE_LGPL_21.txt
+You may redistribute OCCAD, in source or binary form, only for Non-Commercial
+Use and only if you:
 
-The additional permission that applies specifically to OcctCSharpBridge is
-provided in:
+(a) preserve this license and all copyright notices;
+(b) clearly identify material modifications you made; and
+(c) do not represent your modified version as an official release of the
+    copyright holder.
 
-  OcctCSharpBridge_LGPL_EXCEPTION.txt
+2. Non-Commercial Use
 
-The two files above form the license terms for OcctCSharpBridge and should be
-read together.
+"Non-Commercial Use" means use whose primary purpose is not commercial
+advantage, monetary compensation, revenue generation, or support of a
+for-profit business activity. Examples include personal learning, personal
+projects, non-profit education, non-profit research, evaluation, and
+non-commercial open technical study.
 
-The OcctCSharpBridge Exception permits applications to use OcctCSharpBridge
-through .NET assembly references, dynamic linking, P/Invoke, or equivalent
-runtime linking without requiring the application itself to be licensed under
-the GNU LGPL solely because of that use. Such applications may be distributed
-under terms of their choice, including proprietary terms, provided the GNU
-LGPL obligations for OcctCSharpBridge itself are satisfied.
+The following are Commercial Use and are NOT licensed by this license without
+separate written authorization from the copyright holder:
 
-Commercial use is permitted under these terms. No separate commercial
-authorization is required merely to use OcctCSharpBridge in a commercial
-application in compliance with this license.
+(a) use in or for a paid product, paid service, subscription, hosted service,
+    consulting engagement, engineering deliverable, or other revenue-generating
+    activity;
+(b) redistribution for a fee or as part of a commercial product or service;
+(c) use by a for-profit organization as part of its internal business,
+    production, design, engineering, or operational workflow; or
+(d) use intended to obtain a direct commercial advantage.
 
-Open CASCADE Technology (OCCT) and other third-party components are not
-relicensed by this notice. They remain subject to their own licenses. OCCT is
-distributed under its own GNU LGPL version 2.1 terms with the Open CASCADE
-exception.
+3. Commercial licensing
 
-This software is provided without warranty to the extent permitted by the GNU
-LGPL version 2.1.
+Commercial Use requires a separate written commercial license from the
+copyright holder. Nothing in this license grants commercial rights by default.
+
+4. Attribution and notices
+
+You must retain the OCCAD copyright notice, this license, and applicable
+third-party notices in source distributions. Binary distributions must include
+this license and the applicable third-party notices in accompanying materials
+or an accessible notice location.
+
+5. Third-party software
+
+This license applies only to original OCCAD code owned by the copyright holder.
+It does not relicense Open CASCADE Technology (OCCT), OcctCSharpBridge,
+Avalonia, .NET, or any other third-party component. Those components remain
+subject to their respective licenses. See THIRD_PARTY_NOTICES.md.
+
+6. No trademark license
+
+No trademark, product-name, logo, or branding rights are granted except as
+strictly necessary to provide required attribution.
+
+7. No warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. IN NO EVENT
+SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
+
+8. Termination
+
+Your rights under this license terminate automatically if you materially breach
+its terms. Rights may be restored only by curing the breach and obtaining any
+required authorization from the copyright holder.
+
+9. Entire permission
+
+This license states the complete permission granted for OCCAD under the
+non-commercial terms. Any right not expressly granted is reserved.

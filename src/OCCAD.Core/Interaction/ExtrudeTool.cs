@@ -32,9 +32,6 @@ public sealed class ExtrudeTool :
             ? _center
             : base.PrecisionReferencePoint;
 
-    // Extrude supports parameter-only precision input. Once a valid profile is
-    // selected, Height/Reverse define a complete preview and Accept/Enter can
-    // commit without requiring another pointer event.
     public override bool CanCommitCurrentStage =>
         State == CadToolState.WaitForSelect
             ? base.CanCommitCurrentStage
@@ -243,8 +240,24 @@ public sealed class ExtrudeTool :
         if (!TryCreate(out var entity))
             return false;
 
-        Context.Workspace.AddGeneratedEntities([entity], "Extrude");
-        Context.Workspace.Tools.CompleteCurrent();
+        var engine = Context.Engine;
+        Context.Preview.Clear();
+        try
+        {
+            CadTransaction.ApplyCreatedEntity(
+                Context.Workspace,
+                entity,
+                "Extrude",
+                Context.Workspace.Tools.CompleteCurrent);
+        }
+        catch
+        {
+            if (IsActive)
+                RefreshPreview();
+            throw;
+        }
+
+        engine.Redraw();
         return true;
     }
 
@@ -266,7 +279,10 @@ public sealed class ExtrudeTool :
             return false;
 
         var vector = _normal * (_height * (_reverse ? -1.0 : 1.0));
-        entity = new CadExtrudeEntity(Entities[0], vector);
+        entity = new CadExtrudeEntity(Entities[0], vector)
+        {
+            Layer = Context.Workspace.Layers.Current.Name
+        };
         entity.BindProfileSource(Entities[0]);
         return true;
     }

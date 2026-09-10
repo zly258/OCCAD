@@ -131,13 +131,14 @@ public sealed class CadToolManager
                 return SubmitCurrent(pointer: input);
             return tool.HandlePointer(input);
         }
-        catch (Exception exception) when (IsRecoverablePointerFailure(exception))
+        catch (Exception exception) when (
+            input.Kind == OcctPointerInputKind.Moved &&
+            IsRecoverablePointerFailure(exception))
         {
-            // Invalid or temporarily unsolvable pointer geometry must not tear
-            // down the active CAD command. Transient cleanup is best-effort as
-            // well: one native feedback channel failing to clear must not stop
-            // the other channels from being reset or convert a recoverable input
-            // sample into a false command failure.
+            // Only pointer-move geometry is provisional preview state. A click,
+            // double-click or other explicit confirmation is a commit boundary;
+            // failures there must propagate to the caller instead of being
+            // misreported as a harmless preview miss.
             ClearPointerFeedbackAfterRecoverableFailure(exception);
             return true;
         }
@@ -226,11 +227,6 @@ public sealed class CadToolManager
         if (tool is null)
             return false;
 
-        // During command-first selection, right-click has the same meaning as
-        // Enter when a valid selection exists. With no valid selection it
-        // cancels the command. Once geometry input has started, continuous
-        // tools may finish; all other tools cancel rather than implicitly
-        // committing another pointer sample.
         if (tool.State == CadToolState.WaitForSelect)
             return tool.CanCommitCurrentStage
                 ? CommitCurrentStage()
@@ -329,8 +325,6 @@ public sealed class CadToolManager
         _transitioning = false;
         Cleanup(RestoreSelectionGrips);
 
-        // Tool state is already authoritative and neutral here. UI observers are
-        // notifications only and cannot veto or reverse a completed transition.
         PublishToolChanged(null);
 
         if (failures.Count == 1)
@@ -477,5 +471,8 @@ public sealed class CadToolManager
         not AccessViolationException;
 
     private static bool IsRecoverablePointerFailure(Exception exception) =>
-        exception is ArgumentException or InvalidOperationException or ArithmeticException;
+        exception is ArgumentException or
+        InvalidOperationException or
+        ArithmeticException or
+        OcctException;
 }

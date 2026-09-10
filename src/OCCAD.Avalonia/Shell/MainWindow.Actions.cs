@@ -14,7 +14,7 @@ public sealed partial class MainWindow
 
         if (!action.CanExecute())
         {
-            _commandLine.ShowFeedback(
+            ShowStatusFeedback(
                 UiFormat(
                     "Cad.Text.ActionUnavailable",
                     "{0} is not available in the current state.",
@@ -30,13 +30,33 @@ public sealed partial class MainWindow
     }
 
     private void RefreshActionUi() =>
-        RefreshRibbonActionUi();
+        RefreshClassicShellActions();
 
     private void RefreshPanelMenuState() =>
-        RefreshRibbonPanelState();
+        RefreshClassicPanelState();
 
     private void MainWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        // Escape is an application-level CAD cancel command. It must work even
+        // when focus is inside a Tool parameter TextBox rather than the viewport.
+        if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None)
+        {
+            if (_workspace.Tools.ActiveTool is not null)
+                _workspace.Tools.CancelCurrent();
+
+            _workspace.Selection.Clear();
+            _workspace.Subobjects.Clear();
+            _workspace.Preselection.Clear();
+            _workspace.Snap.Clear();
+            _workspace.Tracking.Clear();
+            ShowStatusFeedback(null);
+            RefreshActionUi();
+            RefreshOperationStatus();
+            _viewport.Focus();
+            e.Handled = true;
+            return;
+        }
+
         var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
         if (focused is TextBox)
             return;
@@ -75,7 +95,6 @@ public sealed partial class MainWindow
             }
         }
 
-        // F3/F8/F10 belong exclusively to CadViewportInteractionController.
         if (e.Key is Key.Enter or Key.Space &&
             _workspace.Tools.ActiveTool is null &&
             _workspace.Actions.ExecuteLast())
@@ -84,8 +103,6 @@ public sealed partial class MainWindow
             return;
         }
 
-        // Active-tool Enter/Space/Escape/Backspace belong exclusively to the
-        // viewport/tool route and are dispatched once by CadToolManager.
         if (_workspace.Tools.ActiveTool is not null)
             return;
 

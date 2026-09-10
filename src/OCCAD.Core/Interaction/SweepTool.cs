@@ -40,6 +40,12 @@ public sealed class SweepTool : CadTool, ICadPointInputTool
             return true;
         }
 
+        if (input.Kind == OcctPointerInputKind.Moved)
+        {
+            RefreshHoverPreview();
+            return _profile is not null;
+        }
+
         if (input.Kind != OcctPointerInputKind.Pressed ||
             input.Button != OcctPointerButton.Left)
             return false;
@@ -53,11 +59,15 @@ public sealed class SweepTool : CadTool, ICadPointInputTool
                 return false;
 
             _profile = entity;
+            _path = null;
             SetSelectionFilter(
                 new CadEntityFilter(
                     "sweep.path",
-                    CadSweepEntity.IsPath));
+                    candidate =>
+                        !ReferenceEquals(candidate, _profile) &&
+                        CadSweepEntity.IsPath(candidate)));
             Context.Workspace.Preselection.Clear();
+            Context.Preview.Clear();
             SetStageLocalized(
                 1,
                 "Cad.Prompt.sweep.Path",
@@ -65,74 +75,103 @@ public sealed class SweepTool : CadTool, ICadPointInputTool
             return true;
         }
 
-        if (_path is null)
-        {
-            if (!CadSweepEntity.IsPath(entity))
-                return false;
+        if (!IsValidPath(entity))
+            return false;
 
-            _path = entity;
-            return CommitSweep();
-        }
-
-        return false;
+        _path = entity;
+        return CommitSweep();
     }
 
     public bool TryAcceptPoint(OcctPoint3d point) => false;
-
-    private bool CommitSweep()
-    {
-        if (_profile is null || _path is null)
-            return false;
-
-        try
-        {
-            var sweep = new CadSweepEntity(_profile, _path);
-            sweep.BindSources(_profile, _path);
-            Context.Preview.Clear();
-            Context.Workspace.AddGeneratedEntities([sweep], "Sweep");
-            Context.Workspace.Tools.CompleteCurrent();
-            return true;
-        }
-        catch
-        {
-            Context.Preview.Clear();
-            return false;
-        }
-    }
 
     protected override bool CanStepBackCore => _profile is not null;
 
     protected override bool OnStepBack()
     {
-        if (_profile is not null)
-        {
-            _profile = null;
-            _path = null;
-            Context.Preview.Clear();
-            SetSelectionFilter(
-                new CadEntityFilter(
-                    "sweep.profile",
-                    CadPlanarProfileGeometry.IsSupported));
-            Context.Workspace.Preselection.Clear();
-            SetStageLocalized(
-                0,
-                "Cad.Prompt.sweep.Profile",
-                "Sweep: select planar profile [Esc cancel]");
-            return true;
-        }
+        if (_profile is null)
+            return false;
 
-        return false;
-    }
-
-    protected override void OnCanceled()
-    {
-        Context.Preview.Clear();
         _profile = null;
         _path = null;
+        Context.Preview.Clear();
+        SetSelectionFilter(
+            new CadEntityFilter(
+                "sweep.profile",
+                CadPlanarProfileGeometry.IsSupported));
         Context.Workspace.Preselection.Clear();
+        SetStageLocalized(
+            0,
+            "Cad.Prompt.sweep.Profile",
+            "Sweep: select planar profile [Esc cancel]");
+        return true;
     }
 
-    protected override void OnDeactivated()
+    protected override void OnCanceled() => ResetSweepState();
+
+    protected override void OnDeactivated() => ResetSweepState();
+
+    private void RefreshHoverPreview()
+    {
+        if (_profile is null ||
+            Context.Workspace.Preselection.Current is not { Entity: var candidate } ||
+            !IsValidPath(candidate))
+        {
+            Context.Preview.Clear();
+            return;
+        }
+
+        var sweep = CreateSweep(candidate);
+        Context.Preview.Show(sweep);
+    }
+
+    private bool CommitSweep()
+    {
+        if (_profile is null || _path is null || !IsValidPath(_path))
+            return false;
+
+        var sweep = CreateSweep(_path);
+        var engine = Context.Engine;
+        Context.Preview.Clear();
+        try
+        {
+            CadTransaction.ApplyCreatedEntity(
+                Context.Workspace,
+                sweep,
+                "Sweep",
+                Context.Workspace.Tools.CompleteCurrent);
+        }
+        catch
+        {
+            if (IsActive)
+                RefreshHoverPreview();
+            throw;
+        }
+
+        engine.Redraw();
+        return true;
+    }
+
+    private CadSweepEntity CreateSweep(CadEntity path)
+    {
+        if (_profile is null)
+            throw new InvalidOperationException("Sweep profile is not selected.");
+        if (!IsValidPath(path))
+            throw new InvalidOperationException("Sweep path is not valid.");
+
+        var sweep = new CadSweepEntity(_profile, path)
+        {
+            Layer = Context.Workspace.Layers.Current.Name
+        };
+        sweep.BindSources(_profile, path);
+        return sweep;
+    }
+
+    private bool IsValidPath(CadEntity entity) =>
+        _profile is not null &&
+        !ReferenceEquals(entity, _profile) &&
+        CadSweepEntity.IsPath(entity);
+
+    private void ResetSweepState()
     {
         Context.Preview.Clear();
         _profile = null;

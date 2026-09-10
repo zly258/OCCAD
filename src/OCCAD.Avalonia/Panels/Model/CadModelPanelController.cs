@@ -2,41 +2,12 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
-using AvaloniaPath = Avalonia.Controls.Shapes.Path;
 using OCCAD;
 
 namespace OCCAD.Avalonia;
 
 internal sealed class CadModelPanelController
 {
-    private static readonly HashSet<string> VisibleEntityTypes =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            "Point",
-            "Line",
-            "Polyline",
-            "Rectangle",
-            "Polygon",
-            "Regular Polygon",
-            "Circle",
-            "Arc",
-            "Ellipse",
-            "Spline",
-            "Text",
-            "Length Dimension",
-            "Angle Dimension",
-            "Circular Dimension",
-            "Box",
-            "Cylinder",
-            "Cone",
-            "Frustum",
-            "Sphere",
-            "Ellipsoid",
-            "Torus",
-            "Helix",
-            "Extrude"
-        };
-
     private readonly CadWorkspace _workspace;
     private readonly TextBox _search;
     private readonly TreeView _tree;
@@ -69,8 +40,12 @@ internal sealed class CadModelPanelController
             var filter = _search.Text?.Trim() ?? string.Empty;
             var selected = _workspace.Selection.Primary;
 
+            // The model browser follows the authoritative entity registry rather
+            // than maintaining a second feature whitelist. This keeps newly
+            // registered OCCAD entities visible automatically while excluding
+            // internal Path support entities used only by feature persistence.
             var entities = _workspace.Document.Entities
-                .Where(static entity => VisibleEntityTypes.Contains(entity.EntityType))
+                .Where(IsVisibleInModelTree)
                 .Where(entity => MatchesFilter(entity, filter))
                 .ToArray();
 
@@ -200,6 +175,26 @@ internal sealed class CadModelPanelController
         }
     }
 
+    private bool IsVisibleInModelTree(CadEntity entity)
+    {
+        if (entity.EntityType.Equals("Path", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        try
+        {
+            _workspace.Entities.GetRequired(entity);
+            return true;
+        }
+        catch (KeyNotFoundException)
+        {
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
     private TreeViewItem CreateTypeGroup(
         IGrouping<string, CadEntity> group,
         CadEntity? selected)
@@ -236,36 +231,43 @@ internal sealed class CadModelPanelController
         var container = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 6,
+            Spacing = 5,
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        var icon = CreateEntityIcon(entity.EntityType);
-        container.Children.Add(icon);
-
-        var textBlock = new TextBlock
+        var nameText = new TextBlock
         {
-            Text = $"{entity.Name}  [{entity.Layer}]",
+            Text = entity.Name,
             VerticalAlignment = VerticalAlignment.Center,
-            FontSize = CadTheme.FontSize
+            FontSize = CadTheme.FontSize,
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
-        container.Children.Add(textBlock);
+        container.Children.Add(nameText);
+
+        var layerText = new TextBlock
+        {
+            Text = $"[{entity.Layer}]",
+            Foreground = CadTheme.Muted,
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = CadTheme.SmallFontSize,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        container.Children.Add(layerText);
 
         var editBox = new TextBox
         {
             Text = entity.Name,
             IsVisible = false,
             VerticalAlignment = VerticalAlignment.Center,
-            FontSize = CadTheme.FontSize,
             Height = CadTheme.ControlHeight,
             MinWidth = 90
         };
-        editBox.Classes.Add("cad-input");
         container.Children.Add(editBox);
 
         void StartRename()
         {
-            textBlock.IsVisible = false;
+            nameText.IsVisible = false;
+            layerText.IsVisible = false;
             editBox.Text = entity.Name;
             editBox.IsVisible = true;
             editBox.Focus();
@@ -274,10 +276,13 @@ internal sealed class CadModelPanelController
 
         void CommitRename()
         {
-            if (!editBox.IsVisible) return;
+            if (!editBox.IsVisible)
+                return;
+
             var newName = editBox.Text?.Trim();
             editBox.IsVisible = false;
-            textBlock.IsVisible = true;
+            nameText.IsVisible = true;
+            layerText.IsVisible = true;
             if (!string.IsNullOrWhiteSpace(newName) && newName != entity.Name)
             {
                 if (CadPropertyTransaction.TryApply(
@@ -287,7 +292,7 @@ internal sealed class CadModelPanelController
                         newName,
                         out var error))
                 {
-                    textBlock.Text = $"{entity.Name}  [{entity.Layer}]";
+                    nameText.Text = entity.Name;
                     Refresh();
                 }
                 else if (error is not null)
@@ -300,7 +305,8 @@ internal sealed class CadModelPanelController
         void CancelRename()
         {
             editBox.IsVisible = false;
-            textBlock.IsVisible = true;
+            nameText.IsVisible = true;
+            layerText.IsVisible = true;
         }
 
         editBox.KeyDown += (_, e) =>
@@ -323,43 +329,6 @@ internal sealed class CadModelPanelController
         return item;
     }
 
-    private static Control CreateEntityIcon(string entityType)
-    {
-        var pathData = entityType switch
-        {
-            "Point" => "M 3,7 L 11,7 M 7,3 L 7,11",
-            "Line" => "M 2,12 L 12,2",
-            "Polyline" => "M 2,11 L 5,4 L 9,9 L 12,3",
-            "Rectangle" => "M 2,4 H 12 V 10 H 2 Z",
-            "Polygon" or "Regular Polygon" => "M 7,2 L 12,5 L 12,10 L 7,13 L 2,10 L 2,5 Z",
-            "Circle" => "M 7,2 A 5,5 0 1 0 7,12 A 5,5 0 1 0 7,2",
-            "Arc" => "M 3,11 A 6,6 0 0 1 11,3",
-            "Ellipse" => "M 7,3.5 A 5,3 0 1 0 7,10.5 A 5,3 0 1 0 7,3.5",
-            "Spline" => "M 2,10 C 4,3 8,11 12,4",
-            "Box" => "M 7,2 L 12,5 L 7,8 L 2,5 Z M 2,5 V 10 L 7,13 V 8 M 12,5 V 10 L 7,13",
-            "Cylinder" => "M 2,5 A 5,2 0 1 0 12,5 A 5,2 0 1 0 2,5 M 2,5 V 10 A 5,2 0 0 0 12,10 V 5",
-            "Cone" or "Frustum" => "M 7,2 L 2,10 A 5,2 0 0 0 12,10 Z",
-            "Sphere" or "Ellipsoid" => "M 7,2 A 5,5 0 1 0 7,12 A 5,5 0 1 0 7,2 M 2,7 A 5,2 0 1 0 12,7 A 5,2 0 1 0 2,7",
-            "Torus" or "Helix" => "M 7,3 A 4,3 0 1 0 7,11 A 4,3 0 1 0 7,3 M 7,5 A 2,1.5 0 1 0 7,9 A 2,1.5 0 1 0 7,5",
-            "Extrude" or "Revolve" or "Loft" or "Sweep" => "M 3,11 L 7,3 L 11,11 Z",
-            "Text" => "M 3,4 H 11 M 7,4 V 12",
-            "Length Dimension" or "Angle Dimension" or "Circular Dimension" => "M 2,7 H 12 M 4,5 L 2,7 L 4,9 M 10,5 L 12,7 L 10,9",
-            _ => "M 3,3 H 11 V 11 H 3 Z"
-        };
-
-        return new AvaloniaPath
-        {
-            Data = Geometry.Parse(pathData),
-            Stroke = CadTheme.Muted,
-            StrokeThickness = 1.1,
-            Fill = null,
-            Width = 14,
-            Height = 14,
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Center
-        };
-    }
-
     private ContextMenu BuildEntityContextMenu(CadEntity entity, Action startRename)
     {
         var properties = new MenuItem
@@ -374,7 +343,8 @@ internal sealed class CadModelPanelController
                 entity.Visible ? "Cad.Text.Hide" : "Cad.Text.Show",
                 entity.Visible ? "Hide" : "Show")
         };
-        visibility.Click += (_, _) => ApplyEntityFlag(entity, nameof(CadEntity.Visible), !entity.Visible);
+        visibility.Click += (_, _) =>
+            ApplyEntityFlag(entity, nameof(CadEntity.Visible), !entity.Visible);
 
         var locking = new MenuItem
         {
@@ -382,7 +352,8 @@ internal sealed class CadModelPanelController
                 entity.Selectable ? "Cad.Text.Lock" : "Cad.Text.Unlock",
                 entity.Selectable ? "Lock" : "Unlock")
         };
-        locking.Click += (_, _) => ApplyEntityFlag(entity, nameof(CadEntity.Selectable), !entity.Selectable);
+        locking.Click += (_, _) =>
+            ApplyEntityFlag(entity, nameof(CadEntity.Selectable), !entity.Selectable);
 
         var rename = new MenuItem
         {
@@ -390,18 +361,9 @@ internal sealed class CadModelPanelController
         };
         rename.Click += (_, _) => startRename();
 
-        var delete = new MenuItem
-        {
-            Header = CadLanguageManager.Text("Cad.Text.Delete", "Delete"),
-            IsEnabled = _workspace.Document.IsEntitySelectable(entity)
-        };
-        delete.Click += (_, _) =>
-        {
-            if (!SelectForAction(entity))
-                return;
-            _workspace.Actions.Execute("edit.delete");
-        };
-
+        // Editing actions such as delete/transform are intentionally absent from
+        // the initial release surface. The model tree remains a selection,
+        // visibility, metadata and inspection surface only.
         return new ContextMenu
         {
             ItemsSource = new object[]
@@ -409,26 +371,9 @@ internal sealed class CadModelPanelController
                 properties,
                 visibility,
                 locking,
-                rename,
-                new Separator(),
-                delete
+                rename
             }
         };
-    }
-
-    private bool SelectForAction(CadEntity entity)
-    {
-        if (!_workspace.Document.IsEntitySelectable(entity))
-        {
-            _publishStatus(
-                CadLanguageManager.Text(
-                    "Cad.Text.EntityNotSelectable",
-                    "The entity is not selectable."));
-            return false;
-        }
-
-        _workspace.Selection.Select(entity);
-        return true;
     }
 
     private void ApplyEntityFlag(CadEntity entity, string propertyName, bool value)
@@ -489,10 +434,6 @@ internal sealed class CadModelPanelController
         entityType.ToUpperInvariant() switch
         {
             "POINT" => new("Cad.Text.ModelPoints", "Points", 10),
-            "TEXT" or
-            "LENGTH DIMENSION" or
-            "ANGLE DIMENSION" or
-            "CIRCULAR DIMENSION" => new("Cad.Text.ModelAnnotations", "Annotations", 40),
             "BOX" or
             "CYLINDER" or
             "CONE" or
@@ -500,7 +441,10 @@ internal sealed class CadModelPanelController
             "SPHERE" or
             "ELLIPSOID" or
             "TORUS" or
-            "EXTRUDE" => new("Cad.Text.ModelSolids", "Solids", 30),
+            "EXTRUDE" or
+            "REVOLVE" or
+            "SWEEP" or
+            "LOFT" => new("Cad.Text.ModelSolids", "Solids", 30),
             _ => new("Cad.Text.ModelCurves", "Curves", 20)
         };
 
@@ -518,10 +462,6 @@ internal sealed class CadModelPanelController
             "ELLIPSE" => 90,
             "SPLINE" => 100,
             "HELIX" => 110,
-            "TEXT" => 150,
-            "LENGTH DIMENSION" => 160,
-            "ANGLE DIMENSION" => 170,
-            "CIRCULAR DIMENSION" => 180,
             "BOX" => 210,
             "CYLINDER" => 220,
             "CONE" => 230,
@@ -530,6 +470,9 @@ internal sealed class CadModelPanelController
             "ELLIPSOID" => 260,
             "TORUS" => 270,
             "EXTRUDE" => 310,
+            "REVOLVE" => 320,
+            "SWEEP" => 330,
+            "LOFT" => 340,
             _ => int.MaxValue
         };
 

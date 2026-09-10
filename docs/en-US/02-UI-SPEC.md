@@ -1,81 +1,229 @@
 # 02 UI Specification
 
-## Visual direction
+## 1. Single UI baseline
 
-OCCAD uses a compact industrial CAD shell:
+The OCCAD initial release has one shell only: **classic CAD Menu + single-row Toolbar + active Tool parameter strip**.
 
-```text
-Ribbon
-┌──────────────┬──────────────────────────────┬─────────────────────┐
-│ Model        │          Viewport            │ Layer               │
-│              │   Floating Tool Panel        │ splitter            │
-│              │                              │ Property            │
-└──────────────┴──────────────────────────────┴─────────────────────┘
-Command Line
-Selection | Work Plane | SNAP ORTHO POLAR | XYZ
-```
+Do not restore or run in parallel:
 
-The viewport remains dominant. The application no longer constructs the legacy Menu, legacy Toolbar, or post-startup UI refinement shells.
+- Ribbon;
+- grouped three-row command surface;
+- a second Toolbar;
+- Floating Tool Panel;
+- permanent Dynamic HUD;
+- permanent bottom Command Input;
+- placeholder commands added only for visual completeness.
 
-## Theme contract
+The UI exposes only functionality that is registered and reaches a real Core path.
 
-`CadTheme` is the single visual-metric source. Major controls do not invent local typography, control height, radius, or panel width.
-
-Baseline: 11 px main UI font, 10/10.5 px secondary text, 22 px compact controls, ~23–24 px headers, restrained light-gray surfaces, dark viewport, blue accent only for active/current state, low/no corner radius, thin separators, and a Segoe UI / Microsoft YaHei UI / CJK fallback font stack.
-
-The Ribbon uses native Avalonia controls only. Groups use a compact three-row layout. When horizontal space is insufficient the Ribbon scrolls instead of forcing the main window wider at 125% or 150% DPI.
-
-## Ribbon / Actions / Tool Panel
-
-Ribbon controls invoke registered Action IDs and never duplicate business logic. Real command families use one drop-down layer, such as Circle, Arc, Regular Polygon, Ellipse, and 3D Primitives.
-
-`CadActionManager`, `CadToolManager`, and `CadCommandManager.ForWorkspace()` are the single state sources for Actions, Tools, and the command session. Ribbon, Command Line, and Floating Tool Panel are different input surfaces for the same Core state machine.
-
-Stable Tool parameters such as Radius, Width, Height, Angle, and Factor belong in the Floating Tool Panel. The panel does not duplicate the full prompt. Parameter edits, precision input, Back, Accept, Finish, and Cancel directly operate on the active Tool and do not maintain a second parameter model.
-
-## Model / Layer / Property
-
-Model is on the left. Layer and Property are independent resizable panels stacked on the right.
-
-Layer columns are:
+## 2. Main window
 
 ```text
-Current | Name | V | C | Style | Width | L
+MainWindow
+├─ Menu
+│  ├─ File
+│  ├─ Draw
+│  ├─ Model
+│  ├─ View
+│  ├─ Window
+│  └─ Language
+├─ Single-row Toolbar
+├─ Active Tool Parameter Strip   ← visible only when the active Tool has parameters
+├─ Workspace
+│  ├─ Model Tree
+│  ├─ CAD Viewport
+│  └─ Layers / Properties
+└─ Status Strip
+   ├─ Current Operation Prompt
+   └─ XY / YZ / XZ / SNAP / ORTHO / POLAR
 ```
 
-The current layer uses an explicit `●/○` state. Only the Current column changes the current layer; clicking the name only inspects it. The default layer cannot be renamed or removed. Layer UI calls `CadWorkspace`; transactions, rollback, and history remain in Core.
+## 3. Theme rules
 
-Property uses Core descriptors/editor semantics and supports categories, common-property multi-selection, mixed values, Layer, ByLayer, Color, Enum, Numeric, and Point/Vector X/Y/Z editing. Changes are committed through `CadPropertyTransaction`.
+The application uses Avalonia 12 native `FluentTheme`. `DensityStyle.Compact` is not enabled and OCCAD does not register global skins for Button/TextBox/ComboBox/TreeView.
 
-Appearance rows remain compact:
+`CadTheme` may contain only:
+
+- layout metrics for panels/property/status surfaces;
+- CAD-scene visuals for Viewport, Overlay, Snap, Grip, etc.;
+- colors/separators required by CAD table-style surfaces.
+
+Standard controls should use native Fluent states.
+
+The custom ColorTable remains because it is a CAD business control rather than decorative application theming.
+
+## 4. Menu
+
+Top-level categories are fixed to File, Draw, Model, View, Window, and Language.
+
+Command families with multiple construction methods use submenus and reuse one Tool implementation.
+
+Example:
 
 ```text
-Color      [ByLayer] [value]
-LineStyle  [ByLayer] [value]
-LineWidth  [ByLayer] [value]
-Transparency
-Visible
+Draw
+├─ Point
+├─ Line
+├─ Polyline
+├─ Free Polygon
+├─ Regular Polygon
+│  ├─ Inscribed
+│  └─ Circumscribed
+├─ Rectangle
+├─ Circle
+├─ Arc
+├─ Ellipse
+└─ Spline
 ```
 
-ByLayer booleans remain Core state but are not separate rows.
+## 5. Toolbar
 
-## Prompt and status ownership
+The Toolbar is one row of frequent commands; it is not a surface for flattening every command.
 
-- Command Line: the only full Tool prompt, typed command input, history/completion, results, and errors.
-- Floating Tool Panel: current step, exact coordinates, Length/Angle/Factor, Tool parameters, Back/Accept/Finish/Cancel.
-- Dynamic HUD: pointer-adjacent Length/Angle, SNAP, and ORTHO/POLAR tracking feedback.
-- StatusBar: Selection, Work Plane, SNAP/ORTHO/POLAR, and XYZ coordinates.
+Requirements:
 
-Do not copy next-step Tool prompts, History, or Precision text back into the StatusBar.
+- single row;
+- horizontal scrolling is allowed when width is insufficient;
+- no functional icons;
+- short text labels;
+- native Button controls;
+- no custom forced background/border scheme;
+- current Layer ComboBox may appear near the end;
+- language switching may use Menu or ComboBox but must not maintain separate language state.
 
-## Viewport / cursor / DPI
+## 6. Active Tool parameter strip
 
-`OcctAvaloniaViewport` is the only OCCT host. Drawing uses the hollow cross cursor. Snap aperture and Dynamic HUD remain screen-size stable. ViewCube is hidden and the lower-left triedron remains.
+This is a required engineering-input surface.
 
-Do not issue duplicate explicit redraws after Bridge operations that already request redraw. Render scaling, overlays, and native viewport input coordinates must remain aligned at common Windows scale values such as 125% and 150%.
+When `CadTool.ParameterPanel` contains parameters, a strip is shown below the Toolbar. When there are no parameters, the strip is hidden completely.
 
-## Application preferences
+Descriptor mapping:
 
-Long-lived viewport/interaction preferences are application state, not Document state. `Manage → Preferences...` edits and persists scene background, grip/snap marker sizes, grip/snap/selection pixel tolerances, mouse-wheel zoom sensitivity, and viewer display deviation/angle.
+```text
+Integer        → TextBox
+Double         → TextBox
+OptionalDouble → TextBox
+Boolean        → CheckBox
+Choice         → ComboBox
+String         → TextBox
+```
 
-Changing a preference applies immediately to the current viewport. Viewer display precision is presentation tessellation quality only and must never be presented as changing CAD model mathematical precision.
+Editors call `tool.TrySetParameter()`; UI code must not mutate Tool internals directly.
+
+### Regular Polygon
+
+```text
+Regular Polygon: Sides [6]  Mode [Inscribed]
+```
+
+- Sides range: 3..360;
+- Mode: Inscribed / Circumscribed;
+- before center placement, the side count can also be typed directly and confirmed with Enter;
+- after center placement, numeric exact input belongs to the radius/current geometry stage again.
+
+The same mechanism serves existing parameterized tools such as Box, Cylinder, Cone, Frustum, Sphere, Ellipsoid, Torus, Helix, Ellipse, and Extrude.
+
+## 7. Model Tree
+
+- narrow left panel;
+- native TextBox filtering;
+- native TreeView;
+- no decorative entity icons;
+- entity types come from `CadEntityRegistry`;
+- internal persistence helpers such as `Path` are hidden from normal browsing;
+- selection stays synchronized with Workspace Selection;
+- initial context menu: Properties, Show/Hide, Lock/Unlock, Rename only.
+
+## 8. Layers
+
+- upper-right panel;
+- filter/new/rename/remove use native controls;
+- default Layer cannot be renamed or removed;
+- current layer, visibility, color, line style, line width, and lock state bind to real Layer state;
+- color cells and ColorTable may retain CAD-specific visuals;
+- do not reintroduce global `cad-input`, `cad-compact`, or similar styling classes.
+
+## 9. PropertyGrid
+
+PropertyGrid is driven by Core descriptors.
+
+Requirements:
+
+- Property / Value two-column layout;
+- labels and values left aligned;
+- numeric editors left aligned;
+- categories use native `Expander`;
+- mixed values are explicit;
+- Layer uses ComboBox;
+- Boolean uses CheckBox;
+- Enum/Choice uses ComboBox;
+- Color uses OCCAD ColorTable/Color Dialog;
+- Measurement remains read-only.
+
+Point / Vector / Normal use vertical component editing:
+
+```text
+X  [ ... ]
+Y  [ ... ]
+Z  [ ... ]
+```
+
+Do not restore horizontally compressed X/Y/Z editors.
+
+Planar `Normal` remains editable for Circle / Arc / Ellipse / Rectangle / Regular Polygon through the real geometry/transaction path.
+
+## 10. Viewport
+
+- dark by default;
+- lower-left triedron retained;
+- ViewCube disabled by default;
+- Snap / Grip / Preview / Tracking / Selection Window exist only during relevant lifecycles;
+- no permanent version, OCCT, Ready, or help watermark;
+- Preview/transients must be cleared after Commit/Cancel.
+
+## 11. Status Strip
+
+The bottom strip contains only:
+
+- current operation prompt;
+- XY / YZ / XZ;
+- SNAP;
+- ORTHO;
+- POLAR.
+
+The prompt region may be blank while idle.
+
+Do not permanently show Ready, Command: Ready, version text, permanent XYZ coordinates, duplicated WorkPlane/Drafting captions, or another command input.
+
+## 12. Dialogs
+
+Dialogs use native Fluent Button/TextBox/ComboBox controls. OCCAD should not maintain a separate decorative MessageBox skin system.
+
+CAD business controls such as the ColorTable may keep their required custom visuals.
+
+## 13. Localization
+
+- supported languages: `zh-CN` and `en-US`;
+- Action/Tool IDs never change with language;
+- UI text uses localization keys;
+- language changes refresh Menu, Toolbar, Tool parameter strip, panels, and operation prompt;
+- the preference is persisted.
+
+## 14. UI acceptance
+
+A feature is complete only when all of the following are true:
+
+1. Entity / Tool / Action registration is consistent;
+2. Menu/Toolbar entry works;
+3. required parameters have a visible input surface;
+4. prompt is clear;
+5. preview is correct;
+6. exact input works;
+7. Commit / Cancel returns interaction to neutral;
+8. Property editing works;
+9. Snap / Grip / Selection behave correctly;
+10. Save/Open restores the result;
+11. no native transient remains;
+12. actual Windows/Linux build and manual interaction validation succeed.
+
+Source existence or Action registration alone does not prove product completion.

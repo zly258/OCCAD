@@ -13,21 +13,13 @@ public sealed class CadApplication : Application
         CadDiagnostics.Trace("CadApplication.Initialize entered.");
 
         RequestedThemeVariant = global::Avalonia.Styling.ThemeVariant.Light;
-
-        Styles.Add(new FluentTheme
-        {
-            DensityStyle = DensityStyle.Compact
-        });
+        Styles.Add(new FluentTheme());
         Styles.Add(new StyleInclude(new Uri("avares://OCCAD/"))
         {
             Source = new Uri(
                 "avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml")
         });
 
-        CadTheme.Apply(this);
-
-        // OCCAD uses English as the product default. Once the user changes
-        // language, the persisted application setting wins on the next start.
         var settings = CadApplicationSettings.Load();
         CadLanguageManager.Apply(settings.Language);
 
@@ -51,9 +43,9 @@ public sealed class CadApplication : Application
             CadDiagnostics.Trace("Constructing MainWindow.");
 
             var window = new MainWindow();
-            window.ApplyRibbon();
-            window.ApplyFloatingToolPanel();
-            window.ApplyReferenceVisualShell();
+            window.ApplyClassicShell();
+            window.StabilizeClassicShell();
+            window.EnableDirectInput();
 
             CadDiagnostics.Trace("MainWindow constructed.");
 

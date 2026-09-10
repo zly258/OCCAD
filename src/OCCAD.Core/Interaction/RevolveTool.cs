@@ -20,7 +20,17 @@ public sealed class RevolveTool : CadSelectionTransformToolBase, ICadPointInputT
     public override CadToolInteractionPolicy InteractionPolicy =>
         State == CadToolState.WaitForSelect
             ? CadToolInteractionPolicy.Selection
-            : CadToolInteractionPolicy.Drawing;
+            : _axisStart is null
+                ? new CadToolInteractionPolicy(
+                    SelectionEnabled: false,
+                    PreselectionEnabled: true,
+                    GripEnabled: false)
+                : CadToolInteractionPolicy.Drawing;
+
+    public override bool CanCommitCurrentStage =>
+        State == CadToolState.WaitForSelect
+            ? base.CanCommitCurrentStage
+            : _axisStart is not null && base.CanCommitCurrentStage;
 
     public override CadToolPanelDescriptor ParameterPanel =>
         new(
@@ -59,7 +69,7 @@ public sealed class RevolveTool : CadSelectionTransformToolBase, ICadPointInputT
         _axisEnd = null;
         _axisLine = null;
 
-        SetSelectionFilter(null);
+        SetAxisLineFilter();
         SetStageLocalized(
             1,
             "Cad.Prompt.revolve.AxisStart",
@@ -81,29 +91,32 @@ public sealed class RevolveTool : CadSelectionTransformToolBase, ICadPointInputT
 
         if (_axisStart is null)
         {
-            if (input.Kind == OcctPointerInputKind.Pressed &&
-                input.Button == OcctPointerButton.Left)
-            {
-                // Check if user clicked an existing line entity
-                if (Context.Workspace.Preselection.Current?.Entity is CadLineEntity line)
-                {
-                    _axisLine = line;
-                    _axisStart = line.ToWorldPoint(line.Start);
-                    _axisEnd = line.ToWorldPoint(line.End);
-                    RefreshPreview();
-                    return CommitRevolve();
-                }
-
-                var point = Context.ResolvePoint(input.X, input.Y, null).Point;
-                _axisStart = point;
-                SetStageLocalized(
-                    2,
-                    "Cad.Prompt.revolve.AxisEnd",
-                    "Revolve: specify axis end point [Backspace undo, Esc cancel]",
-                    CadPrecisionInputKind.None);
+            if (input.Kind == OcctPointerInputKind.Moved)
                 return true;
+
+            if (input.Kind != OcctPointerInputKind.Pressed ||
+                input.Button != OcctPointerButton.Left)
+                return false;
+
+            if (Context.Workspace.Preselection.Current?.Entity is CadLineEntity line)
+            {
+                _axisLine = line;
+                _axisStart = line.ToWorldPoint(line.Start);
+                _axisEnd = line.ToWorldPoint(line.End);
+                SetSelectionFilter(null);
+                RefreshPreview();
+                return CommitRevolve();
             }
-            return false;
+
+            var point = Context.ResolvePoint(input.X, input.Y, null).Point;
+            _axisStart = point;
+            SetSelectionFilter(null);
+            SetStageLocalized(
+                2,
+                "Cad.Prompt.revolve.AxisEnd",
+                "Revolve: specify axis end point [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.None);
+            return true;
         }
 
         if (input.Kind == OcctPointerInputKind.Moved)
@@ -126,12 +139,16 @@ public sealed class RevolveTool : CadSelectionTransformToolBase, ICadPointInputT
 
     public bool TryAcceptPoint(OcctPoint3d point)
     {
-        if (State != CadToolState.Drawing || Entities.Count != 1)
+        if (!IsActive ||
+            State != CadToolState.Drawing ||
+            Entities.Count != 1 ||
+            !point.IsFinite)
             return false;
 
         if (_axisStart is null)
         {
             _axisStart = point;
+            SetSelectionFilter(null);
             SetStageLocalized(
                 2,
                 "Cad.Prompt.revolve.AxisEnd",
@@ -145,7 +162,8 @@ public sealed class RevolveTool : CadSelectionTransformToolBase, ICadPointInputT
     }
 
     protected override bool CanStepBackCore =>
-        State == CadToolState.Drawing && (Entities.Count > 0 || _axisStart is not null);
+        State == CadToolState.Drawing &&
+        (Entities.Count > 0 || _axisStart is not null);
 
     protected override bool OnStepBack()
     {
@@ -155,6 +173,7 @@ public sealed class RevolveTool : CadSelectionTransformToolBase, ICadPointInputT
             _axisEnd = null;
             _axisLine = null;
             Context.Preview.Clear();
+            SetAxisLineFilter();
             SetStageLocalized(
                 1,
                 "Cad.Prompt.revolve.AxisStart",
@@ -185,10 +204,20 @@ public sealed class RevolveTool : CadSelectionTransformToolBase, ICadPointInputT
 
     private void RefreshPreview()
     {
-        if (TryCreate(out var entity))
-            Context.Preview.Show(entity);
-        else
+        if (!TryCreate(out var entity))
+        {
             Context.Preview.Clear();
+            return;
+        }
+
+        try
+        {
+            Context.Preview.Show(entity);
+        }
+        catch (Exception exception) when (IsRecoverablePreviewFailure(exception))
+        {
+            Context.Preview.Clear();
+        }
     }
 
     private bool TryCreate(out CadRevolveEntity entity)
@@ -199,27 +228,23 @@ public sealed class RevolveTool : CadSelectionTransformToolBase, ICadPointInputT
 
         var start = _axisStart.Value;
         var end = _axisEnd.Value;
-        var dir = end - start;
-        if (!dir.TryNormalize(out var normalizedDir))
+        var direction = end - start;
+        if (!direction.TryNormalize(out var normalizedDirection))
             return false;
 
-        try
+        entity = new CadRevolveEntity(
+            Entities[0],
+            start,
+            normalizedDirection,
+            _angleDegrees)
         {
-            entity = new CadRevolveEntity(
-                Entities[0],
-                start,
-                normalizedDir,
-                _angleDegrees);
+            Layer = Context.Workspace.Layers.Current.Name
+        };
 
-            if (_axisLine is not null)
-                entity.BindSources(Entities[0], _axisLine);
+        if (_axisLine is not null)
+            entity.BindSources(Entities[0], _axisLine);
 
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
+        return true;
     }
 
     private bool CommitRevolve()
@@ -227,11 +252,38 @@ public sealed class RevolveTool : CadSelectionTransformToolBase, ICadPointInputT
         if (!TryCreate(out var entity))
             return false;
 
+        var engine = Context.Engine;
         Context.Preview.Clear();
-        Context.Workspace.AddGeneratedEntities([entity], "Revolve");
-        Context.Workspace.Tools.CompleteCurrent();
+        try
+        {
+            CadTransaction.ApplyCreatedEntity(
+                Context.Workspace,
+                entity,
+                "Revolve",
+                Context.Workspace.Tools.CompleteCurrent);
+        }
+        catch
+        {
+            if (IsActive)
+                RefreshPreview();
+            throw;
+        }
+
+        engine.Redraw();
         return true;
     }
+
+    private void SetAxisLineFilter() =>
+        SetSelectionFilter(
+            new CadEntityFilter(
+                "revolve.axis",
+                static entity => entity is CadLineEntity));
+
+    private static bool IsRecoverablePreviewFailure(Exception exception) =>
+        exception is ArgumentException or
+        InvalidOperationException or
+        ArithmeticException or
+        OcctException;
 
     protected override void ResetTransformState()
     {

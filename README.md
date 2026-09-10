@@ -1,92 +1,165 @@
 # OCCAD
 
-OCCAD is an Avalonia desktop CAD application and extensible CAD framework built on **OcctCSharpBridge / OCCT**.
+OCCAD is an Avalonia desktop CAD application and extensible CAD kernel built on **OcctCSharpBridge / Open CASCADE Technology (OCCT)**.
 
 [中文说明](README.zh-CN.md)
 
-## What OCCAD is
+## Project scope
 
-OCCAD is a product repository, not an OCCT wrapper demo. It contains the CAD domain model, interactive Tool framework, Avalonia desktop shell, persistence, documentation, and product build/run/publish entry points.
+OCCAD is not an OCCT API demo or just a model viewer. The current milestone is an initial CAD baseline with explicit lifecycle and ownership rules for:
 
-The current architecture includes Document/Entity/Layer ownership, Selection/Preselection/Subobject selection, Grip editing, WorkPlane/Snap/Tracking/Precision, Preview/History/Action/Tool, 2D/3D entities, modify/modeling, annotations, measurement, persistence, and native Avalonia Ribbon, Model/Layer/Property panels, Floating Tool Panel, Command Line, and Status Bar.
+`Create → Preview → Exact Input → Commit → Property → Grip → Undo/Redo`
 
-## Repository layout
+Core product layers include Document / Entity / Layer, Tool / Action / Transaction / History, Selection / Preselection / Subobject Selection, WorkPlane / Snap / Tracking / Precision Input, Grip / Preview / transient scene ownership, 2D drafting, 3D primitives, modeling features, Model Tree / Layers / Properties, localization, persistence, exchange, build, and publish.
 
-- `src/OCCAD.Core` — CAD domain, document, entities, layers, history, actions/tools, selection, snap, grip, precision, geometry, persistence.
-- `src/OCCAD.Avalonia` — Ribbon-first Avalonia shell, OCCT viewport integration, Model/Layer/Property/Floating Tool panels, Command Line, Status Bar, localization, dialogs.
-- `docs/en-US` / `docs/zh-CN` — synchronized long-lived design and implementation contracts.
-- `build.ps1`, `run.ps1`, `publish.ps1` — product build/run/publish entry points.
-- `OCCAD.sln` — `OCCAD.Core` + `OCCAD.Avalonia`.
+## Technical baseline
 
-## Requirements
-
-- Windows x64
-- .NET SDK from `global.json`
-- Avalonia restored by NuGet
-- installed OcctCSharpBridge SDK, default `C:\Program Files\OcctCSharpBridge\SDK\3.0\win-x64`
-- compatible OCCT runtime when the installed Bridge SDK does not provide a portable runtime
-
-Override the SDK path with `OCCTCSHARPBRIDGE_SDK`.
-
-## Build and run
-
-```powershell
-cd D:\workspace\occt\OCCAD
-git pull
-.\build.ps1
-.\run.ps1 -OcctRoot D:\tools\occt-vc144-64
-```
-
-When the Bridge SDK contains a portable runtime, `run.ps1` uses it automatically. Otherwise pass `-OcctRoot` or set `OCCT_ROOT` / `CASROOT`.
-
-```powershell
-.\publish.ps1 -OcctRoot D:\tools\occt-vc144-64
-```
-
-Normal OCCAD builds do not clone, rebuild, or sync OcctCSharpBridge.
+- .NET 10
+- Avalonia 12 native `FluentTheme`
+- OcctCSharpBridge SDK 3.0 / ABI 5
+- Open CASCADE Technology 7.9.0
+- Windows x64 / Linux x64
 
 ## UI baseline
 
-The shell uses a compact industrial CAD style: a native Avalonia custom Ribbon, restrained gray tool surfaces, dark viewport, consistent 11 px UI typography, compact 22 px controls, low/no corner radius, left Model panel, resizable right Layer/Property panels, Command Line above Status Bar, and a non-modal Floating Tool Panel inside the viewport.
+The product has one **classic CAD shell**:
 
-Ribbon controls invoke registered Core Action IDs only. Circle, Arc, Regular Polygon, Ellipse, and 3D Primitives use one command-family drop-down layer instead of duplicating Tool logic. Ribbon content scrolls horizontally when required so common 125%/150% Windows scaling does not force the main window wider.
+```text
+Menu: File | Draw | Model | View | Window | Language
+Single-row Toolbar
+Active Tool Parameter Strip (visible only for tools with parameters)
 
-The Command Line is the only surface that shows the full active Tool prompt. Floating Tool Panel shows current Step, exact coordinates, Length/Angle/Factor, Tool parameters, and Back/Accept/Finish/Cancel. Dynamic HUD shows pointer-adjacent precision/snap/tracking feedback. Status Bar is limited to Selection, WorkPlane, SNAP/ORTHO/POLAR, and XYZ coordinates.
+Model Tree | CAD Viewport | Layers / Properties
 
-## Property and layer semantics
+Operation Prompt | XY YZ XZ | SNAP ORTHO POLAR
+```
 
-Normal Entity appearance properties are Layer, Color, LineStyle, LineWidth, Transparency, and Visible. Color/LineStyle/LineWidth each have an integrated `ByLayer` control.
+Rules:
 
-PropertyGrid is descriptor-driven and supports categories, common-property multi-selection, mixed values, Numeric, Enum, Color, Layer/ByLayer, and Point/Vector X/Y/Z component editing.
+- no Ribbon;
+- no grouped three-row command surface;
+- no `DensityStyle.Compact` or custom global control skin;
+- Button / TextBox / ComboBox / CheckBox / Menu use native Avalonia Fluent styling;
+- `CadTheme` contains only CAD layout metrics and product-specific viewport/overlay visuals;
+- the custom CAD ColorTable is retained;
+- dark viewport, lower-left triedron, ViewCube disabled by default;
+- no permanent bottom command input, `Ready`, version text, or permanent coordinate noise;
+- the current operation prompt remains visible in the status strip.
 
-Layer columns are `Current | Name | V | C | Style | Width | L`. Current layer uses an explicit `●/○` state. Only the Current column changes current layer; clicking the name only inspects the layer. The default layer cannot be renamed or removed.
+## Tool parameters
 
-Internal viewer handles, IDs, selectable implementation state, material/display-mode details, imported BREP byte counts, and similar implementation fields are hidden from the normal Property panel.
+A Tool `ParameterPanel` is rendered automatically in the active-tool parameter strip, avoiding the previous state where Core had parameters but the UI exposed no editor.
 
-Editing explicit Color/LineStyle/LineWidth automatically leaves its corresponding ByLayer mode. Re-enabling ByLayer preserves the stored override and changes only the effective source.
+Regular Polygon example:
 
-Entity and Layer edits use Core transaction/history paths so UI edits, Undo/Redo, presentation updates, and rollback share one contract.
+```text
+Regular Polygon: Sides [6]  Mode [Inscribed]
+```
 
-## Core design rules
+- `Sides`: 3..360;
+- `Mode`: Inscribed / Circumscribed;
+- before the center is specified, a side count can also be typed directly and confirmed with Enter.
 
-- Document state and Entity geometry are authoritative; Viewer objects are derived presentation.
-- Avalonia adapts Core state only.
-- Tool is an explicit staged state machine.
-- Ribbon, Command Line, and Floating Tool Panel share the same Action/Command/Tool state and never create a parallel command system.
-- `CadCommandManager.ForWorkspace()` is the single command-session entry point per Workspace.
-- Preview never enters Document, Selection, or History.
-- Commit keeps the last valid Preview until model/history mutation succeeds.
-- Grip pointer movement edits a duplicate preview only.
-- Snap owns candidate resolution; Entity owns Snap/Grip semantics.
-- Layer and Property controllers call Core business APIs instead of implementing parallel transactions.
-- Avoid reflection dispatch, duplicate public APIs, compatibility/migration layers, excessive smoke/check frameworks, GitHub Actions, and artificial suffixes such as `Advanced`, `Extended`, `V1`, or `V2`.
+The same parameter surface is used by existing parameterized tools such as Box, Cylinder, Cone, Frustum, Sphere, Ellipsoid, Torus, Helix, Ellipse, and Extrude.
 
-See [docs/README.md](docs/README.md).
+## PropertyGrid
 
-## Application preferences
+PropertyGrid is driven by Core descriptors rather than a second UI property model.
 
-`Manage → Preferences...` stores application-level viewport and interaction preferences in `%LOCALAPPDATA%\OCCAD\settings.json`.
+- Property and Value are left aligned;
+- numeric values are not right aligned;
+- Point / Vector / Normal use vertical engineering input:
 
-Current preferences include scene background, grip marker size and hit tolerance, snap marker size and snap tolerance, selection tolerance, mouse-wheel zoom sensitivity, and OCCT display tessellation precision.
+```text
+X  [ ... ]
+Y  [ ... ]
+Z  [ ... ]
+```
 
-Display precision controls OCCT presentation deviation/angle only. It does **not** change the mathematical precision of BRep, curves, surfaces, dimensions, or saved CAD geometry.
+- planar `Normal` is editable for Circle / Arc / Ellipse / Rectangle / Regular Polygon;
+- Layer uses a drop-down selector;
+- Color / LineStyle / LineWidth support ByLayer;
+- color editing keeps OCCAD's custom CAD ColorTable.
+
+## Initial feature surface
+
+2D: Point, Line, Polyline, Free Polygon, Regular Polygon, Rectangle, Circle, Arc, Ellipse, Spline.
+
+Circle methods: Center+Radius, Center+Diameter, Two Points, Three Points, Point+Center.
+
+Arc methods: Three Points, Center→Start→End, Start→Center→End, Start→End→Center, Start→End→Point, Start→End→Tangent.
+
+Ellipse methods: Center+Axes, Axis Endpoints+Minor Axis.
+
+3D/curves: Box, Cylinder, Cone, Frustum, Sphere, Ellipsoid, Torus, Helix.
+
+Features: Extrude, Revolve, Sweep, Loft.
+
+Views: Top / Bottom / Front / Back / Left / Right, Iso NE/NW/SE/SW, Fit, Wireframe, Shaded.
+
+Interaction foundation: Window/Crossing Selection, Subobject Selection, Preselection, Snap, Grip, XY/YZ/XZ WorkPlane, ORTHO, POLAR, Preview, Tracking, Precision Input.
+
+See [Initial Release Feature Matrix](docs/en-US/14-FEATURE-MATRIX.md) for exact status.
+
+## Architecture
+
+```text
+OCCAD.Avalonia
+      ↓
+OCCAD.Core
+      ↓
+OcctNet / OcctCSharpBridge
+      ↓
+OCCT
+```
+
+Core does not depend on Avalonia. The UI adapts input and presents state; it does not duplicate Document, Selection, History, Layer, Geometry, or Tool business state.
+
+## Repository layout
+
+```text
+OCCAD/
+├─ src/
+│  ├─ OCCAD.Core/
+│  └─ OCCAD.Avalonia/
+├─ docs/
+│  ├─ en-US/
+│  ├─ zh-CN/
+│  └─ adr/
+├─ build.ps1 / build.sh
+├─ run.ps1 / run.sh
+├─ publish.ps1 / publish.sh
+└─ OCCAD.sln
+```
+
+## Build
+
+Windows:
+
+```powershell
+.\build.ps1
+```
+
+Linux:
+
+```bash
+./build.sh
+```
+
+If the Bridge SDK does not include a complete portable runtime, configure `OCCT_ROOT` / `CASROOT` or provide the OCCT path through the run script.
+
+The project currently does not maintain a separate Test project. Validation order is:
+
+`Core build → Avalonia build → real interactive regression → native/transient cleanup checks`
+
+A source file or registered Action alone does not prove product support.
+
+## Documentation
+
+Start at [docs/README.md](docs/README.md). Key contracts include UI, interaction, architecture, entity/tool, extension, transaction/resource, build validation, user guide, and feature matrix documents.
+
+## License
+
+Original OCCAD code uses **OCCAD Non-Commercial License 1.0** from the repository root. Non-commercial use is permitted under its terms; commercial products, paid engineering delivery, services, and use inside a for-profit production/design/engineering workflow require separate written authorization.
+
+OCCT, OcctCSharpBridge, Avalonia, .NET, and other dependencies remain under their own licenses. See `THIRD_PARTY_NOTICES.md`.

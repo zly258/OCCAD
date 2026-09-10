@@ -9,17 +9,11 @@ internal sealed class LayerNameDialog : Window
 {
     private readonly TextBox _input;
 
-    public LayerNameDialog(
-        string initialName,
-        bool creating)
+    public LayerNameDialog(string initialName, bool creating)
     {
         Title = CadLanguageManager.Text(
-            creating
-                ? "Cad.Text.NewLayerTitle"
-                : "Cad.Text.RenameLayerTitle",
-            creating
-                ? "New Layer"
-                : "Rename Layer");
+            creating ? "Cad.Text.NewLayerTitle" : "Cad.Text.RenameLayerTitle",
+            creating ? "New Layer" : "Rename Layer");
         Width = 370;
         Height = 154;
         CanResize = false;
@@ -39,38 +33,53 @@ internal sealed class LayerNameDialog : Window
                 Accept();
                 e.Handled = true;
             }
+            else if (e.Key == Key.Escape)
+            {
+                Close((string?)null);
+                e.Handled = true;
+            }
         };
 
-        var buttons = new StackPanel
+        var body = new StackPanel
+        {
+            Margin = new Thickness(CadTheme.DialogPadding),
+            Spacing = 5
+        };
+        body.Children.Add(new TextBlock
+        {
+            Text = CadLanguageManager.Text("Cad.Text.LayerName", "Layer name"),
+            Foreground = CadTheme.Muted
+        });
+        body.Children.Add(_input);
+
+        var cancel = DialogButton(CadLanguageManager.Text("Cad.Text.Cancel", "Cancel"));
+        cancel.Click += (_, _) => Close((string?)null);
+        var ok = DialogButton(CadLanguageManager.Text("Cad.Text.Accept", "OK"), primary: true);
+        ok.Click += (_, _) => Accept();
+
+        var actions = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
             Spacing = 4
         };
-        var ok = Button(
-            CadLanguageManager.Text("Cad.Text.Accept", "OK"));
-        ok.Classes.Add("cad-primary");
-        ok.Click += (_, _) => Accept();
-        var cancel = Button(
-            CadLanguageManager.Text("Cad.Text.Cancel", "Cancel"));
-        cancel.Click += (_, _) => Close((string?)null);
-        buttons.Children.Add(ok);
-        buttons.Children.Add(cancel);
+        actions.Children.Add(cancel);
+        actions.Children.Add(ok);
 
-        var content = new StackPanel
+        var footer = new Border
         {
-            Margin = new Thickness(CadTheme.DialogPadding),
-            Spacing = 6
+            Background = CadTheme.Panel,
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(CadTheme.DialogPadding, 6),
+            Child = actions
         };
-        content.Children.Add(new TextBlock
-        {
-            Text = CadLanguageManager.Text(
-                "Cad.Text.LayerName",
-                "Layer name")
-        });
-        content.Children.Add(_input);
-        content.Children.Add(buttons);
-        Content = content;
+
+        var root = new Grid { RowDefinitions = new RowDefinitions("*,Auto") };
+        root.Children.Add(body);
+        Grid.SetRow(footer, 1);
+        root.Children.Add(footer);
+        Content = root;
 
         Opened += (_, _) =>
         {
@@ -87,15 +96,17 @@ internal sealed class LayerNameDialog : Window
         Close(value);
     }
 
-    private static Button Button(string text)
+    private static Button DialogButton(string text, bool primary = false)
     {
         var button = new Button
         {
             Content = text,
             MinWidth = CadTheme.DialogButtonWidth,
-            HorizontalContentAlignment = HorizontalAlignment.Center
+            MinHeight = CadTheme.ControlHeight
         };
         button.Classes.Add("cad-compact");
+        if (primary)
+            button.Classes.Add("cad-primary");
         return button;
     }
 }

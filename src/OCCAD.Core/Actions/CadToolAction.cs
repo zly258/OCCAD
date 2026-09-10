@@ -34,6 +34,10 @@ public sealed class CadToolAction : CadAction
     public override string Description => $"Start {DisplayName} tool";
     public override bool IsRepeatable => true;
 
+    public override bool CanExecute() =>
+        Workspace.Engine is { IsInitialized: true } &&
+        Workspace.Tools.IsRegistered(_toolId);
+
     public override void Execute()
     {
         if (!Workspace.Tools.Activate(_toolId))

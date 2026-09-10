@@ -23,8 +23,8 @@ internal enum CadMessageDialogKind
 }
 
 /// <summary>
-/// Compact industrial CAD message dialog. The visual language intentionally
-/// avoids decorative icons and keeps message text and actions dominant.
+/// Compact Fluent message dialog shared by all OCCAD confirmation and notice
+/// flows. No decorative icons: message and actions remain the visual priority.
 /// </summary>
 internal sealed class CadMessageDialog : Window
 {
@@ -36,6 +36,7 @@ internal sealed class CadMessageDialog : Window
         bool yesNoCancel,
         CadMessageDialogKind kind)
     {
+        _ = kind;
         Title = title;
         Width = 420;
         MinWidth = 360;
@@ -63,22 +64,21 @@ internal sealed class CadMessageDialog : Window
         {
             Content = messageText,
             MaxHeight = 260,
-            Margin = new Thickness(16, 14, 16, 14),
+            Margin = new Thickness(CadTheme.DialogPadding),
             HorizontalScrollBarVisibility =
                 global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             VerticalScrollBarVisibility =
                 global::Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
         };
 
-        var buttons = BuildButtons(yesNoCancel);
         var footer = new Border
         {
-            MinHeight = 40,
-            Background = CadTheme.PanelAlt,
+            MinHeight = 38,
+            Background = CadTheme.Panel,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(10, 6),
-            Child = buttons
+            Padding = new Thickness(CadTheme.DialogPadding, 6),
+            Child = BuildButtons(yesNoCancel)
         };
 
         var root = new Grid();
@@ -111,11 +111,7 @@ internal sealed class CadMessageDialog : Window
         bool yesNoCancel = false,
         CadMessageDialogKind kind = CadMessageDialogKind.Information)
     {
-        var dialog = new CadMessageDialog(
-            title,
-            message,
-            yesNoCancel,
-            kind);
+        var dialog = new CadMessageDialog(title, message, yesNoCancel, kind);
 
         if (owner is { IsVisible: true })
             return dialog.ShowDialog<CadDialogResult>(owner);
@@ -133,32 +129,26 @@ internal sealed class CadMessageDialog : Window
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Spacing = 5
+            Spacing = 4
         };
 
         if (yesNoCancel)
         {
-            var yes = Button(
-                CadLanguageManager.Text("Cad.Text.Yes", "Yes"),
-                primary: true);
+            var yes = DialogButton(CadLanguageManager.Text("Cad.Text.Yes", "Yes"), primary: true);
             yes.Click += (_, _) => CloseWith(CadDialogResult.Yes);
             buttons.Children.Add(yes);
 
-            var no = Button(
-                CadLanguageManager.Text("Cad.Text.No", "No"));
+            var no = DialogButton(CadLanguageManager.Text("Cad.Text.No", "No"));
             no.Click += (_, _) => CloseWith(CadDialogResult.No);
             buttons.Children.Add(no);
 
-            var cancel = Button(
-                CadLanguageManager.Text("Cad.Text.Cancel", "Cancel"));
+            var cancel = DialogButton(CadLanguageManager.Text("Cad.Text.Cancel", "Cancel"));
             cancel.Click += (_, _) => CloseWith(CadDialogResult.Cancel);
             buttons.Children.Add(cancel);
         }
         else
         {
-            var ok = Button(
-                CadLanguageManager.Text("Cad.Text.OK", "OK"),
-                primary: true);
+            var ok = DialogButton(CadLanguageManager.Text("Cad.Text.OK", "OK"), primary: true);
             ok.Click += (_, _) => CloseWith(CadDialogResult.Ok);
             buttons.Children.Add(ok);
         }
@@ -172,15 +162,13 @@ internal sealed class CadMessageDialog : Window
         Close(_result);
     }
 
-    private static Button Button(string text, bool primary = false)
+    private static Button DialogButton(string text, bool primary = false)
     {
         var button = new Button
         {
             Content = text,
             MinWidth = CadTheme.DialogButtonWidth,
-            MinHeight = CadTheme.ControlHeight,
-            HorizontalContentAlignment = HorizontalAlignment.Center,
-            VerticalContentAlignment = VerticalAlignment.Center
+            MinHeight = CadTheme.ControlHeight
         };
         button.Classes.Add("cad-compact");
         if (primary)

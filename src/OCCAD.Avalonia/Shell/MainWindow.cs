@@ -55,17 +55,12 @@ public sealed partial class MainWindow : Window
     private readonly Grid _viewportHost = new();
     private readonly OcctAvaloniaViewport _viewport = new();
     private readonly Ellipse _snapAperture = new();
-    private CadDynamicInputHud? _dynamicInputHud;
 
     private readonly TextBlock _selectionStatus = new();
-    private readonly TextBlock _coordinateStatus = new();
-    private TextBlock? _workPlaneUiLabel;
-    private readonly StackPanel _commandHost = new();
 
     private readonly CadViewportInteractionController _viewportInteraction;
     private readonly CadPropertyInspectorController _propertyInspector;
     private readonly CadLayerPanelController _layerPanel;
-    private readonly CadCommandLineController _commandLine;
 
     private bool _refreshingUi;
     private bool _closingConfirmed;
@@ -112,10 +107,6 @@ public sealed partial class MainWindow : Window
                 _workspace,
                 _layerHost,
                 InspectLayer);
-        _commandLine =
-            new CadCommandLineController(
-                _workspace,
-                _commandHost);
 
         CadDiagnostics.Trace(
             "MainWindow controllers created.");
@@ -160,13 +151,9 @@ public sealed partial class MainWindow : Window
             Background = CadTheme.WindowBrush
         };
 
-        // Ribbon is inserted by ApplyRibbon() before the window is shown.
         var status = BuildStatusBar();
         DockPanel.SetDock(status, Dock.Bottom);
         root.Children.Add(status);
-
-        DockPanel.SetDock(_commandHost, Dock.Bottom);
-        root.Children.Add(_commandHost);
 
         var workspace = BuildWorkspace();
         root.Children.Add(workspace);
@@ -181,7 +168,6 @@ public sealed partial class MainWindow : Window
         ConfigurePlaneButton(_planeXz, "XZ", CadWorkPlanePreset.XZ);
 
         _layerCombo.Width = 150;
-        _layerCombo.Classes.Add("cad-input");
         _layerCombo.SelectionChanged += (_, _) =>
         {
             if (_refreshingUi ||
@@ -250,7 +236,6 @@ public sealed partial class MainWindow : Window
             Width = CadTheme.SplitterThickness,
             ResizeDirection = GridResizeDirection.Columns
         };
-        leftSplitter.Classes.Add("cad-splitter");
         Grid.SetColumn(leftSplitter, 1);
         grid.Children.Add(leftSplitter);
 
@@ -263,7 +248,6 @@ public sealed partial class MainWindow : Window
             Width = CadTheme.SplitterThickness,
             ResizeDirection = GridResizeDirection.Columns
         };
-        rightSplitter.Classes.Add("cad-splitter");
         Grid.SetColumn(rightSplitter, 3);
         grid.Children.Add(rightSplitter);
 
@@ -288,11 +272,9 @@ public sealed partial class MainWindow : Window
             "Cad.Text.FilterModel",
             "Filter model tree");
         _modelSearch.Margin = new Thickness(6, 6, 6, 4);
-        _modelSearch.Classes.Add("cad-input");
         _modelSearch.TextChanged += (_, _) => RefreshTree();
 
         _modelTree.Margin = new Thickness(5, 0, 5, 5);
-        _modelTree.Classes.Add("cad-tree");
         _modelTree.SelectionChanged += ModelTreeSelectionChanged;
 
         var grid = new Grid();
@@ -325,7 +307,6 @@ public sealed partial class MainWindow : Window
             Height = CadTheme.SplitterThickness,
             ResizeDirection = GridResizeDirection.Rows
         };
-        splitter.Classes.Add("cad-splitter");
 
         var grid = new Grid
         {
@@ -410,7 +391,8 @@ public sealed partial class MainWindow : Window
 
         var overlay = new Canvas
         {
-            ClipToBounds = true
+            ClipToBounds = true,
+            IsHitTestVisible = false
         };
 
         _snapAperture.IsHitTestVisible = false;
@@ -423,38 +405,14 @@ public sealed partial class MainWindow : Window
         _snapAperture.Opacity = 0.55;
         overlay.Children.Add(_snapAperture);
 
-        _dynamicInputHud = new CadDynamicInputHud(_workspace);
-        overlay.Children.Add(_dynamicInputHud);
-
         _viewportHost.Children.Add(overlay);
-
-        _viewport.KeyDown += (_, e) =>
-        {
-            if (_dynamicInputHud?.HandleViewportKeyDown(e) == true)
-                return;
-        };
-        _viewport.TextInput += (_, e) =>
-        {
-            if (_dynamicInputHud?.HandleViewportTextInput(e) == true)
-                return;
-        };
     }
 
     private Control BuildStatusBar()
     {
         ConfigureStatusText(_selectionStatus, 120);
-        ConfigureStatusText(_coordinateStatus, 214);
         _selectionStatus.Foreground = CadTheme.Text;
-        _coordinateStatus.Foreground = CadTheme.Text;
-        _coordinateStatus.TextAlignment = TextAlignment.Right;
 
-        _workPlaneUiLabel = new TextBlock
-        {
-            Foreground = CadTheme.Muted,
-            FontSize = CadTheme.CaptionFontSize,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(5, 0, 3, 0)
-        };
         ConfigureStatusPlaneButton(_planeXy);
         ConfigureStatusPlaneButton(_planeYz);
         ConfigureStatusPlaneButton(_planeXz);
@@ -466,18 +424,10 @@ public sealed partial class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(2, 0, 6, 0)
         };
-        planePanel.Children.Add(_workPlaneUiLabel);
         planePanel.Children.Add(_planeXy);
         planePanel.Children.Add(_planeYz);
         planePanel.Children.Add(_planeXz);
 
-        _draftingStatusLabel = new TextBlock
-        {
-            Foreground = CadTheme.Muted,
-            FontSize = CadTheme.CaptionFontSize,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(4, 0, 3, 0)
-        };
         ConfigureStatusDraftingToggle(_snapToggle);
         ConfigureStatusDraftingToggle(_orthoToggle);
         ConfigureStatusDraftingToggle(_polarToggle);
@@ -489,7 +439,6 @@ public sealed partial class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(2, 0, 5, 0)
         };
-        draftingPanel.Children.Add(_draftingStatusLabel);
         draftingPanel.Children.Add(_snapToggle);
         draftingPanel.Children.Add(_orthoToggle);
         draftingPanel.Children.Add(_polarToggle);
@@ -500,8 +449,6 @@ public sealed partial class MainWindow : Window
             Margin = new Thickness(6, 2)
         };
 
-        DockPanel.SetDock(_coordinateStatus, Dock.Right);
-        panel.Children.Add(_coordinateStatus);
         DockPanel.SetDock(draftingPanel, Dock.Right);
         panel.Children.Add(draftingPanel);
         DockPanel.SetDock(planePanel, Dock.Right);
@@ -552,11 +499,7 @@ public sealed partial class MainWindow : Window
                     _workspace.AttachEngine(args.Engine);
                     ConfigureEngine(args.Engine);
                     _viewportInteraction.AttachEngine(args.Engine);
-                    _commandLine.ShowFeedback(
-                        UiFormat(
-                            "Cad.Text.ReadyOcct",
-                            "Ready - OCCT {0}",
-                            OcctEngine.OcctVersion));
+                    ShowStatusFeedback(null);
                     RefreshTree();
                     RefreshActionUi();
 
@@ -572,7 +515,7 @@ public sealed partial class MainWindow : Window
                     if (CadDiagnostics.IsFatal(exception))
                         throw;
 
-                    _commandLine.ShowFeedback(exception.Message);
+                    ShowStatusFeedback(exception.Message);
                     CadErrorWindow.ShowError(
                         exception,
                         "Viewport initialization");
@@ -589,7 +532,7 @@ public sealed partial class MainWindow : Window
                 if (CadDiagnostics.IsFatal(args.Exception))
                     throw args.Exception;
 
-                _commandLine.ShowFeedback(args.Exception.Message);
+                ShowStatusFeedback(args.Exception.Message);
                 CadErrorWindow.ShowError(
                     args.Exception,
                     "Viewport");
@@ -610,7 +553,7 @@ public sealed partial class MainWindow : Window
                 CadDiagnostics.Report(
                     args.Exception,
                     $"Action '{args.Action.Id}'");
-                _commandLine.ShowFeedback(args.Exception.Message);
+                ShowStatusFeedback(args.Exception.Message);
             });
         _workspace.Snap.CurrentChanged += (_, _) =>
             Ui(RefreshSnapStatus);
@@ -756,7 +699,6 @@ public sealed partial class MainWindow : Window
 
     private static void ConfigureToggle(ToggleButton button)
     {
-        button.Classes.Add("cad-toggle");
         button.HorizontalContentAlignment = HorizontalAlignment.Center;
     }
 
@@ -776,7 +718,7 @@ public sealed partial class MainWindow : Window
 
             if (!_workspace.Tools.TryChangeDrawingPlane(preset))
             {
-                _commandLine.ShowFeedback(
+                ShowStatusFeedback(
                     UiText(
                         "Cad.Text.WorkPlaneChangeBlocked",
                         "Finish the active tool before changing the work plane."));
@@ -814,7 +756,6 @@ public sealed partial class MainWindow : Window
         _disposed = true;
         CadLanguageManager.Changed -= LanguageChanged;
         KeyDown -= MainWindowKeyDown;
-        _commandLine.Dispose();
         _layerPanel.Dispose();
         _propertyInspector.Dispose();
         _viewportInteraction.Dispose();

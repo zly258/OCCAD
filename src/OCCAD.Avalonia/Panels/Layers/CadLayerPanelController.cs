@@ -39,7 +39,6 @@ internal sealed class CadLayerPanelController : IDisposable
                 "Cad.Text.FilterLayers",
                 "Filter layers")
         };
-        _search.Classes.Add("cad-input");
         _search.TextChanged += (_, _) => Rebuild();
 
         _workspace.Layers.Changed += LayersChanged;
@@ -95,21 +94,21 @@ internal sealed class CadLayerPanelController : IDisposable
 
             toolbar.Children.Add(_search);
 
-            var add = CompactButton(
+            var add = ActionButton(
                 CadLanguageManager.Text("Cad.Text.New", "New"));
             add.Click += async (_, _) => await AddLayerAsync();
             Grid.SetColumn(add, 1);
             toolbar.Children.Add(add);
 
             var currentLayerIsDefault = _workspace.Layers.Current.IsDefault;
-            var rename = CompactButton(
+            var rename = ActionButton(
                 CadLanguageManager.Text("Cad.Text.Rename", "Rename"));
             rename.IsEnabled = !currentLayerIsDefault;
             rename.Click += async (_, _) => await RenameLayerAsync();
             Grid.SetColumn(rename, 2);
             toolbar.Children.Add(rename);
 
-            var remove = CompactButton(
+            var remove = ActionButton(
                 CadLanguageManager.Text("Cad.Text.Remove", "Remove"));
             remove.IsEnabled = !currentLayerIsDefault;
             remove.Click += (_, _) => RemoveLayer();
@@ -348,7 +347,6 @@ internal sealed class CadLayerPanelController : IDisposable
             SelectedItem = styles.FirstOrDefault(item => item.Value == layer.LineStyle),
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        style.Classes.Add("cad-input");
         style.SelectionChanged += (_, _) =>
         {
             if (_refreshing ||
@@ -368,7 +366,6 @@ internal sealed class CadLayerPanelController : IDisposable
                 value => Math.Abs(value - layer.LineWidth) < 1e-12),
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        width.Classes.Add("cad-input");
         width.SelectionChanged += (_, _) =>
         {
             if (_refreshing ||
@@ -493,21 +490,14 @@ internal sealed class CadLayerPanelController : IDisposable
             kind: CadMessageDialogKind.Error);
     }
 
-    private static Button CompactButton(string text)
-    {
-        var button = new Button
+    private static Button ActionButton(string text) =>
+        new()
         {
             Content = text,
             MinWidth = CadTheme.LayerActionButtonMinWidth,
             HorizontalContentAlignment = HorizontalAlignment.Center,
-            VerticalContentAlignment = VerticalAlignment.Center,
-            Background = CadTheme.PanelAlt,
-            BorderBrush = CadTheme.Border,
-            BorderThickness = new Thickness(1)
+            VerticalContentAlignment = VerticalAlignment.Center
         };
-        button.Classes.Add("cad-compact");
-        return button;
-    }
 
     private static string ShortHeader(string chinese, string english) =>
         string.Equals(

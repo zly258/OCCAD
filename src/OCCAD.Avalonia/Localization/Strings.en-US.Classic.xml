@@ -1,0 +1,7 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    <sys:String x:Key="Cad.Prompt.RegularPolygon.SidesCenter">Regular Polygon: enter sides &lt;{0}&gt; or specify center [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Parameter.regularpolygon.mode.Inscribed">Inscribed</sys:String>
+    <sys:String x:Key="Cad.Parameter.regularpolygon.mode.Circumscribed">Circumscribed</sys:String>
+</ResourceDictionary>

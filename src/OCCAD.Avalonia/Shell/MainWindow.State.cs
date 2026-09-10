@@ -1,7 +1,6 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Media;
 using OCCAD;
 using OcctNet;
 
@@ -21,7 +20,7 @@ public sealed partial class MainWindow
                 _propertyInspector.InspectEntities([entity]);
                 SetPropertyPanelVisible(true);
             },
-            message => _commandLine.ShowFeedback(message));
+            ShowStatusFeedback);
 
     private void RefreshAll()
     {
@@ -47,10 +46,9 @@ public sealed partial class MainWindow
 
         _layerPanel.RefreshLanguage();
         _propertyInspector.RefreshLanguage();
-        _commandLine.RefreshLanguage();
         ModelPanel.RefreshLanguage();
         RefreshCommandStatusLanguage();
-        RefreshRibbonLanguage();
+        RebuildCleanToolbar();
 
         UpdateToolUi(_workspace.Tools.ActiveTool);
         UpdateSelectionStatus();
@@ -117,8 +115,9 @@ public sealed partial class MainWindow
                 type);
         }
 
-        _selectionStatus.Text = text;
-
+        // Selection detail belongs to the model browser tooltip. The permanent
+        // status strip is reserved for active Tool prompts and actionable
+        // feedback, so idle selection counts never replace the operation text.
         if (_workspace.Preselection.Current is { } hover)
             ToolTip.SetTip(_modelTree, $"{text} | {hoverLabel}: {hover.Entity.Name}");
         else
@@ -157,8 +156,6 @@ public sealed partial class MainWindow
         if (tool is null)
         {
             _viewport.InteractionFeatures = OcctViewportInteractionFeatures.Default;
-            if (_dynamicInputHud is not null)
-                _dynamicInputHud.IsVisible = false;
             _snapAperture.IsVisible = false;
         }
         else
@@ -172,16 +169,12 @@ public sealed partial class MainWindow
                 features &= ~OcctViewportInteractionFeatures.HoverDetection;
 
             _viewport.InteractionFeatures = features;
-
-            if (_workspace.LastResolvedPoint is { } resolved)
-                UpdateDynamicInputHud(resolved);
-            else if (_dynamicInputHud is not null)
-                _dynamicInputHud.IsVisible = false;
         }
 
         RefreshInteractionUi();
         RefreshActionUi();
         RefreshPanelMenuState();
+        RefreshOperationStatus();
     }
 
     private void WorkPlaneChanged()
@@ -241,28 +234,6 @@ public sealed partial class MainWindow
         _planeXy.IsEnabled = canChange;
         _planeYz.IsEnabled = canChange;
         _planeXz.IsEnabled = canChange;
-
-        var label = UiText("Cad.Text.WorkPlane", "Work Plane");
-        var userLocked = _workspace.WorkPlane.UserPlaneLocked;
-        var toolFixed = _workspace.WorkPlane.ToolPlaneFixed ||
-                        _workspace.WorkPlane.GripPlaneFixed;
-        var state = userLocked
-            ? UiText("Cad.Text.Locked", "Locked")
-            : toolFixed
-                ? UiText("Cad.Text.ToolFixed", "Tool fixed")
-                : null;
-
-        if (_workPlaneUiLabel is not null)
-        {
-            _workPlaneUiLabel.Text = state is null
-                ? $"{label}:"
-                : $"{label} ({state}):";
-            ToolTip.SetTip(
-                _workPlaneUiLabel,
-                state is null
-                    ? $"{label}: {preset}"
-                    : $"{label}: {preset} · {state}");
-        }
     }
 
     private void RefreshSnapStatus()
@@ -306,20 +277,12 @@ public sealed partial class MainWindow
 
     private void UpdateCoordinateStatus(CadResolvedPoint resolved)
     {
-        _coordinateStatus.Text =
-            $"X {resolved.Point.X:F3}  " +
-            $"Y {resolved.Point.Y:F3}  " +
-            $"Z {resolved.Point.Z:F3}";
-
-        UpdateDynamicInputHud(resolved);
+        _ = resolved;
         UpdateSnapAperture();
     }
 
     private void ClearCoordinateStatus()
     {
-        _coordinateStatus.Text = string.Empty;
-        if (_dynamicInputHud is not null)
-            _dynamicInputHud.IsVisible = false;
         _snapAperture.IsVisible = false;
     }
 
@@ -354,20 +317,6 @@ public sealed partial class MainWindow
         Canvas.SetTop(_snapAperture, y - diameter * 0.5);
         _snapAperture.Opacity = _workspace.Snap.Current is null ? 0.45 : 0.82;
         _snapAperture.IsVisible = true;
-    }
-
-    private void UpdateDynamicInputHud(CadResolvedPoint resolved)
-    {
-        if (_dynamicInputHud is null ||
-            _workspace.LastPointerPosition is not { } pointer)
-        {
-            if (_dynamicInputHud is not null)
-                _dynamicInputHud.IsVisible = false;
-            return;
-        }
-
-        var scaling = TopLevel.GetTopLevel(_viewport)?.RenderScaling ?? 1.0;
-        _dynamicInputHud.UpdateHud(resolved, pointer, scaling, _viewport.Bounds.Size);
     }
 
     private static string UiText(string key, string fallback) =>

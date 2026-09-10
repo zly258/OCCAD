@@ -505,21 +505,15 @@ internal sealed class CadPropertyInspectorController : IDisposable
         switch (control)
         {
             case TextBox textBox:
-                textBox.Margin = new Thickness(0);
+                textBox.Margin = new Thickness(2, 1);
                 textBox.MinHeight = CadTheme.ControlHeight;
-                textBox.Padding = new Thickness(5, 0);
-                textBox.Background = CadTheme.Surface;
-                textBox.BorderThickness = new Thickness(0);
-                textBox.CornerRadius = new CornerRadius(0);
                 textBox.HorizontalAlignment = HorizontalAlignment.Stretch;
+                textBox.TextAlignment = TextAlignment.Left;
                 break;
 
             case ComboBox comboBox:
-                comboBox.Margin = new Thickness(0);
+                comboBox.Margin = new Thickness(2, 1);
                 comboBox.MinHeight = CadTheme.ControlHeight;
-                comboBox.Background = CadTheme.Surface;
-                comboBox.BorderThickness = new Thickness(0);
-                comboBox.CornerRadius = new CornerRadius(0);
                 comboBox.HorizontalAlignment = HorizontalAlignment.Stretch;
                 break;
 
@@ -529,10 +523,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 break;
 
             case Button button:
-                button.Margin = new Thickness(0);
+                button.Margin = new Thickness(2, 1);
                 button.MinHeight = CadTheme.ControlHeight;
-                button.BorderThickness = new Thickness(0);
-                button.CornerRadius = new CornerRadius(0);
                 button.HorizontalAlignment = HorizontalAlignment.Stretch;
                 break;
 
@@ -543,7 +535,6 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
             case Grid grid:
                 grid.Margin = new Thickness(0);
-                grid.ColumnSpacing = 4;
                 grid.HorizontalAlignment = HorizontalAlignment.Stretch;
                 foreach (var child in grid.Children.OfType<Control>())
                     ConfigurePropertyValueControl(child);
@@ -623,74 +614,21 @@ internal sealed class CadPropertyInspectorController : IDisposable
             _collapsedCategories.TryGetValue(categoryKey, out var stored) && stored;
         var body = new StackPanel
         {
-            IsVisible = !collapsed,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         foreach (var row in rows)
             body.Children.Add(row);
 
-        var chevron = new TextBlock
+        var expander = new Expander
         {
-            Text = collapsed ? "▶" : "▼",
-            Width = CadTheme.PropertyChevronWidth,
-            FontSize = 9.0,
-            Foreground = CadTheme.Muted,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextAlignment = TextAlignment.Center
-        };
-        var titleText = new TextBlock
-        {
-            Text = title,
-            FontWeight = FontWeight.SemiBold,
-            FontSize = 11.5,
-            Foreground = CadTheme.Text,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        };
-        var headerContent = new Grid
-        {
-            ColumnSpacing = 4,
-            Margin = new Thickness(6, 0, 6, 0),
+            Header = title,
+            Content = body,
+            IsExpanded = !collapsed,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        headerContent.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-        headerContent.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
-        headerContent.Children.Add(chevron);
-        Grid.SetColumn(titleText, 1);
-        headerContent.Children.Add(titleText);
-
-        var header = new Button
-        {
-            Content = headerContent,
-            Height = CadTheme.PropertyCategoryHeaderHeight + 2,
-            Padding = new Thickness(0),
-            Margin = new Thickness(0),
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            VerticalContentAlignment = VerticalAlignment.Center,
-            Background = CadTheme.Header,
-            Foreground = CadTheme.Text,
-            BorderBrush = CadTheme.Border,
-            BorderThickness = new Thickness(0, 1, 0, 1),
-            CornerRadius = new CornerRadius(0)
-        };
-        header.Classes.Add("cad-category-header");
-        header.Click += (_, _) =>
-        {
-            var nextCollapsed = body.IsVisible;
-            body.IsVisible = !nextCollapsed;
-            chevron.Text = nextCollapsed ? "▶" : "▼";
-            _collapsedCategories[categoryKey] = nextCollapsed;
-        };
-
-        var section = new StackPanel
-        {
-            HorizontalAlignment = HorizontalAlignment.Stretch
-        };
-        section.Children.Add(header);
-        section.Children.Add(body);
-        _host.Children.Add(section);
+        expander.Expanded += (_, _) => _collapsedCategories[categoryKey] = false;
+        expander.Collapsed += (_, _) => _collapsedCategories[categoryKey] = true;
+        _host.Children.Add(expander);
     }
 
     private Control CreateEditor(PropertySlot slot)
@@ -824,7 +762,6 @@ internal sealed class CadPropertyInspectorController : IDisposable
             SelectedItem = isMixed ? null : value,
             PlaceholderText = isMixed ? "—" : null
         };
-        combo.Classes.Add("cad-input");
         combo.SelectionChanged += (_, _) =>
         {
             if (_refreshing || combo.SelectedItem is not string layerName)
@@ -879,7 +816,6 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 : items.FirstOrDefault(item => Equals(item.Value, value)),
             PlaceholderText = isMixed ? "—" : null
         };
-        combo.Classes.Add("cad-input");
         combo.SelectionChanged += (_, _) =>
         {
             if (_refreshing || combo.SelectedItem is not EnumChoice choice)
@@ -921,7 +857,6 @@ internal sealed class CadPropertyInspectorController : IDisposable
                     ? $"{CadLanguageManager.Text("Cad.Text.ByLayer", "ByLayer")} · #{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
                     : $"#{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
         };
-        button.Classes.Add("cad-compact");
         ToolTip.SetTip(button, CadLanguageManager.Text("Cad.Text.Color", "Color"));
         button.Click += async (_, _) =>
         {
@@ -950,9 +885,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
             VerticalAlignment = VerticalAlignment.Center,
             Text = initialText,
             PlaceholderText = isMixed ? "—" : null,
-            TextAlignment = TextAlignment.Right
+            TextAlignment = TextAlignment.Left
         };
-        editor.Classes.Add("cad-input");
 
         var rangeHint = NumericRangeHint(descriptor.Value);
         if (rangeHint is not null)
@@ -1025,7 +959,6 @@ internal sealed class CadPropertyInspectorController : IDisposable
             Text = initialText,
             PlaceholderText = isMixed ? "—" : null
         };
-        editor.Classes.Add("cad-input");
 
         void Commit(bool revertOnInvalid)
         {
@@ -1095,21 +1028,22 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         var grid = new Grid
         {
-            ColumnSpacing = 2,
-            VerticalAlignment = VerticalAlignment.Center
+            ColumnSpacing = 6,
+            RowSpacing = 2,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(18)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
         for (var index = 0; index < 3; index++)
-        {
-            grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-            grid.ColumnDefinitions.Add(
-                new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
-        }
+            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
 
         AddCoordinate("X", xEditor, 0);
-        AddCoordinate("Y", yEditor, 2);
-        AddCoordinate("Z", zEditor, 4);
+        AddCoordinate("Y", yEditor, 1);
+        AddCoordinate("Z", zEditor, 2);
 
-        void AddCoordinate(string label, TextBox editor, int column)
+        void AddCoordinate(string label, TextBox editor, int row)
         {
             var caption = new TextBlock
             {
@@ -1117,11 +1051,12 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 Foreground = CadTheme.Muted,
                 FontSize = CadTheme.CaptionFontSize,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(2, 0)
+                HorizontalAlignment = HorizontalAlignment.Center
             };
-            Grid.SetColumn(caption, column);
+            Grid.SetRow(caption, row);
             grid.Children.Add(caption);
-            Grid.SetColumn(editor, column + 1);
+            Grid.SetColumn(editor, 1);
+            Grid.SetRow(editor, row);
             grid.Children.Add(editor);
         }
 
@@ -1157,9 +1092,6 @@ internal sealed class CadPropertyInspectorController : IDisposable
             };
             editor.LostFocus += (_, _) =>
             {
-                // LostFocus is raised while the focus transition is still in
-                // progress. Defer the decision so Tab between X/Y/Z does not
-                // rebuild the entire PropertyGrid and destroy the next editor.
                 global::Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     if (_disposed || _refreshing)
@@ -1180,21 +1112,18 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         return grid;
 
-        static TextBox CoordinateEditor(double? coordinate, bool mixed)
-        {
-            var editor = new TextBox
+        static TextBox CoordinateEditor(double? coordinate, bool mixed) =>
+            new()
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Left,
                 Text = mixed || coordinate is null
                     ? string.Empty
                     : coordinate.Value.ToString("0.######", CultureInfo.CurrentCulture),
                 PlaceholderText = mixed ? "—" : null,
-                MinWidth = 36
+                MinWidth = 48
             };
-            editor.Classes.Add("cad-input");
-            return editor;
-        }
     }
 
     private static string? NumericRangeHint(CadValueDescriptor descriptor)

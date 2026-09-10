@@ -366,10 +366,13 @@ public sealed class CadWorkPlane
                 OcctVector3d.UnitY,
                 OcctVector3d.UnitZ,
                 preset),
+            // Front/XZ drawing uses world X as the horizontal axis and world Z
+            // as the vertical axis. This keeps typed X,Z coordinates and the
+            // screen-space drafting convention consistent with XY and YZ.
             CadWorkPlanePreset.XZ => CreateFrame(
                 origin,
-                OcctVector3d.UnitZ,
                 OcctVector3d.UnitX,
+                OcctVector3d.UnitZ,
                 preset),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(preset))

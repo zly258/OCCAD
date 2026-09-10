@@ -13,7 +13,7 @@ public sealed class TextTool : CadDrawingTool, ICadPointInputTool
     public override string Id => "text";
     public override string DisplayName => "Text";
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new(
             "Text",
             [

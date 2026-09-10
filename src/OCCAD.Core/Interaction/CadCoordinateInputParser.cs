@@ -17,7 +17,9 @@ public readonly record struct CadCoordinateInput(
     double? AngleDegrees = null);
 
 /// <summary>
-/// Parses AutoCAD-style point input in the active work-plane/UCS frame.
+/// Parses AutoCAD-style point input in the active drawing-plane/UCS frame.
+/// Absolute and relative input deliberately use the same effective frame so
+/// typed coordinates remain correct after XY/XZ/YZ or custom plane changes.
 /// Supported forms:
 /// 100,200
 /// 100,200,50
@@ -49,7 +51,7 @@ public static class CadCoordinateInputParser
         if (!TryParseCartesian(value, out var x, out var y, out var z, out var hasZ))
             return false;
 
-        var frame = relative ? workPlane.EffectivePlane : workPlane.UserPlane;
+        var frame = workPlane.EffectivePlane;
         if (!frame.XAxis.Cross(frame.YAxis).TryNormalize(out var normal))
             return false;
 
@@ -95,7 +97,7 @@ public static class CadCoordinateInputParser
         if (!TryDouble(value[(separator + 1)..], out var angleDegrees))
             return false;
 
-        var frame = relative ? workPlane.EffectivePlane : workPlane.UserPlane;
+        var frame = workPlane.EffectivePlane;
         var radians = angleDegrees * Math.PI / 180.0;
         var direction =
             frame.XAxis * Math.Cos(radians) +

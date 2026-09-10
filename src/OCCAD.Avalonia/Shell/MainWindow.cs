@@ -267,7 +267,7 @@ internal sealed class MainWindow : Window
             ViewOrientation = OcctViewOrientation.Isometric,
             Projection = OcctProjectionType.Orthographic,
             TriedronVisible = true,
-            ViewCubeVisible = true
+            ViewCubeVisible = false
         };
     }
 
@@ -311,6 +311,7 @@ internal sealed class MainWindow : Window
         _viewport.ErrorOccurred += (_, args) => ShowFeedback(args.Exception.Message);
         _viewport.PreviewKeyInput += ViewportShortcutKeyInput;
         _viewport.PreviewPointerInput += ViewportContextPointerInput;
+        _viewport.TextInput += ViewportTextInput;
         _viewportController.CoordinateChanged += (_, args) =>
         {
             var point = args.Value.Point;
@@ -444,6 +445,25 @@ internal sealed class MainWindow : Window
             input.Handled = true;
             BeginCommandEntry(digit);
         }
+    }
+
+    private void ViewportTextInput(object? sender, TextInputEventArgs args)
+    {
+        if (_workspace.Tools.ActiveTool is null ||
+            string.IsNullOrEmpty(args.Text) ||
+            args.Text.Length != 1)
+            return;
+
+        // OcctKey intentionally models command/navigation keys only. Printable
+        // punctuation needed by exact point syntax is routed from Avalonia text
+        // input so @relative, #absolute, negative and decimal values can start
+        // directly while the viewport owns focus.
+        var character = args.Text[0];
+        if (character is not ('@' or '#' or '-' or '+' or '.' or ',' or '<'))
+            return;
+
+        BeginCommandEntry(args.Text);
+        args.Handled = true;
     }
 
     private void ViewportContextPointerInput(

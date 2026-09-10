@@ -34,7 +34,7 @@ public sealed class ArrayTool : CadSelectionTransformToolBase, ICadPointInputToo
 
     protected override bool AutoCommitValidSelection => true;
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         string.Equals(_mode, "Circular", StringComparison.OrdinalIgnoreCase)
             ? new(
                 "Array",

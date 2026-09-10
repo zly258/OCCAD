@@ -63,7 +63,8 @@ public sealed class SettingsAndSchemaTests
             new ChamferTool(),
             new FilletTool(),
             new OffsetTool(),
-            new CopyTool()
+            new CopyTool(),
+            new TextTool()
         ];
 
         foreach (var tool in tools)

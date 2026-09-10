@@ -132,7 +132,7 @@ public sealed class CadWorkspace : IDisposable
     public void AddEntity(CadEntity entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
-        entity.Layer = Layers.Current.Name;
+        entity.LayerId = Layers.Current.Id;
         CadTransaction.Execute(this,
             new CadAddEntitiesHistoryEntry(
                 Document,
@@ -282,7 +282,7 @@ public sealed class CadWorkspace : IDisposable
         ArgumentNullException.ThrowIfNull(layer);
         _ = Layers.IndexOf(layer);
 
-        var entities = Document.GetEntitiesByLayer(layer.Name);
+        var entities = Document.GetEntitiesByLayer(layer.Id);
         if (entities.Count > 0)
             throw new InvalidOperationException(
                 $"Layer '{layer.Name}' contains {entities.Count} " +
@@ -293,14 +293,14 @@ public sealed class CadWorkspace : IDisposable
 
     public void AssignEntitiesToLayer(
         IEnumerable<CadEntity> entities,
-        string layerName)
+        string layerReference)
     {
         ArgumentNullException.ThrowIfNull(entities);
-        var layer = Layers.GetRequired(layerName);
+        var layer = Layers.GetRequired(layerReference);
         ApplyStateChange(
             entities,
             $"Assign Layer {layer.Name}",
-            entity => entity.Layer = layer.Name);
+            entity => entity.LayerId = layer.Id);
     }
 
     public void SetLayerVisible(CadLayer layer, bool visible) =>
@@ -581,7 +581,7 @@ public sealed class CadWorkspace : IDisposable
     public CadLayerState CaptureLayerState(CadLayer layer)
     {
         ArgumentNullException.ThrowIfNull(layer);
-        Layers.GetRequired(layer.Name);
+        Layers.GetRequiredById(layer.Id);
         return layer.CaptureState();
     }
 
@@ -618,7 +618,7 @@ public sealed class CadWorkspace : IDisposable
         string name)
     {
         ArgumentNullException.ThrowIfNull(layer);
-        Layers.GetRequired(layer.Name);
+        Layers.GetRequiredById(layer.Id);
         var after = layer.CaptureState();
         if (before == after) return;
 
@@ -829,7 +829,7 @@ public sealed class CadWorkspace : IDisposable
     {
         ArgumentNullException.ThrowIfNull(layer);
         ArgumentNullException.ThrowIfNull(action);
-        Layers.GetRequired(layer.Name);
+        Layers.GetRequiredById(layer.Id);
 
         var before = layer.CaptureState();
         try

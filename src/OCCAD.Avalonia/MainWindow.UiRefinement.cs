@@ -147,7 +147,12 @@ public sealed partial class MainWindow
 
     private void AddQuickAccessToolbar()
     {
-        if (_snapToggle.Parent is not StackPanel toolbar ||
+        // The native Ribbon already owns File/Edit/Fit entry points. Once the
+        // Ribbon is active, the legacy toolbar has been removed from the visual
+        // tree, so adding quick-access buttons to that detached StackPanel only
+        // creates invisible controls and duplicate language/state updates.
+        if (IsRibbonApplied ||
+            _snapToggle.Parent is not StackPanel toolbar ||
             _quickAccessButtons.Count != 0)
             return;
 

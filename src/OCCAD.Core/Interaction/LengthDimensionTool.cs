@@ -39,6 +39,13 @@ public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
 
     protected override bool CanStepBackCore => _start is not null;
 
+    public override bool CanCommitCurrentStage =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        TryResolveExactStagePoint(out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnActivated()
     {
         _start = null;
@@ -77,6 +84,9 @@ public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
 
     protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
     {
+        if (TryResolveExactStagePoint(out var exactPoint))
+            return AcceptPoint(exactPoint);
+
         var reference = _end is not null
             ? Context.WorkPlane.Origin
             : _start;
@@ -85,6 +95,18 @@ public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive && State == CadToolState.Drawing && AcceptPoint(point);
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+        {
+            if (_start is { } start && _end is { } end)
+                UpdatePreview(start, end, exactPoint);
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
+    }
 
     protected override bool OnSetParameter(string id, string value)
     {
@@ -200,6 +222,26 @@ public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
         return true;
     }
 
+    private bool TryResolveExactStagePoint(out OcctPoint3d point)
+    {
+        point = default;
+        if (_start is not { } start)
+            return false;
+
+        if (_end is null)
+        {
+            return CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                start,
+                out point);
+        }
+
+        return CadExactInputGeometry.TryResolveLengthAnglePoint(
+            Context.Workspace,
+            Context.WorkPlane.Origin,
+            out point);
+    }
+
     private void UpdatePreview(
         OcctPoint3d start,
         OcctPoint3d end,
@@ -278,7 +320,7 @@ public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
 
         SetStageLocalized(
             2,
-            "Cad.Prompt.LengthDimension.Line",
+            "Cad.Prompt.LengthDimension.Position",
             "Dimension: specify dimension-line offset [Backspace undo, Esc cancel]",
             CadPrecisionInputKind.Length);
     }

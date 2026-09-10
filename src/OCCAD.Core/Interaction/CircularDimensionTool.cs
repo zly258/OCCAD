@@ -18,6 +18,18 @@ public sealed class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
     public override string Id => "circulardimension";
     public override string DisplayName =>
         IsDiameter ? "Diameter Dimension" : "Radius Dimension";
+    public override string PrecisionLengthLabel => Stage switch
+    {
+        1 => "Radius",
+        2 => "Leader Distance",
+        _ => base.PrecisionLengthLabel
+    };
+    public override string PrecisionAngleLabel => Stage switch
+    {
+        1 => "Direction",
+        2 => "Leader Angle",
+        _ => base.PrecisionAngleLabel
+    };
 
     public override CadToolPanelDescriptor ParameterPanel
     {
@@ -60,6 +72,13 @@ public sealed class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
 
     protected override bool CanStepBackCore => _center is not null;
 
+    public override bool CanCommitCurrentStage =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        TryResolveExactStagePoint(out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     private bool IsDiameter =>
         _kind.Equals(DiameterKind, StringComparison.OrdinalIgnoreCase);
 
@@ -98,13 +117,30 @@ public sealed class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
                 _center).Point);
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(pointer, _center, AcceptPoint);
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+            return AcceptPoint(exactPoint);
+
+        return CommitResolvedPoint(pointer, _center, AcceptPoint);
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive &&
         State == CadToolState.Drawing &&
         AcceptPoint(point);
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (_center is { } center &&
+            TryResolveExactStagePoint(out var exactPoint))
+        {
+            UpdatePreview(center, exactPoint);
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
+    }
 
     protected override bool OnSetParameter(string id, string value)
     {
@@ -212,6 +248,16 @@ public sealed class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
 
         CommitPreview(entity);
         return true;
+    }
+
+    private bool TryResolveExactStagePoint(out OcctPoint3d point)
+    {
+        point = default;
+        return _center is { } center &&
+               CadExactInputGeometry.TryResolveLengthAnglePoint(
+                   Context.Workspace,
+                   center,
+                   out point);
     }
 
     private void UpdatePreview(OcctPoint3d center, OcctPoint3d point)

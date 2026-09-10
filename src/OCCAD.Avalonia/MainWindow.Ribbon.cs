@@ -11,6 +11,7 @@ public sealed partial class MainWindow
 {
     private readonly Dictionary<string, List<Button>> _ribbonActionButtons =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<RibbonActionMenuBinding> _ribbonActionMenus = [];
     private readonly Dictionary<string, ToggleButton> _ribbonPanelToggles =
         new(StringComparer.OrdinalIgnoreCase);
     private Border? _ribbonHost;
@@ -65,6 +66,7 @@ public sealed partial class MainWindow
         DetachRibbonControl(_layerCombo);
 
         _ribbonActionButtons.Clear();
+        _ribbonActionMenus.Clear();
         _ribbonPanelToggles.Clear();
         _ribbonHost.Child = BuildRibbonContent();
         RefreshRibbonActionUi();
@@ -132,29 +134,35 @@ public sealed partial class MainWindow
                     RibbonAction("draw.polygon", "Cad.Text.Polygon", "Polygon"),
                     RibbonAction("draw.spline", "Cad.Text.Spline", "Spline")),
                 RibbonGroup(
-                    "Cad.Text.Circle",
-                    "Circle",
-                    RibbonAction("draw.circle.centerradius", "Cad.Parameter.circle.Method.CenterRadius", "Center + Radius"),
-                    RibbonAction("draw.circle.centerdiameter", "Cad.Parameter.circle.Method.CenterDiameter", "Center + Diameter"),
-                    RibbonAction("draw.circle.twopoints", "Cad.Parameter.circle.Method.TwoPoints", "Two Points"),
-                    RibbonAction("draw.circle.threepoints", "Cad.Parameter.circle.Method.ThreePoints", "Three Points"),
-                    RibbonAction("draw.circle.pointcenter", "Cad.Parameter.circle.Method.PointCenter", "Point + Center")),
-                RibbonGroup(
-                    "Cad.Text.Arc",
-                    "Arc",
-                    RibbonAction("draw.arc.threepoints", "Cad.Parameter.arc.Method.ThreePoints", "Three Points"),
-                    RibbonAction("draw.arc.centerstartend", "Cad.Parameter.arc.Method.CenterStartEnd", "Center + Start + End"),
-                    RibbonAction("draw.arc.startcenterend", "Cad.Parameter.arc.Method.StartCenterEnd", "Start + Center + End"),
-                    RibbonAction("draw.arc.startendcenter", "Cad.Parameter.arc.Method.StartEndCenter", "Start + End + Center"),
-                    RibbonAction("draw.arc.startendpoint", "Cad.Parameter.arc.Method.StartEndPoint", "Start + End + Point"),
-                    RibbonAction("draw.arc.startendtangent", "Cad.Parameter.arc.Method.StartEndTangent", "Start + End + Tangent")),
-                RibbonGroup(
-                    "Cad.Text.Curves",
-                    "Curves",
-                    RibbonAction("draw.regularpolygon.inscribed", "Cad.Parameter.regularpolygon.mode.Inscribed", "Polygon Inscribed"),
-                    RibbonAction("draw.regularpolygon.circumscribed", "Cad.Parameter.regularpolygon.mode.Circumscribed", "Polygon Circumscribed"),
-                    RibbonAction("draw.ellipse.centermajor", "Cad.Parameter.ellipse.Method.CenterMajorMinor", "Ellipse Center + Axes"),
-                    RibbonAction("draw.ellipse.axisendpoints", "Cad.Parameter.ellipse.Method.AxisEndpointsMinor", "Ellipse Axis Endpoints")),
+                    "Cad.Text.Construction",
+                    "Construction",
+                    RibbonActionMenu(
+                        "Cad.Text.Circle",
+                        "Circle",
+                        new("draw.circle.centerradius", "Cad.Parameter.circle.Method.CenterRadius", "Center + Radius"),
+                        new("draw.circle.centerdiameter", "Cad.Parameter.circle.Method.CenterDiameter", "Center + Diameter"),
+                        new("draw.circle.twopoints", "Cad.Parameter.circle.Method.TwoPoints", "Two Points"),
+                        new("draw.circle.threepoints", "Cad.Parameter.circle.Method.ThreePoints", "Three Points"),
+                        new("draw.circle.pointcenter", "Cad.Parameter.circle.Method.PointCenter", "Point + Center")),
+                    RibbonActionMenu(
+                        "Cad.Text.Arc",
+                        "Arc",
+                        new("draw.arc.threepoints", "Cad.Parameter.arc.Method.ThreePoints", "Three Points"),
+                        new("draw.arc.centerstartend", "Cad.Parameter.arc.Method.CenterStartEnd", "Center + Start + End"),
+                        new("draw.arc.startcenterend", "Cad.Parameter.arc.Method.StartCenterEnd", "Start + Center + End"),
+                        new("draw.arc.startendcenter", "Cad.Parameter.arc.Method.StartEndCenter", "Start + End + Center"),
+                        new("draw.arc.startendpoint", "Cad.Parameter.arc.Method.StartEndPoint", "Start + End + Point"),
+                        new("draw.arc.startendtangent", "Cad.Parameter.arc.Method.StartEndTangent", "Start + End + Tangent")),
+                    RibbonActionMenu(
+                        "Cad.Text.RegularPolygon",
+                        "Regular Polygon",
+                        new("draw.regularpolygon.inscribed", "Cad.Parameter.regularpolygon.mode.Inscribed", "Inscribed"),
+                        new("draw.regularpolygon.circumscribed", "Cad.Parameter.regularpolygon.mode.Circumscribed", "Circumscribed")),
+                    RibbonActionMenu(
+                        "Cad.Text.Ellipse",
+                        "Ellipse",
+                        new("draw.ellipse.centermajor", "Cad.Parameter.ellipse.Method.CenterMajorMinor", "Center + Axes"),
+                        new("draw.ellipse.axisendpoints", "Cad.Parameter.ellipse.Method.AxisEndpointsMinor", "Axis Endpoints"))),
                 RibbonGroup(
                     "Cad.Text.Modeling",
                     "Model",
@@ -345,6 +353,53 @@ public sealed partial class MainWindow
         return button;
     }
 
+    private Button RibbonActionMenu(
+        string resourceKey,
+        string fallback,
+        params RibbonMenuAction[] actions)
+    {
+        ArgumentNullException.ThrowIfNull(actions);
+        if (actions.Length == 0)
+            throw new ArgumentException("Ribbon action menu requires at least one action.", nameof(actions));
+
+        var button = RibbonButton(
+            CadLanguageManager.Text(resourceKey, fallback) + " ▾");
+        var items = actions
+            .Select(action =>
+            {
+                var item = new MenuItem
+                {
+                    Header = CadLanguageManager.Text(action.ResourceKey, action.Fallback),
+                    Tag = action.Id
+                };
+                item.Click += (_, _) =>
+                {
+                    ExecuteAction(action.Id);
+                    _viewport.Focus();
+                };
+                return item;
+            })
+            .ToArray();
+
+        var menu = new ContextMenu
+        {
+            ItemsSource = items
+        };
+        menu.Opening += (_, _) =>
+        {
+            for (var index = 0; index < actions.Length; index++)
+            {
+                items[index].IsEnabled =
+                    _workspace.Actions.Find(actions[index].Id)?.CanExecute() == true;
+            }
+        };
+        button.ContextMenu = menu;
+        button.Click += (_, _) => menu.Open(button);
+
+        _ribbonActionMenus.Add(new RibbonActionMenuBinding(button, actions));
+        return button;
+    }
+
     private static Button RibbonButton(string text)
     {
         var button = new Button
@@ -413,6 +468,12 @@ public sealed partial class MainWindow
             foreach (var button in pair.Value)
                 button.IsEnabled = enabled;
         }
+
+        foreach (var binding in _ribbonActionMenus)
+        {
+            binding.Button.IsEnabled = binding.Actions.Any(action =>
+                _workspace.Actions.Find(action.Id)?.CanExecute() == true);
+        }
     }
 
     private void RefreshRibbonPanelState()
@@ -460,4 +521,13 @@ public sealed partial class MainWindow
         else if (control.Parent is ContentControl content && ReferenceEquals(content.Content, control))
             content.Content = null;
     }
+
+    private sealed record RibbonMenuAction(
+        string Id,
+        string ResourceKey,
+        string Fallback);
+
+    private sealed record RibbonActionMenuBinding(
+        Button Button,
+        IReadOnlyList<RibbonMenuAction> Actions);
 }

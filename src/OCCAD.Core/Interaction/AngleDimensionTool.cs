@@ -41,6 +41,13 @@ public sealed class AngleDimensionTool : CadDrawingTool, ICadPointInputTool
 
     protected override bool CanStepBackCore => _vertex is not null;
 
+    public override bool CanCommitCurrentStage =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        TryResolveExactStagePoint(out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnActivated()
     {
         _vertex = null;
@@ -82,11 +89,35 @@ public sealed class AngleDimensionTool : CadDrawingTool, ICadPointInputTool
                 PrecisionReferencePoint).Point);
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(pointer, PrecisionReferencePoint, AcceptPoint);
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+            return AcceptPoint(exactPoint);
+
+        return CommitResolvedPoint(
+            pointer,
+            PrecisionReferencePoint,
+            AcceptPoint);
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive && State == CadToolState.Drawing && AcceptPoint(point);
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+        {
+            if (_vertex is { } vertex &&
+                _firstRayPoint is { } first &&
+                _secondRayPoint is { } second)
+            {
+                UpdatePreview(vertex, first, second, exactPoint);
+            }
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
+    }
 
     protected override bool OnSetParameter(string id, string value)
     {
@@ -200,6 +231,34 @@ public sealed class AngleDimensionTool : CadDrawingTool, ICadPointInputTool
         _preview = null;
         CommitPreview(entity);
         return true;
+    }
+
+    private bool TryResolveExactStagePoint(out OcctPoint3d point)
+    {
+        point = default;
+        if (_vertex is not { } vertex)
+            return false;
+
+        if (_firstRayPoint is null || _secondRayPoint is null)
+        {
+            return CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                vertex,
+                out point);
+        }
+
+        var drafting = Context.Workspace.Drafting;
+        if (!drafting.LengthLockEnabled ||
+            !double.IsFinite(drafting.LockedLength) ||
+            drafting.LockedLength <= 1e-9)
+            return false;
+
+        return CadExactInputGeometry.TryResolveAnglePoint(
+            Context.Workspace,
+            vertex,
+            0.0,
+            drafting.LockedLength,
+            out point);
     }
 
     private void UpdatePreview(

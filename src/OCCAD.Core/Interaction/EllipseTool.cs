@@ -40,12 +40,17 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
     protected override void OnActivated()
     {
         Reset();
-        _initialPlane = CaptureWorkPlaneFrame();
-        _planeOrigin = Context.WorkPlane.Origin;
-        _normal = Context.WorkPlane.Normal;
-        _planeX = Context.WorkPlane.XAxis;
-        _planeY = Context.WorkPlane.YAxis;
+        CaptureCurrentWorkPlane();
         RestorePrompt();
+    }
+
+    protected internal override void OnWorkPlaneChanged()
+    {
+        // Ellipse construction uses a cached planar basis. Refresh it when the
+        // active XY/YZ/XZ preset changes so subsequent points, preview geometry,
+        // and committed geometry all use the same effective work plane.
+        CaptureCurrentWorkPlane();
+        NotifyUpdated();
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
@@ -511,6 +516,15 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
             point,
             _planeX,
             _planeY);
+
+    private void CaptureCurrentWorkPlane()
+    {
+        _initialPlane = CaptureWorkPlaneFrame();
+        _planeOrigin = Context.WorkPlane.Origin;
+        _normal = Context.WorkPlane.Normal;
+        _planeX = Context.WorkPlane.XAxis;
+        _planeY = Context.WorkPlane.YAxis;
+    }
 
     private void Reset()
     {

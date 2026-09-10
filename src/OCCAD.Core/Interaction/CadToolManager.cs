@@ -16,6 +16,8 @@ public sealed class CadToolChangedEventArgs(CadTool? tool) : EventArgs
 
 public sealed class CadToolManager
 {
+    private const int MaximumPlaneRollbackSteps = 32;
+
     private readonly CadToolRegistry _registry;
     private readonly CadToolContext _context;
     private bool _transitioning;
@@ -60,15 +62,30 @@ public sealed class CadToolManager
 
     public bool CanChangeDrawingPlane =>
         !_context.WorkPlane.UserPlaneLocked &&
-        !_context.WorkPlane.ToolPlaneFixed &&
-        !_context.WorkPlane.GripPlaneFixed;
+        !_context.WorkPlane.GripPlaneFixed &&
+        (!_context.WorkPlane.ToolPlaneFixed || ActiveTool is { CanStepBack: true });
 
     public bool TryChangeDrawingPlane(CadWorkPlanePreset preset)
     {
         if (!Enum.IsDefined(preset))
             throw new ArgumentOutOfRangeException(nameof(preset));
-        if (!CanChangeDrawingPlane)
+        if (_context.WorkPlane.UserPlaneLocked ||
+            _context.WorkPlane.GripPlaneFixed)
             return false;
+
+        // A drawing stage may temporarily fix a construction plane (for example,
+        // the height stage of a primitive). Switching the user preset in that
+        // state must not mix points from incompatible frames. Roll the active
+        // tool back to the nearest stage that permits a plane change, then apply
+        // the preset through the same Core path used by every UI surface.
+        var rollbackSteps = 0;
+        while (_context.WorkPlane.ToolPlaneFixed)
+        {
+            if (rollbackSteps++ >= MaximumPlaneRollbackSteps ||
+                ActiveTool is not { CanStepBack: true } ||
+                !StepBackCurrent())
+                return false;
+        }
 
         var tool = ActiveTool;
         var origin = tool?.PrecisionReferencePoint ?? _context.WorkPlane.Origin;

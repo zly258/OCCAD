@@ -23,8 +23,7 @@ internal enum CadMessageDialogKind
 }
 
 /// <summary>
-/// Compact Fluent message dialog shared by all OCCAD confirmation and notice
-/// flows. No decorative icons: message and actions remain the visual priority.
+/// Compact Fluent message dialog shared by OCCAD confirmation and notice flows.
 /// </summary>
 internal sealed class CadMessageDialog : Window
 {
@@ -134,7 +133,7 @@ internal sealed class CadMessageDialog : Window
 
         if (yesNoCancel)
         {
-            var yes = DialogButton(CadLanguageManager.Text("Cad.Text.Yes", "Yes"), primary: true);
+            var yes = DialogButton(CadLanguageManager.Text("Cad.Text.Yes", "Yes"));
             yes.Click += (_, _) => CloseWith(CadDialogResult.Yes);
             buttons.Children.Add(yes);
 
@@ -148,7 +147,7 @@ internal sealed class CadMessageDialog : Window
         }
         else
         {
-            var ok = DialogButton(CadLanguageManager.Text("Cad.Text.OK", "OK"), primary: true);
+            var ok = DialogButton(CadLanguageManager.Text("Cad.Text.OK", "OK"));
             ok.Click += (_, _) => CloseWith(CadDialogResult.Ok);
             buttons.Children.Add(ok);
         }
@@ -162,17 +161,13 @@ internal sealed class CadMessageDialog : Window
         Close(_result);
     }
 
-    private static Button DialogButton(string text, bool primary = false)
-    {
-        var button = new Button
+    private static Button DialogButton(string text) =>
+        new()
         {
             Content = text,
             MinWidth = CadTheme.DialogButtonWidth,
-            MinHeight = CadTheme.ControlHeight
+            MinHeight = CadTheme.ControlHeight,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center
         };
-        button.Classes.Add("cad-compact");
-        if (primary)
-            button.Classes.Add("cad-primary");
-        return button;
-    }
 }

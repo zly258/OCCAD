@@ -57,7 +57,24 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool, ICa
         _sides = DefaultSides;
         _inscribed = true;
         _initialPlane = CaptureWorkPlaneFrame();
+        _normal = Context.WorkPlane.Normal;
+        _planeX = Context.WorkPlane.XAxis;
+        _planeY = Context.WorkPlane.YAxis;
         SetCenterPrompt();
+    }
+
+    protected internal override void OnWorkPlaneChanged()
+    {
+        // The regular-polygon geometry caches a plane frame because its axis and
+        // circumscribed rotation are evaluated in that frame. Refresh the cache
+        // whenever XY/YZ/XZ changes; otherwise the work-plane buttons appear to
+        // change while the polygon keeps using the plane captured at activation.
+        _initialPlane = CaptureWorkPlaneFrame();
+        _normal = Context.WorkPlane.Normal;
+        _planeX = Context.WorkPlane.XAxis;
+        _planeY = Context.WorkPlane.YAxis;
+        _currentPoint = null;
+        NotifyUpdated();
     }
 
     public bool TryExecuteOption(string input, out bool success, out string? message)

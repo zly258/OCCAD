@@ -37,22 +37,11 @@ public sealed partial class MainWindow
 
     private void MainWindowKeyDown(object? sender, KeyEventArgs e)
     {
-        // Escape is an application-level CAD cancel command. It must work even
-        // when focus is inside a Tool parameter TextBox rather than the viewport.
+        // Escape is the application-level CAD cancel command and must work even
+        // while focus is inside a parameter editor instead of the viewport.
         if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None)
         {
-            if (_workspace.Tools.ActiveTool is not null)
-                _workspace.Tools.CancelCurrent();
-
-            _workspace.Selection.Clear();
-            _workspace.Subobjects.Clear();
-            _workspace.Preselection.Clear();
-            _workspace.Snap.Clear();
-            _workspace.Tracking.Clear();
-            ShowStatusFeedback(null);
-            RefreshActionUi();
-            RefreshOperationStatus();
-            _viewport.Focus();
+            ClearCadCommandAndSelection();
             e.Handled = true;
             return;
         }

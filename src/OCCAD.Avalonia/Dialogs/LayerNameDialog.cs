@@ -25,7 +25,6 @@ internal sealed class LayerNameDialog : Window
             Text = initialName,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        _input.Classes.Add("cad-input");
         _input.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter)
@@ -54,7 +53,7 @@ internal sealed class LayerNameDialog : Window
 
         var cancel = DialogButton(CadLanguageManager.Text("Cad.Text.Cancel", "Cancel"));
         cancel.Click += (_, _) => Close((string?)null);
-        var ok = DialogButton(CadLanguageManager.Text("Cad.Text.Accept", "OK"), primary: true);
+        var ok = DialogButton(CadLanguageManager.Text("Cad.Text.Accept", "OK"));
         ok.Click += (_, _) => Accept();
 
         var actions = new StackPanel
@@ -96,17 +95,13 @@ internal sealed class LayerNameDialog : Window
         Close(value);
     }
 
-    private static Button DialogButton(string text, bool primary = false)
-    {
-        var button = new Button
+    private static Button DialogButton(string text) =>
+        new()
         {
             Content = text,
             MinWidth = CadTheme.DialogButtonWidth,
-            MinHeight = CadTheme.ControlHeight
+            MinHeight = CadTheme.ControlHeight,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center
         };
-        button.Classes.Add("cad-compact");
-        if (primary)
-            button.Classes.Add("cad-primary");
-        return button;
-    }
 }

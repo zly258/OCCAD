@@ -12,8 +12,11 @@ internal sealed record CadShellCommand(
 
 /// <summary>
 /// Thin action-driven Ribbon adapter. Layout follows ModelScript's compact
-/// three-row industrial Ribbon; every CAD command still resolves through Core's
+/// three-row industrial Ribbon; every CAD command resolves through Core's
 /// authoritative <see cref="CadActionManager"/>.
+///
+/// The shell intentionally exposes only the current common 2D/3D and edit
+/// surface. It must not advertise dormant experimental implementations.
 /// </summary>
 internal sealed class CadCompactRibbon : Border
 {
@@ -51,67 +54,52 @@ internal sealed class CadCompactRibbon : Border
             {
                 BuildHomeTab(),
                 CadRibbonBar.CreateTab(
-                    "绘图",
-                    ActionGroup("基础",
+                    "二维",
+                    ActionGroup(
+                        "基本",
                         Item("点", "draw.point"),
                         Item("直线", "draw.line"),
                         Item("多段线", "draw.polyline"),
                         Item("矩形", "draw.rectangle")),
-                    ActionGroup("圆与曲线",
+                    ActionGroup(
+                        "曲线",
                         Item("圆", "draw.circle"),
                         Item("圆弧", "draw.arc"),
                         Item("椭圆", "draw.ellipse"),
                         Item("样条", "draw.spline")),
-                    ActionGroup("构造",
-                        Item("中心线", "draw.centerline"),
-                        Item("中心标记", "draw.centermark"),
+                    ActionGroup(
+                        "多边形",
                         Item("多边形", "draw.polygon"),
-                        Item("正多边形", "draw.regularpolygon"))),
+                        Item("正多边形", "draw.regularpolygon")),
+                    ActionGroup(
+                        "中心",
+                        Item("中心线", "draw.centerline"),
+                        Item("中心标记", "draw.centermark"))),
 
                 CadRibbonBar.CreateTab(
-                    "修改",
-                    ActionGroup("变换",
+                    "编辑",
+                    ActionGroup(
+                        "变换",
                         Item("移动", "modify.move"),
                         Item("复制", "modify.copy"),
                         Item("旋转", "modify.rotate"),
                         Item("缩放", "modify.scale"),
                         Item("镜像", "modify.mirror"),
-                        Item("阵列", "modify.array")),
-                    ActionGroup("编辑",
-                        Item("偏移", "modify.offset"),
-                        Item("修剪", "modify.trim"),
-                        Item("延伸", "modify.extend"),
-                        Item("圆角", "modify.fillet"),
-                        Item("倒角", "modify.chamfer"))),
+                        Item("阵列", "modify.array"))),
 
                 CadRibbonBar.CreateTab(
-                    "建模",
-                    ActionGroup("基本实体",
+                    "三维",
+                    ActionGroup(
+                        "基本实体",
                         Item("长方体", "solid.box"),
                         Item("圆柱", "solid.cylinder"),
                         Item("圆锥", "solid.cone"),
-                        Item("球", "solid.sphere"),
-                        Item("椭球", "solid.ellipsoid"),
-                        Item("圆环", "solid.torus")),
-                    ActionGroup("特征",
-                        Item("拉伸", "feature.extrude"),
-                        Item("旋转", "feature.revolve"),
-                        Item("扫掠", "feature.sweep"),
-                        Item("放样", "feature.loft"))),
-
-                CadRibbonBar.CreateTab(
-                    "标注",
-                    ActionGroup("文字",
-                        Item("文字", "annotate.text")),
-                    ActionGroup("尺寸",
-                        Item("长度", "annotate.length"),
-                        Item("角度", "annotate.angle"),
-                        Item("半径", "annotate.radius"),
-                        Item("直径", "annotate.diameter"))),
+                        Item("球", "solid.sphere"))),
 
                 CadRibbonBar.CreateTab(
                     "视图",
-                    ActionGroup("视角",
+                    ActionGroup(
+                        "视角",
                         Item("适合", "view.fit"),
                         Item("等轴测", "view.isometric"),
                         Item("顶", "view.top"),
@@ -120,7 +108,8 @@ internal sealed class CadCompactRibbon : Border
                         Item("后", "view.back"),
                         Item("左", "view.left"),
                         Item("右", "view.right")),
-                    ActionGroup("显示",
+                    ActionGroup(
+                        "显示",
                         Item("线框", "display.wireframe"),
                         Item("着色", "display.shaded"),
                         Item("隐藏", "view.hide"),
@@ -150,24 +139,27 @@ internal sealed class CadCompactRibbon : Border
         var fileButtons = new List<Control>();
         foreach (var command in _shellCommands)
         {
-            var button = CadRibbonBar.CreateButton(
-                command.Text,
-                () => _ = ExecuteShellAsync(command),
-                command.Description);
-            fileButtons.Add(button);
+            fileButtons.Add(
+                CadRibbonBar.CreateButton(
+                    command.Text,
+                    () => _ = ExecuteShellAsync(command),
+                    command.Description));
         }
 
         return CadRibbonBar.CreateTab(
             "开始",
             CadRibbonBar.CreateGroup("文件", fileButtons),
-            ActionGroup("编辑",
+            ActionGroup(
+                "编辑",
                 Item("撤销", "edit.undo"),
                 Item("重做", "edit.redo"),
                 Item("删除", "edit.delete")),
-            ActionGroup("选择",
+            ActionGroup(
+                "选择",
                 Item("全选", "select.all"),
                 Item("反选", "select.invert")),
-            ActionGroup("工具",
+            ActionGroup(
+                "测量",
                 Item("测距", "measure.distance")));
     }
 
@@ -182,6 +174,7 @@ internal sealed class CadCompactRibbon : Border
             if (button is not null)
                 controls.Add(button);
         }
+
         return CadRibbonBar.CreateGroup(title, controls);
     }
 

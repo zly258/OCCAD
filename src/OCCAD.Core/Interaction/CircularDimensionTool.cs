@@ -65,7 +65,7 @@ public class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
         if(entity is CadCircleEntity circle) { _center=circle.Center; _normal=circle.Normal; _radius=circle.Radius; }
         else if(_kind==CadCircularDimensionKind.Radius && entity is CadArcEntity arc) { _center=arc.Center; _normal=arc.Normal; _radius=arc.Radius; }
         else return false;
-        _source=entity; Context.WorkPlane.SetPlaneLocked(true); UpdatePrompt(); return true;
+        _source=entity; Context.WorkPlane.SetToolPlaneFixed(true); UpdatePrompt(); return true;
     }
 
     public bool TryAcceptPoint(OcctPoint3d point)
@@ -84,7 +84,7 @@ public class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
         NotifyUpdated(); return true;
     }
 
-    protected override bool OnStepBack() { if(_source is null)return false; _source=null; Context.Preview.Clear(); Context.WorkPlane.SetPlaneLocked(false); UpdatePrompt(); return true; }
+    protected override bool OnStepBack() { if(_source is null)return false; _source=null; Context.Preview.Clear(); Context.WorkPlane.SetToolPlaneFixed(false); UpdatePrompt(); return true; }
     private CadCircularDimensionEntity? Create(OcctPoint3d point)
     {
         var planar=point-_center; planar-=_normal*planar.Dot(_normal);

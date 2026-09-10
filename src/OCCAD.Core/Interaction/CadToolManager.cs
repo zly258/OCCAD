@@ -54,7 +54,8 @@ public sealed class CadToolManager
     }
 
     public bool CanChangeDrawingPlane =>
-        !_context.WorkPlane.IsPlaneLocked &&
+        !_context.WorkPlane.UserPlaneLocked &&
+        !_context.WorkPlane.ToolPlaneFixed &&
         (ActiveTool is null || ActiveTool is CadDrawingTool { Stage: 0 });
 
     public bool TryChangeDrawingPlane(CadWorkPlanePreset preset)
@@ -136,7 +137,7 @@ public sealed class CadToolManager
             _context.Workspace.Tracking.Clear();
             _context.Workspace.Snap.Clear();
             _context.Workspace.Snap.Active = false;
-            _context.Workspace.WorkPlane.Deactivate();
+            _context.Workspace.WorkPlane.EndToolPlane();
             return false;
         }
 

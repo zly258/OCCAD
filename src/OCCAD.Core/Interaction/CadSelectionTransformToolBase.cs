@@ -90,7 +90,7 @@ public abstract class CadSelectionTransformToolBase : CadTool
         SetState(CadToolState.WaitForSelect);
         Context.Tracking.Clear();
         Context.Snap.Active = false;
-        Context.WorkPlane.Deactivate();
+        Context.WorkPlane.EndToolPlane();
         UpdateSelectionPrompt(Context.Selection.Selected.Count);
     }
 
@@ -100,7 +100,7 @@ public abstract class CadSelectionTransformToolBase : CadTool
         SetState(CadToolState.Drawing);
 
         if (!Context.WorkPlane.IsActive)
-            Context.WorkPlane.Activate(Context.WorkPlane.Origin);
+            Context.WorkPlane.BeginToolPlane(Context.WorkPlane.Origin);
         Context.Snap.Active = true;
 
         OnTransformStarted();

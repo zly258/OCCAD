@@ -2,8 +2,15 @@
 
 namespace OCCAD;
 
-public enum CadWorkPlanePreset { XY, YZ, XZ }
+public enum CadWorkPlanePreset { XY, YZ, XZ, Custom }
 public readonly record struct CadPlanePoint(double X, double Y);
+
+public readonly record struct CadPlaneFrame(
+    OcctPoint3d Origin,
+    OcctVector3d XAxis,
+    OcctVector3d YAxis,
+    OcctVector3d Normal,
+    CadWorkPlanePreset Preset);
 
 public enum CadTrackingKind
 {
@@ -19,12 +26,12 @@ public readonly record struct CadTrackingResult(
 
 public sealed class CadWorkPlane
 {
-    private bool _isActive;
-    private bool _planeLocked;
-    private OcctPoint3d _referenceOrigin;
-    private OcctVector3d _referenceXAxis = OcctVector3d.UnitX;
-    private OcctVector3d _referenceYAxis = OcctVector3d.UnitY;
-    private OcctVector3d _referenceNormal = OcctVector3d.UnitZ;
+    private CadPlaneFrame _userPlane;
+    private CadPlaneFrame? _toolPlane;
+    private CadPlaneFrame? _gripPlane;
+    private bool _userPlaneLocked;
+    private bool _toolPlaneFixed;
+    private bool _gripPlaneFixed;
     private bool _axisLockEnabled;
     private bool _lengthLockEnabled;
     private double _lockedLength;
@@ -35,18 +42,43 @@ public sealed class CadWorkPlane
     private double _polarIncrementDegrees = 45.0;
     private double _trackingToleranceDegrees = 2.0;
 
-    public CadWorkPlane() => SetPreset(CadWorkPlanePreset.XY);
+    public CadWorkPlane()
+    {
+        _userPlane = CreatePresetFrame(
+            CadWorkPlanePreset.XY,
+            OcctPoint3d.Origin);
+    }
 
-    public bool IsActive => _isActive;
-    public bool IsPlaneLocked => _planeLocked;
-    public OcctPoint3d Origin { get; private set; }
-    public OcctVector3d XAxis { get; private set; }
-    public OcctVector3d YAxis { get; private set; }
-    public OcctVector3d Normal { get; private set; }
-    public CadWorkPlanePreset Preset { get; private set; }
+    public bool IsActive => _toolPlane is not null || _gripPlane is not null;
+    public bool UserPlaneLocked => _userPlaneLocked;
+    public bool ToolPlaneFixed => _toolPlaneFixed;
+    public bool GripPlaneFixed => _gripPlaneFixed;
+    public bool EffectivePlaneFixed =>
+        _gripPlane is not null
+            ? _gripPlaneFixed
+            : _toolPlane is not null
+                ? _toolPlaneFixed
+                : _userPlaneLocked;
 
-    // Explicit hard axis constraint. Unlike ORTHO/POLAR tracking this does not
-    // use an angular tolerance: the point is projected to the dominant local axis.
+    // Existing callers can still query the effective lock. New code should use
+    // UserPlaneLocked / ToolPlaneFixed / GripPlaneFixed explicitly.
+    public bool IsPlaneLocked => EffectivePlaneFixed;
+
+    public CadPlaneFrame UserPlane => _userPlane;
+    public CadPlaneFrame? ToolPlane => _toolPlane;
+    public CadPlaneFrame? GripPlane => _gripPlane;
+    public CadPlaneFrame EffectivePlane =>
+        _gripPlane ?? _toolPlane ?? _userPlane;
+
+    // Preset describes the persistent user plane. A temporary Tool/Grip frame
+    // may independently be Custom.
+    public CadWorkPlanePreset Preset => _userPlane.Preset;
+    public CadWorkPlanePreset EffectivePreset => EffectivePlane.Preset;
+    public OcctPoint3d Origin => EffectivePlane.Origin;
+    public OcctVector3d XAxis => EffectivePlane.XAxis;
+    public OcctVector3d YAxis => EffectivePlane.YAxis;
+    public OcctVector3d Normal => EffectivePlane.Normal;
+
     public bool AxisLockEnabled
     {
         get => _axisLockEnabled;
@@ -82,8 +114,6 @@ public sealed class CadWorkPlane
         }
     }
 
-    // Explicit exact angular constraint. It takes precedence over automatic
-    // ORTHO/POLAR tracking and over AXIS lock.
     public bool AngleLockEnabled
     {
         get => _angleLockEnabled;
@@ -108,8 +138,8 @@ public sealed class CadWorkPlane
         }
     }
 
-    // Automatic tracking modes. They only project when the pointer is inside
-    // TrackingToleranceDegrees and are suppressed by explicit direction locks.
+    // Tracking switches remain drafting state for now, but no longer participate
+    // in plane-frame lifetime or restoration.
     public bool OrthogonalTrackingEnabled
     {
         get => _orthogonalTrackingEnabled;
@@ -160,121 +190,241 @@ public sealed class CadWorkPlane
 
     public event EventHandler? Changed;
 
-    public void Activate(OcctPoint3d origin)
+    public void BeginToolPlane(OcctPoint3d origin)
     {
-        if (!origin.IsFinite) throw new ArgumentOutOfRangeException(nameof(origin));
-        _isActive = true;
-        _planeLocked = false;
-        Origin = origin;
-        XAxis = _referenceXAxis;
-        YAxis = _referenceYAxis;
-        Normal = _referenceNormal;
+        if (!origin.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(origin));
+
+        _toolPlane = WithOrigin(_userPlane, origin);
+        _toolPlaneFixed = false;
+        _gripPlane = null;
+        _gripPlaneFixed = false;
         ResetTransientLocksCore();
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    public void Deactivate()
+    public void EndToolPlane()
     {
-        if (!_isActive && !_planeLocked && !LengthLockEnabled && !AngleLockEnabled)
+        if (_toolPlane is null &&
+            _gripPlane is null &&
+            !LengthLockEnabled &&
+            !AngleLockEnabled)
             return;
 
-        _isActive = false;
-        _planeLocked = false;
-        Origin = _referenceOrigin;
-        XAxis = _referenceXAxis;
-        YAxis = _referenceYAxis;
-        Normal = _referenceNormal;
+        _gripPlane = null;
+        _gripPlaneFixed = false;
+        _toolPlane = null;
+        _toolPlaneFixed = false;
         ResetTransientLocksCore();
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    public void SetPlaneLocked(bool value)
+    public void SetUserPlaneLocked(bool value)
     {
-        if (_planeLocked == value) return;
-        _planeLocked = value;
+        if (_userPlaneLocked == value) return;
+        _userPlaneLocked = value;
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    public void SetPreset(CadWorkPlanePreset preset, OcctPoint3d? origin = null)
+    public void SetToolPlaneFixed(bool value)
     {
-        if (_planeLocked) return;
-        var point = origin ?? OcctPoint3d.Origin;
-        switch (preset)
-        {
-            case CadWorkPlanePreset.XY: SetBasisCore(point, OcctVector3d.UnitX, OcctVector3d.UnitY); break;
-            case CadWorkPlanePreset.YZ: SetBasisCore(point, OcctVector3d.UnitY, OcctVector3d.UnitZ); break;
-            // Match OCCTBIM-Source XOZ orientation: local X follows world Z,
-            // local Y follows world X and the plane normal is +world Y.
-            case CadWorkPlanePreset.XZ: SetBasisCore(point, OcctVector3d.UnitZ, OcctVector3d.UnitX); break;
-            default: throw new ArgumentOutOfRangeException(nameof(preset));
-        }
-        Preset = preset;
-        if (!_isActive) CaptureReferencePlane();
+        if (_toolPlane is null || _toolPlaneFixed == value) return;
+        _toolPlaneFixed = value;
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    public void SetCustom(OcctPoint3d origin, OcctVector3d xAxis, OcctVector3d yAxis)
+    public void SetGripPlaneFixed(bool value)
     {
-        if (_planeLocked) return;
-        var previousOrigin = Origin;
-        var previousX = XAxis;
-        var previousY = YAxis;
-        SetBasisCore(origin, xAxis, yAxis);
-        if (Origin == previousOrigin &&
-            (XAxis - previousX).Length <= 1e-12 &&
-            (YAxis - previousY).Length <= 1e-12) return;
-        if (!_isActive) CaptureReferencePlane();
+        if (_gripPlane is null || _gripPlaneFixed == value) return;
+        _gripPlaneFixed = value;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SetPreset(
+        CadWorkPlanePreset preset,
+        OcctPoint3d? origin = null)
+    {
+        if (_userPlaneLocked) return;
+        if (preset == CadWorkPlanePreset.Custom)
+            throw new ArgumentException(
+                "Custom work planes require explicit axes.",
+                nameof(preset));
+
+        var next = CreatePresetFrame(
+            preset,
+            origin ?? OcctPoint3d.Origin);
+        if (_userPlane == next) return;
+
+        _userPlane = next;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SetCustom(
+        OcctPoint3d origin,
+        OcctVector3d xAxis,
+        OcctVector3d yAxis) =>
+        SetUserCustomPlane(origin, xAxis, yAxis);
+
+    public void SetUserCustomPlane(
+        OcctPoint3d origin,
+        OcctVector3d xAxis,
+        OcctVector3d yAxis)
+    {
+        if (_userPlaneLocked) return;
+
+        var next = CreateFrame(
+            origin,
+            xAxis,
+            yAxis,
+            CadWorkPlanePreset.Custom);
+        if (_userPlane == next) return;
+
+        _userPlane = next;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SetToolPlane(
+        OcctPoint3d origin,
+        OcctVector3d xAxis,
+        OcctVector3d yAxis)
+    {
+        if (_toolPlane is null)
+            throw new InvalidOperationException(
+                "No Tool work plane is active.");
+        if (_toolPlaneFixed) return;
+
+        var next = CreateFrame(
+            origin,
+            xAxis,
+            yAxis,
+            CadWorkPlanePreset.Custom);
+        if (_toolPlane == next) return;
+
+        _toolPlane = next;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SetGripPlane(
+        OcctPoint3d origin,
+        OcctVector3d xAxis,
+        OcctVector3d yAxis,
+        bool fixedPlane = false)
+    {
+        if (_toolPlane is null)
+            throw new InvalidOperationException(
+                "A Grip plane requires an active Tool plane.");
+
+        var next = CreateFrame(
+            origin,
+            xAxis,
+            yAxis,
+            CadWorkPlanePreset.Custom);
+        if (_gripPlane == next &&
+            _gripPlaneFixed == fixedPlane)
+            return;
+
+        _gripPlane = next;
+        _gripPlaneFixed = fixedPlane;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void ClearGripPlane()
+    {
+        if (_gripPlane is null && !_gripPlaneFixed) return;
+        _gripPlane = null;
+        _gripPlaneFixed = false;
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public void SetOrigin(OcctPoint3d origin)
     {
-        if (!origin.IsFinite) throw new ArgumentOutOfRangeException(nameof(origin));
-        if (Origin == origin) return;
-        Origin = origin;
-        if (!_isActive) _referenceOrigin = origin;
+        if (!origin.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(origin));
+
+        if (_gripPlane is { } grip)
+        {
+            if (grip.Origin == origin) return;
+            _gripPlane = WithOrigin(grip, origin);
+        }
+        else if (_toolPlane is { } tool)
+        {
+            if (tool.Origin == origin) return;
+            _toolPlane = WithOrigin(tool, origin);
+        }
+        else
+        {
+            if (_userPlaneLocked ||
+                _userPlane.Origin == origin)
+                return;
+            _userPlane = WithOrigin(_userPlane, origin);
+        }
+
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    public bool TryIntersect(OcctProjectionRay ray, out OcctPoint3d point)
+    public bool TryIntersect(
+        OcctProjectionRay ray,
+        out OcctPoint3d point)
     {
-        if (!ray.Origin.IsFinite || !ray.Direction.TryNormalize(out var direction))
+        if (!ray.Origin.IsFinite ||
+            !ray.Direction.TryNormalize(out var direction))
         {
             point = default;
             return false;
         }
-        var denominator = direction.Dot(Normal);
+
+        var frame = EffectivePlane;
+        var denominator = direction.Dot(frame.Normal);
         if (Math.Abs(denominator) <= 1e-12)
         {
             point = default;
             return false;
         }
-        var t = (Origin - ray.Origin).Dot(Normal) / denominator;
+
+        var t =
+            (frame.Origin - ray.Origin).Dot(frame.Normal) /
+            denominator;
         point = ray.Origin + direction * t;
         return point.IsFinite;
     }
 
     public CadPlanePoint WorldToLocal(OcctPoint3d point)
     {
-        if (!point.IsFinite) throw new ArgumentOutOfRangeException(nameof(point));
-        var delta = point - Origin;
-        return new CadPlanePoint(delta.Dot(XAxis), delta.Dot(YAxis));
+        if (!point.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(point));
+
+        var frame = EffectivePlane;
+        var delta = point - frame.Origin;
+        return new CadPlanePoint(
+            delta.Dot(frame.XAxis),
+            delta.Dot(frame.YAxis));
     }
 
     public OcctPoint3d LocalToWorld(CadPlanePoint point)
     {
-        if (!double.IsFinite(point.X) || !double.IsFinite(point.Y))
+        if (!double.IsFinite(point.X) ||
+            !double.IsFinite(point.Y))
             throw new ArgumentOutOfRangeException(nameof(point));
-        return Origin + XAxis * point.X + YAxis * point.Y;
+
+        var frame = EffectivePlane;
+        return frame.Origin +
+               frame.XAxis * point.X +
+               frame.YAxis * point.Y;
     }
 
-    public CadTrackingResult? Track(OcctPoint3d reference, OcctPoint3d point)
+    public CadTrackingResult? Track(
+        OcctPoint3d reference,
+        OcctPoint3d point)
     {
-        if (!reference.IsFinite) throw new ArgumentOutOfRangeException(nameof(reference));
-        if (!point.IsFinite) throw new ArgumentOutOfRangeException(nameof(point));
+        if (!reference.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(reference));
+        if (!point.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(point));
         if (!IsActive ||
-            (!OrthogonalTrackingEnabled && !PolarTrackingEnabled) ||
-            AxisLockEnabled || AngleLockEnabled)
+            (!OrthogonalTrackingEnabled &&
+             !PolarTrackingEnabled) ||
+            AxisLockEnabled ||
+            AngleLockEnabled)
             return null;
 
         var a = WorldToLocal(reference);
@@ -284,29 +434,50 @@ public sealed class CadWorkPlane
         var length = Math.Sqrt(dx * dx + dy * dy);
         if (length <= 1e-12) return null;
 
-        var angleDegrees = Math.Atan2(dy, dx) * 180.0 / Math.PI;
+        var angleDegrees =
+            Math.Atan2(dy, dx) * 180.0 / Math.PI;
         var bestDelta = double.PositiveInfinity;
         var bestAngle = 0.0;
         var bestKind = CadTrackingKind.Orthogonal;
 
         if (OrthogonalTrackingEnabled)
-            Consider(CadTrackingKind.Orthogonal, Math.Round(angleDegrees / 90.0) * 90.0);
+            Consider(
+                CadTrackingKind.Orthogonal,
+                Math.Round(angleDegrees / 90.0) * 90.0);
         if (PolarTrackingEnabled)
-            Consider(CadTrackingKind.Polar, Math.Round(angleDegrees / PolarIncrementDegrees) * PolarIncrementDegrees);
-        if (bestDelta > TrackingToleranceDegrees) return null;
+            Consider(
+                CadTrackingKind.Polar,
+                Math.Round(
+                    angleDegrees /
+                    PolarIncrementDegrees) *
+                PolarIncrementDegrees);
+        if (bestDelta > TrackingToleranceDegrees)
+            return null;
 
         var radians = bestAngle * Math.PI / 180.0;
         var directionX = Math.Cos(radians);
         var directionY = Math.Sin(radians);
-        var projectedLength = dx * directionX + dy * directionY;
-        var tracked = LocalToWorld(new CadPlanePoint(
-            a.X + directionX * projectedLength,
-            a.Y + directionY * projectedLength));
-        return new CadTrackingResult(reference, tracked, bestKind, NormalizeAngleDegrees(bestAngle));
+        var projectedLength =
+            dx * directionX + dy * directionY;
+        var tracked = LocalToWorld(
+            new CadPlanePoint(
+                a.X + directionX * projectedLength,
+                a.Y + directionY * projectedLength));
 
-        void Consider(CadTrackingKind kind, double candidateAngle)
+        return new CadTrackingResult(
+            reference,
+            tracked,
+            bestKind,
+            NormalizeAngleDegrees(bestAngle));
+
+        void Consider(
+            CadTrackingKind kind,
+            double candidateAngle)
         {
-            var delta = Math.Abs(AngleDeltaDegrees(angleDegrees, candidateAngle));
+            var delta = Math.Abs(
+                AngleDeltaDegrees(
+                    angleDegrees,
+                    candidateAngle));
             if (delta >= bestDelta) return;
             bestDelta = delta;
             bestAngle = candidateAngle;
@@ -314,39 +485,50 @@ public sealed class CadWorkPlane
         }
     }
 
-    public OcctPoint3d Constrain(OcctPoint3d reference, OcctPoint3d point)
+    public OcctPoint3d Constrain(
+        OcctPoint3d reference,
+        OcctPoint3d point)
     {
-        if (!AxisLockEnabled && !LengthLockEnabled && !AngleLockEnabled) return point;
+        if (!AxisLockEnabled &&
+            !LengthLockEnabled &&
+            !AngleLockEnabled)
+            return point;
+
         var a = WorldToLocal(reference);
         var b = WorldToLocal(point);
         var dx = b.X - a.X;
         var dy = b.Y - a.Y;
 
-        if (AxisLockEnabled && !AngleLockEnabled)
+        if (AxisLockEnabled &&
+            !AngleLockEnabled)
         {
-            if (Math.Abs(dx) >= Math.Abs(dy)) dy = 0.0;
-            else dx = 0.0;
+            if (Math.Abs(dx) >= Math.Abs(dy))
+                dy = 0.0;
+            else
+                dx = 0.0;
         }
 
         var angle = Math.Atan2(dy, dx);
         if (AngleLockEnabled)
         {
-            // A direction lock constrains by orthogonal projection. Rotating the
-            // full radial pointer distance onto the locked direction makes side
-            // grips grow when the pointer moves diagonally and loses the signed
-            // direction when crossing the opposite side.
-            angle = LockedAngleDegrees * Math.PI / 180.0;
+            angle =
+                LockedAngleDegrees *
+                Math.PI / 180.0;
             var directionX = Math.Cos(angle);
             var directionY = Math.Sin(angle);
-            var projectedLength = dx * directionX + dy * directionY;
+            var projectedLength =
+                dx * directionX + dy * directionY;
             dx = directionX * projectedLength;
             dy = directionY * projectedLength;
         }
 
         if (LengthLockEnabled)
         {
-            if (!double.IsFinite(LockedLength) || LockedLength <= 0.0)
-                throw new InvalidOperationException("Locked length must be finite and greater than zero.");
+            if (!double.IsFinite(LockedLength) ||
+                LockedLength <= 0.0)
+                throw new InvalidOperationException(
+                    "Locked length must be finite and greater than zero.");
+
             var current = Math.Sqrt(dx * dx + dy * dy);
             if (current <= 1e-12)
             {
@@ -361,7 +543,10 @@ public sealed class CadWorkPlane
             }
         }
 
-        return LocalToWorld(new CadPlanePoint(a.X + dx, a.Y + dy));
+        return LocalToWorld(
+            new CadPlanePoint(
+                a.X + dx,
+                a.Y + dy));
     }
 
     public void ResetLocks()
@@ -384,37 +569,81 @@ public sealed class CadWorkPlane
         ResetTransientLocksCore();
     }
 
-    private static double AngleDeltaDegrees(double left, double right)
+    private static double AngleDeltaDegrees(
+        double left,
+        double right)
     {
-        var delta = NormalizeAngleDegrees(left - right);
-        return delta > 180.0 ? delta - 360.0 : delta;
+        var delta =
+            NormalizeAngleDegrees(left - right);
+        return delta > 180.0
+            ? delta - 360.0
+            : delta;
     }
 
     private static double NormalizeAngleDegrees(double angle)
     {
         var normalized = angle % 360.0;
-        return normalized < 0.0 ? normalized + 360.0 : normalized;
+        return normalized < 0.0
+            ? normalized + 360.0
+            : normalized;
     }
 
-    private void CaptureReferencePlane()
-    {
-        _referenceOrigin = Origin;
-        _referenceXAxis = XAxis;
-        _referenceYAxis = YAxis;
-        _referenceNormal = Normal;
-    }
+    private static CadPlaneFrame CreatePresetFrame(
+        CadWorkPlanePreset preset,
+        OcctPoint3d origin) =>
+        preset switch
+        {
+            CadWorkPlanePreset.XY => CreateFrame(
+                origin,
+                OcctVector3d.UnitX,
+                OcctVector3d.UnitY,
+                preset),
+            CadWorkPlanePreset.YZ => CreateFrame(
+                origin,
+                OcctVector3d.UnitY,
+                OcctVector3d.UnitZ,
+                preset),
+            CadWorkPlanePreset.XZ => CreateFrame(
+                origin,
+                OcctVector3d.UnitZ,
+                OcctVector3d.UnitX,
+                preset),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(preset))
+        };
 
-    private void SetBasisCore(OcctPoint3d origin, OcctVector3d xAxis, OcctVector3d yAxis)
+    private static CadPlaneFrame CreateFrame(
+        OcctPoint3d origin,
+        OcctVector3d xAxis,
+        OcctVector3d yAxis,
+        CadWorkPlanePreset preset)
     {
-        if (!origin.IsFinite) throw new ArgumentOutOfRangeException(nameof(origin));
-        if (!xAxis.TryNormalize(out var x)) throw new ArgumentOutOfRangeException(nameof(xAxis));
+        if (!origin.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(origin));
+        if (!xAxis.TryNormalize(out var x))
+            throw new ArgumentOutOfRangeException(nameof(xAxis));
+
         var cross = x.Cross(yAxis);
         if (!cross.TryNormalize(out var normal))
-            throw new ArgumentException("Work-plane axes must not be parallel.", nameof(yAxis));
+            throw new ArgumentException(
+                "Work-plane axes must not be parallel.",
+                nameof(yAxis));
+
         var y = normal.Cross(x).Normalized();
-        Origin = origin;
-        XAxis = x;
-        YAxis = y;
-        Normal = normal;
+        return new CadPlaneFrame(
+            origin,
+            x,
+            y,
+            normal,
+            preset);
+    }
+
+    private static CadPlaneFrame WithOrigin(
+        CadPlaneFrame frame,
+        OcctPoint3d origin)
+    {
+        if (!origin.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(origin));
+        return frame with { Origin = origin };
     }
 }

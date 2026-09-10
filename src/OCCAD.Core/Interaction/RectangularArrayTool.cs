@@ -28,7 +28,7 @@ public sealed class RectangularArrayTool : CadSelectionTransformToolBase
     {
         _xAxis = Context.WorkPlane.XAxis;
         _yAxis = Context.WorkPlane.YAxis;
-        Context.WorkPlane.SetPlaneLocked(true);
+        Context.WorkPlane.SetToolPlaneFixed(true);
         Context.Snap.Active = false;
         SetStageLocalized(1, "Cad.Prompt.rectarray.Parameters", "Rectangular Array: set rows, columns and spacing [Enter accept, Esc cancel]");
         UpdatePreview();

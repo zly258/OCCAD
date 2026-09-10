@@ -10,7 +10,8 @@ public sealed class RevolveTool : CadSelectionTransformToolBase
 
     public override string Id => "revolve";
     public override string DisplayName => "Revolve";
-    public override bool AllowsPreselectionDuringDrawing => true;
+    public override CadToolInteractionPolicy InteractionPolicy =>
+        base.InteractionPolicy with { PreselectionEnabled = true };
 
     public override CadToolPanelDescriptor ParameterPanel =>
         new(

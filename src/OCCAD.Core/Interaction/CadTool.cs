@@ -11,6 +11,35 @@ public enum CadToolState
     WaitForSelect
 }
 
+public enum CadToolInputKind
+{
+    Point,
+    Selection,
+    Distance,
+    Angle,
+    Choice,
+    Confirmation
+}
+
+public readonly record struct CadToolStep(
+    int Index,
+    CadToolInputKind InputKind,
+    CadPrecisionInputKind PrecisionInputs,
+    CadToolPrompt? Prompt);
+
+public readonly record struct CadToolInteractionPolicy(
+    bool SelectionEnabled,
+    bool PreselectionEnabled,
+    bool SubobjectEnabled,
+    bool GripEnabled)
+{
+    public static CadToolInteractionPolicy Drawing =>
+        new(false, false, false, false);
+
+    public static CadToolInteractionPolicy Selection =>
+        new(true, true, false, false);
+}
+
 public readonly record struct CadToolInteractionState(
     int Stage,
     CadToolState State,
@@ -42,7 +71,16 @@ public abstract class CadTool
     public CadPrecisionInputKind PrecisionInputs =>
         Prompt?.PrecisionInputs ?? CadPrecisionInputKind.None;
     public virtual string PrecisionLengthLabel => "Length";
-    public virtual bool AllowsPreselectionDuringDrawing => false;
+    public virtual CadSnapResolvePolicy SnapResolvePolicy =>
+        CadSnapResolvePolicy.KeepExactPoint;
+    public virtual CadToolInputKind InputKind =>
+        State == CadToolState.WaitForSelect
+            ? CadToolInputKind.Selection
+            : CadToolInputKind.Point;
+    public virtual CadToolInteractionPolicy InteractionPolicy =>
+        State == CadToolState.WaitForSelect
+            ? CadToolInteractionPolicy.Selection
+            : CadToolInteractionPolicy.Drawing;
     public virtual string PrecisionAngleLabel => "Angle";
     public virtual string PrecisionFactorLabel => "Factor";
 
@@ -51,12 +89,20 @@ public abstract class CadTool
             ? Context.WorkPlane.Origin
             : null;
 
+    public CadToolStep CurrentStep =>
+        new(
+            Stage,
+            InputKind,
+            PrecisionInputs,
+            Prompt);
+
     public bool HasPreview =>
         IsActive && Context.Preview.IsVisible;
     public virtual bool CanCommitCurrentStage =>
         IsActive &&
         CanCommitCurrentStageCore &&
-        Context.Workspace.LastPointerPosition is not null;
+        (InputKind != CadToolInputKind.Point ||
+         Context.Workspace.LastPointerPosition is not null);
     public bool CanCancel => IsActive;
     public bool CanFinish => IsActive && CanFinishCore;
     public bool CanStepBack => IsActive && CanStepBackCore;
@@ -80,7 +126,8 @@ public abstract class CadTool
         _state = CadToolState.Drawing;
         _stage = 0;
         _previousSelectionFilter = Context.Selection.Filter;
-        Context.WorkPlane.Activate(Context.WorkPlane.Origin);
+        Context.ActiveTool = this;
+        Context.WorkPlane.BeginToolPlane(Context.WorkPlane.Origin);
         Context.Snap.Active = true;
         OnActivated();
     }
@@ -99,13 +146,15 @@ public abstract class CadTool
         TryCleanup(Context.Workspace.Precision.ResetFactor);
         TryCleanup(() => Context.Selection.SetFilter(_previousSelectionFilter));
         TryCleanup(() => Context.Snap.Active = false);
-        TryCleanup(Context.WorkPlane.Deactivate);
+        TryCleanup(Context.WorkPlane.EndToolPlane);
 
         Prompt = null;
         IsActive = false;
         _state = CadToolState.Idle;
         _stage = 0;
         _previousSelectionFilter = null;
+        if (ReferenceEquals(Context.ActiveTool, this))
+            Context.ActiveTool = null;
 
         if (failure is not null)
             ExceptionDispatchInfo.Capture(failure).Throw();
@@ -127,10 +176,12 @@ public abstract class CadTool
 
     internal virtual bool CommitCurrentStage()
     {
-        if (!CanCommitCurrentStage ||
-            Context.Workspace.LastPointerPosition is not { } pointer)
+        if (!CanCommitCurrentStage)
             return false;
 
+        var pointer =
+            Context.Workspace.LastPointerPosition ??
+            default;
         return OnCommitCurrentStage(pointer);
     }
 
@@ -249,9 +300,9 @@ public abstract class CadTool
         OcctVector3d yAxis,
         bool lockPlane = true)
     {
-        Context.WorkPlane.SetPlaneLocked(false);
-        Context.WorkPlane.SetCustom(origin, xAxis, yAxis);
-        Context.WorkPlane.SetPlaneLocked(lockPlane);
+        Context.WorkPlane.SetToolPlaneFixed(false);
+        Context.WorkPlane.SetToolPlane(origin, xAxis, yAxis);
+        Context.WorkPlane.SetToolPlaneFixed(lockPlane);
     }
 
     protected void SetSelectionFilter(CadSelectionFilter? filter) =>
@@ -303,6 +354,8 @@ public abstract class CadTool
 
 public sealed class CadToolContext(CadWorkspace workspace)
 {
+    internal CadTool? ActiveTool { get; set; }
+
     public CadWorkspace Workspace { get; } =
         workspace ?? throw new ArgumentNullException(nameof(workspace));
 
@@ -319,7 +372,12 @@ public sealed class CadToolContext(CadWorkspace workspace)
         int x,
         int y,
         OcctPoint3d? constraintOrigin = null) =>
-        Workspace.ResolvePoint(x, y, constraintOrigin);
+        Workspace.ResolvePoint(
+            x,
+            y,
+            constraintOrigin,
+            ActiveTool?.SnapResolvePolicy ??
+            CadSnapResolvePolicy.KeepExactPoint);
 
     public void AddEntity(CadEntity entity) => Workspace.AddEntity(entity);
 }

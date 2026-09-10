@@ -567,7 +567,8 @@ public sealed class CadWorkspace : IDisposable
     public CadResolvedPoint ResolvePoint(
         int x,
         int y,
-        OcctPoint3d? constraintOrigin = null)
+        OcctPoint3d? constraintOrigin = null,
+        CadSnapResolvePolicy snapPolicy = default)
     {
         ObservePointer(x, y);
         var engine = Engine ??
@@ -591,7 +592,8 @@ public sealed class CadWorkspace : IDisposable
             y,
             point,
             WorkPlane,
-            constraintOrigin);
+            constraintOrigin,
+            snapPolicy);
         if (snap is { } value)
         {
             point = value.Position;

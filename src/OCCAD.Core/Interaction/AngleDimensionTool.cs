@@ -38,7 +38,7 @@ public sealed class AngleDimensionTool : CadDrawingTool, ICadPointInputTool
         if(!IsActive||_lines.Contains(line)||!Context.Document.IsEntitySelectable(line)||_lines.Count>=2)return false;
         if(_lines.Count==0){_lines.Add(line);UpdatePrompt();return true;}
         if(!TryFrame(_lines[0],line,out _vertex,out _firstDirection,out _secondDirection,out _normal)){SetPromptLocalized("Cad.Prompt.angledimension.Invalid","Angle dimension: lines must share one endpoint and not be parallel [Esc cancel]");return false;}
-        _lines.Add(line);Context.WorkPlane.SetPlaneLocked(true);UpdatePrompt();return true;
+        _lines.Add(line);Context.WorkPlane.SetToolPlaneFixed(true);UpdatePrompt();return true;
     }
     public bool TryAcceptPoint(OcctPoint3d point)
     {
@@ -51,7 +51,7 @@ public sealed class AngleDimensionTool : CadDrawingTool, ICadPointInputTool
         if((!double.TryParse(value,NumberStyles.Float,CultureInfo.CurrentCulture,out var n)&&!double.TryParse(value,NumberStyles.Float,CultureInfo.InvariantCulture,out n))||!double.IsFinite(n)||n<=1e-9)return false;
         if(id.Equals("TextHeight",StringComparison.OrdinalIgnoreCase))_textHeight=n;else if(id.Equals("ArrowSize",StringComparison.OrdinalIgnoreCase))_arrowSize=n;else return false;NotifyUpdated();return true;
     }
-    protected override bool OnStepBack(){if(_lines.Count==0)return false;_lines.RemoveAt(_lines.Count-1);Context.Preview.Clear();Context.WorkPlane.SetPlaneLocked(false);UpdatePrompt();return true;}
+    protected override bool OnStepBack(){if(_lines.Count==0)return false;_lines.RemoveAt(_lines.Count-1);Context.Preview.Clear();Context.WorkPlane.SetToolPlaneFixed(false);UpdatePrompt();return true;}
     private void TryAcceptSelected(){foreach(var line in Context.Selection.Selected.OfType<CadLineEntity>().Take(2))if(!TryAcceptLine(line))break;}
     private void Show(OcctPoint3d point){var delta=point-_vertex;delta-=_normal*delta.Dot(_normal);if(delta.Length>1e-9)Context.Preview.Show(new CadAngleDimensionEntity(_vertex,_firstDirection,_secondDirection,delta.Length,_textHeight,_arrowSize));}
     private void UpdatePrompt(){var key=_lines.Count switch{0=>"First",1=>"Second",_=>"Position"};var text=_lines.Count switch{0=>"Angle dimension: select first line [Esc cancel]",1=>"Angle dimension: select second line [Backspace undo, Esc cancel]",_=>"Angle dimension: specify arc position [Backspace undo, Esc cancel]"};SetStageLocalized(_lines.Count,$"Cad.Prompt.angledimension.{key}",text);}

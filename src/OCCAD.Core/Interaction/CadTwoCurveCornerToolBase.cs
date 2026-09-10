@@ -7,7 +7,8 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
     private CadEntity? _first;
     private OcctPoint3d _firstPick;
 
-    public override bool AllowsPreselectionDuringDrawing => true;
+    public override CadToolInteractionPolicy InteractionPolicy =>
+        base.InteractionPolicy with { PreselectionEnabled = true };
 
     protected CadEntity FirstEntity =>
         _first ?? throw new InvalidOperationException("First entity is not selected.");

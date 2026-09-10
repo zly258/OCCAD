@@ -40,7 +40,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
         {
             _center = point;
             Context.WorkPlane.SetOrigin(point);
-            Context.WorkPlane.SetPlaneLocked(true);
+            Context.WorkPlane.SetToolPlaneFixed(true);
             RestorePrompt();
             return true;
         }
@@ -79,7 +79,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     protected override bool OnStepBack()
     {
         if (_reference is not null) _reference = null;
-        else { _center = null; Context.WorkPlane.SetPlaneLocked(false); }
+        else { _center = null; Context.WorkPlane.SetToolPlaneFixed(false); }
         Context.Preview.Clear();
         RestorePrompt();
         return true;

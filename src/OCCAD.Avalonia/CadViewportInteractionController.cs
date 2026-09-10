@@ -23,6 +23,13 @@ internal sealed class CadViewportInteractionController : IDisposable
     private readonly List<OcctShape> _subobjectMarkers = [];
     private bool _shiftMiddleRotating;
     private bool _middleNavigating;
+    private bool _selectionGesture;
+    private bool _selectionRectangleVisible;
+    private int _selectionStartX;
+    private int _selectionStartY;
+    private int _selectionCurrentX;
+    private int _selectionCurrentY;
+    private OcctInputModifiers _selectionModifiers;
     private bool _disposed;
 
     public CadViewportInteractionController(
@@ -354,7 +361,8 @@ internal sealed class CadViewportInteractionController : IDisposable
         OcctAvaloniaSelectionEventArgs input)
     {
         var tool = _workspace.Tools.ActiveTool;
-        if (tool is null || tool.State == CadToolState.WaitForSelect)
+        if (tool is null ||
+            tool.InteractionPolicy.SelectionEnabled)
         {
             _workspace.Selection.UpdateFromViewer(
                 input.SelectedObjects,
@@ -368,8 +376,7 @@ internal sealed class CadViewportInteractionController : IDisposable
     {
         var tool = _workspace.Tools.ActiveTool;
         if (tool is not null &&
-            tool.State != CadToolState.WaitForSelect &&
-            !tool.AllowsPreselectionDuringDrawing)
+            !tool.InteractionPolicy.PreselectionEnabled)
         {
             _workspace.Preselection.Clear();
             return;
@@ -458,6 +465,7 @@ internal sealed class CadViewportInteractionController : IDisposable
         _pointerMoves.Clear();
         _shiftMiddleRotating = false;
         _middleNavigating = false;
+        CancelSelectionGesture();
         _workspace.Preselection.Clear();
         _workspace.Snap.Clear();
         _workspace.Tracking.Clear();
@@ -467,6 +475,10 @@ internal sealed class CadViewportInteractionController : IDisposable
         OcctPointerInputEventArgs input)
     {
         if (_workspace.Engine is null) return;
+
+        if (_selectionGesture &&
+            HandleSelectionGesture(input))
+            return;
 
         if (_workspace.Tools.HandlePointer(input))
         {
@@ -493,21 +505,16 @@ internal sealed class CadViewportInteractionController : IDisposable
             if (_workspace.Preselection.Current is
                 { IsSubshape: true } subobject)
             {
-                var operation =
-                    (input.Modifiers & OcctInputModifiers.Control) != 0
-                        ? CadSelectionOperation.Toggle
-                        : (input.Modifiers & OcctInputModifiers.Shift) != 0
-                            ? CadSelectionOperation.Add
-                            : CadSelectionOperation.Replace;
-                _workspace.Subobjects.Select(subobject, operation);
+                _workspace.Subobjects.Select(
+                    subobject,
+                    SelectionOperation(input.Modifiers));
                 input.Handled = true;
                 return;
             }
 
-            if ((input.Modifiers &
-                 (OcctInputModifiers.Control |
-                  OcctInputModifiers.Shift)) == 0)
-                _workspace.Subobjects.Clear();
+            BeginSelectionGesture(input);
+            input.Handled = true;
+            return;
         }
 
         if (input.Kind != OcctPointerInputKind.Moved)
@@ -526,6 +533,209 @@ internal sealed class CadViewportInteractionController : IDisposable
             // View ray parallel to active work plane.
         }
     }
+
+    private void BeginSelectionGesture(
+        OcctPointerInputEventArgs input)
+    {
+        CancelSelectionGesture();
+        _selectionGesture = true;
+        _selectionStartX = input.X;
+        _selectionStartY = input.Y;
+        _selectionCurrentX = input.X;
+        _selectionCurrentY = input.Y;
+        _selectionModifiers = input.Modifiers;
+    }
+
+    private bool HandleSelectionGesture(
+        OcctPointerInputEventArgs input)
+    {
+        if (!_selectionGesture)
+            return false;
+
+        if (input.Kind == OcctPointerInputKind.Moved)
+        {
+            if ((input.Buttons & OcctPointerButtons.Left) == 0)
+            {
+                CancelSelectionGesture();
+                return false;
+            }
+
+            input.Handled = true;
+            _selectionCurrentX = input.X;
+            _selectionCurrentY = input.Y;
+            UpdateSelectionRectangle();
+            return true;
+        }
+
+        if (input.Kind == OcctPointerInputKind.Released &&
+            input.Button == OcctPointerButton.Left)
+        {
+            input.Handled = true;
+            _selectionCurrentX = input.X;
+            _selectionCurrentY = input.Y;
+            CompleteSelectionGesture();
+            return true;
+        }
+
+        if (input.Kind == OcctPointerInputKind.Pressed &&
+            input.Button != OcctPointerButton.Left)
+        {
+            CancelSelectionGesture();
+        }
+
+        return false;
+    }
+
+    private void UpdateSelectionRectangle()
+    {
+        if (_workspace.Engine is not { IsInitialized: true } engine)
+            return;
+
+        var threshold = Math.Max(
+            0,
+            _viewport.RectangleSelectionThreshold);
+        var dx = Math.Abs(
+            _selectionCurrentX - _selectionStartX);
+        var dy = Math.Abs(
+            _selectionCurrentY - _selectionStartY);
+        if (dx < threshold &&
+            dy < threshold)
+        {
+            HideSelectionRectangle(engine);
+            return;
+        }
+
+        var crossing =
+            _selectionCurrentX < _selectionStartX;
+        var lineColor = crossing
+            ? Color.ForestGreen
+            : Color.CornflowerBlue;
+        var fillColor = crossing
+            ? Color.FromArgb(54, 70, 150, 70)
+            : Color.FromArgb(44, 80, 120, 210);
+
+        engine.ShowSelectionRectangle(
+            Math.Min(_selectionStartX, _selectionCurrentX),
+            Math.Min(_selectionStartY, _selectionCurrentY),
+            Math.Max(_selectionStartX, _selectionCurrentX),
+            Math.Max(_selectionStartY, _selectionCurrentY),
+            lineColor,
+            fillColor,
+            0.72,
+            1.0);
+        _selectionRectangleVisible = true;
+    }
+
+    private void CompleteSelectionGesture()
+    {
+        var engine = _workspace.Engine;
+        var startX = _selectionStartX;
+        var startY = _selectionStartY;
+        var endX = _selectionCurrentX;
+        var endY = _selectionCurrentY;
+        var modifiers = _selectionModifiers;
+        var rectangleVisible = _selectionRectangleVisible;
+
+        _selectionGesture = false;
+        _selectionRectangleVisible = false;
+
+        if (engine is not { IsInitialized: true })
+            return;
+
+        if (rectangleVisible)
+        {
+            HideSelectionRectangle(engine);
+            var allowOverlap = endX < startX;
+            var objects = engine.QueryRectangle(
+                startX,
+                startY,
+                endX,
+                endY,
+                allowOverlap);
+            var entities = objects
+                .Select(_workspace.Document.FindByViewerObject)
+                .OfType<CadEntity>()
+                .Distinct()
+                .ToArray();
+            ApplyEntitySelection(
+                entities,
+                SelectionOperation(modifiers));
+            return;
+        }
+
+        var entity =
+            _workspace.Preselection.Current?.Entity;
+        ApplyEntitySelection(
+            entity is null
+                ? Array.Empty<CadEntity>()
+                : [entity],
+            SelectionOperation(modifiers),
+            entity);
+    }
+
+    private void ApplyEntitySelection(
+        IReadOnlyList<CadEntity> entities,
+        CadSelectionOperation operation,
+        CadEntity? primary = null)
+    {
+        if (operation == CadSelectionOperation.Replace)
+            _workspace.Subobjects.Clear();
+
+        _workspace.Selection.Apply(
+            entities,
+            operation,
+            primary);
+    }
+
+    private void CancelSelectionGesture()
+    {
+        if (_workspace.Engine is { IsInitialized: true } engine)
+            HideSelectionRectangle(engine);
+
+        _selectionGesture = false;
+        _selectionRectangleVisible = false;
+    }
+
+    private void HideSelectionRectangle(
+        OcctEngine engine)
+    {
+        if (!_selectionRectangleVisible)
+            return;
+
+        try
+        {
+            engine.HideSelectionRectangle();
+        }
+        catch (Exception exception)
+            when (IsRecoverableSelectionFailure(exception))
+        {
+        }
+
+        _selectionRectangleVisible = false;
+    }
+
+    private static CadSelectionOperation SelectionOperation(
+        OcctInputModifiers modifiers)
+    {
+        var control =
+            (modifiers & OcctInputModifiers.Control) != 0;
+        var shift =
+            (modifiers & OcctInputModifiers.Shift) != 0;
+
+        return (control, shift) switch
+        {
+            (false, false) => CadSelectionOperation.Replace,
+            (true, false) => CadSelectionOperation.Add,
+            (false, true) => CadSelectionOperation.Remove,
+            (true, true) => CadSelectionOperation.Toggle
+        };
+    }
+
+    private static bool IsRecoverableSelectionFailure(
+        Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private void PublishLastCoordinate()
     {

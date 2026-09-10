@@ -77,11 +77,11 @@ public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
         _points.RemoveAt(_points.Count - 1);
         _preview = null;
         Context.Preview.Clear();
-        Context.WorkPlane.SetPlaneLocked(false);
+        Context.WorkPlane.SetToolPlaneFixed(false);
         if (_points.Count > 0)
         {
             Context.WorkPlane.SetOrigin(_points[0]);
-            Context.WorkPlane.SetPlaneLocked(true);
+            Context.WorkPlane.SetToolPlaneFixed(true);
         }
         UpdatePrompt();
         return true;
@@ -95,7 +95,7 @@ public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
         {
             _points.Add(point);
             Context.WorkPlane.SetOrigin(point);
-            Context.WorkPlane.SetPlaneLocked(true);
+            Context.WorkPlane.SetToolPlaneFixed(true);
             UpdatePrompt();
             return true;
         }

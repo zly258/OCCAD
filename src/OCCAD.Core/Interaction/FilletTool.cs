@@ -115,10 +115,10 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
         }
 
         if (FirstEntity is CadArcEntity firstArc &&
-            second is CadLineEntity secondLine)
+            second is CadLineEntity arcLine)
         {
             return CadLineArcFilletGeometry.TryFillet(
-                secondLine,
+                arcLine,
                 secondPick,
                 firstArc,
                 FirstPick,

@@ -600,18 +600,18 @@
     <sys:String x:Key="Cad.Prompt.offset.Select">偏移：选择直线、多段线、圆或圆弧 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.offset.Selected">偏移：已选择 {0} 条曲线 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.offset.Side">偏移：指定方向和距离 [Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.offset.Invalid">偏移：所选曲线必须位于当前绘图平面，并能生成有效的偏移几何。</sys:String>
+    <sys:String x:Key="Cad.Prompt.offset.Invalid">偏移：所选曲线或路径必须位于当前绘图平面，并能生成有效的偏移几何。</sys:String>
     <sys:String x:Key="Cad.History.Offset">偏移</sys:String>
     <sys:String x:Key="Cad.Text.Trim">修剪</sys:String>
     <sys:String x:Key="Cad.Text.Extend">延伸</sys:String>
     <sys:String x:Key="Cad.Prompt.trim.Select">修剪：选择修剪边界曲线 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.trim.Selected">修剪：已选择 {0} 条边界曲线 [Enter 确认，Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.trim.Target">修剪：单击需要移除的直线段、多段线段、圆段或圆弧段 [Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.trim.Invalid">修剪：当前悬停直线无法由所选边界修剪。</sys:String>
+    <sys:String x:Key="Cad.Prompt.trim.Target">修剪：单击需要移除的曲线段或路径段 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.trim.Invalid">修剪：当前悬停曲线或路径无法由所选边界修剪。</sys:String>
     <sys:String x:Key="Cad.Prompt.extend.Select">延伸：选择边界曲线 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.extend.Selected">延伸：已选择 {0} 条边界曲线 [Enter 确认，Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.extend.Target">延伸：在需要延伸的直线、多段线或圆弧端点附近单击 [Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.extend.Invalid">延伸：当前悬停直线无法延伸到所选边界。</sys:String>
+    <sys:String x:Key="Cad.Prompt.extend.Target">延伸：在需要延伸的曲线或路径端点附近单击 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.extend.Invalid">延伸：当前悬停曲线或路径无法延伸到所选边界。</sys:String>
     <sys:String x:Key="Cad.History.Trim">修剪</sys:String>
     <sys:String x:Key="Cad.History.Extend">延伸</sys:String>
     <sys:String x:Key="Cad.Text.Join">合并</sys:String>
@@ -620,7 +620,7 @@
     <sys:String x:Key="Cad.Text.Break">打断</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Select">打断：选择一条直线、多段线、圆或圆弧 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Selected">打断：已选择 {0} 个对象 [Enter 确认，Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.break.Single">打断：请仅选择一条直线、多段线、圆或圆弧 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.break.Single">打断：请仅选择一条曲线或路径 [Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.First">打断：指定第一个打断点 [Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Second">打断：指定第二个打断点 [Backspace 返回，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Invalid">打断：两个点不能定义有效的移除区段。</sys:String>
@@ -637,7 +637,7 @@
     <sys:String x:Key="Cad.Prompt.fillet.Invalid">圆角：所选直线和半径无法生成有效圆角。</sys:String>
     <sys:String x:Key="Cad.Prompt.chamfer.First">倒角：选择第一条直线及保留侧 [Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.chamfer.Second">倒角：选择第二条直线及保留侧 [Backspace 返回，Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.chamfer.Invalid">倒角：所选直线和距离无法生成有效倒角。</sys:String>
+    <sys:String x:Key="Cad.Prompt.chamfer.Invalid">倒角：所选几何和距离无法生成有效倒角。</sys:String>
     <sys:String x:Key="Cad.History.Fillet">圆角</sys:String>
     <sys:String x:Key="Cad.History.Chamfer">倒角</sys:String>
     <sys:String x:Key="Cad.Text.JoinArcNote">同圆且连续的圆弧可合并为一条圆弧。</sys:String>
@@ -771,6 +771,33 @@
     <sys:String x:Key="Cad.Text.SubobjectWire">线框</sys:String>
     <sys:String x:Key="Cad.Text.SubobjectEdge">边</sys:String>
     <sys:String x:Key="Cad.Text.SubobjectVertex">顶点</sys:String>
+    <sys:String x:Key="Cad.Category.Subobject">子对象</sys:String>
+    <sys:String x:Key="Cad.Property.SubobjectIndex">索引</sys:String>
+    <sys:String x:Key="Cad.Property.SubobjectType">类型</sys:String>
+    <sys:String x:Key="Cad.Property.StartPoint">起点</sys:String>
+    <sys:String x:Key="Cad.Property.EndPoint">终点</sys:String>
+    <sys:String x:Key="Cad.Property.Normal">法向</sys:String>
+    <sys:String x:Key="Cad.Property.Details">详细信息</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Line">直线</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Circle">圆</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Ellipse">椭圆</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Hyperbola">双曲线</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Parabola">抛物线</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Bezier">贝塞尔曲线</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.BSpline">B 样条曲线</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Offset">偏移曲线</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Other">其他</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Plane">平面</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Cylinder">圆柱面</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Cone">圆锥面</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Sphere">球面</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Torus">圆环面</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Bezier">贝塞尔曲面</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.BSpline">B 样条曲面</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Revolution">旋转面</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Extrusion">拉伸面</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Offset">偏移面</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Other">其他</sys:String>
 </ResourceDictionary>
 
 

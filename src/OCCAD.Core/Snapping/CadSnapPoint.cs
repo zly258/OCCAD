@@ -17,18 +17,36 @@ public enum CadSnapType
     Perpendicular = 1 << 7,
     Tangent = 1 << 8,
 
-    // Keep the default/UI contract conservative. Precision modes remain available
-    // internally for geometry combinations with exact implementations, but they
-    // are not advertised as globally supported until the remaining conic/spline
-    // cases are implemented through the Bridge.
     Default = Endpoint | Midpoint | Center | Vertex | Quadrant
 }
 
 public enum CadSnapPlaneMode
 {
     KeepEntityPoint,
-    ProjectToWorkPlane,
     RequireOnWorkPlane
+}
+
+public readonly record struct CadSnapResolvePolicy(
+    CadSnapPlaneMode PlaneMode,
+    double PlaneTolerance)
+{
+    public static CadSnapResolvePolicy KeepExactPoint =>
+        new(CadSnapPlaneMode.KeepEntityPoint, 1e-6);
+
+    public static CadSnapResolvePolicy RequireOnWorkPlane(
+        double tolerance = 1e-6) =>
+        new(CadSnapPlaneMode.RequireOnWorkPlane, tolerance);
+
+    public void Validate()
+    {
+        if (!Enum.IsDefined(PlaneMode))
+            throw new ArgumentOutOfRangeException(
+                nameof(PlaneMode));
+        if (!double.IsFinite(PlaneTolerance) ||
+            PlaneTolerance < 0.0)
+            throw new ArgumentOutOfRangeException(
+                nameof(PlaneTolerance));
+    }
 }
 
 public readonly record struct CadSnapWorkPlane(

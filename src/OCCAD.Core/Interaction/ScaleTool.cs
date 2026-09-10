@@ -34,7 +34,7 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
         {
             _center = point;
             Context.WorkPlane.SetOrigin(point);
-            Context.WorkPlane.SetPlaneLocked(true);
+            Context.WorkPlane.SetToolPlaneFixed(true);
             RestorePrompt();
             return true;
         }
@@ -75,7 +75,7 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
     protected override bool OnStepBack()
     {
         if (_referenceLength is not null) _referenceLength = null;
-        else { _center = null; Context.WorkPlane.SetPlaneLocked(false); }
+        else { _center = null; Context.WorkPlane.SetToolPlaneFixed(false); }
         Context.Preview.Clear();
         RestorePrompt();
         return true;

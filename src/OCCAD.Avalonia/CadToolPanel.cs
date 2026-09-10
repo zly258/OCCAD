@@ -102,7 +102,8 @@ internal sealed class CadToolPanel : Border
         _planeLock.IsCheckedChanged += (_, _) =>
         {
             if (_refreshing) return;
-            _workspace.WorkPlane.SetPlaneLocked(_planeLock.IsChecked == true);
+            _workspace.WorkPlane.SetToolPlaneFixed(
+                _planeLock.IsChecked == true);
             RefreshWorkPlaneState();
         };
 
@@ -271,8 +272,8 @@ internal sealed class CadToolPanel : Border
     private void AddWorkPlaneState()
     {
         _planeLock.Content = CadLanguageManager.Text(
-            "Cad.Text.LockWorkPlane",
-            "Lock work plane");
+            "Cad.Text.FixToolPlane",
+            "Fix tool plane");
 
         var row = new Grid
         {
@@ -290,14 +291,22 @@ internal sealed class CadToolPanel : Border
 
     private void RefreshWorkPlaneState()
     {
-        _planeState.Text = _workspace.WorkPlane.IsPlaneLocked
-            ? CadLanguageManager.Text(
-                "Cad.Text.ToolPlaneLocked",
-                "Work plane locked")
-            : CadLanguageManager.Text(
-                "Cad.Text.ToolPlaneActive",
-                "Work plane active");
-        _planeLock.IsChecked = _workspace.WorkPlane.IsPlaneLocked;
+        _planeState.Text =
+            _workspace.WorkPlane.ToolPlaneFixed
+                ? CadLanguageManager.Text(
+                    "Cad.Text.ToolPlaneFixed",
+                    "Tool plane fixed")
+                : _workspace.WorkPlane.UserPlaneLocked
+                    ? CadLanguageManager.Text(
+                        "Cad.Text.UserPlaneLocked",
+                        "User work plane locked")
+                    : CadLanguageManager.Text(
+                        "Cad.Text.ToolPlaneActive",
+                        "Tool plane active");
+        _planeLock.IsChecked =
+            _workspace.WorkPlane.ToolPlaneFixed;
+        _planeLock.IsEnabled =
+            _workspace.WorkPlane.ToolPlane is not null;
     }
 
     private void AddPrecisionEditors(CadTool tool)

@@ -9,6 +9,14 @@ public readonly record struct CadPreselection(
     int SubshapeIndex)
 {
     public bool IsSubshape => SubshapeIndex >= 0;
+
+    public CadSelectionReference Reference =>
+        IsSubshape
+            ? CadSelectionReference.Subobject(
+                Entity,
+                SubshapeType,
+                SubshapeIndex)
+            : CadSelectionReference.Entity(Entity);
 }
 
 public sealed class CadPreselectionChangedEventArgs(CadPreselection? value) : EventArgs

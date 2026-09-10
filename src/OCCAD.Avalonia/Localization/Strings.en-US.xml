@@ -600,18 +600,18 @@
     <sys:String x:Key="Cad.Prompt.offset.Select">Offset: select lines, polylines, circles, or arcs [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.offset.Selected">Offset: {0} curves selected [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.offset.Side">Offset: specify side and distance [Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.offset.Invalid">Offset: selected curves must lie on the current drawing plane and produce valid offset geometry.</sys:String>
+    <sys:String x:Key="Cad.Prompt.offset.Invalid">Offset: selected curves or paths must lie on the current drawing plane and produce valid offset geometry.</sys:String>
     <sys:String x:Key="Cad.History.Offset">Offset</sys:String>
     <sys:String x:Key="Cad.Text.Trim">Trim</sys:String>
     <sys:String x:Key="Cad.Text.Extend">Extend</sys:String>
     <sys:String x:Key="Cad.Prompt.trim.Select">Trim: select cutting curves [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.trim.Selected">Trim: {0} cutting curves selected [Enter accept, Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.trim.Target">Trim: click the line, polyline, circle, or arc segment to remove [Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.trim.Invalid">Trim: the hovered line cannot be trimmed by the selected cutting lines.</sys:String>
+    <sys:String x:Key="Cad.Prompt.trim.Target">Trim: click the curve or path segment to remove [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.trim.Invalid">Trim: the hovered curve or path cannot be trimmed by the selected boundaries.</sys:String>
     <sys:String x:Key="Cad.Prompt.extend.Select">Extend: select boundary curves [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.extend.Selected">Extend: {0} boundary curves selected [Enter accept, Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.extend.Target">Extend: click near the line, polyline, or arc endpoint to extend [Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.extend.Invalid">Extend: the hovered line cannot be extended to the selected boundary lines.</sys:String>
+    <sys:String x:Key="Cad.Prompt.extend.Target">Extend: click near the curve or path endpoint to extend [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.extend.Invalid">Extend: the hovered curve or path cannot be extended to the selected boundaries.</sys:String>
     <sys:String x:Key="Cad.History.Trim">Trim</sys:String>
     <sys:String x:Key="Cad.History.Extend">Extend</sys:String>
     <sys:String x:Key="Cad.Text.Join">Join</sys:String>
@@ -620,7 +620,7 @@
     <sys:String x:Key="Cad.Text.Break">Break</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Select">Break: select one line, polyline, circle, or arc [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Selected">Break: {0} selected [Enter accept, Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.break.Single">Break: select exactly one line, polyline, circle, or arc [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.break.Single">Break: select exactly one curve or path [Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.First">Break: specify first break point [Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Second">Break: specify second break point [Backspace undo, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.break.Invalid">Break: the two points do not define a valid removable segment.</sys:String>
@@ -637,7 +637,7 @@
     <sys:String x:Key="Cad.Prompt.fillet.Invalid">Fillet: selected lines and radius do not define a valid corner.</sys:String>
     <sys:String x:Key="Cad.Prompt.chamfer.First">Chamfer: select first line and keep side [Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.chamfer.Second">Chamfer: select second line and keep side [Backspace undo, Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.chamfer.Invalid">Chamfer: selected lines and distances do not define a valid corner.</sys:String>
+    <sys:String x:Key="Cad.Prompt.chamfer.Invalid">Chamfer: selected geometry and distances do not define a valid corner.</sys:String>
     <sys:String x:Key="Cad.History.Fillet">Fillet</sys:String>
     <sys:String x:Key="Cad.History.Chamfer">Chamfer</sys:String>
     <sys:String x:Key="Cad.Text.JoinArcNote">Compatible contiguous arcs on the same circle can be joined.</sys:String>
@@ -771,6 +771,33 @@
     <sys:String x:Key="Cad.Text.SubobjectWire">Wire</sys:String>
     <sys:String x:Key="Cad.Text.SubobjectEdge">Edge</sys:String>
     <sys:String x:Key="Cad.Text.SubobjectVertex">Vertex</sys:String>
+    <sys:String x:Key="Cad.Category.Subobject">Subobject</sys:String>
+    <sys:String x:Key="Cad.Property.SubobjectIndex">Index</sys:String>
+    <sys:String x:Key="Cad.Property.SubobjectType">Type</sys:String>
+    <sys:String x:Key="Cad.Property.StartPoint">Start</sys:String>
+    <sys:String x:Key="Cad.Property.EndPoint">End</sys:String>
+    <sys:String x:Key="Cad.Property.Normal">Normal</sys:String>
+    <sys:String x:Key="Cad.Property.Details">Details</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Line">Line</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Circle">Circle</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Ellipse">Ellipse</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Hyperbola">Hyperbola</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Parabola">Parabola</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Bezier">Bezier</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.BSpline">B-Spline</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Offset">Offset Curve</sys:String>
+    <sys:String x:Key="Cad.Value.OcctCurveType.Other">Other</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Plane">Plane</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Cylinder">Cylinder</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Cone">Cone</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Sphere">Sphere</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Torus">Torus</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Bezier">Bezier Surface</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.BSpline">B-Spline Surface</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Revolution">Revolution Surface</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Extrusion">Extrusion Surface</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Offset">Offset Surface</sys:String>
+    <sys:String x:Key="Cad.Value.OcctSurfaceType.Other">Other</sys:String>
 </ResourceDictionary>
 
 

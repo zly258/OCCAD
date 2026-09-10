@@ -8,6 +8,12 @@ public readonly record struct CadSubobjectSelection(
     int SubshapeIndex,
     OcctPoint3d Point)
 {
+    public CadSelectionReference Reference =>
+        CadSelectionReference.Subobject(
+            Entity,
+            SubshapeType,
+            SubshapeIndex);
+
     public bool IsValid =>
         Entity is not null &&
         SubshapeIndex >= 0 &&
@@ -161,18 +167,14 @@ public sealed class CadSubobjectSelectionManager
 
     private int FindIndex(CadSubobjectSelection item) =>
         _selected.FindIndex(value =>
-            ReferenceEquals(value.Entity, item.Entity) &&
-            value.SubshapeType == item.SubshapeType &&
-            value.SubshapeIndex == item.SubshapeIndex);
+            value.Reference == item.Reference);
 
     private CadSubobjectSelection? ResolvePrimary(
         CadSubobjectSelection? current,
         CadSubobjectSelection removed)
     {
         if (current is { } value &&
-            ReferenceEquals(value.Entity, removed.Entity) &&
-            value.SubshapeType == removed.SubshapeType &&
-            value.SubshapeIndex == removed.SubshapeIndex)
+            value.Reference == removed.Reference)
             return _selected.Count == 0 ? null : _selected[^1];
 
         return current;

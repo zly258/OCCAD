@@ -6,7 +6,8 @@ public sealed class TrimTool : CadSelectionTransformToolBase
 {
     public override string Id => "trim";
     public override string DisplayName => "Trim";
-    public override bool AllowsPreselectionDuringDrawing => true;
+    public override CadToolInteractionPolicy InteractionPolicy =>
+        base.InteractionPolicy with { PreselectionEnabled = true };
 
     protected override void OnActivated()
     {
@@ -31,11 +32,12 @@ public sealed class TrimTool : CadSelectionTransformToolBase
                     entity is CadLineEntity or
                     CadArcEntity or
                     CadCircleEntity or
-                    CadPolylineEntity));
+                    CadPolylineEntity or
+                    CadPathEntity));
         SetStageLocalized(
             0,
             "Cad.Prompt.trim.Target",
-            "Trim: click the line segment to remove [Esc cancel]");
+            "Trim: click the curve segment to remove [Esc cancel]");
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
@@ -76,7 +78,7 @@ public sealed class TrimTool : CadSelectionTransformToolBase
         {
             SetPromptLocalized(
                 "Cad.Prompt.trim.Invalid",
-                "Trim: the hovered line cannot be trimmed by the selected cutting lines.");
+                "Trim: the hovered curve cannot be trimmed by the selected boundaries.");
             return true;
         }
 
@@ -134,6 +136,13 @@ public sealed class TrimTool : CadSelectionTransformToolBase
             CadCircleEntity circle =>
                 CadCircleEditGeometry.TryTrim(
                     circle,
+                    boundaries,
+                    hit,
+                    Context.WorkPlane,
+                    out replacements),
+            CadPathEntity path =>
+                CadPathEditGeometry.TryTrim(
+                    path,
                     boundaries,
                     hit,
                     Context.WorkPlane,

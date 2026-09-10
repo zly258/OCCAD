@@ -142,32 +142,24 @@ internal static class CadPathFilletGeometry
              nextIndex >= source.Count))
             return false;
 
-        if (source[previousIndex] is not CadLineEntity previous ||
-            source[nextIndex] is not CadLineEntity next)
+        var previous = source[previousIndex];
+        var next = source[nextIndex];
+        var corner =
+            CadPathEntity.SegmentEnd(previous);
+        if (corner.DistanceTo(
+                CadPathEntity.SegmentStart(next)) >
+            Tolerance)
             return false;
 
-        var corner = previous.End;
-        if (corner.DistanceTo(next.Start) > Tolerance)
-            return false;
-
-        if (!CadLineCornerGeometry.TryFillet(
+        if (!TryBuildFilletParts(
                 previous,
-                previous.Start,
                 next,
-                next.End,
                 radius,
                 plane,
-                out var filletParts) ||
-            filletParts.Length != 3 ||
-            filletParts[0] is not CadLineEntity previousTrimmed ||
-            filletParts[2] is not CadArcEntity filletArc)
+                out var previousTrimmed,
+                out var filletArc,
+                out var nextTrimmed))
             return false;
-
-        var nextTangent = filletArc.End;
-        var nextTrimmed =
-            next.CreateLine(
-                nextTangent,
-                next.End);
 
         var output = new List<CadEntity>(
             source.Count + 1);
@@ -222,6 +214,92 @@ internal static class CadPathFilletGeometry
         }
 
         result = output;
+        return true;
+    }
+
+    private static bool TryBuildFilletParts(
+        CadEntity previous,
+        CadEntity next,
+        double radius,
+        CadWorkPlane plane,
+        out CadEntity previousTrimmed,
+        out CadArcEntity fillet,
+        out CadEntity nextTrimmed)
+    {
+        previousTrimmed = null!;
+        nextTrimmed = null!;
+        fillet = null!;
+
+        CadEntity[] parts;
+        switch (previous, next)
+        {
+            case (CadLineEntity first, CadLineEntity second):
+                if (!CadLineCornerGeometry.TryFillet(
+                        first,
+                        first.Start,
+                        second,
+                        second.End,
+                        radius,
+                        plane,
+                        out parts))
+                    return false;
+                break;
+
+            case (CadLineEntity line, CadArcEntity arc):
+                if (!CadLineArcFilletGeometry.TryFillet(
+                        line,
+                        line.Start,
+                        arc,
+                        arc.End,
+                        radius,
+                        plane,
+                        out parts))
+                    return false;
+                break;
+
+            case (CadArcEntity arc, CadLineEntity line):
+                if (!CadLineArcFilletGeometry.TryFillet(
+                        line,
+                        line.End,
+                        arc,
+                        arc.Start,
+                        radius,
+                        plane,
+                        out parts) ||
+                    parts.Length != 3 ||
+                    parts[0] is not CadLineEntity lineTrimmed ||
+                    parts[1] is not CadArcEntity arcTrimmed ||
+                    parts[2] is not CadArcEntity reverseFillet)
+                    return false;
+
+                previousTrimmed = arcTrimmed;
+                nextTrimmed = lineTrimmed;
+                fillet = reverseFillet.ReversedCopy();
+                return true;
+
+            case (CadArcEntity first, CadArcEntity second):
+                if (!CadArcArcFilletGeometry.TryFillet(
+                        first,
+                        first.Start,
+                        second,
+                        second.End,
+                        radius,
+                        plane,
+                        out parts))
+                    return false;
+                break;
+
+            default:
+                return false;
+        }
+
+        if (parts.Length != 3 ||
+            parts[2] is not CadArcEntity filletArc)
+            return false;
+
+        previousTrimmed = parts[0];
+        nextTrimmed = parts[1];
+        fillet = filletArc;
         return true;
     }
 

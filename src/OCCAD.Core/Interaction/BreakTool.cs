@@ -18,7 +18,8 @@ public sealed class BreakTool : CadSelectionTransformToolBase, ICadPointInputToo
                     entity is CadLineEntity or
                     CadPolylineEntity or
                     CadCircleEntity or
-                    CadArcEntity));
+                    CadArcEntity or
+                    CadPathEntity));
 
         if (Context.Selection.Selected.Count > 1)
             Context.Selection.Clear();
@@ -36,7 +37,7 @@ public sealed class BreakTool : CadSelectionTransformToolBase, ICadPointInputToo
             SetStageLocalized(
                 0,
                 "Cad.Prompt.break.Single",
-                "Break: select exactly one line, polyline, circle, or arc [Esc cancel]");
+                "Break: select exactly one curve or path [Esc cancel]");
             return;
         }
 

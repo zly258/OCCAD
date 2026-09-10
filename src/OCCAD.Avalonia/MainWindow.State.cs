@@ -269,9 +269,8 @@ public sealed partial class MainWindow
         if (_refreshingTree)
             return;
 
-        if (_workspace.Tools.Mode == CadInteractionMode.Drawing &&
-            _workspace.Tools.ActiveTool?.State !=
-                CadToolState.WaitForSelect)
+        if (_workspace.Tools.ActiveTool is { } activeTool &&
+            !activeTool.InteractionPolicy.SelectionEnabled)
         {
             _workspace.Tools.CancelCurrent();
         }
@@ -393,18 +392,14 @@ public sealed partial class MainWindow
         {
             var features =
                 OcctViewportInteractionFeatures.Default;
+            var policy = tool.InteractionPolicy;
 
-            if (tool.State != CadToolState.WaitForSelect)
-            {
+            if (!policy.SelectionEnabled)
                 features &=
                     ~OcctViewportInteractionFeatures.Selection;
-
-                if (!tool.AllowsPreselectionDuringDrawing)
-                {
-                    features &=
-                        ~OcctViewportInteractionFeatures.HoverDetection;
-                }
-            }
+            if (!policy.PreselectionEnabled)
+                features &=
+                    ~OcctViewportInteractionFeatures.HoverDetection;
 
             _viewport.InteractionFeatures = features;
 
@@ -523,10 +518,15 @@ public sealed partial class MainWindow
         var label = UiText(
             "Cad.Text.WorkPlane",
             "Work Plane");
+        var userLocked = _workspace.WorkPlane.UserPlaneLocked;
+        var toolFixed = _workspace.WorkPlane.ToolPlaneFixed ||
+                        _workspace.WorkPlane.GripPlaneFixed;
         _workPlaneStatus.Text =
-            _workspace.WorkPlane.IsPlaneLocked
+            userLocked
                 ? $"{label}: {preset} · {UiText("Cad.Text.Locked", "Locked")}"
-                : $"{label}: {preset}";
+                : toolFixed
+                    ? $"{label}: {preset} · {UiText("Cad.Text.ToolFixed", "Tool fixed")}"
+                    : $"{label}: {preset}";
     }
 
     private void RefreshSnapStatus()

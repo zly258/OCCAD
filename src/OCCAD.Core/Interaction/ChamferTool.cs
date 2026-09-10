@@ -133,9 +133,13 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
     protected override bool TryBuild(
         CadEntity second,
         OcctPoint3d secondPick,
-        out CadEntity[] replacements) =>
-        second is CadLineEntity line &&
-        CadLineCornerGeometry.TryChamfer(
+        out CadEntity[] replacements)
+    {
+        replacements = [];
+        if (second is not CadLineEntity line)
+            return false;
+
+        return CadLineCornerGeometry.TryChamfer(
             FirstLine,
             FirstPick,
             line,
@@ -144,6 +148,7 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
             _secondDistance,
             Context.WorkPlane,
             out replacements);
+    }
 
     protected override bool OnSetParameter(
         string id,

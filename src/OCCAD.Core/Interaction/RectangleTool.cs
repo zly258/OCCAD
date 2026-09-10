@@ -200,8 +200,8 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
 
     private void RestoreWorkPlane()
     {
-        Context.WorkPlane.SetPlaneLocked(false);
-        Context.WorkPlane.SetCustom(_planeOrigin, _baseX, _baseY);
+        Context.WorkPlane.SetToolPlaneFixed(false);
+        Context.WorkPlane.SetToolPlane(_planeOrigin, _baseX, _baseY);
     }
 
     private void RestorePrompt()

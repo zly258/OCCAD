@@ -10,10 +10,21 @@ public abstract record CadToolParameterDescriptor
         ArgumentException.ThrowIfNullOrWhiteSpace(label);
         Id = id.Trim();
         Label = label.Trim();
+        ValueDescriptor =
+            CadValueDescriptor.Create(
+                Id,
+                typeof(object),
+                semantic:
+                    CadValueSemantic.General);
     }
 
     public string Id { get; }
     public string Label { get; }
+    public CadValueDescriptor ValueDescriptor
+    {
+        get;
+        protected set;
+    }
 }
 
 public sealed record CadStringToolParameterDescriptor
@@ -31,6 +42,12 @@ public sealed record CadStringToolParameterDescriptor
             throw new ArgumentException("Value cannot be empty.", nameof(value));
         Value = value;
         AllowEmpty = allowEmpty;
+        ValueDescriptor =
+            CadValueDescriptor.Create(
+                Id,
+                typeof(string),
+                semantic:
+                    CadValueSemantic.Text);
     }
 
     public string Value { get; }
@@ -59,6 +76,14 @@ public sealed record CadIntegerToolParameterDescriptor
         Value = value;
         Minimum = minimum;
         Maximum = maximum;
+        ValueDescriptor =
+            CadValueDescriptor.Create(
+                Id,
+                typeof(int),
+                minimum,
+                maximum,
+                semantic:
+                    CadValueSemantic.Integer);
     }
 
     public int Value { get; }
@@ -98,6 +123,12 @@ public sealed record CadDoubleToolParameterDescriptor
         Value = value;
         Minimum = minimum;
         Maximum = maximum;
+        ValueDescriptor =
+            CadValueDescriptor.Create(
+                Id,
+                typeof(double),
+                minimum,
+                maximum);
     }
 
     public double Value { get; }
@@ -136,6 +167,12 @@ public sealed record CadOptionalDoubleToolParameterDescriptor
         Value = value;
         Minimum = minimum;
         Maximum = maximum;
+        ValueDescriptor =
+            CadValueDescriptor.Create(
+                Id,
+                typeof(double),
+                minimum,
+                maximum);
     }
 
     public double? Value { get; }
@@ -153,6 +190,12 @@ public sealed record CadBooleanToolParameterDescriptor
         : base(id, label)
     {
         Value = value;
+        ValueDescriptor =
+            CadValueDescriptor.Create(
+                Id,
+                typeof(bool),
+                semantic:
+                    CadValueSemantic.Boolean);
     }
 
     public bool Value { get; }
@@ -197,6 +240,13 @@ public sealed record CadChoiceToolParameterDescriptor
 
         Value = selected;
         Choices = normalizedChoices;
+        ValueDescriptor =
+            CadValueDescriptor.Create(
+                Id,
+                typeof(string),
+                choices: normalizedChoices,
+                semantic:
+                    CadValueSemantic.Choice);
     }
 
     public string Value { get; }

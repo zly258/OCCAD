@@ -36,13 +36,20 @@ public sealed class GripEditTool : CadTool
 
         if (_grip.WorkPlane is { } plane)
         {
-            SetWorkPlane(plane.Origin, plane.XAxis, plane.YAxis, plane.LockPlane);
+            Context.WorkPlane.SetGripPlane(
+                plane.Origin,
+                plane.XAxis,
+                plane.YAxis,
+                plane.LockPlane);
             if (plane.LockedAngleDegrees is { } angle)
                 LockStageAngle(angle);
         }
         else
         {
-            Context.WorkPlane.SetOrigin(_grip.Position);
+            Context.WorkPlane.SetGripPlane(
+                _grip.Position,
+                Context.WorkPlane.XAxis,
+                Context.WorkPlane.YAxis);
         }
 
         Context.Preview.Show(_preview);

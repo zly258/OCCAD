@@ -62,7 +62,7 @@ public sealed class PathArrayTool : CadSelectionTransformToolBase, ICadPointInpu
         }
         _path = path;
         _pathEntity = entity;
-        Context.WorkPlane.SetPlaneLocked(true);
+        Context.WorkPlane.SetToolPlaneFixed(true);
         UpdatePreview();
         return true;
     }
@@ -104,7 +104,7 @@ public sealed class PathArrayTool : CadSelectionTransformToolBase, ICadPointInpu
     protected override bool OnStepBack()
     {
         if (_reference is not null) _reference = null;
-        else { _path?.Dispose(); _path = null; _pathEntity = null; Context.WorkPlane.SetPlaneLocked(false); }
+        else { _path?.Dispose(); _path = null; _pathEntity = null; Context.WorkPlane.SetToolPlaneFixed(false); }
         UpdatePreview();
         return true;
     }

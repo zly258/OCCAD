@@ -6,7 +6,8 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
 {
     public override string Id => "extend";
     public override string DisplayName => "Extend";
-    public override bool AllowsPreselectionDuringDrawing => true;
+    public override CadToolInteractionPolicy InteractionPolicy =>
+        base.InteractionPolicy with { PreselectionEnabled = true };
 
     protected override void OnActivated()
     {
@@ -35,7 +36,7 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
         SetStageLocalized(
             0,
             "Cad.Prompt.extend.Target",
-            "Extend: click near the endpoint to extend [Esc cancel]");
+            "Extend: click near the curve or path endpoint to extend [Esc cancel]");
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
@@ -76,7 +77,7 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
         {
             SetPromptLocalized(
                 "Cad.Prompt.extend.Invalid",
-                "Extend: the hovered line cannot be extended to the selected boundary lines.");
+                "Extend: the hovered curve or path cannot be extended to the selected boundaries.");
             return true;
         }
 

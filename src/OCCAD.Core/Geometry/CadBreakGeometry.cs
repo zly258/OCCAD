@@ -46,6 +46,13 @@ internal static class CadBreakGeometry
                     secondPoint,
                     plane,
                     out replacements),
+            CadPathEntity path =>
+                TryBreakPath(
+                    path,
+                    firstPoint,
+                    secondPoint,
+                    plane,
+                    out replacements),
             _ => false
         };
     }
@@ -269,6 +276,104 @@ internal static class CadBreakGeometry
             polyline.CopyWithPoints(
                 keep,
                 closed: false)
+        ];
+        return true;
+    }
+
+    private static bool TryBreakPath(
+        CadPathEntity path,
+        OcctPoint3d firstPoint,
+        OcctPoint3d secondPoint,
+        CadWorkPlane plane,
+        out CadEntity[] replacements)
+    {
+        replacements = [];
+
+        if (!CadPathCurveGeometry.TryClosestPosition(
+                path,
+                firstPoint,
+                plane,
+                out var first) ||
+            !CadPathCurveGeometry.TryClosestPosition(
+                path,
+                secondPoint,
+                plane,
+                out var second))
+            return false;
+
+        if (!path.Closed)
+        {
+            var low =
+                first.Value <= second.Value
+                    ? first
+                    : second;
+            var high =
+                first.Value <= second.Value
+                    ? second
+                    : first;
+
+            if (high.Value -
+                low.Value <=
+                Tolerance)
+                return false;
+
+            var result = new List<CadEntity>(2);
+            var start =
+                new CadPathPosition(0, 0.0);
+            var end =
+                new CadPathPosition(
+                    path.Segments.Count - 1,
+                    1.0);
+
+            var left =
+                CadPathCurveGeometry.BuildForwardSegments(
+                    path,
+                    start,
+                    low,
+                    allowWrap: false);
+            if (left.Count > 0)
+                result.Add(
+                    path.CopyWithSegments(left));
+
+            var right =
+                CadPathCurveGeometry.BuildForwardSegments(
+                    path,
+                    high,
+                    end,
+                    allowWrap: false);
+            if (right.Count > 0)
+                result.Add(
+                    path.CopyWithSegments(right));
+
+            replacements = result.ToArray();
+            return true;
+        }
+
+        var segmentCount =
+            path.Segments.Count;
+        var forward =
+            second.Value -
+            first.Value;
+        if (forward <= Tolerance)
+            forward += segmentCount;
+        if (forward <= Tolerance ||
+            forward >=
+                segmentCount -
+                Tolerance)
+            return false;
+
+        var keep =
+            CadPathCurveGeometry.BuildForwardSegments(
+                path,
+                second,
+                first,
+                allowWrap: true);
+        if (keep.Count == 0)
+            return false;
+
+        replacements =
+        [
+            path.CopyWithSegments(keep)
         ];
         return true;
     }

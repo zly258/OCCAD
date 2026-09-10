@@ -8,6 +8,10 @@ public sealed class BooleanTool : CadSelectionTransformToolBase
 
     public override string Id => "boolean";
     public override string DisplayName => "Boolean";
+    public override CadToolInputKind InputKind =>
+        State == CadToolState.WaitForSelect
+            ? CadToolInputKind.Selection
+            : CadToolInputKind.Confirmation;
 
     public override CadToolPanelDescriptor ParameterPanel =>
         new(

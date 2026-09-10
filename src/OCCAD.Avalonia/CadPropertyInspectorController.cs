@@ -178,6 +178,9 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 Margin = new Thickness(8, 7, 8, 8)
             });
 
+            if (_subobject is { } subobject)
+                AddSubobjectDetails(subobject);
+
             var groups = CommonProperties(targets)
                 .GroupBy(slot => LocalizeCategory(slot.Descriptor.Category))
                 .OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase);
@@ -260,6 +263,294 @@ internal sealed class CadPropertyInspectorController : IDisposable
                      "Orientation",
                      StringComparison.OrdinalIgnoreCase)));
     }
+
+    private void AddSubobjectDetails(
+        CadSubobjectSelection selection)
+    {
+        var rows = new List<(string Label, string Value)>();
+
+        if (selection.TryGetPathSegment(out var segment))
+        {
+            rows.Add((
+                Text("Cad.Property.SubobjectIndex", "Index"),
+                (segment.Index + 1).ToString(CultureInfo.CurrentCulture)));
+            rows.Add((
+                Text("Cad.Property.SubobjectType", "Type"),
+                segment.Type == CadPathSegmentType.Line
+                    ? Text("Cad.Text.PathSegmentLine", "Line")
+                    : Text("Cad.Text.PathSegmentArc", "Arc")));
+            rows.Add((
+                Text("Cad.Property.Length", "Length"),
+                FormatNumber(segment.Length)));
+            rows.Add((
+                Text("Cad.Property.StartPoint", "Start"),
+                FormatPoint(segment.Start)));
+            rows.Add((
+                Text("Cad.Property.EndPoint", "End"),
+                FormatPoint(segment.End)));
+            if (segment.Radius is { } radius)
+            {
+                rows.Add((
+                    Text("Cad.Property.Radius", "Radius"),
+                    FormatNumber(radius)));
+            }
+
+            AddReadOnlyGroup(
+                Text("Cad.Category.Subobject", "Subobject"),
+                rows);
+            return;
+        }
+
+        var engine = _workspace.Engine;
+        var owner = selection.Entity.ViewerShape;
+        if (engine is not { IsInitialized: true } ||
+            owner is null)
+            return;
+
+        OcctShape? temporary = null;
+        try
+        {
+            rows.Add((
+                Text("Cad.Property.SubobjectIndex", "Index"),
+                (selection.SubshapeIndex + 1)
+                    .ToString(CultureInfo.CurrentCulture)));
+
+            switch (selection.SubshapeType)
+            {
+                case OcctShapeType.Vertex:
+                {
+                    rows.Add((
+                        Text("Cad.Property.SubobjectType", "Type"),
+                        Text("Cad.Text.SubobjectVertex", "Vertex")));
+                    rows.Add((
+                        Text("Cad.Property.Position", "Position"),
+                        FormatPoint(
+                            engine.GetVertexPoint(
+                                owner,
+                                selection.SubshapeIndex))));
+                    break;
+                }
+
+                case OcctShapeType.Edge:
+                {
+                    temporary = engine.GetSubshapeAt(
+                        owner,
+                        OcctShapeType.Edge,
+                        selection.SubshapeIndex);
+                    var curveType =
+                        engine.GetEdgeCurveType(temporary);
+                    var endpoints =
+                        engine.GetEdgeEndpoints(temporary);
+                    var properties =
+                        engine.GetShapeLinearProperties(temporary);
+
+                    rows.Add((
+                        Text("Cad.Property.SubobjectType", "Type"),
+                        Text(
+                            $"Cad.Value.OcctCurveType.{curveType}",
+                            curveType.ToString())));
+                    rows.Add((
+                        Text("Cad.Property.Length", "Length"),
+                        FormatNumber(properties.Mass)));
+                    rows.Add((
+                        Text("Cad.Property.StartPoint", "Start"),
+                        FormatPoint(endpoints.Start)));
+                    rows.Add((
+                        Text("Cad.Property.EndPoint", "End"),
+                        FormatPoint(endpoints.End)));
+                    rows.Add((
+                        Text("Cad.Property.Center", "Center"),
+                        FormatPoint(properties.CenterOfMass)));
+                    break;
+                }
+
+                case OcctShapeType.Face:
+                {
+                    temporary = engine.GetSubshapeAt(
+                        owner,
+                        OcctShapeType.Face,
+                        selection.SubshapeIndex);
+                    var surfaceType =
+                        engine.GetFaceSurfaceType(temporary);
+                    var properties =
+                        engine.GetShapeSurfaceProperties(temporary);
+                    rows.Add((
+                        Text("Cad.Property.SubobjectType", "Type"),
+                        Text(
+                            $"Cad.Value.OcctSurfaceType.{surfaceType}",
+                            surfaceType.ToString())));
+                    rows.Add((
+                        Text("Cad.Property.Area", "Area"),
+                        FormatNumber(properties.Mass)));
+                    rows.Add((
+                        Text("Cad.Property.Center", "Center"),
+                        FormatPoint(properties.CenterOfMass)));
+
+                    try
+                    {
+                        var bounds =
+                            engine.GetFaceUvBounds(temporary);
+                        var u =
+                            (bounds.UMin + bounds.UMax) * 0.5;
+                        var v =
+                            (bounds.VMin + bounds.VMax) * 0.5;
+                        var evaluation =
+                            engine.EvaluateFace(
+                                temporary,
+                                u,
+                                v);
+                        rows.Add((
+                            Text("Cad.Property.Normal", "Normal"),
+                            FormatVector(evaluation.Normal)));
+                    }
+                    catch (Exception exception)
+                        when (IsRecoverable(exception))
+                    {
+                    }
+
+                    break;
+                }
+
+                default:
+                    rows.Add((
+                        Text("Cad.Property.SubobjectType", "Type"),
+                        Text(
+                            $"Cad.Text.Subobject{selection.SubshapeType}",
+                            selection.SubshapeType.ToString())));
+                    break;
+            }
+        }
+        catch (Exception exception)
+            when (IsRecoverable(exception))
+        {
+            rows.Add((
+                Text("Cad.Property.Details", "Details"),
+                exception.GetBaseException().Message));
+        }
+        finally
+        {
+            if (temporary is not null)
+                TryDeleteTemporaryShape(engine, temporary);
+        }
+
+        AddReadOnlyGroup(
+            Text("Cad.Category.Subobject", "Subobject"),
+            rows);
+    }
+
+    private void AddReadOnlyGroup(
+        string title,
+        IReadOnlyList<(string Label, string Value)> rows)
+    {
+        if (rows.Count == 0)
+            return;
+
+        _host.Children.Add(new Border
+        {
+            Background = CadTheme.PanelAlt,
+            Padding = new Thickness(8, 5),
+            Margin = new Thickness(0, 2, 0, 2),
+            Child = new TextBlock
+            {
+                Text = title,
+                FontWeight = FontWeight.SemiBold,
+                Foreground = CadTheme.Text
+            }
+        });
+
+        foreach (var row in rows)
+            _host.Children.Add(
+                CreateReadOnlyRow(
+                    row.Label,
+                    row.Value));
+    }
+
+    private static Control CreateReadOnlyRow(
+        string label,
+        string value)
+    {
+        var row = new Grid
+        {
+            ColumnSpacing = 8,
+            Margin = new Thickness(8, 2)
+        };
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition(
+                new GridLength(118)));
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition(
+                new GridLength(
+                    1,
+                    GridUnitType.Star)));
+
+        row.Children.Add(new TextBlock
+        {
+            Text = label,
+            Foreground = CadTheme.Text,
+            VerticalAlignment =
+                VerticalAlignment.Center,
+            TextTrimming =
+                TextTrimming.CharacterEllipsis
+        });
+
+        var text = new TextBlock
+        {
+            Text = value,
+            Foreground = CadTheme.Muted,
+            VerticalAlignment =
+                VerticalAlignment.Center,
+            TextTrimming =
+                TextTrimming.CharacterEllipsis
+        };
+        Grid.SetColumn(text, 1);
+        row.Children.Add(text);
+        return row;
+    }
+
+    private static string Text(
+        string key,
+        string fallback) =>
+        CadLanguageManager.Text(key, fallback);
+
+    private static string FormatNumber(double value) =>
+        value.ToString(
+            "0.######",
+            CultureInfo.CurrentCulture);
+
+    private static string FormatPoint(OcctPoint3d point) =>
+        string.Format(
+            CultureInfo.CurrentCulture,
+            "({0:0.######}, {1:0.######}, {2:0.######})",
+            point.X,
+            point.Y,
+            point.Z);
+
+    private static string FormatVector(OcctVector3d vector) =>
+        FormatPoint(
+            new OcctPoint3d(
+                vector.X,
+                vector.Y,
+                vector.Z));
+
+    private static void TryDeleteTemporaryShape(
+        OcctEngine engine,
+        OcctShape shape)
+    {
+        try
+        {
+            if (engine.ContainsObject(shape.Id))
+                engine.Delete(shape);
+        }
+        catch (Exception exception)
+            when (IsRecoverable(exception))
+        {
+        }
+    }
+
+    private static bool IsRecoverable(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private Control CreatePropertyRow(PropertySlot slot)
     {

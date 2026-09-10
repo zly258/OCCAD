@@ -41,7 +41,7 @@ public sealed class CircularArrayTool : CadSelectionTransformToolBase, ICadPoint
         {
             _center = point;
             Context.WorkPlane.SetOrigin(point);
-            Context.WorkPlane.SetPlaneLocked(true);
+            Context.WorkPlane.SetToolPlaneFixed(true);
         }
         else if (!_rotate && _reference is null)
         {
@@ -87,7 +87,7 @@ public sealed class CircularArrayTool : CadSelectionTransformToolBase, ICadPoint
     protected override bool OnStepBack()
     {
         if (!_rotate && _reference is not null) _reference = null;
-        else { _center = null; _reference = null; Context.WorkPlane.SetPlaneLocked(false); }
+        else { _center = null; _reference = null; Context.WorkPlane.SetToolPlaneFixed(false); }
         UpdatePreview();
         return true;
     }

@@ -269,16 +269,16 @@ public sealed class CadPathEntity : CadEntity
             }
         }
         else if (previousArcIndex is { } previousOnly &&
-                 updated[previousOnly] is CadArcEntity previousArc)
+                 updated[previousOnly] is CadArcEntity previousOnlyArc)
         {
-            previousArc.MoveGrip(2, resolvedTarget);
-            resolvedTarget = previousArc.End;
+            previousOnlyArc.MoveGrip(2, resolvedTarget);
+            resolvedTarget = previousOnlyArc.End;
         }
         else if (nextArcIndex is { } nextOnly &&
-                 updated[nextOnly] is CadArcEntity nextArc)
+                 updated[nextOnly] is CadArcEntity nextOnlyArc)
         {
-            nextArc.MoveGrip(1, resolvedTarget);
-            resolvedTarget = nextArc.Start;
+            nextOnlyArc.MoveGrip(1, resolvedTarget);
+            resolvedTarget = nextOnlyArc.Start;
         }
 
         if (binding.PreviousSegmentIndex is { } previousLineIndex &&
@@ -741,7 +741,7 @@ public sealed class CadPathEntity : CadEntity
             throw new FormatException("Path segments are missing.");
 
         var segments = values
-            .Select(node =>
+            .Select<JsonNode?, CadEntity>(node =>
             {
                 var item = node as JsonObject ??
                     throw new FormatException("Path segment is invalid.");

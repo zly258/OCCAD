@@ -42,7 +42,7 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
         {
             _first = point;
             Context.WorkPlane.SetOrigin(point);
-            Context.WorkPlane.SetPlaneLocked(true);
+            Context.WorkPlane.SetToolPlaneFixed(true);
             SetStageLocalized(1, "Cad.Prompt.mirror.Second", "Mirror: specify second point of mirror line [Backspace undo, Esc cancel]");
             return true;
         }
@@ -64,7 +64,7 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
     {
         _first = null;
         Context.Preview.Clear();
-        Context.WorkPlane.SetPlaneLocked(false);
+        Context.WorkPlane.SetToolPlaneFixed(false);
         SetStageLocalized(0, "Cad.Prompt.mirror.First", "Mirror: specify first point of mirror line [Esc cancel]");
         return true;
     }

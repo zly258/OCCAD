@@ -34,7 +34,8 @@ public sealed class OffsetTool : CadSelectionTransformToolBase, ICadPointInputTo
                     entity is CadLineEntity or
                     CadPolylineEntity or
                     CadCircleEntity or
-                    CadArcEntity));
+                    CadArcEntity or
+                    CadPathEntity));
         base.OnActivated();
     }
 
@@ -119,7 +120,7 @@ public sealed class OffsetTool : CadSelectionTransformToolBase, ICadPointInputTo
             Context.Preview.Clear();
             SetPromptLocalized(
                 "Cad.Prompt.offset.Invalid",
-                "Offset: selected curves must lie on the current drawing plane and produce valid offset geometry.");
+                "Offset: selected curves or paths must lie on the current drawing plane and produce valid offset geometry.");
             return true;
         }
 
@@ -170,6 +171,8 @@ public sealed class OffsetTool : CadSelectionTransformToolBase, ICadPointInputTo
                 TryCreateCircleOffset(circle, sidePoint, out offset),
             CadArcEntity arc =>
                 TryCreateArcOffset(arc, sidePoint, out offset),
+            CadPathEntity path =>
+                TryCreatePathOffset(path, sidePoint, out offset),
             _ => Fail(out offset)
         };
 
@@ -257,6 +260,92 @@ public sealed class OffsetTool : CadSelectionTransformToolBase, ICadPointInputTo
         copy.Radius = radius;
         offset = copy;
         return true;
+    }
+
+    private bool TryCreatePathOffset(
+        CadPathEntity path,
+        OcctPoint3d sidePoint,
+        out CadEntity offset)
+    {
+        offset = null!;
+
+        if (!CadPlanarCurveIntersections.IsBoundaryOnPlane(
+                path,
+                Context.WorkPlane) ||
+            !CadPathCurveGeometry.TryClosestPosition(
+                path,
+                sidePoint,
+                Context.WorkPlane,
+                out var sourcePosition))
+            return false;
+
+        var sourcePoint =
+            CadPathCurveGeometry.PointAt(
+                path,
+                sourcePosition);
+        var distance =
+            _distance ??
+            sourcePoint.DistanceTo(sidePoint);
+        if (!double.IsFinite(distance) ||
+            distance <= DistanceTolerance)
+            return false;
+
+        var positiveOk =
+            CadPathOffsetGeometry.TryOffset(
+                path,
+                distance,
+                out var positive);
+        var negativeOk =
+            CadPathOffsetGeometry.TryOffset(
+                path,
+                -distance,
+                out var negative);
+
+        if (!positiveOk && !negativeOk)
+            return false;
+
+        if (!positiveOk)
+        {
+            offset = negative;
+            return true;
+        }
+
+        if (!negativeOk)
+        {
+            offset = positive;
+            return true;
+        }
+
+        var positiveDistance =
+            DistanceToPath(
+                positive,
+                sidePoint);
+        var negativeDistance =
+            DistanceToPath(
+                negative,
+                sidePoint);
+
+        offset =
+            positiveDistance <= negativeDistance
+                ? positive
+                : negative;
+        return true;
+    }
+
+    private double DistanceToPath(
+        CadPathEntity path,
+        OcctPoint3d point)
+    {
+        if (!CadPathCurveGeometry.TryClosestPosition(
+                path,
+                point,
+                Context.WorkPlane,
+                out var position))
+            return double.PositiveInfinity;
+
+        return CadPathCurveGeometry
+            .PointAt(path, position)
+            .DistanceTo(point);
     }
 
     private bool TryCreatePolylineOffset(

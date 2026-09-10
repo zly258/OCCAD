@@ -38,8 +38,6 @@ public sealed class CadSnapManager
     private int _currentCandidateIndex = -1;
     private int? _lastResolveX;
     private int? _lastResolveY;
-    private CadSnapPlaneMode _planeMode = CadSnapPlaneMode.KeepEntityPoint;
-    private double _planeTolerance = 1e-6;
 
     public CadSnapManager(CadDocument document)
     {
@@ -100,32 +98,6 @@ public sealed class CadSnapManager
 
     public CadSnapType EffectiveModes => TemporaryModes ?? Modes;
 
-    public CadSnapPlaneMode PlaneMode
-    {
-        get => _planeMode;
-        set
-        {
-            if (!Enum.IsDefined(value))
-                throw new ArgumentOutOfRangeException(nameof(value));
-            if (_planeMode == value) return;
-            _planeMode = value;
-            ResetCandidateState();
-        }
-    }
-
-    public double PlaneTolerance
-    {
-        get => _planeTolerance;
-        set
-        {
-            if (!double.IsFinite(value) || value < 0.0)
-                throw new ArgumentOutOfRangeException(nameof(value));
-            if (_planeTolerance.Equals(value)) return;
-            _planeTolerance = value;
-            ResetCandidateState();
-        }
-    }
-
     public double PixelTolerance { get; set; } = 10.0;
     public CadSnapPoint? Current { get; private set; }
     public IReadOnlyList<CadSnapPoint> Candidates => _candidates;
@@ -149,11 +121,15 @@ public sealed class CadSnapManager
         int y,
         OcctPoint3d queryPoint,
         CadWorkPlane workPlane,
-        OcctPoint3d? reference = null)
+        OcctPoint3d? reference = null,
+        CadSnapResolvePolicy policy = default)
     {
         ArgumentNullException.ThrowIfNull(workPlane);
         if (!queryPoint.IsFinite)
             throw new ArgumentOutOfRangeException(nameof(queryPoint));
+        if (policy == default)
+            policy = CadSnapResolvePolicy.KeepExactPoint;
+        policy.Validate();
 
         var effectiveModes = EffectiveModes;
         if (!Active ||
@@ -199,7 +175,8 @@ public sealed class CadSnapManager
                              x,
                              y,
                              tolerance,
-                             workPlane))
+                             workPlane,
+                             policy))
                     Consider(candidate);
             }
 
@@ -263,7 +240,7 @@ public sealed class CadSnapManager
                     !source.Position.IsFinite)
                     return;
 
-                var candidate = ApplyPlanePolicy(source, workPlane);
+                var candidate = ApplyPlanePolicy(source, workPlane, policy);
                 if (candidate is null) return;
 
                 if (ranked.Any(existing =>
@@ -330,30 +307,22 @@ public sealed class CadSnapManager
             CurrentChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private CadSnapPoint? ApplyPlanePolicy(
+    private static CadSnapPoint? ApplyPlanePolicy(
         CadSnapPoint candidate,
-        CadWorkPlane workPlane)
+        CadWorkPlane workPlane,
+        CadSnapResolvePolicy policy)
     {
         if (!workPlane.IsActive ||
-            PlaneMode == CadSnapPlaneMode.KeepEntityPoint)
+            policy.PlaneMode == CadSnapPlaneMode.KeepEntityPoint)
             return candidate;
 
         var local = workPlane.WorldToLocal(candidate.Position);
         var projected = workPlane.LocalToWorld(local);
         var distance = candidate.Position.DistanceTo(projected);
 
-        if (PlaneMode == CadSnapPlaneMode.RequireOnWorkPlane)
-        {
-            return distance <= PlaneTolerance
-                ? candidate with { WorkPlane = null }
-                : null;
-        }
-
-        return candidate with
-        {
-            Position = projected,
-            WorkPlane = null
-        };
+        return distance <= policy.PlaneTolerance
+            ? candidate with { WorkPlane = null }
+            : null;
     }
 
     private bool CycleCandidate(int direction)
@@ -586,18 +555,18 @@ public sealed class CadSnapManager
             if ((modes & CadSnapType.Tangent) != 0 &&
                 reference is { } tangentReference)
             {
-                foreach (var tangent in engine.GetTangentPoints(
+                foreach (var tangent in
+                         CadNativeEdgeSnapGeometry.TangentPoints(
+                             engine,
                              edge,
-                             new OcctPlane3d(
-                                 workPlane.Origin,
-                                 workPlane.Normal),
+                             workPlane,
                              tangentReference))
                 {
                     AddUnique(
                         result,
                         new CadSnapPoint(
                             entity,
-                            tangent.Point,
+                            tangent,
                             CadSnapType.Tangent,
                             edgeIndex));
                 }
@@ -685,18 +654,17 @@ public sealed class CadSnapManager
                      secondIndex < unique.Length;
                      secondIndex++)
                 {
-                    foreach (var intersection in engine.IntersectEdges(
+                    foreach (var intersection in
+                             CadNativeEdgeSnapGeometry.Intersections(
+                                 engine,
                                  copies[firstIndex],
                                  copies[secondIndex]))
                     {
-                        if (intersection.Kind != OcctIntersectionKind.Point)
-                            continue;
-
                         AddUnique(
                             result,
                             new CadSnapPoint(
                                 unique[firstIndex].Entity,
-                                intersection.StartPoint,
+                                intersection,
                                 CadSnapType.Intersection,
                                 unique[firstIndex].EdgeIndex));
                     }
@@ -829,7 +797,8 @@ public sealed class CadSnapManager
         int x,
         int y,
         double tolerance,
-        CadWorkPlane plane)
+        CadWorkPlane plane,
+        CadSnapResolvePolicy policy)
     {
         var camera = engine.GetCamera();
         var viewport = engine.GetViewportState();
@@ -847,8 +816,8 @@ public sealed class CadSnapManager
             plane.Origin,
             plane.XAxis,
             plane.YAxis,
-            PlaneMode,
-            PlaneTolerance);
+            policy.PlaneMode,
+            policy.PlaneTolerance);
         if (_centerProjection != projection)
         {
             _centerProjection = null;
@@ -864,7 +833,7 @@ public sealed class CadSnapManager
                         !point.Position.IsFinite)
                         continue;
 
-                    var candidate = ApplyPlanePolicy(point, plane);
+                    var candidate = ApplyPlanePolicy(point, plane, policy);
                     if (candidate is null) continue;
                     if (viewport.ProjectionType == OcctProjectionType.Perspective &&
                         (candidate.Value.Position - camera.Eye)

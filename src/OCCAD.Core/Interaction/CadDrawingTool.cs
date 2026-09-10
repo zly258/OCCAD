@@ -85,8 +85,8 @@ public abstract class CadDrawingTool : CadTool
         }
 
         var yAxis = normal.Cross(xAxis).Normalized();
-        Context.WorkPlane.SetPlaneLocked(false);
-        Context.WorkPlane.SetCustom(to, xAxis, yAxis);
+        Context.WorkPlane.SetToolPlaneFixed(false);
+        Context.WorkPlane.SetToolPlane(to, xAxis, yAxis);
     }
 
     protected void CommitPreview(CadEntity? entity)

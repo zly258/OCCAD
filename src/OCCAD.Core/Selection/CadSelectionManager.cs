@@ -55,7 +55,15 @@ public sealed class CadSelectionManager
     }
 
     public IReadOnlyList<CadEntity> Selected => _selected;
+    public IReadOnlyList<CadSelectionReference> References =>
+        _selected
+            .Select(CadSelectionReference.Entity)
+            .ToArray();
     public CadEntity? Primary => _primary;
+    public CadSelectionReference? PrimaryReference =>
+        _primary is null
+            ? null
+            : CadSelectionReference.Entity(_primary);
     public CadSelectionFilter? Filter { get; private set; }
 
     public event EventHandler<CadSelectionChangedEventArgs>? Changed;

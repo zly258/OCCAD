@@ -5,9 +5,11 @@ namespace OCCAD;
 public abstract class CadSelectionTransformToolBase : CadTool
 {
     private CadEntity[] _entities = [];
+    private readonly List<CadEntity> _suppressedSources = [];
 
     protected IReadOnlyList<CadEntity> Entities => _entities;
     protected virtual bool AutoCommitValidSelection => false;
+    protected virtual bool SuppressSourcesDuringPreview => false;
 
     public override bool CanCommitCurrentStage => State == CadToolState.WaitForSelect
         ? IsActive && IsSelectionValid(CurrentSelection())
@@ -61,6 +63,8 @@ public abstract class CadSelectionTransformToolBase : CadTool
 
     protected override void OnDeactivated()
     {
+        Context.Preview.Clear();
+        RestoreSourcePresentations();
         Context.Selection.Changed -= SelectionChanged;
         _entities = [];
         ResetTransformState();
@@ -77,7 +81,7 @@ public abstract class CadSelectionTransformToolBase : CadTool
 
     protected void RestartSelection(bool clearSelection = true)
     {
-        Context.Preview.Clear();
+        ClearTransformPreview();
         _entities = [];
         if (clearSelection)
             Context.Selection.Clear();
@@ -92,7 +96,74 @@ public abstract class CadSelectionTransformToolBase : CadTool
             .ToArray();
         foreach (var entity in previews)
             transform(entity);
+
         Context.Preview.Show(previews);
+        if (SuppressSourcesDuringPreview)
+            SuppressSourcePresentations();
+    }
+
+    protected void ClearTransformPreview()
+    {
+        Context.Preview.Clear();
+        RestoreSourcePresentations();
+    }
+
+    private void SuppressSourcePresentations()
+    {
+        if (_suppressedSources.Count > 0 ||
+            Context.Workspace.Engine is not
+            { IsInitialized: true } engine)
+            return;
+
+        using var batch =
+            engine.BeginDisplayBatch();
+
+        foreach (var entity in _entities)
+        {
+            if (entity.ViewerObject is not
+                { } source ||
+                !engine.ContainsObject(source.Id) ||
+                !Context.Document
+                    .ResolveAppearance(entity)
+                    .Visible)
+                continue;
+
+            engine.SetObjectVisible(
+                source,
+                false);
+            _suppressedSources.Add(entity);
+        }
+    }
+
+    private void RestoreSourcePresentations()
+    {
+        if (_suppressedSources.Count == 0)
+            return;
+
+        var values =
+            _suppressedSources.ToArray();
+        _suppressedSources.Clear();
+
+        if (Context.Workspace.Engine is not
+            { IsInitialized: true } engine)
+            return;
+
+        using var batch =
+            engine.BeginDisplayBatch();
+
+        foreach (var entity in values)
+        {
+            if (entity.ViewerObject is not
+                { } source ||
+                !engine.ContainsObject(source.Id))
+                continue;
+
+            engine.SetObjectVisible(
+                source,
+                Context.Document
+                    .ResolveAppearance(entity)
+                    .Visible);
+        }
     }
 
     private void BeginSelection()

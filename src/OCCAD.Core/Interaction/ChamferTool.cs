@@ -41,9 +41,9 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
                         chain,
                         hit,
                         out var preview))
-                    Context.Preview.Show(preview);
+                    ShowReplacementPreview([chain], [preview]);
                 else
-                    Context.Preview.Clear();
+                    ClearReplacementPreview();
                 return true;
             }
 
@@ -56,14 +56,14 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
                     hit,
                     out var replacement))
             {
-                Context.Preview.Clear();
+                ClearReplacementPreview();
                 SetPromptLocalized(
                     "Cad.Prompt.chamfer.Invalid",
                     "Chamfer: selected geometry and distances do not define a valid corner.");
                 return true;
             }
 
-            Context.Preview.Clear();
+            ClearReplacementPreview();
             Context.Workspace.ReplaceEntities(
                 [chain],
                 [replacement],
@@ -172,7 +172,26 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
         else
             return false;
 
-        RefreshPreview();
+        if (!HasFirstEntity &&
+            Context.Workspace.Preselection.Current is
+            {
+                Entity: var chain,
+                Point: var hit
+            } &&
+            chain is CadPolylineEntity or CadPathEntity)
+        {
+            if (TryChamferChain(
+                    chain,
+                    hit,
+                    out var preview))
+                ShowReplacementPreview([chain], [preview]);
+            else
+                ClearReplacementPreview();
+        }
+        else
+        {
+            RefreshPreview();
+        }
         NotifyUpdated();
         return true;
     }

@@ -84,7 +84,7 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
             return false;
 
         _basePoint = null;
-        Context.Preview.Clear();
+        ClearTransformPreview();
         Context.WorkPlane.SetOrigin(
             _initialOrigin);
         SetStageLocalized(
@@ -106,7 +106,7 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
         {
             _basePoint = point;
             Context.WorkPlane.SetOrigin(point);
-            Context.Preview.Clear();
+            ClearTransformPreview();
             SetStageLocalized(
                 1,
                 $"Cad.Prompt.{Id}.Target",
@@ -119,7 +119,7 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
             CadTransformMath.Between(_basePoint.Value, point);
         if (displacement.LengthSquared <= 1e-18)
         {
-            Context.Preview.Clear();
+            ClearTransformPreview();
             return false;
         }
 
@@ -157,7 +157,7 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
             CadTransformMath.Between(BasePoint, target);
         if (displacement.LengthSquared <= 1e-18)
         {
-            Context.Preview.Clear();
+            ClearTransformPreview();
             return;
         }
 

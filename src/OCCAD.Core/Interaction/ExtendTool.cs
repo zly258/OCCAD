@@ -85,24 +85,25 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
     {
         if (!TryBuild(out _, out var replacement))
         {
-            Context.Preview.Clear();
+            ClearReplacementPreview();
             return;
         }
 
-        Context.Preview.Show(replacement);
+        ShowReplacementPreview([target], [replacement]);
     }
 
     private bool CommitHovered()
     {
         if (!TryBuild(out var target, out var replacement))
         {
+            ClearReplacementPreview();
             SetPromptLocalized(
                 "Cad.Prompt.extend.Invalid",
                 "Extend: the hovered curve or path cannot be extended to the selected boundaries.");
             return true;
         }
 
-        Context.Preview.Clear();
+        ClearReplacementPreview();
         Context.Workspace.ApplyGeneratedGeometryChange(
             [target],
             "Extend",

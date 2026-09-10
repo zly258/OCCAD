@@ -36,9 +36,9 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
                         _radius,
                         Context.WorkPlane,
                         out var preview))
-                    Context.Preview.Show(preview);
+                    ShowReplacementPreview([path], [preview]);
                 else
-                    Context.Preview.Clear();
+                    ClearReplacementPreview();
                 return true;
             }
 
@@ -52,14 +52,14 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
                         Context.WorkPlane,
                         out var replacement))
                 {
-                    Context.Preview.Clear();
+                    ClearReplacementPreview();
                     SetPromptLocalized(
                         "Cad.Prompt.fillet.Invalid",
                         "Fillet: selected vertex and radius do not define a valid fillet.");
                     return true;
                 }
 
-                Context.Preview.Clear();
+                ClearReplacementPreview();
                 Context.Workspace.ReplaceEntities(
                     [path],
                     [replacement],
@@ -159,7 +159,28 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
             return false;
 
         _radius = radius;
-        RefreshPreview();
+        if (!HasFirstEntity &&
+            Context.Workspace.Preselection.Current is
+            {
+                Entity: var path,
+                Point: var hit
+            } &&
+            path is CadPolylineEntity or CadPathEntity)
+        {
+            if (CadPathFilletGeometry.TryFillet(
+                    path.CreateWorldGeometrySnapshot(),
+                    hit,
+                    _radius,
+                    Context.WorkPlane,
+                    out var preview))
+                ShowReplacementPreview([path], [preview]);
+            else
+                ClearReplacementPreview();
+        }
+        else
+        {
+            RefreshPreview();
+        }
         NotifyUpdated();
         return true;
     }

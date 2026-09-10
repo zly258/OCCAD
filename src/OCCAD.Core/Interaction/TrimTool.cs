@@ -84,26 +84,27 @@ public sealed class TrimTool : CadSelectionTransformToolBase
 
     private void UpdatePreview()
     {
-        if (!TryBuild(out _, out var replacements))
+        if (!TryBuild(out var target, out var replacements))
         {
-            Context.Preview.Clear();
+            ClearReplacementPreview();
             return;
         }
 
-        Context.Preview.Show(replacements);
+        ShowReplacementPreview([target], replacements);
     }
 
     private bool CommitHovered()
     {
         if (!TryBuild(out var target, out var replacements))
         {
+            ClearReplacementPreview();
             SetPromptLocalized(
                 "Cad.Prompt.trim.Invalid",
                 "Trim: the hovered curve cannot be trimmed by the selected boundaries.");
             return true;
         }
 
-        Context.Preview.Clear();
+        ClearReplacementPreview();
         Context.Workspace.ReplaceEntities(
             [target],
             replacements,

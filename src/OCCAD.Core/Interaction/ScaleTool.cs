@@ -10,6 +10,7 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
     private CadPlaneFrame _initialPlane;
     public override string Id => "scale";
     public override string DisplayName => "Scale";
+    protected override bool SuppressSourcesDuringPreview => true;
     public override OcctPoint3d? PrecisionReferencePoint => _center;
     protected override bool CanCommitCurrentStageCore => State == CadToolState.Drawing;
     protected override bool CanStepBackCore => _center is not null;
@@ -108,7 +109,7 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
         if (_referenceLength is null) return false;
         if (input.Factor is { } factor)
             ShowEntityPreview(entity => entity.ScaleFromWorld(_center!.Value, factor));
-        else Context.Preview.Clear();
+        else ClearTransformPreview();
         NotifyUpdated();
         return true;
     }
@@ -141,7 +142,7 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
                 _initialPlane.YAxis,
                 lockPlane: false);
         }
-        Context.Preview.Clear();
+        ClearTransformPreview();
         RestorePrompt();
         return true;
     }
@@ -160,7 +161,7 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
         var factor = Factor(point);
         if (double.IsFinite(factor) && factor > 1e-9)
             ShowEntityPreview(entity => entity.ScaleFromWorld(_center!.Value, factor));
-        else Context.Preview.Clear();
+        else ClearTransformPreview();
     }
 
     private void Commit(double factor)

@@ -83,14 +83,14 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
                 hit,
                 out var replacements))
         {
-            Context.Preview.Clear();
+            ClearReplacementPreview();
             SetPromptLocalized(
                 $"Cad.Prompt.{Id}.Invalid",
                 $"{DisplayName}: selected curves and parameters do not define a valid corner.");
             return true;
         }
 
-        Context.Preview.Clear();
+        ClearReplacementPreview();
         Context.Workspace.ReplaceEntities(
             [_first, entity],
             replacements,
@@ -108,7 +108,7 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
             return false;
 
         _first = null;
-        Context.Preview.Clear();
+        ClearReplacementPreview();
         SetStageLocalized(
             0,
             $"Cad.Prompt.{Id}.First",
@@ -133,11 +133,11 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
             ReferenceEquals(_first, second) ||
             !TryBuild(second, hit, out var replacements))
         {
-            Context.Preview.Clear();
+            ClearReplacementPreview();
             return;
         }
 
-        Context.Preview.Show(replacements);
+        ShowReplacementPreview([_first, second], replacements);
     }
 
     protected virtual bool IsSupportedEntity(CadEntity entity) =>

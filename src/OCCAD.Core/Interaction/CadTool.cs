@@ -65,6 +65,7 @@ public abstract class CadTool
     private CadToolState _state = CadToolState.Idle;
     private int _stage;
     private CadSelectionFilter? _previousSelectionFilter;
+    private readonly List<CadEntity> _replacementPreviewSources = [];
 
     public CadToolState State => _state;
     public int Stage => _stage;
@@ -144,6 +145,7 @@ public abstract class CadTool
             TryCleanup(OnCanceled);
         TryCleanup(OnDeactivated);
         TryCleanup(Context.Preview.Clear);
+        TryCleanup(RestoreReplacementPreviewSources);
         TryCleanup(Context.Tracking.Clear);
         TryCleanup(Context.Snap.Clear);
         TryCleanup(Context.Workspace.Precision.ResetFactor);
@@ -315,6 +317,107 @@ public abstract class CadTool
     protected void NotifyUpdated() =>
         PublishUpdated();
 
+    protected void ShowReplacementPreview(
+        IReadOnlyList<CadEntity> sources,
+        IReadOnlyList<CadEntity> replacements)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        ArgumentNullException.ThrowIfNull(replacements);
+
+        if (!MatchesReplacementPreviewSources(sources))
+        {
+            RestoreReplacementPreviewSources();
+            SuppressReplacementPreviewSources(sources);
+        }
+
+        Context.Preview.Show(replacements);
+    }
+
+    protected void ClearReplacementPreview()
+    {
+        Context.Preview.Clear();
+        RestoreReplacementPreviewSources();
+    }
+
+    private bool MatchesReplacementPreviewSources(
+        IReadOnlyList<CadEntity> sources)
+    {
+        if (_replacementPreviewSources.Count != sources.Count)
+            return false;
+
+        for (var index = 0; index < sources.Count; index++)
+        {
+            if (!ReferenceEquals(
+                    _replacementPreviewSources[index],
+                    sources[index]))
+                return false;
+        }
+
+        return true;
+    }
+
+    private void SuppressReplacementPreviewSources(
+        IReadOnlyList<CadEntity> sources)
+    {
+        if (sources.Count == 0 ||
+            Context.Workspace.Engine is not
+            { IsInitialized: true } engine)
+            return;
+
+        using var batch =
+            engine.BeginDisplayBatch();
+
+        foreach (var entity in sources)
+        {
+            if (_replacementPreviewSources.Contains(entity))
+                continue;
+
+            if (entity.ViewerObject is not
+                { } source ||
+                !engine.ContainsObject(source.Id) ||
+                !Context.Document
+                    .ResolveAppearance(entity)
+                    .Visible)
+                continue;
+
+            engine.SetObjectVisible(
+                source,
+                false);
+            _replacementPreviewSources.Add(entity);
+        }
+    }
+
+    private void RestoreReplacementPreviewSources()
+    {
+        if (_replacementPreviewSources.Count == 0)
+            return;
+
+        var values =
+            _replacementPreviewSources.ToArray();
+        _replacementPreviewSources.Clear();
+
+        if (Context.Workspace.Engine is not
+            { IsInitialized: true } engine)
+            return;
+
+        using var batch =
+            engine.BeginDisplayBatch();
+
+        foreach (var entity in values)
+        {
+            if (entity.ViewerObject is not
+                { } source ||
+                !engine.ContainsObject(source.Id))
+                continue;
+
+            engine.SetObjectVisible(
+                source,
+                Context.Document
+                    .ResolveAppearance(entity)
+                    .Visible);
+        }
+    }
+
     private void PublishUpdated()
     {
         SynchronizeSnapState();
@@ -351,7 +454,7 @@ public abstract class CadTool
 
     private void ResetStageTransientState()
     {
-        Context.Preview.Clear();
+        ClearReplacementPreview();
         Context.Snap.TemporaryModes = null;
         Context.Snap.Clear();
         Context.Tracking.Clear();

@@ -9,6 +9,7 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
     private CadEntity? _preview;
     private bool _invalidGrip;
     private CadPrecisionInputKind _effectivePrecisionInputs;
+    private bool _sourcePresentationSuppressed;
 
     public GripEditTool(CadGripPoint grip)
     {
@@ -223,6 +224,56 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
             ShowInvalidGripPrompt();
             return false;
         }
+    }
+
+    private void SuppressSourcePresentation()
+    {
+        if (_sourcePresentationSuppressed ||
+            Context.Workspace.Engine is not
+            { IsInitialized: true } engine ||
+            _grip.Entity.ViewerObject is not
+            { } source ||
+            !engine.ContainsObject(source.Id))
+            return;
+
+        using var batch =
+            engine.BeginDisplayBatch();
+        engine.SetObjectSelectable(
+            source,
+            false);
+        engine.SetObjectVisible(
+            source,
+            false);
+        _sourcePresentationSuppressed = true;
+    }
+
+    private void RestoreSourcePresentation()
+    {
+        if (!_sourcePresentationSuppressed)
+            return;
+
+        _sourcePresentationSuppressed = false;
+
+        if (Context.Workspace.Engine is not
+            { IsInitialized: true } engine ||
+            _grip.Entity.ViewerObject is not
+            { } source ||
+            !engine.ContainsObject(source.Id))
+            return;
+
+        var appearance =
+            Context.Workspace.Document
+                .ResolveAppearance(
+                    _grip.Entity);
+
+        using var batch =
+            engine.BeginDisplayBatch();
+        engine.SetObjectVisible(
+            source,
+            appearance.Visible);
+        engine.SetObjectSelectable(
+            source,
+            appearance.Selectable);
     }
 
     private void SetGripPrompt(

@@ -10,6 +10,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     private CadPlaneFrame _initialPlane;
     public override string Id => "rotate";
     public override string DisplayName => "Rotate";
+    protected override bool SuppressSourcesDuringPreview => true;
     public override OcctPoint3d? PrecisionReferencePoint => _center;
     protected override bool CanCommitCurrentStageCore => State == CadToolState.Drawing;
     protected override bool CanStepBackCore => _center is not null;
@@ -74,7 +75,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
         if (_reference is null) return false;
         if (input.AngleDegrees is { } angle)
             ShowEntityPreview(entity => entity.RotatePlacement(_center!.Value, _normal, angle));
-        else Context.Preview.Clear();
+        else ClearTransformPreview();
         NotifyUpdated();
         return true;
     }
@@ -106,7 +107,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
                 _initialPlane.YAxis,
                 lockPlane: false);
         }
-        Context.Preview.Clear();
+        ClearTransformPreview();
         RestorePrompt();
         return true;
     }
@@ -138,7 +139,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     {
         if (Angle(point, out var angle))
             ShowEntityPreview(entity => entity.RotatePlacement(_center!.Value, _normal, angle));
-        else Context.Preview.Clear();
+        else ClearTransformPreview();
     }
 
     private void Commit(double angle)

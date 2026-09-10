@@ -3,8 +3,8 @@ using OCCAD;
 namespace OCCAD.Avalonia;
 
 /// <summary>
-/// Resolves editor behavior from ordered property rules. The inspector owns
-/// Avalonia control instances and transactions; Core owns value conversion.
+/// Resolves editor behavior from Core property descriptors. Avalonia owns the
+/// control instances; Core owns property semantics, conversion, and validation.
 /// </summary>
 internal static class CadPropertyEditorFactory
 {
@@ -14,13 +14,12 @@ internal static class CadPropertyEditorFactory
 
         var editor = descriptor.Editor;
 
-        // Entity appearance properties (Color / LineStyle / LineWidth) use a
-        // compound ByLayer editor in the entity PropertyGrid. The value editor
-        // nested inside that compound control resolves the underlying value
-        // kind rather than recursively resolving to ByLayer again.
+        // Entity appearance properties use a compound ByLayer editor. Its
+        // nested value control must resolve the real value kind instead of
+        // recursively producing another ByLayer editor.
         if (!entityContext && editor == CadPropertyEditorKind.ByLayer)
         {
-            editor = descriptor.Value.Semantic switch
+            return descriptor.Value.Semantic switch
             {
                 CadValueSemantic.Boolean => CadPropertyEditorKind.Boolean,
                 CadValueSemantic.Enum or CadValueSemantic.Choice => CadPropertyEditorKind.Choice,
@@ -35,11 +34,7 @@ internal static class CadPropertyEditorFactory
             };
         }
 
-        // Numeric values intentionally share the normal left-aligned TextBox
-        // surface; parsing and validation remain in Core.
-        return editor == CadPropertyEditorKind.Numeric
-            ? CadPropertyEditorKind.Text
-            : editor;
+        return editor;
     }
 
     public static string? ByLayerProperty(CadPropertyDescriptor descriptor) => descriptor.ByLayerProperty;

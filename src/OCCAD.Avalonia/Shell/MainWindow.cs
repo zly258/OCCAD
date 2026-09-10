@@ -670,10 +670,21 @@ public sealed partial class MainWindow : Window
         };
         var button = new Button
         {
-            Content = "×",
+            Content = new TextBlock
+            {
+                Text = "×",
+                FontSize = CadTheme.FontSize,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center
+            },
             Width = CadTheme.ControlHeight,
             Height = CadTheme.ControlHeight,
             Padding = new Thickness(0),
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
             Background = Brushes.Transparent,
             Foreground = CadTheme.Muted,
             BorderThickness = new Thickness(0)

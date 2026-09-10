@@ -1,6 +1,6 @@
 # OCCAD Documentation
 
-This directory contains OCCAD's long-lived product, user, architecture, command, development, build, release, quality, and maintenance documentation.
+This directory contains OCCAD's long-lived product, user, feature, command, architecture, development, build, release, quality, and maintenance documentation.
 
 - 中文: [zh-CN/README.md](zh-CN/README.md)
 - English: [en-US/README.md](en-US/README.md)
@@ -8,7 +8,7 @@ This directory contains OCCAD's long-lived product, user, architecture, command,
 
 ## Documentation set
 
-The two language trees are kept structurally synchronized.
+The two language trees are structurally synchronized:
 
 1. Product goals and scope
 2. UI specification
@@ -35,7 +35,7 @@ For end users:
 
 For contributors:
 
-`01 Product Goals → 04 Architecture → 05 Entity/Tool Contract → 08 Development Guide → 09 Extension Guide → 10 Transaction/Resource Contract`
+`01 Product Goals → 04 Architecture → 07 Code Organization → 08 Development Guide → 09 Extension Guide → 10 Transaction/Resource Contract`
 
 For UI/interaction work:
 
@@ -45,15 +45,61 @@ For release preparation:
 
 `11 Build Validation → 14 Feature Matrix → 15 Command Reference → 16 Release Guide`
 
-## Documentation rules
+## Canonical ownership
 
-- Documentation describes stable product behavior and engineering contracts, not temporary sprint notes or commit history.
-- `docs/en-US` and `docs/zh-CN` must keep the same numbered topic set.
-- Architecture, lifecycle, public extension-point, transaction, persistence, command, or product-surface changes must update the matching document in the same change set.
-- Source code is authoritative if implementation and documentation disagree; the mismatch is a defect to be corrected.
-- Public extension points must document ownership, lifecycle, failure semantics, Undo/Redo semantics, native/thread assumptions, and validation expectations.
-- Cross-cutting architectural decisions with durable trade-offs require an ADR.
-- A feature is not release-ready merely because an Entity/API exists; the full user flow must be validated.
+Do not copy long normative sections between documents. Each subject has one primary owner:
+
+- product scope and non-goals → `01` + `14`;
+- shell/layout → `02`;
+- pointer/selection/snap/grip/work-plane behavior → `03`;
+- dependency, ownership and lifecycle architecture → `04`;
+- Entity/Tool implementation contract → `05`;
+- quality/data semantics → `06`;
+- source layout and repository hygiene → `07`;
+- daily development workflow → `08`;
+- extension procedure → `09`;
+- transaction/event/native-resource invariants → `10`;
+- build/runtime validation → `11`;
+- troubleshooting → `12`;
+- user operation → `13`;
+- release feature classification → `14`;
+- Action IDs, aliases and Tool mapping → `15`;
+- release gate and packaging → `16`.
+
+Other documents should state only the local consequence and link to the canonical owner.
+
+## Terminology standard
+
+Use these terms consistently in both language trees:
+
+- **Entity** — persistent CAD domain object;
+- **Tool** — staged interactive command state machine;
+- **Action** — stable command entry point;
+- **Document** — persistent Entity owner;
+- **Selection / Subobject Selection / Preselection** — distinct formal interaction states;
+- **Preview / Snap / Tracking / Grip** — transient interaction presentation;
+- **WorkPlane** — drafting coordinate plane;
+- **Transaction / History / Undo / Redo** — authoritative mutation and reversal model;
+- **ByLayer** — entity appearance inherited from its Layer;
+- **Override** — entity-specific Color/LineStyle/LineWidth;
+- **Initial Release** — validated user-facing product surface;
+- **Infrastructure** — implemented Core capability not yet a complete user workflow;
+- **Internal** — implementation/persistence support not presented as user functionality;
+- **Out of Scope** — intentionally excluded from the current release.
+
+Stable identifiers such as `edit.move`, Tool IDs, registry IDs, enum names, and filenames are never translated.
+
+## Writing rules
+
+- Describe current stable behavior, not sprint notes or commit history.
+- Prefer short normative statements over repeated rationale.
+- Use code font for IDs, paths, commands, properties, enum values, and shortcuts.
+- Use the exact current source name for classes and stable identifiers.
+- Do not call an API/Entity/helper a product feature unless the complete user flow is exposed and validated.
+- Do not document retired Ribbon, permanent Command Line, floating Tool Panel, or Dynamic HUD as current UI.
+- When implementation changes, update the matching English and Chinese document in the same change set.
+- Cross-cutting decisions with durable trade-offs require an ADR.
+- If source and documentation disagree, source is authoritative and the mismatch is a defect.
 
 ## Current architectural baseline
 
@@ -61,6 +107,6 @@ For release preparation:
 
 The initial product shell is a compact Fluent desktop shell with two compact toolbar rows, a dark viewport, Model/Layer/Property panels, explicit Chinese/English switching, a fixed Tool parameter strip, and a drafting status strip. It deliberately does not display a large Ribbon, permanent Command Line, permanent Ready text, or redundant coordinate/status noise.
 
-## Release documentation status
+## Release status
 
-The documentation set now covers the initial release surface in enough detail for user operation, maintenance, extension, and packaging. Formal release readiness still requires the real build and manual/native regression gates in [16 Release Guide](en-US/16-RELEASE-GUIDE.md) / [16 发布指南](zh-CN/16-RELEASE-GUIDE.md).
+The documentation set covers the current initial-release surface. Formal release readiness still requires the real build and manual/native regression gates in [16 Release Guide](en-US/16-RELEASE-GUIDE.md) / [16 发布指南](zh-CN/16-RELEASE-GUIDE.md).

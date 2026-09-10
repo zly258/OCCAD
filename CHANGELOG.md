@@ -26,23 +26,35 @@ All notable OCCAD product changes are recorded here. This file describes user-vi
 
 ### Stabilized
 
-- Tool neutral-state cleanup now retries Preview, Snap, Tracking, and GripDrag cleanup before the next Tool session.
+- Tool neutral-state cleanup retries Preview, Snap, Tracking, and GripDrag cleanup before the next Tool session.
 - Transient ownership is retained when native cleanup still has state, preventing ownerless ghost presentation.
 - Esc cleanup performs best-effort cleanup across all interaction channels before reporting recoverable failures.
 - Undo/Redo UI paths use `CadWorkspace.Undo()` / `CadWorkspace.Redo()` rather than bypassing workspace cleanup.
-- Classic Tool parameter refresh avoids redundant ToolChanged/ToolUpdated rebuilds.
 - Action, direct-input, and precision-input exception boundaries no longer convert fatal runtime failures into ordinary user-input errors.
-- Command catalog was aligned with actual registered Actions and obsolete/unreachable aliases were removed.
-- Windows/Linux build and publish scripts were aligned with nested or root portable Bridge layouts.
+- Command catalog is aligned with actual registered Actions; obsolete/unreachable aliases were removed.
+- Entity Color, LineStyle, and LineWidth can be overridden independently from Layer appearance. Direct value editing disables the corresponding ByLayer flag in the same property transaction; re-enabling ByLayer restores Layer inheritance.
+- PropertyGrid editor resolution no longer recursively resolves nested ByLayer editors. Numeric properties use the dedicated numeric editor path while remaining normal left-aligned TextBox controls.
+- Property and engineering UI text metrics were increased for practical readability at normal Windows DPI scaling.
+- Windows/Linux build and publish scripts support nested or SDK-root portable Bridge layouts.
 - Windows publish packages include a launcher that runs directly from the publish directory.
+
+### Cleanup
+
+- Removed an unused PropertyGrid editing helper and eliminated the Numeric-as-Text compatibility detour in editor resolution.
+- Corrected contributor documentation that referenced the removed `11-TESTING-VALIDATION.md` name.
+- Replaced stale code-organization references to retired `CommandLine`, `DynamicInput`, `ToolPanel`, `Panels/Tools`, and `INTERACTION-CONTRACTS.md` structures with the real current repository layout.
+- Standardized code/document ownership rules so retired UI concepts are not reintroduced as parallel frameworks.
+- Kept unexposed Core Entity/Geometry families when persistence, feature, selection, or compatibility dependencies could not be disproved without a real build; release cleanup is intentionally conservative at the Core boundary.
 
 ### Documentation
 
-- Expanded detailed User Guide.
+- Expanded the detailed User Guide.
 - Expanded Architecture Design with ownership, data-flow, Tool, transaction, transient, engine, and UI boundaries.
 - Expanded Developer Handbook with practical Entity/Tool/Action/Property/Snap/Grip/Persistence workflows.
 - Added Command and Feature Reference.
 - Added Release and Delivery Guide with build, regression, package, and release gates.
+- Reworked Code Organization documentation against the actual current source tree.
+- Added canonical-document ownership and terminology rules for Entity, Tool, Action, Preview, ByLayer, Override, release classifications, IDs, and product boundaries.
 - Updated English/Chinese documentation indexes and root README release entry points.
 
 ### Current product boundaries

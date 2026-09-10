@@ -156,7 +156,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                         "Cad.Text.SelectionInitial",
                         "Selection: 0"),
                     Foreground = CadTheme.Muted,
-                    Margin = new Thickness(7)
+                    Margin = new Thickness(7),
+                    FontSize = CadTheme.PropertyFontSize
                 });
                 return;
             }
@@ -370,7 +371,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
             Foreground = CadTheme.Text,
             Margin = new Thickness(5, 0, 4, 0),
             VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            FontSize = CadTheme.PropertyFontSize
         });
 
         var text = new TextBlock
@@ -432,7 +434,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
             Margin = new Thickness(5, 0, 4, 0),
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            FontSize = CadTheme.FontSize
+            FontSize = CadTheme.PropertyFontSize
         };
         if (!string.IsNullOrWhiteSpace(slot.Descriptor.Description))
         {
@@ -505,30 +507,35 @@ internal sealed class CadPropertyInspectorController : IDisposable
         switch (control)
         {
             case TextBox textBox:
+                textBox.FontSize = CadTheme.PropertyFontSize;
                 textBox.Margin = new Thickness(2, 1);
-                textBox.MinHeight = CadTheme.ControlHeight;
+                textBox.MinHeight = CadTheme.PropertyControlHeight;
                 textBox.HorizontalAlignment = HorizontalAlignment.Stretch;
                 textBox.TextAlignment = TextAlignment.Left;
                 break;
 
             case ComboBox comboBox:
+                comboBox.FontSize = CadTheme.PropertyFontSize;
                 comboBox.Margin = new Thickness(2, 1);
-                comboBox.MinHeight = CadTheme.ControlHeight;
+                comboBox.MinHeight = CadTheme.PropertyControlHeight;
                 comboBox.HorizontalAlignment = HorizontalAlignment.Stretch;
                 break;
 
             case CheckBox checkBox:
+                checkBox.FontSize = CadTheme.PropertyFontSize;
                 checkBox.Margin = new Thickness(5, 0, 0, 0);
-                checkBox.MinHeight = CadTheme.ControlHeight;
+                checkBox.MinHeight = CadTheme.PropertyControlHeight;
                 break;
 
             case Button button:
+                button.FontSize = CadTheme.PropertyFontSize;
                 button.Margin = new Thickness(2, 1);
-                button.MinHeight = CadTheme.ControlHeight;
+                button.MinHeight = CadTheme.PropertyControlHeight;
                 button.HorizontalAlignment = HorizontalAlignment.Stretch;
                 break;
 
             case TextBlock text:
+                text.FontSize = CadTheme.PropertyFontSize;
                 text.Margin = new Thickness(5, 0, 3, 0);
                 text.VerticalAlignment = VerticalAlignment.Center;
                 break;
@@ -562,7 +569,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
             {
                 Text = title,
                 FontWeight = FontWeight.Bold,
-                FontSize = 12.0,
+                FontSize = CadTheme.PropertyTitleFontSize,
                 Foreground = CadTheme.Text,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis
@@ -576,7 +583,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         {
             Text = Text("Cad.Text.Property", "Property"),
             FontWeight = FontWeight.SemiBold,
-            FontSize = 11.0,
+            FontSize = CadTheme.PropertyHeaderFontSize,
             Foreground = CadTheme.Muted,
             Margin = new Thickness(8, 0, 4, 0),
             VerticalAlignment = VerticalAlignment.Center
@@ -585,7 +592,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         {
             Text = Text("Cad.Text.Value", "Value"),
             FontWeight = FontWeight.SemiBold,
-            FontSize = 11.0,
+            FontSize = CadTheme.PropertyHeaderFontSize,
             Foreground = CadTheme.Muted,
             Margin = new Thickness(6, 0, 3, 0),
             VerticalAlignment = VerticalAlignment.Center
@@ -624,7 +631,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
             Header = title,
             Content = body,
             IsExpanded = !collapsed,
-            HorizontalAlignment = HorizontalAlignment.Stretch
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            FontSize = CadTheme.PropertyCategoryFontSize
         };
         expander.Expanded += (_, _) => _collapsedCategories[categoryKey] = false;
         expander.Collapsed += (_, _) => _collapsedCategories[categoryKey] = true;
@@ -706,15 +714,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
             Content = CadLanguageManager.Text("Cad.Text.ByLayer", "ByLayer"),
             IsThreeState = mixedByLayer,
             IsChecked = mixedByLayer ? null : first == true,
-            VerticalAlignment = VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = CadTheme.PropertyFontSize
         };
         ToolTip.SetTip(byLayer, CadLanguageManager.Text("Cad.Text.ByLayer", "ByLayer"));
-        byLayer.IsCheckedChanged += (_, _) =>
-        {
-            if (_refreshing || byLayer.IsChecked is not { } next)
-                return;
-            ApplyHiddenEntityProperty(byLayerProperty, next);
-        };
 
         Control valueEditor = CadPropertyEditorFactory.Resolve(
             slot.Descriptor,
@@ -737,6 +740,16 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         valueEditor.VerticalAlignment = VerticalAlignment.Center;
         valueEditor.HorizontalAlignment = HorizontalAlignment.Stretch;
+        valueEditor.IsEnabled = !mixedByLayer && first != true;
+
+        byLayer.IsCheckedChanged += (_, _) =>
+        {
+            if (_refreshing || byLayer.IsChecked is not { } next)
+                return;
+
+            valueEditor.IsEnabled = !next;
+            ApplyHiddenEntityProperty(byLayerProperty, next);
+        };
 
         var grid = new Grid
         {
@@ -842,7 +855,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         var button = new Button
         {
-            MinHeight = CadTheme.ControlHeight,
+            MinHeight = CadTheme.PropertyControlHeight,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalContentAlignment = HorizontalAlignment.Left,
@@ -855,7 +868,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 ? "—"
                 : byLayer && showByLayerText
                     ? $"{CadLanguageManager.Text("Cad.Text.ByLayer", "ByLayer")} · #{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
-                    : $"#{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
+                    : $"#{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}",
+            FontSize = CadTheme.PropertyFontSize
         };
         ToolTip.SetTip(button, CadLanguageManager.Text("Cad.Text.Color", "Color"));
         button.Click += async (_, _) =>
@@ -1049,7 +1063,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
             {
                 Text = label,
                 Foreground = CadTheme.Muted,
-                FontSize = CadTheme.CaptionFontSize,
+                FontSize = CadTheme.PropertyFontSize,
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
@@ -1122,7 +1136,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                     ? string.Empty
                     : coordinate.Value.ToString("0.######", CultureInfo.CurrentCulture),
                 PlaceholderText = mixed ? "—" : null,
-                MinWidth = 48
+                MinWidth = 48,
+                FontSize = CadTheme.PropertyFontSize
             };
     }
 
@@ -1156,7 +1171,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 : CadPropertyEditorFactory.FormatValue(descriptor, value),
             Foreground = CadTheme.Muted,
             VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            FontSize = CadTheme.PropertyFontSize
         };
 
     private void ApplyHiddenEntityProperty(string propertyName, object value)

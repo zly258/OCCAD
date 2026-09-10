@@ -1,42 +1,42 @@
 # 08 Development Guide
 
-## 1. Development priorities
+## 1. Purpose
 
-Daily OCCAD development prioritizes:
+This document describes the normal OCCAD development workflow. It does not duplicate the full architecture, transaction, build, or release contracts; those remain authoritative in `04`, `10`, `11`, and `16`.
+
+Daily priorities are:
 
 1. correct interaction behavior;
 2. model/presentation coherence;
 3. atomic Undo/Redo;
-4. fully neutral Tool teardown;
+4. neutral Tool teardown;
 5. no native/transient ghost state;
-6. extensions that preserve existing ownership and dependency boundaries;
-7. consistency between UI, documentation, registration, and actual capability.
+6. one clear owner for every stateful concern;
+7. agreement between registration, UI, documentation, and actual behavior.
 
-Do not refactor stable paths merely for stylistic uniformity. Prefer reproducible defects and explicit architectural debt.
-
-## 2. Development environment
+## 2. Environment
 
 Repository files are authoritative:
 
-- .NET SDK: `global.json`
-- Solution: `OCCAD.sln`
-- Core: `src/OCCAD.Core`
-- Avalonia: `src/OCCAD.Avalonia`
-- Bridge SDK: OcctCSharpBridge SDK 3.0
-- Windows default: `C:\Program Files\OcctCSharpBridge\SDK\3.0\win-x64`
-- Linux default: `~/.local/share/OcctCSharpBridge/SDK/3.0/linux-x64`
+- .NET SDK: `global.json`;
+- solution: `OCCAD.sln`;
+- Core: `src/OCCAD.Core`;
+- Avalonia: `src/OCCAD.Avalonia`;
+- Bridge: OcctCSharpBridge SDK 3.0;
+- Windows default SDK: `C:\Program Files\OcctCSharpBridge\SDK\3.0\win-x64`;
+- Linux default SDK: `~/.local/share/OcctCSharpBridge/SDK/3.0/linux-x64`.
 
-Override with `OCCTCSHARPBRIDGE_SDK`.
+Override the SDK location with `OCCTCSHARPBRIDGE_SDK`.
 
 Windows:
 
 ```powershell
-git pull
+git pull --ff-only
 .\build.ps1
 .\run.ps1
 ```
 
-Flat runtime:
+If a flat Bridge SDK uses an external OCCT runtime:
 
 ```powershell
 .\run.ps1 -OcctRoot D:\tools\occt-vc144-64
@@ -45,478 +45,227 @@ Flat runtime:
 Linux:
 
 ```bash
-git pull
+git pull --ff-only
 ./build.sh
 ./run.sh
 ```
 
-Publish:
+Normal OCCAD builds consume the installed Bridge SDK. They do not clone, rebuild, or synchronize Bridge source.
 
-```powershell
-.\publish.ps1
-```
+## 3. Standard workflow
 
-or:
+### 3.1 Classify the change
 
-```bash
-./publish.sh
-```
+Before editing code, classify the concern:
 
-## 3. Directory responsibilities
+- persistent domain state;
+- interaction state;
+- presentation/input adaptation;
+- persistence/exchange;
+- build/runtime/release infrastructure.
 
-### `src/OCCAD.Core`
+Then identify the single owner. See [07 Code Organization](07-CODE-ORGANIZATION.md).
 
-```text
-Actions/       Action / command metadata
-Document/      Document membership / persistence presentation
-Entities/      2D / 3D / Feature entities
-Events/        Workspace event projection
-Exchange/      external-format boundary
-Geometry/      reusable geometry algorithms
-Grips/         Grip owner
-History/       Undo/Redo
-Interaction/   Tool / Preview / Precision / Tracking / Transient
-Layers/        Layer model
-Properties/    Property descriptors/value conversion
-Selection/     Entity/Subobject/Preselection
-Snapping/      Snap discovery/selection/marker
-WorkPlane/     WorkPlane state
-```
+### 3.2 Change Core first when behavior is authoritative
 
-### `src/OCCAD.Avalonia`
+Typical ownership:
 
-```text
-Application/   startup/settings
-Dialogs/       dialogs and CAD ColorTable
-Input/         direct input / cursor
-Localization/  zh-CN/en-US resources
-Panels/        Model/Layers/Properties controllers
-Shell/         MainWindow partial responsibilities
-Theming/       layout metrics/CAD visuals
-Viewport/      input adaptation and viewport interaction
-```
+- Entity semantics → `Entities/`;
+- Document membership/presentation synchronization → `Document/`;
+- Tool lifecycle and transient ownership → `Interaction/`;
+- selection → `Selection/`;
+- Snap → `Snapping/`;
+- Grip → `Grips/`;
+- layers → `Layers/`;
+- property semantics → `Properties/` + `CadPropertyTransaction`;
+- Action registration → `Actions/` + `CadCoreRegistration`;
+- Avalonia controls/layout only → `OCCAD.Avalonia`.
 
-UI code must not introduce new formal Entity/History/Transaction owners.
+Do not start from a UI handler when the requested behavior changes authoritative CAD state.
 
-## 4. Standard development workflow
-
-### 4.1 Identify the responsibility layer first
+### 3.3 Define mutation semantics
 
-Classify the work as Domain, Interaction, Presentation, or Persistence, then identify the single owner. Do not begin by accumulating business logic in Button.Click or PointerMoved handlers.
+For every state-changing operation decide before implementation:
 
-### 4.2 Core first
+- what the authoritative state is;
+- where commit occurs;
+- which failure must roll back;
+- when History is installed;
+- whether Tool completion belongs to commit;
+- what transient state must be released;
+- which events are veto, strict propagation, or post-state notification.
 
-Business behavior belongs in Core:
+Use [10 Transaction, Event, and Native Resource Contract](10-TRANSACTION-RESOURCE-CONTRACT.md) for the full rules.
 
-- Entity semantics → `Entities`
-- Document membership/presentation → `Document`
-- Tool lifecycle → `Interaction`
-- Selection → `Selection`
-- Snap → `Snapping`
-- Grip → `Grips`
-- History → `History`
-- Layers → `Layers`
-- Property transactions → `CadPropertyTransaction` / `CadTransaction`
-- Actions → `Actions` / `CadCoreRegistration`
+### 3.4 Implement the smallest complete path
 
-Avalonia is added last as entry and presentation.
-
-### 4.3 Define failure semantics first
-
-Before implementing any model or native mutation, define:
-
-- commit point;
-- rollback conditions;
-- history-installation point;
-- whether Tool completion is part of commit;
-- transient release timing;
-- whether notification observer failure may affect the business result;
-- whether fatal exceptions could be incorrectly suppressed.
+Prefer extending the existing owner instead of adding a parallel framework.
 
-### 4.4 Build the smallest complete loop
+Examples:
 
-Do not start with a broad menu surface. First complete:
+- a new Circle construction method should activate the existing `CircleTool` with initial parameters;
+- an Entity appearance edit should use `CadPropertyTransaction`, not direct UI mutation;
+- a new formal edit operation needs a real interactive Tool before it is exposed in the product shell;
+- a new marker must have explicit transient/native ownership.
 
-`Core semantics → Tool → Preview → Commit → Undo → Cancel cleanup`
+### 3.5 Adapt Avalonia last
 
-Then add Property, Grip, Snap, Persistence, UI, and documentation.
+Avalonia is responsible for:
 
-### 4.5 Add UI last
+- collecting input;
+- calling Core APIs/Actions/Tools;
+- observing Core notifications;
+- showing validation feedback;
+- building controls and layout;
+- localization and DPI-safe presentation.
 
-UI code only:
+Avalonia must not duplicate transaction, geometry, selection, layer, or history semantics.
 
-- collects parameters;
-- calls Core APIs;
-- observes notifications;
-- renders visual state;
-- localizes presentation.
+## 4. Property development
 
-It must not duplicate transaction or geometry rules.
+Property descriptors and value semantics belong to Core.
 
-## 5. Adding an Entity
+Entity property edits use `CadPropertyTransaction` so multi-selection changes are atomic and undoable.
 
-For a new `CadXxxEntity`:
+Appearance rules:
 
-1. add the type under `Entities` with a stable `EntityType`;
-2. validate parameters in Entity/Core;
-3. implement geometry/presentation semantics;
-4. implement `Duplicate`, snapshots, and `RestoreState`;
-5. define Snap/Grip geometry where applicable;
-6. register persistence in `CadEntityRegistry`;
-7. add `XxxTool` if interactive creation is required;
-8. register an Action;
-9. add property descriptors;
-10. add zh-CN/en-US localization;
-11. expose Menu/Toolbar only if product-facing;
-12. validate Save/Open, Undo/Redo, Cancel, and Preview cleanup.
+- `ColorByLayer`, `LineStyleByLayer`, and `LineWidthByLayer` represent Layer inheritance;
+- directly editing Color/LineStyle/LineWidth creates an Entity **Override** by disabling the matching ByLayer flag in the same transaction;
+- re-enabling ByLayer restores inheritance;
+- presentation refresh follows authoritative Core state.
 
-The existence of an Entity class alone does not justify adding the feature to README.
+The PropertyGrid may choose TextBox, ComboBox, CheckBox, ColorTable, or compound ByLayer editors, but editor selection is a presentation concern only.
 
-## 6. Adding a Tool
+## 5. Tool development
 
-A Tool must have an explicit stage machine.
+A Tool is a staged state machine. A new Tool must define:
 
-Write the state flow first:
+- stable Tool ID;
+- stages and prompts;
+- valid exact-input forms;
+- Preview behavior;
+- Backspace/StepBack behavior;
+- Enter/Space/right-click completion behavior;
+- Cancel/deactivate cleanup;
+- transaction/history boundary;
+- Snap/Tracking/WorkPlane policy;
+- parameter descriptors when applicable.
 
-```text
-Activate
-→ Stage 0
-→ accept point/selection/parameter
-→ Stage 1
-→ Preview
-→ CanCommit / CanFinish
-→ Commit
-→ Deactivate
-```
+Commit and Cancel must both return the interaction system to neutral.
 
-Verify:
+## 6. Action and command development
 
-- `CurrentStep` matches the prompt;
-- `CanStepBack` is correct;
-- `CanFinish` is correct;
-- pointer movement updates Preview only;
-- exact input and pointer input share geometry semantics;
-- Cancel never mutates the formal Entity;
-- Tool-owned transient state is registered through `CadTransientScene`;
-- completion/cancel returns `NeutralStateViolations.Count == 0`.
+Actions are stable command entry points.
 
-## 7. Adding a modify command
+When registering a new Action:
 
-Define the selection contract first:
+1. choose a stable hierarchical ID;
+2. register it in `CadCoreRegistration`;
+3. add aliases only if the Action is truly registered;
+4. map localized captions separately from the stable ID;
+5. expose it in Menu/Toolbar only when the complete workflow is ready;
+6. update [15 Command Reference](15-COMMAND-REFERENCE.md) and [14 Feature Matrix](14-FEATURE-MATRIX.md).
 
-- preselection allowed or not;
-- selecting inside the Tool or not;
-- Entity/Subobject scope;
-- selection confirmation;
-- replacement-preview strategy;
-- mutate original Entities or create duplicates.
+Do not use localized text as an Action/Tool/Entity ID.
 
-Recommended flow:
+## 7. Entity development
 
-```text
-Selection
-→ capture source state
-→ base/reference input
-→ replacement Preview
-→ formal mutation
-→ Tool completion
-→ history
-```
+A persistent Entity must define the geometry and state needed by its product contract, including as applicable:
 
-Move is the current reference implementation. Do not expose Copy/Rotate/Scale/Mirror as buttons before their complete Tool lifecycle exists.
+- geometry validation;
+- duplicate/snapshot/restore behavior;
+- transform behavior;
+- Snap points/curves;
+- Grip points/editing;
+- presentation construction;
+- persistence read/write;
+- property descriptors.
 
-## 8. Action and command registration
+Adding an Entity class alone does not make it a user-facing feature.
 
-Product-facing entries are registered through `CadCoreRegistration`.
+## 8. Native and transient development
 
-Keep these synchronized:
+Every native temporary object must have an owner immediately after creation.
 
-1. Action ID;
-2. `CadCommandCatalog` alias/caption;
-3. Menu/Toolbar entry.
-
-Move currently uses the stable ID:
-
-```text
-edit.move
-```
-
-Do not retain dead aliases such as an obsolete `modify.move`.
-
-For multiple drawing methods of one Tool, register multiple Actions with initial parameters rather than duplicating the Tool:
-
-```text
-draw.circle.centerradius
-→ CircleTool + Method=CenterRadius
-```
-
-## 9. Property development
-
-For an editable property:
-
-1. define the descriptor in Core;
-2. parse/validate in Core value conversion/metadata;
-3. mutate through `CadPropertyTransaction` / `ApplyEntities`;
-4. keep Document presentation synchronized;
-5. ensure Undo/Redo works;
-6. keep UI editor logic presentation-only.
-
-Never mutate native shapes directly from the PropertyGrid controller or bypass History.
-
-## 10. Snap development
-
-Separate responsibilities:
-
-- Entity/geometry supplies candidate semantics;
-- `CadSnapManager` owns filtering, ranking, hysteresis, cycling, and markers;
-- pointer processing consumes the final resolved point.
-
-Regression for a new Snap type includes single candidate, multiple candidates, Tab cycling, temporary modes, Tool switching, Commit/Cancel cleanup, and engine recreation.
-
-## 11. Grip development
-
-Grip data comes from formal Entity geometry, but dragging must not repeatedly mutate the formal Entity.
-
-Standard flow:
-
-```text
-selected Entity
-→ GripPoint
-→ GripEditTool
-→ duplicate/preview
-→ validate target
-→ ApplyEntities
-→ history
-```
-
-Normal Grips are filled rectangles; Hot/Drag markers are circular. Marker size and hit tolerance come from Settings rather than hard-coded UI pixels.
-
-## 12. WorkPlane and exact input
-
-Every new 2D Tool must explicitly support XY/YZ/XZ rather than assuming XY.
-
-Exact and pointer input must share stage semantics. Avoid:
-
-- correct pointer geometry with different text-input geometry;
-- retaining points from an incompatible frame after WorkPlane switching;
-- ORTHO/POLAR affecting visuals without affecting the resolved point.
-
-## 13. Persistence development
-
-Persist formal model state only.
-
-Schema may include:
-
-- Entity identity/type;
-- geometry;
-- placement;
-- layer;
-- appearance;
-- feature references/parameters.
-
-Never persist Preview, Snap markers, Grip markers, Tracking, Preselection, or SelectionWindow.
-
-A Registry ID that ships in a released file format is a protocol identifier and must not be renamed casually with a class refactor.
-
-## 14. Event rules
-
-Every new event must be classified as:
-
-- veto/pre-state;
-- strict internal propagation;
-- post-state notification.
-
-Public notifications normally isolate observers. Direct multicast invocation is reserved for intentional strict/veto contracts.
-
-Recoverable observer failure is diagnostic only and must not make an already-committed model API report failure.
-
-## 15. Exception rules
-
-Argument errors use `ArgumentNullException`, `ArgumentOutOfRangeException`, or `ArgumentException`.
-
-Broken runtime invariants use `InvalidOperationException`.
-
-Recoverable native failures may be suppressed only at explicit presentation/transient-cleanup boundaries and remain diagnosable.
-
-The following are not ordinary recoverable failures:
-
-- `OutOfMemoryException`
-- `StackOverflowException`
-- `AccessViolationException`
-
-Aggregate/inner exceptions must be classified recursively.
-
-## 16. Transaction and History rules
-
-- prefer lightweight history entries for small frequent edits;
-- use `CadTransaction` for compound work;
-- do not install nested Undo inside an outer transaction;
-- no-op must not change History/Modified state;
-- Tool completion belongs inside the atomic boundary when it is part of commit semantics;
-- Undo/Redo implementations must consider partial failure and recovery.
-
-UI calls `CadWorkspace.Undo/Redo`, not `CadHistory.Undo/Redo` directly.
-
-## 17. Native resource ownership
-
-Every native object receives an owner immediately.
-
-Code must answer:
+Code must be able to answer:
 
 - where the handle is stored;
 - who deletes it;
-- what happens after engine recreation;
-- whether a failed delete retains the handle;
-- whether a failed cleanup can leave it visible/selectable;
-- where retry cleanup occurs.
+- what happens if deletion fails;
+- whether failed cleanup leaves it visible/selectable;
+- how engine recreation is handled;
+- how a later cleanup retries retained state.
 
-Temporary native objects must not rely on GC/finalizers for correctness.
+Do not rely on GC/finalizers for correctness of temporary native presentation.
 
-## 18. UI development rules
+## 9. Exception policy
 
-### Shell
+Use normal argument exceptions for invalid API input and `InvalidOperationException` for broken runtime invariants.
 
-Keep:
+Recoverable failures may be contained only at an explicit presentation/input/cleanup boundary and must remain diagnosable.
 
-- Menu + no more than two toolbar rows;
-- dark Viewport;
-- fixed Tool parameter strip;
-- Status Strip;
-- Model/Layers/Properties panels.
+At minimum, these are not ordinary recoverable errors:
 
-Do not restore:
+- `OutOfMemoryException`;
+- `StackOverflowException`;
+- `AccessViolationException`.
 
-- Ribbon;
-- grouped three-row toolbar;
-- permanent command line;
-- floating tool panel;
-- Ready/version/permanent coordinate noise.
+Do not hide a fatal failure behind a user-facing “invalid input” result.
 
-### DPI
-
-Design for at least 100%, 125%, and 150%. Do not hard-code label widths based on Chinese text length; prefer Grid Auto/* layout.
-
-### Localization
-
-Every new user-visible string must be added to zh-CN and en-US. Stable Action/Tool/Entity IDs are never localized.
-
-## 19. Performance rules
+## 10. Performance
 
 High-frequency pointer paths should avoid:
 
-- full Document snapshots on every MouseMove;
-- unnecessary large LINQ allocations;
-- repeated BuildPresentation;
-- redundant redraw;
-- repeated expensive Snap geometry evaluation at the same location;
-- rebuilding the entire shell on every ToolUpdated event.
+- full Document snapshots per move;
+- repeated native presentation rebuilds;
+- redundant redraws;
+- repeated expensive Snap geometry evaluation at the same state;
+- large avoidable allocations.
 
-Prefer pointer scheduling, native display batches, replacement preview, Snap cache with correct invalidation, and non-destructive refresh of focused editors.
+Correct invalidation and ownership are more important than speculative caching.
 
-## 20. Build and run
+## 11. Validation
 
-Authoritative Windows build:
+The repository currently does **not** maintain a separate Test project. Do not write documentation or review checklists that imply one exists.
 
-```powershell
-.\build.ps1
-```
+For each change, use the narrowest real validation available:
 
-Linux:
+- `build.ps1` / `build.sh` for compile/runtime-layout validation;
+- focused manual interaction regression for Tool/Selection/Snap/Grip/Property changes;
+- native object/transient observation when Viewer state is involved;
+- Save/Open regression for persisted changes;
+- 125%/150% DPI and Chinese/English checks for UI changes.
 
-```bash
-./build.sh
-```
+The complete build matrix is in [11 Build and Validation](11-BUILD-VALIDATION.md); the release matrix is in [16 Release Guide](16-RELEASE-GUIDE.md).
 
-Build scripts validate Bridge managed assemblies, metadata, and portable/flat native layout. Do not hard-code personal SDK paths into project files.
+If validation was not executed, state that explicitly. Static review is not a passing build.
 
-Run the real app with:
+## 12. Pre-commit checklist
 
-```powershell
-.\run.ps1
-```
+- [ ] Change belongs to one clear owner.
+- [ ] No duplicate Core/UI state model was introduced.
+- [ ] No-op does not create History or Modified state.
+- [ ] Rollback and Undo/Redo semantics are defined.
+- [ ] Tool Commit/Cancel returns neutral when applicable.
+- [ ] Preview/Snap/Tracking/Grip transient state is cleaned.
+- [ ] Native handles are not forgotten after failed cleanup.
+- [ ] ByLayer/Override semantics remain correct for appearance edits.
+- [ ] Stable IDs and registrations match documentation.
+- [ ] Chinese and English resources/docs are synchronized where applicable.
+- [ ] Required build/manual/native validation was actually executed or explicitly marked pending.
 
-or:
+## 13. Release stabilization rules
 
-```bash
-./run.sh
-```
+During release preparation do not add broad new feature families or perform aesthetic architecture rewrites.
 
-Compilation success alone does not validate native interaction behavior.
+Allowed work is limited to:
 
-## 21. Publishing
+- compile/runtime fixes;
+- reproducible release blockers;
+- transaction/transient/selection/native cleanup fixes;
+- localization/DPI corrections;
+- documentation corrections;
+- build/run/publish fixes;
+- removal of code proven dead without breaking persistence or documented contracts.
 
-Windows:
-
-```powershell
-.\publish.ps1
-```
-
-Linux:
-
-```bash
-./publish.sh
-```
-
-Publishing must verify:
-
-- `OCCAD.dll`;
-- Bridge managed assemblies/metadata;
-- portable runtime when used;
-- portable OCCT resources;
-- launcher: Windows `run.ps1`, Linux `run.sh`.
-
-See [16-RELEASE-GUIDE.md](16-RELEASE-GUIDE.md).
-
-## 22. Pre-commit checklist
-
-Core:
-
-- [ ] ownership is explicit;
-- [ ] no-op does not create History;
-- [ ] rollback is defined;
-- [ ] Undo/Redo are symmetric;
-- [ ] observer semantics are correct;
-- [ ] Tool Cancel/Deactivate returns neutral;
-- [ ] transient state does not enter Document/History;
-- [ ] native handles are not forgotten;
-- [ ] fatal exceptions are not swallowed;
-- [ ] new extension points are documented.
-
-UI:
-
-- [ ] no duplicated Core business logic;
-- [ ] layout survives 125%/150% DPI;
-- [ ] no duplicated prompt/status surface;
-- [ ] localization is complete;
-- [ ] Menu/Toolbar matches Action registration.
-
-## 23. Feature Definition of Done
-
-A new feature should pass:
-
-```text
-Action/Menu entry
-→ Tool activation
-→ Prompt
-→ pointer path
-→ exact input path
-→ Preview
-→ Commit
-→ Property
-→ Snap/Grip if applicable
-→ Undo/Redo
-→ Cancel
-→ Save/Open if persistent
-```
-
-Verify no ghost Preview, no stale Snap/Grip/Tracking, neutral state, one Undo per user operation, and coherent model/native presentation.
-
-## 24. Avoid
-
-- GitHub Actions by default;
-- reflection-based command dispatch;
-- compatibility layers that preserve incorrect APIs;
-- parallel frameworks added to solve one bug;
-- broad entity expansion before core interaction loops are stable;
-- exposing incomplete Tools merely because transaction APIs already exist;
-- running as Administrator/root to hide SDK/runtime configuration defects.
+See [16 Release Guide](16-RELEASE-GUIDE.md).

@@ -1,13 +1,13 @@
 # OCCAD Documentation
 
-This directory contains long-lived product and Core implementation contracts. Temporary migration plans, gap matrices, commit logs, local validation transcripts, and UI experiments do not belong here.
+This directory contains long-lived product, UI, and Core implementation contracts. Temporary migration plans, gap matrices, commit logs, local validation transcripts, and UI experiments do not belong here.
 
 - English: [en-US/README.md](en-US/README.md)
 - 中文: [zh-CN/README.md](zh-CN/README.md)
 
-The active architecture baseline is UI-independent. `src/OCCAD.Avalonia` is intentionally reduced to an empty application shell while Core ownership is being stabilized.
+`src/OCCAD.Avalonia` is a deliberately compact desktop adapter around `CadApplicationCore`. It may own layout, focus, platform file pickers and native viewport input forwarding, but CAD model state, command/tool state, selection, snap, grip, work plane, preview, history, properties and settings remain authoritative in Core.
 
-`OCCTBIM-Source/release-1.0` is the behavioral and responsibility-boundary reference for Document / Entity / Layer / Property / Tool / Grip / Snap / Settings. OCCAD keeps its C#/.NET/OCCT bridge architecture and does not copy Qt widgets, singleton patterns, database implementation, or class hierarchy literally.
+`OCCTBIM-Source/release-1.0` is the behavioral and responsibility-boundary reference for Document / Entity / Layer / Property / Tool / Grip / Snap / Settings. OCCAD keeps its C#/.NET/OcctCSharpBridge architecture and does not copy Qt widgets, singleton patterns, database implementation, or class hierarchy literally.
 
 Core rules:
 

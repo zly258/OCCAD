@@ -38,12 +38,14 @@ public sealed class CadSettingsBinding : IDisposable
             // Invalid persisted values are ignored individually and then
             // normalized back to the effective Core state below.
             TryApplyPersisted(() =>
-                workspace.Selection.PixelTolerance = store.Get(
+                workspace.Selection.PixelTolerance = ReadIntegerSetting(
+                    store,
                     CadSettingKeys.SelectionTolerance,
                     workspace.Selection.PixelTolerance));
 
             TryApplyPersisted(() =>
-                workspace.Grips.MarkerSize = store.Get(
+                workspace.Grips.MarkerSize = ReadIntegerSetting(
+                    store,
                     CadSettingKeys.GripSize,
                     workspace.Grips.MarkerSize));
             TryApplyPersisted(() =>
@@ -60,7 +62,8 @@ public sealed class CadSettingsBinding : IDisposable
                     CadSettingKeys.SnapModes,
                     workspace.Snap.Modes));
             TryApplyPersisted(() =>
-                workspace.Snap.MarkerSize = store.Get(
+                workspace.Snap.MarkerSize = ReadIntegerSetting(
+                    store,
                     CadSettingKeys.SnapSize,
                     workspace.Snap.MarkerSize));
             TryApplyPersisted(() =>
@@ -304,6 +307,34 @@ public sealed class CadSettingsBinding : IDisposable
         store.Set(
             CadSettingKeys.SnapTolerance,
             workspace.Snap.PixelTolerance);
+    }
+
+    private static int ReadIntegerSetting(
+        CadSettingsStore store,
+        string key,
+        int fallback)
+    {
+        if (!store.Contains(key))
+            return fallback;
+
+        var integer = store.Get<int?>(key, null);
+        if (integer is { } exact)
+            return exact;
+
+        // Older OCCAD builds wrote some pixel sizes as JSON floating-point
+        // numbers. Accept integral legacy values once, then Persist* rewrites
+        // them in the canonical integer representation.
+        var number = store.Get<double?>(key, null);
+        if (number is { } legacy &&
+            double.IsFinite(legacy) &&
+            Math.Abs(legacy - Math.Round(legacy)) <= 1e-9 &&
+            legacy >= int.MinValue &&
+            legacy <= int.MaxValue)
+        {
+            return checked((int)Math.Round(legacy));
+        }
+
+        return fallback;
     }
 
     private static void TryApplyPersisted(Action apply)

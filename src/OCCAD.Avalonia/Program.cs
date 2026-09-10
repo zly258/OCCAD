@@ -83,14 +83,7 @@ internal sealed class App : Application
         try
         {
             if (!string.IsNullOrWhiteSpace(_settingsPath))
-            {
-                var directory = Path.GetDirectoryName(_settingsPath);
-                if (!string.IsNullOrWhiteSpace(directory))
-                    Directory.CreateDirectory(directory);
-
-                using var stream = File.Create(_settingsPath);
-                core.SaveSettings(stream);
-            }
+                SaveSettingsAtomically(core, _settingsPath);
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException)
@@ -101,6 +94,52 @@ internal sealed class App : Application
         finally
         {
             core.Dispose();
+        }
+    }
+
+    private static void SaveSettingsAtomically(
+        CadApplicationCore core,
+        string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(fullPath);
+        if (string.IsNullOrWhiteSpace(directory))
+            throw new InvalidOperationException("Settings path has no parent directory.");
+
+        Directory.CreateDirectory(directory);
+        var tempPath = Path.Combine(
+            directory,
+            $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            using (var stream = new FileStream(
+                       tempPath,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None))
+            {
+                core.SaveSettings(stream);
+                stream.Flush(flushToDisk: true);
+            }
+
+            File.Move(tempPath, fullPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                try
+                {
+                    File.Delete(tempPath);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+            }
         }
     }
 }

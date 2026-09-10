@@ -308,9 +308,13 @@ public static class CadDocumentSerializer
         if (version == LegacyNameLayerVersion)
         {
             if (string.IsNullOrWhiteSpace(item.Layer) ||
-                !layerNamesToIds.TryGetValue(item.Layer.Trim(), out layerId!))
+                !layerNamesToIds.TryGetValue(item.Layer.Trim(), out var legacyLayerId))
+            {
                 throw new InvalidDataException(
                     $"Entity '{item.Id}' references unknown layer '{item.Layer}'.");
+            }
+
+            layerId = legacyLayerId;
         }
         else
         {

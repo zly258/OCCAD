@@ -49,6 +49,7 @@ internal sealed class CadCompactRibbon : Border
                 Tab("绘图",
                     Action("点", "draw.point"),
                     Action("直线", "draw.line"),
+                    Action("中心线", "draw.centerline"),
                     Action("多段线", "draw.polyline"),
                     Action("圆", "draw.circle"),
                     Action("圆弧", "draw.arc"),
@@ -58,7 +59,7 @@ internal sealed class CadCompactRibbon : Border
                     Action("椭圆", "draw.ellipse"),
                     Action("样条", "draw.spline")),
 
-                Tab("三维",
+                Tab("建模",
                     Action("长方体", "solid.box"),
                     Action("圆柱", "solid.cylinder"),
                     Action("圆锥", "solid.cone"),
@@ -84,7 +85,6 @@ internal sealed class CadCompactRibbon : Border
                     Action("倒角", "modify.chamfer")),
 
                 Tab("标注",
-                    Action("中心线", "draw.centerline"),
                     Action("文字", "annotate.text"),
                     Action("长度", "annotate.length"),
                     Action("角度", "annotate.angle"),

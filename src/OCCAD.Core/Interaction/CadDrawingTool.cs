@@ -48,8 +48,13 @@ public abstract class CadDrawingTool : CadTool
         return acceptPoint(point);
     }
 
-    protected void ShowPreview(CadEntity entity) =>
+    protected void ShowPreview(CadEntity entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        entity.Layer =
+            Context.Workspace.Layers.Current.Name;
         Context.Preview.Show(entity);
+    }
 
     protected WorkPlaneFrame CaptureWorkPlaneFrame() =>
         new(

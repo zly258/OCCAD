@@ -28,7 +28,7 @@ public sealed class CadWorkspace : IDisposable
         Snap = new CadSnapManager(Document);
         Tracking = new CadTrackingManager();
         Precision = new CadPrecisionInputManager(Drafting, Tracking);
-        Preview = new CadPreviewManager();
+        Preview = new CadPreviewManager(Document);
         Grips = new CadGripManager();
         History = new CadHistory();
 
@@ -82,12 +82,18 @@ public sealed class CadWorkspace : IDisposable
         if (ReferenceEquals(Engine, engine)) return;
 
         Tools.CancelCurrent();
-        Engine = engine;
+        var previousEngine = Engine;
         var previousSuppress = _suppressModifiedTracking;
+        Engine = engine;
         _suppressModifiedTracking = true;
         try
         {
             Document.AttachEngine(engine);
+        }
+        catch
+        {
+            Engine = previousEngine;
+            throw;
         }
         finally
         {

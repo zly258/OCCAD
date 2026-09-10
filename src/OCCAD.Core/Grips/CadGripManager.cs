@@ -266,7 +266,21 @@ public sealed class CadGripManager
         if (kindsChanged)
         {
             for (var index = 0; index < _markers.Count; index++)
-                SetMarkerStyle(engine, index, NormalMarkerSize, NormalMarkerPixels);
+                SetMarkerStyle(
+                    engine,
+                    index,
+                    NormalMarkerSize,
+                    NormalMarkerPixels);
+
+            if (_hotIndex >= 0 &&
+                _hotIndex < _markers.Count)
+            {
+                SetMarkerStyle(
+                    engine,
+                    _hotIndex,
+                    HotMarkerSize,
+                    HotMarkerPixels);
+            }
         }
     }
 

@@ -241,7 +241,7 @@ public sealed class FrustumTool : CadDrawingTool, ICadPointInputTool
     private void Show(CadFrustumEntity entity)
     {
         _preview = entity;
-        Context.Preview.Show(entity);
+        ShowPreview(entity);
     }
 
     private static OcctVector3d Negate(OcctVector3d value) =>

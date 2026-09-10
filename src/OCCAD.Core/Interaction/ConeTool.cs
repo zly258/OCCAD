@@ -169,7 +169,7 @@ public sealed class ConeTool : CadDrawingTool, ICadPointInputTool
     private void Show(CadConeEntity entity)
     {
         _preview = entity;
-        Context.Preview.Show(entity);
+        ShowPreview(entity);
     }
 
     private static OcctVector3d Negate(OcctVector3d value) =>

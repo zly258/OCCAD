@@ -6,6 +6,8 @@ public sealed class TrimTool : CadSelectionTransformToolBase
 {
     public override string Id => "trim";
     public override string DisplayName => "Trim";
+    public override CadToolInputKind InputKind =>
+        CadToolInputKind.Selection;
     public override CadToolInteractionPolicy InteractionPolicy =>
         base.InteractionPolicy with { PreselectionEnabled = true };
 

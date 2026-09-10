@@ -162,7 +162,7 @@ public sealed class PolygonTool : CadDrawingTool, ICadPointInputTool
         _preview = values.Count >= 3
             ? new CadPolygonEntity(values)
             : new CadPolylineEntity(values);
-        Context.Preview.Show(_preview);
+        ShowPreview(_preview);
     }
 
     private void Reset()

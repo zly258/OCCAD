@@ -226,7 +226,7 @@ public sealed class BoxTool : CadDrawingTool, ICadPointInputTool
     private void Show(CadBoxEntity entity)
     {
         _preview = entity;
-        Context.Preview.Show(entity);
+        ShowPreview(entity);
     }
 
     private void ResetState()

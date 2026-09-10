@@ -26,6 +26,8 @@ Clear transient state → Idle
 
 Right-click first submits the current non-pointer Tool step when that step can be accepted; otherwise it finishes a finishable Tool, and only then falls back to cancel. Enter and the ToolPanel Accept/Finish control use the same Core submission rule. Backspace means Tool StepBack. Delete means delete selection and is not a second StepBack key.
 
+A blank Command Line Enter uses the same `SubmitCurrent()` rule. Point steps never reuse a previously observed pointer position as implicit input.
+
 ## 3. Point-resolution pipeline
 
 All drawing Tools, Grip Edit, Move, and Copy use one ResolvePoint pipeline:
@@ -41,6 +43,8 @@ Screen point
 ```
 
 Individual Tools do not duplicate XY projection, polar math, or angle-lock logic.
+
+Command-line coordinates follow the same work-plane contract. `x,y` and `x,y,z` are absolute coordinates in the persistent user work-plane frame. `@x,y` and `@x,y,z` are relative to the current Tool precision reference and use the effective Tool/Grip frame axes. Two- and three-component coordinates therefore remain consistent on XY, YZ, XZ, and custom planes.
 
 ## 4. Work plane
 

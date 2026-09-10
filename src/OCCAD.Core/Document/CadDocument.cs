@@ -82,19 +82,105 @@ public sealed class CadDocument
     public void AttachEngine(OcctEngine engine)
     {
         ArgumentNullException.ThrowIfNull(engine);
-        if (!engine.IsInitialized) throw new InvalidOperationException("The OCCT engine is not initialized.");
-        if (ReferenceEquals(_engine, engine)) return;
-        _engine = engine;
-        _viewerObjects.Clear();
-        using (engine.BeginDisplayBatch())
+        if (!engine.IsInitialized)
+            throw new InvalidOperationException(
+                "The OCCT engine is not initialized.");
+        if (ReferenceEquals(_engine, engine))
+            return;
+
+        var previousEngine = _engine;
+        var previousObjects = _entities
+            .Select(entity =>
+                (Entity: entity, Object: entity.ViewerObject))
+            .Where(static pair => pair.Object is not null)
+            .Select(static pair =>
+                (pair.Entity, Object: pair.Object!))
+            .ToArray();
+
+        var replacements =
+            new List<(CadEntity Entity, IOcctObject Object)>(
+                _entities.Count);
+
+        try
         {
+            using var batch = engine.BeginDisplayBatch();
             foreach (var entity in _entities)
             {
-                entity.ViewerObject = null;
-                BuildPresentation(entity);
+                var replacement =
+                    entity.BuildPresentation(engine);
+                replacements.Add((entity, replacement));
+                ApplyPlacement(
+                    engine,
+                    entity,
+                    replacement);
+                ApplyAppearance(
+                    engine,
+                    entity,
+                    replacement);
             }
         }
-        PublishChange(CadDocumentChangeKind.Reset, null);
+        catch (Exception failure)
+        {
+            var failures = new List<Exception> { failure };
+            foreach (var (_, replacement) in
+                     replacements.AsEnumerable().Reverse())
+            {
+                try
+                {
+                    if (engine.ContainsObject(replacement.Id))
+                        engine.Delete(replacement);
+                }
+                catch (Exception cleanupFailure)
+                {
+                    failures.Add(cleanupFailure);
+                }
+            }
+
+            if (failures.Count > 1)
+            {
+                throw new AggregateException(
+                    "Engine presentation rebuild and cleanup both failed.",
+                    failures);
+            }
+
+            throw;
+        }
+
+        _engine = engine;
+        _viewerObjects.Clear();
+        foreach (var (entity, replacement) in replacements)
+        {
+            entity.ViewerObject = replacement;
+            _viewerObjects.Add(replacement.Id, entity);
+        }
+
+        if (previousEngine is { IsInitialized: true } oldEngine &&
+            !ReferenceEquals(oldEngine, engine) &&
+            previousObjects.Length > 0)
+        {
+            try
+            {
+                using var batch = oldEngine.BeginDisplayBatch();
+                var existing = previousObjects
+                    .Select(static pair => pair.Object)
+                    .Where(value =>
+                        oldEngine.ContainsObject(value.Id))
+                    .ToArray();
+                if (existing.Length > 0)
+                    oldEngine.Delete(existing);
+            }
+            catch (Exception exception)
+                when (IsRecoverablePresentationCleanupFailure(
+                    exception))
+            {
+                // The new engine state is already authoritative. Failure to
+                // release stale presentation objects must not roll it back.
+            }
+        }
+
+        PublishChange(
+            CadDocumentChangeKind.Reset,
+            null);
     }
 
     public void DetachEngine(bool deletePresentation)
@@ -529,6 +615,20 @@ public sealed class CadDocument
             throw new InvalidOperationException(
                 "No engine is attached.");
 
+        ApplyPlacement(
+            engine,
+            entity,
+            value);
+    }
+
+    private static void ApplyPlacement(
+        OcctEngine engine,
+        CadEntity entity,
+        IOcctObject value)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+        ArgumentNullException.ThrowIfNull(entity);
+
         engine.SetLocalTransformation(
             value,
             entity.Placement.Transform);
@@ -551,6 +651,20 @@ public sealed class CadDocument
             _engine ??
             throw new InvalidOperationException(
                 "No engine is attached.");
+
+        ApplyAppearance(
+            engine,
+            entity,
+            shape);
+    }
+
+    private void ApplyAppearance(
+        OcctEngine engine,
+        CadEntity entity,
+        IOcctObject shape)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+        ArgumentNullException.ThrowIfNull(entity);
 
         var appearance = ResolveAppearance(entity);
         engine.SetObjectColor(
@@ -583,6 +697,12 @@ public sealed class CadDocument
             shape,
             appearance.Selectable);
     }
+
+    private static bool IsRecoverablePresentationCleanupFailure(
+        Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private void DeletePresentation(CadEntity entity)
     {

@@ -81,7 +81,7 @@ public sealed class MeasureDistanceTool : CadDrawingTool, ICadPointInputTool
     {
         var value = new CadDistanceMeasurement(_first!.Value, point);
         Measurement = value;
-        if (value.Distance > 1e-9) Context.Preview.Show(new CadLineEntity(value.Start, value.End));
+        if (value.Distance > 1e-9) ShowPreview(new CadLineEntity(value.Start, value.End));
         else Context.Preview.Clear();
         SetPromptLocalized(
             accepted ? "Cad.Prompt.Distance.Result" : "Cad.Prompt.Distance.Preview",

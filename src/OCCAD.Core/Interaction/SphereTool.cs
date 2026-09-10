@@ -88,7 +88,7 @@ public sealed class SphereTool : CadDrawingTool, ICadPointInputTool
         if (radius <= 1e-9)
             return;
 
-        Context.Preview.Show(new CadSphereEntity(center, radius));
+        ShowPreview(new CadSphereEntity(center, radius));
     }
 
     private void Reset()

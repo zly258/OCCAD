@@ -100,7 +100,7 @@ public sealed class TextTool : CadDrawingTool, ICadPointInputTool
         Show(point);
     }
 
-    private void Show(OcctPoint3d point) => Context.Preview.Show(Create(point));
+    private void Show(OcctPoint3d point) => ShowPreview(Create(point));
 
     private CadTextEntity Create(OcctPoint3d point) =>
         new(_text, point, _normal, _xAxis, _height, _angleDegrees);

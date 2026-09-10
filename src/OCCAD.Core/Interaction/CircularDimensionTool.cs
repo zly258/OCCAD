@@ -92,7 +92,7 @@ public class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
         var offset=_kind==CadCircularDimensionKind.Radius ? planar.Length-_radius : 0;
         return new(_kind,_center,_normal,direction,_radius,offset,_textHeight,_arrowSize);
     }
-    private void Show(OcctPoint3d point) { var e=Create(point); if(e is not null) Context.Preview.Show(e); }
+    private void Show(OcctPoint3d point) { var e=Create(point); if(e is not null) ShowPreview(e); }
     private void UpdatePrompt() => SetStageLocalized(_source is null?0:1,
         _source is null ? $"Cad.Prompt.{Id}.Select" : $"Cad.Prompt.{Id}.Position",
         _source is null ? $"{DisplayName}: select circle{(_kind==CadCircularDimensionKind.Radius ? " or arc" : "")} [Esc cancel]" : $"{DisplayName}: specify label position [Backspace undo, Esc cancel]");

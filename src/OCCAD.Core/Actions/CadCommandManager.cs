@@ -52,17 +52,19 @@ public sealed class CadCommandManager
         {
             if (_workspace.Tools.ActiveTool is { } tool)
             {
-                if (tool.State == CadToolState.WaitForSelect)
-                {
-                    _workspace.Tools.HandleKey(new OcctNet.OcctKeyInputEventArgs(
-                        OcctNet.OcctKeyInputKind.Pressed, OcctNet.OcctKey.Enter, OcctNet.OcctInputModifiers.None));
-                    return Result(CadCommandResultKind.InputApplied, input);
-                }
-                if (tool.CanFinish && _workspace.Tools.FinishCurrent())
-                    return Result(CadCommandResultKind.InputApplied, input, message: "Finish");
-                if (tool.CanCommitCurrentStage && _workspace.Tools.CommitCurrentStage())
-                    return Result(CadCommandResultKind.InputApplied, input, message: "Accept");
-                return Result(CadCommandResultKind.Failed, input, message: "The current tool stage requires input.");
+                var acceptsCurrentStep =
+                    tool.CanCommitCurrentStage &&
+                    !tool.CurrentStep.RequiresPointer;
+                var success = _workspace.Tools.SubmitCurrent();
+                return success
+                    ? Result(
+                        CadCommandResultKind.InputApplied,
+                        input,
+                        message: acceptsCurrentStep ? "Accept" : "Finish")
+                    : Result(
+                        CadCommandResultKind.Failed,
+                        input,
+                        message: "The current tool stage requires input.");
             }
 
             return _workspace.Actions.ExecuteLast()
@@ -167,25 +169,18 @@ public sealed class CadCommandManager
             return true;
         }
 
-        OcctNet.OcctPoint3d point;
-        if (parts.Length == 2)
-        {
-            var local = relative
-                ? _workspace.WorkPlane.WorldToLocal(reference!.Value)
-                : new CadPlanePoint(0, 0);
-            point = _workspace.WorkPlane.LocalToWorld(
-                new CadPlanePoint(local.X + values[0], local.Y + values[1]));
-        }
-        else
-        {
-            var origin = relative
-                ? reference!.Value
-                : OcctNet.OcctPoint3d.Origin;
-            point = new OcctNet.OcctPoint3d(
-                origin.X + values[0],
-                origin.Y + values[1],
-                origin.Z + values[2]);
-        }
+        var frame = relative
+            ? _workspace.WorkPlane.EffectivePlane
+            : _workspace.WorkPlane.UserPlane;
+        var origin = relative
+            ? reference!.Value
+            : frame.Origin;
+        var point =
+            origin +
+            frame.XAxis * values[0] +
+            frame.YAxis * values[1];
+        if (parts.Length == 3)
+            point += frame.Normal * values[2];
 
         var success = point.IsFinite && _workspace.Tools.CommitPoint(point);
         result = Result(

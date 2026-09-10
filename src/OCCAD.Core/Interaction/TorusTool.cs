@@ -183,7 +183,7 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
     private void Show(CadTorusEntity entity)
     {
         _preview = entity;
-        Context.Preview.Show(entity);
+        ShowPreview(entity);
     }
 
     private static double ResolveMinorRadius(

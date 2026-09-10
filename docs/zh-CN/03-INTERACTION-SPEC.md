@@ -26,13 +26,17 @@ Active Tool + Command Line
 
 当 Command Line TextBox 获得焦点：Enter 提交；Up/Down 浏览输入历史；Esc 先清空文本，空文本时取消 Active Tool；Backspace 是正常文本编辑。全局 Tool Backspace/快捷键不得抢占 TextBox 编辑。
 
-Viewport 获得焦点：Enter 在 Idle 时重复最近 repeatable Action；Active Tool 时优先 Finish，否则 CommitCurrentStage；Esc Cancel；Backspace StepBack；F3/F8/F10 保留 Snap/Ortho/Polar。
+Viewport 获得焦点：Enter 在 Idle 时重复最近 repeatable Action；Active Tool 时统一调用 `SubmitCurrent()`，先接受可提交的非 Point Step，其次 Finish；Point Step 不允许用旧鼠标位置代替新点输入。Esc Cancel；Backspace StepBack；F3/F8/F10 保留 Snap/Ortho/Polar。
+
+Command Line 空输入的 Enter 也调用同一个 `SubmitCurrent()`；Selection、Confirmation、Finish 与 Viewport/ToolPanel 使用完全相同的提交优先级。
 
 ## 4. 统一点解析
 
 屏幕点必须走：`Screen → view ray → active WorkPlane → object Snap → Tracking → axis/angle/length constraint → final world point`。Tool 不重复 XY 投影或锁轴算法。
 
 文本坐标输入也必须进入等价的 world-point commit contract；禁止为了 Command Line 在 MainWindow 中直接写 Entity 字段。
+
+Command Line 坐标统一遵循工作平面坐标系：`x,y` / `x,y,z` 是 persistent user plane 下的绝对坐标；`@x,y` / `@x,y,z` 以当前 Tool 的 PrecisionReferencePoint 为参考，并沿 effective Tool/Grip frame 的 X/Y/Normal 解释。这样 XY、YZ、XZ 与自定义平面上的二维、三维坐标输入语义保持一致。
 
 ## 5. WorkPlane 与视觉提示
 

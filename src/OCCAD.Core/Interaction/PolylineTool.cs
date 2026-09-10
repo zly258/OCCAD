@@ -142,7 +142,7 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
         if (values[^1].DistanceTo(cursor) > 1e-9) values.Add(cursor);
         if (values.Count < 2) return;
         _preview = new CadPolylineEntity(values);
-        Context.Preview.Show(_preview);
+        ShowPreview(_preview);
     }
 
     private void Reset()

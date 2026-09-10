@@ -110,12 +110,13 @@ public sealed class CadSnapManager
     public void AttachEngine(OcctEngine engine)
     {
         ArgumentNullException.ThrowIfNull(engine);
-        DeleteMarker();
+        if (ReferenceEquals(_engine, engine))
+            return;
+
+        Clear();
         _centerProjection = null;
+        _centerPoints.Clear();
         _engine = engine;
-        _marker = null;
-        _markerType = null;
-        Current = null;
     }
 
     public CadSnapPoint? Resolve(

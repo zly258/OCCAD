@@ -182,7 +182,7 @@ public sealed class CylinderTool : CadDrawingTool, ICadPointInputTool
     private void Show(CadCylinderEntity entity)
     {
         _preview = entity;
-        Context.Preview.Show(entity);
+        ShowPreview(entity);
     }
 
     private static OcctVector3d Negate(OcctVector3d value) =>

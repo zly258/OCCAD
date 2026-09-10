@@ -317,7 +317,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         }
 
         _preview = entity;
-        Context.Preview.Show(entity);
+        ShowPreview(entity);
     }
 
     private void RefreshPreviewFromLastPointer()
@@ -390,7 +390,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
     private void Commit(CadCircleEntity entity)
     {
         _preview = entity;
-        Context.Preview.Show(entity);
+        ShowPreview(entity);
         Context.AddEntity(entity.Duplicate());
         Context.Workspace.Tools.CompleteCurrent();
     }

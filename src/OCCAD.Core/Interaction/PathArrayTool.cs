@@ -22,7 +22,10 @@ public sealed class PathArrayTool : CadSelectionTransformToolBase, ICadPointInpu
                 : _reference is null
                     ? CadToolInputKind.Point
                     : CadToolInputKind.Confirmation;
-    protected override bool CanCommitCurrentStageCore => State == CadToolState.Drawing && _reference is null;
+    protected override bool CanCommitCurrentStageCore =>
+        State == CadToolState.Drawing &&
+        _path is not null &&
+        _reference is null;
     protected override bool CanStepBackCore => _path is not null;
     protected override bool CanFinishCore => State == CadToolState.Drawing && _reference is not null && CopyCount() > 0;
     public override CadToolPanelDescriptor? ParameterPanel => State != CadToolState.Drawing ? null :
@@ -82,7 +85,14 @@ public sealed class PathArrayTool : CadSelectionTransformToolBase, ICadPointInpu
         UpdatePreview();
         return true;
     }
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) => AcceptAt(pointer.X, pointer.Y);
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (_path is null || _reference is not null)
+            return false;
+
+        return TryAcceptPoint(
+            Context.ResolvePoint(pointer.X, pointer.Y).Point);
+    }
     protected override bool OnSetParameter(string id, string value)
     {
         if (State != CadToolState.Drawing) return false;

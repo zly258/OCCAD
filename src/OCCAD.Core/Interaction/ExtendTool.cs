@@ -6,6 +6,8 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
 {
     public override string Id => "extend";
     public override string DisplayName => "Extend";
+    public override CadToolInputKind InputKind =>
+        CadToolInputKind.Selection;
     public override CadToolInteractionPolicy InteractionPolicy =>
         base.InteractionPolicy with { PreselectionEnabled = true };
 

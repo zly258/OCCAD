@@ -172,7 +172,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         {
             if (_points[0].DistanceTo(cursor) <= 1e-9) return;
             _preview = new CadLineEntity(_points[0], cursor);
-            Context.Preview.Show(_preview);
+            ShowPreview(_preview);
             return;
         }
 
@@ -184,7 +184,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         else
             return;
 
-        Context.Preview.Show(_preview);
+        ShowPreview(_preview);
     }
 
     private void RefreshPreviewFromLastPointer()

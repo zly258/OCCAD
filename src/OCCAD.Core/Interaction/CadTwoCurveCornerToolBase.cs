@@ -7,6 +7,8 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
     private CadEntity? _first;
     private OcctPoint3d _firstPick;
 
+    public override CadToolInputKind InputKind =>
+        CadToolInputKind.Selection;
     public override CadToolInteractionPolicy InteractionPolicy =>
         base.InteractionPolicy with { PreselectionEnabled = true };
 

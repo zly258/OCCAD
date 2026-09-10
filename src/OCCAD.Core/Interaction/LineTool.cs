@@ -58,7 +58,7 @@ public sealed class LineTool : CadDrawingTool, ICadPointInputTool
     {
         if (start.DistanceTo(end) <= 1e-9) return;
         _preview = new CadLineEntity(start, end);
-        Context.Preview.Show(_preview);
+        ShowPreview(_preview);
     }
 
     private void Reset()

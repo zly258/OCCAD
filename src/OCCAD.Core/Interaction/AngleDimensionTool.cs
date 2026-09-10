@@ -53,7 +53,7 @@ public sealed class AngleDimensionTool : CadDrawingTool, ICadPointInputTool
     }
     protected override bool OnStepBack(){if(_lines.Count==0)return false;_lines.RemoveAt(_lines.Count-1);Context.Preview.Clear();Context.WorkPlane.SetToolPlaneFixed(false);UpdatePrompt();return true;}
     private void TryAcceptSelected(){foreach(var line in Context.Selection.Selected.OfType<CadLineEntity>().Take(2))if(!TryAcceptLine(line))break;}
-    private void Show(OcctPoint3d point){var delta=point-_vertex;delta-=_normal*delta.Dot(_normal);if(delta.Length>1e-9)Context.Preview.Show(new CadAngleDimensionEntity(_vertex,_firstDirection,_secondDirection,delta.Length,_textHeight,_arrowSize));}
+    private void Show(OcctPoint3d point){var delta=point-_vertex;delta-=_normal*delta.Dot(_normal);if(delta.Length>1e-9)ShowPreview(new CadAngleDimensionEntity(_vertex,_firstDirection,_secondDirection,delta.Length,_textHeight,_arrowSize));}
     private void UpdatePrompt(){var key=_lines.Count switch{0=>"First",1=>"Second",_=>"Position"};var text=_lines.Count switch{0=>"Angle dimension: select first line [Esc cancel]",1=>"Angle dimension: select second line [Backspace undo, Esc cancel]",_=>"Angle dimension: specify arc position [Backspace undo, Esc cancel]"};SetStageLocalized(_lines.Count,$"Cad.Prompt.angledimension.{key}",text);}
     private static bool TryFrame(CadLineEntity first,CadLineEntity second,out OcctPoint3d vertex,out OcctVector3d d1,out OcctVector3d d2,out OcctVector3d normal)
     {

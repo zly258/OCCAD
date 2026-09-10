@@ -2,7 +2,7 @@ using OcctNet;
 
 namespace OCCAD;
 
-public sealed class GripEditTool : CadTool
+public sealed class GripEditTool : CadTool, ICadPointInputTool
 {
     private readonly CadGripPoint _grip;
     private CadEntity? _before;
@@ -77,6 +77,9 @@ public sealed class GripEditTool : CadTool
 
         return AcceptPoint(Context.ResolvePoint(input.X, input.Y, ConstraintOrigin).Point);
     }
+
+    public bool TryAcceptPoint(OcctPoint3d point) =>
+        AcceptPoint(point);
 
     protected override bool CanCommitCurrentStageCore => true;
 

@@ -120,12 +120,12 @@ public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
         if (_points.Count == 1)
         {
             if ((point - _points[0]).Length <= 1e-9) return;
-            Context.Preview.Show(new CadLineEntity(_points[0], point));
+            ShowPreview(new CadLineEntity(_points[0], point));
             return;
         }
         if (_points.Count != 2) return;
         _preview = Create(point);
-        if (_preview is not null) Context.Preview.Show(_preview);
+        if (_preview is not null) ShowPreview(_preview);
     }
 
     private CadLengthDimensionEntity? Create(OcctPoint3d placement)

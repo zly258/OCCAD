@@ -155,7 +155,7 @@ public sealed class SplineTool : CadDrawingTool, ICadPointInputTool
         _preview = values.Count == 2
             ? new CadLineEntity(values[0], values[1])
             : new CadSplineEntity(values);
-        Context.Preview.Show(_preview);
+        ShowPreview(_preview);
     }
 
     private void Reset()

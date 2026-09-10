@@ -5,8 +5,19 @@ namespace OCCAD;
 public sealed class CadPreviewManager
 {
     private readonly List<CadEntity> _entities = [];
+    private readonly CadDocument? _document;
     private readonly List<IOcctObject> _shapes = [];
     private OcctEngine? _engine;
+
+    public CadPreviewManager()
+    {
+    }
+
+    internal CadPreviewManager(CadDocument document)
+    {
+        _document =
+            document ?? throw new ArgumentNullException(nameof(document));
+    }
 
     public IReadOnlyList<CadEntity> Entities => _entities;
     public CadEntity? Entity => _entities.Count == 1 ? _entities[0] : null;
@@ -67,8 +78,10 @@ public sealed class CadPreviewManager
                 engine.SetLocalTransformation(
                     shape,
                     entity.Placement.Transform);
+                var appearance =
+                    ResolveAppearance(entity);
                 engine.SetObjectSelectable(shape, false);
-                engine.SetObjectColor(shape, entity.Color);
+                engine.SetObjectColor(shape, appearance.Color);
                 engine.SetObjectTransparency(
                     shape,
                     Math.Clamp(entity.Transparency, 0.0, 1.0));
@@ -76,9 +89,16 @@ public sealed class CadPreviewManager
                 {
                     engine.SetObjectLineWidth(
                         shape,
-                        Math.Max(0.1, entity.LineWidth));
-                    engine.SetObjectDisplayMode(shape, entity.DisplayMode);
-                    engine.SetObjectMaterial(shape, entity.Material);
+                        Math.Max(0.1, appearance.LineWidth));
+                    engine.SetObjectLineStyle(
+                        shape,
+                        appearance.LineStyle);
+                    engine.SetObjectDisplayMode(
+                        shape,
+                        entity.DisplayMode);
+                    engine.SetObjectMaterial(
+                        shape,
+                        entity.Material);
                 }
             }
         }
@@ -104,6 +124,17 @@ public sealed class CadPreviewManager
         _shapes.Clear();
         _shapes.AddRange(nextShapes);
     }
+
+    private CadResolvedAppearance ResolveAppearance(
+        CadEntity entity) =>
+        _document is null
+            ? new CadResolvedAppearance(
+                entity.Color,
+                entity.LineWidth,
+                entity.LineStyle,
+                entity.Visible,
+                entity.Selectable)
+            : _document.ResolveAppearance(entity);
 
     private static void DeleteObjects(
         OcctEngine engine,

@@ -37,51 +37,108 @@ public sealed class CadPrecisionInputManager
             (kinds & CadPrecisionInputKind.Angle) != 0;
         var factorAllowed =
             (kinds & CadPrecisionInputKind.Factor) != 0;
-        // Validate the whole input before changing any lock. A rejected angle or
-        // factor must not leave a previously applied length behind.
+
+        // Validate the whole input before changing any lock. A rejected value
+        // must not partially mutate the drafting state.
         if ((input.Length is not null && !lengthAllowed) ||
             (input.AngleDegrees is not null && !angleAllowed) ||
-            (input.Factor is not null && !factorAllowed)) return false;
-        if (input.Length is { } proposedLength && (!double.IsFinite(proposedLength) || proposedLength <= 0.0))
-            throw new ArgumentOutOfRangeException(nameof(input), "Length must be finite and greater than zero.");
-        if (input.AngleDegrees is { } proposedAngle && !double.IsFinite(proposedAngle))
-            throw new ArgumentOutOfRangeException(nameof(input), "Angle must be finite.");
-        if (input.Factor is { } proposedFactor && (!double.IsFinite(proposedFactor) || proposedFactor <= 0.0))
-            throw new ArgumentOutOfRangeException(nameof(input), "Scale factor must be finite and greater than zero.");
-        var hasValue =
-            input.Length is not null ||
-            input.AngleDegrees is not null ||
-            input.Factor is not null;
+            (input.Factor is not null && !factorAllowed))
+            return false;
 
-        if (!hasValue)
+        if (input.Length is { } proposedLength &&
+            (!double.IsFinite(proposedLength) ||
+             proposedLength <= 0.0))
         {
-            if (lengthAllowed) ClearLength();
-            if (angleAllowed) ClearAngle();
-            if (factorAllowed) Factor = null;
+            throw new ArgumentOutOfRangeException(
+                nameof(input),
+                "Length must be finite and greater than zero.");
+        }
+
+        if (input.AngleDegrees is { } proposedAngle &&
+            !double.IsFinite(proposedAngle))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(input),
+                "Angle must be finite.");
+        }
+
+        if (input.Factor is { } proposedFactor &&
+            (!double.IsFinite(proposedFactor) ||
+             proposedFactor <= 0.0))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(input),
+                "Scale factor must be finite and greater than zero.");
+        }
+
+        var previousAxisLock =
+            _drafting.AxisLockEnabled;
+        var previousLengthLock =
+            _drafting.LengthLockEnabled;
+        var previousLength =
+            _drafting.LockedLength;
+        var previousAngleLock =
+            _drafting.AngleLockEnabled;
+        var previousAngle =
+            _drafting.LockedAngleDegrees;
+        var previousFactor =
+            Factor;
+
+        try
+        {
+            var hasValue =
+                input.Length is not null ||
+                input.AngleDegrees is not null ||
+                input.Factor is not null;
+
+            if (!hasValue)
+            {
+                if (lengthAllowed)
+                    ClearLength();
+                if (angleAllowed)
+                    ClearAngle();
+                if (factorAllowed)
+                    Factor = null;
+            }
+            else
+            {
+                if (input.Length is { } length)
+                    ApplyLength(length);
+                if (input.AngleDegrees is { } angle)
+                    ApplyAngle(angle);
+                if (input.Factor is { } factor)
+                    ApplyFactor(factor);
+            }
+
             _tracking.Clear();
-            return tool.ApplyPrecisionInput(input);
-        }
+            if (tool.ApplyPrecisionInput(input))
+                return true;
 
-        if (input.Length is { } length)
+            RestorePreviousState();
+            return false;
+        }
+        catch
         {
-            if (!lengthAllowed) return false;
-            ApplyLength(length);
+            RestorePreviousState();
+            throw;
         }
 
-        if (input.AngleDegrees is { } angle)
+        void RestorePreviousState()
         {
-            if (!angleAllowed) return false;
-            ApplyAngle(angle);
+            _drafting.AxisLockEnabled =
+                previousAxisLock;
+            _drafting.LockedLength =
+                previousLength;
+            _drafting.LengthLockEnabled =
+                previousLengthLock;
+            _drafting.LockedAngleDegrees =
+                previousAngle;
+            _drafting.AngleLockEnabled =
+                previousAngleLock;
+            Factor =
+                previousFactor;
+            _tracking.Clear();
         }
-
-        if (input.Factor is { } factor)
-        {
-            if (!factorAllowed) return false;
-            ApplyFactor(factor);
-        }
-
-        _tracking.Clear();
-        return tool.ApplyPrecisionInput(input);
     }
 
     public void ResetFactor() =>

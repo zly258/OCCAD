@@ -53,7 +53,34 @@ public sealed class CopyTool : CadTranslateToolBase
     protected override void ShowTranslatedPreview(
         OcctVector3d displacement)
     {
-        var previews = new List<CadEntity>(
+        Context.Preview.Show(
+            BuildCopies(displacement));
+    }
+
+    protected override void Commit(
+        OcctVector3d displacement,
+        Action complete)
+    {
+        var copies = BuildCopies(displacement);
+        CadTransaction.ApplyCreatedEntities(
+            Context.Workspace,
+            copies,
+            copies.Length == 1
+                ? "Copy"
+                : $"Copy {copies.Length}",
+            complete);
+    }
+
+    protected override void ResetTransformState()
+    {
+        base.ResetTransformState();
+        _count = 1;
+    }
+
+    private CadEntity[] BuildCopies(
+        OcctVector3d displacement)
+    {
+        var copies = new List<CadEntity>(
             Entities.Count * _count);
 
         for (var index = 1; index <= _count; index++)
@@ -63,23 +90,10 @@ public sealed class CopyTool : CadTranslateToolBase
             {
                 var copy = source.Duplicate();
                 copy.TranslatePlacement(step);
-                previews.Add(copy);
+                copies.Add(copy);
             }
         }
 
-        Context.Preview.Show(previews);
-    }
-
-    protected override void Commit(
-        OcctVector3d displacement) =>
-        Context.Workspace.CopyEntities(
-            Entities,
-            displacement,
-            _count);
-
-    protected override void ResetTransformState()
-    {
-        base.ResetTransformState();
-        _count = 1;
+        return copies.ToArray();
     }
 }

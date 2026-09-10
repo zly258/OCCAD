@@ -183,11 +183,40 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
 
         try
         {
-            CommitTransform(() => Context.Workspace.MirrorEntities(
-                Entities,
-                _firstPoint.Value,
-                planeNormal,
-                _keepSource));
+            var origin = _firstPoint.Value;
+            var copies = Entities
+                .Select(entity =>
+                    entity.MirroredCopy(
+                        origin,
+                        planeNormal))
+                .ToArray();
+
+            CommitTransform(complete =>
+            {
+                if (_keepSource)
+                {
+                    CadTransaction.ApplyCreatedEntities(
+                        Context.Workspace,
+                        copies,
+                        "Mirror",
+                        complete);
+                    return;
+                }
+
+                var geometry = Entities
+                    .Zip(copies)
+                    .ToDictionary(
+                        pair => pair.First,
+                        pair => pair.Second);
+                CadTransaction.ApplyEntities(
+                    Context.Workspace,
+                    Entities,
+                    "Mirror",
+                    entity => entity.RestoreGeometrySnapshot(
+                        geometry[entity]),
+                    geometryOnly: true,
+                    complete: complete);
+            });
             return true;
         }
         catch (NotSupportedException)

@@ -9,6 +9,14 @@ public sealed class MoveTool : CadTranslateToolBase
 
     protected override bool SuppressSourcesDuringPreview => true;
 
-    protected override void Commit(OcctVector3d displacement) =>
-        Context.Workspace.TranslateEntities(Entities, displacement);
+    protected override void Commit(
+        OcctVector3d displacement,
+        Action complete) =>
+        CadTransaction.ApplyEntities(
+            Context.Workspace,
+            Entities,
+            "Move",
+            entity => entity.TranslatePlacement(displacement),
+            geometryOnly: true,
+            complete: complete);
 }

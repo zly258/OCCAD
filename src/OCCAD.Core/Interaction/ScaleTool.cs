@@ -233,10 +233,16 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
             return false;
         }
 
-        CommitTransform(() => Context.Workspace.ScaleEntities(
-            Entities,
-            _basePoint.Value,
-            factor));
+        CommitTransform(complete =>
+            CadTransaction.ApplyEntities(
+                Context.Workspace,
+                Entities,
+                "Scale",
+                entity => entity.ScaleFromWorld(
+                    _basePoint.Value,
+                    factor),
+                geometryOnly: true,
+                complete: complete));
         return true;
     }
 

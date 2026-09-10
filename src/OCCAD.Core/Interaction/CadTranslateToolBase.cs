@@ -97,7 +97,9 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
         Entities.Count > 0 &&
         AcceptPoint(point);
 
-    protected abstract void Commit(OcctVector3d displacement);
+    protected abstract void Commit(
+        OcctVector3d displacement,
+        Action complete);
 
     protected override bool OnStepBack()
     {
@@ -150,7 +152,8 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
             return false;
         }
 
-        CommitTransform(() => Commit(displacement));
+        CommitTransform(complete =>
+            Commit(displacement, complete));
         return true;
     }
 

@@ -233,11 +233,17 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
             return false;
         }
 
-        CommitTransform(() => Context.Workspace.RotateEntities(
-            Entities,
-            _basePoint.Value,
-            _rotationAxis,
-            angleDegrees));
+        CommitTransform(complete =>
+            CadTransaction.ApplyEntities(
+                Context.Workspace,
+                Entities,
+                "Rotate",
+                entity => entity.RotatePlacement(
+                    _basePoint.Value,
+                    _rotationAxis,
+                    angleDegrees),
+                geometryOnly: true,
+                complete: complete));
         return true;
     }
 

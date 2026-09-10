@@ -79,27 +79,44 @@ public sealed class CadTransaction : IDisposable
         workspace.History.Execute(entry);
     }
 
-    /// <summary>
-    /// Applies one newly-created entity and installs its lightweight history entry
-    /// only after the caller-supplied completion step succeeds. If completion
-    /// fails, the entity is removed again and the previous modified state is
-    /// restored, so a failed drawing command cannot leave committed geometry or
-    /// an Undo entry behind.
-    /// </summary>
     internal static void ApplyCreatedEntity(
         CadWorkspace workspace,
         CadEntity entity,
         string name,
+        Action complete) =>
+        ApplyCreatedEntities(
+            workspace,
+            [entity],
+            name,
+            complete);
+
+    /// <summary>
+    /// Applies newly-created entities and installs one lightweight history entry
+    /// only after the caller-supplied completion step succeeds. If completion
+    /// fails, all created entities are removed again and no Undo record is kept.
+    /// </summary>
+    internal static void ApplyCreatedEntities(
+        CadWorkspace workspace,
+        IReadOnlyList<CadEntity> entities,
+        string name,
         Action complete)
     {
         ArgumentNullException.ThrowIfNull(workspace);
-        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(entities);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(complete);
 
         if (workspace.History.RecordingSuspended)
             throw new InvalidOperationException(
-                "A drawing create commit cannot be nested inside another transaction.");
+                "A tool create commit cannot be nested inside another transaction.");
+
+        var values = entities
+            .Distinct()
+            .ToArray();
+        if (values.Length == 0)
+            throw new ArgumentException(
+                "At least one entity is required for a create commit.",
+                nameof(entities));
 
         var wasModified = workspace.IsModified;
         var historyState = workspace.History.CurrentStateId;
@@ -113,7 +130,7 @@ public sealed class CadTransaction : IDisposable
             {
                 try
                 {
-                    workspace.Document.Add(entity);
+                    workspace.Document.AddRange(values);
 
                     // Tool completion is part of the command contract. The model is not
                     // considered committed until all tool-owned transient state has been
@@ -125,7 +142,7 @@ public sealed class CadTransaction : IDisposable
                         workspace.History.RecordApplied(
                             new CadAddEntitiesHistoryEntry(
                                 workspace.Document,
-                                [entity],
+                                values,
                                 name.Trim()));
                     }
                     finally
@@ -143,11 +160,14 @@ public sealed class CadTransaction : IDisposable
                     if (!historyInstalled)
                     {
                         var failures = new List<Exception> { error };
-                        if (workspace.Document.Entities.Contains(entity))
+                        var existing = values
+                            .Where(workspace.Document.Entities.Contains)
+                            .ToArray();
+                        if (existing.Length > 0)
                         {
                             try
                             {
-                                workspace.Document.Remove(entity);
+                                workspace.Document.RemoveRange(existing);
                             }
                             catch (Exception rollbackFailure)
                             {
@@ -155,8 +175,8 @@ public sealed class CadTransaction : IDisposable
                             }
                         }
 
-                        rollbackComplete =
-                            !workspace.Document.Entities.Contains(entity);
+                        rollbackComplete = values.All(
+                            entity => !workspace.Document.Entities.Contains(entity));
 
                         if (failures.Count > 1)
                         {
@@ -182,9 +202,26 @@ public sealed class CadTransaction : IDisposable
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
-    internal static bool ApplyEntities(CadWorkspace workspace, IReadOnlyList<CadEntity> targets,
-        string name, Action<CadEntity> mutation, bool geometryOnly = false)
+    internal static bool ApplyEntities(
+        CadWorkspace workspace,
+        IReadOnlyList<CadEntity> targets,
+        string name,
+        Action<CadEntity> mutation,
+        bool geometryOnly = false,
+        Action? complete = null)
     {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(targets);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(mutation);
+
+        if (complete is not null &&
+            workspace.History.RecordingSuspended)
+        {
+            throw new InvalidOperationException(
+                "A tool entity commit cannot be nested inside another transaction.");
+        }
+
         if (targets.Count == 0) return false;
         var before = workspace.CaptureEntityStates(targets);
         var wasModified = workspace.IsModified;
@@ -199,6 +236,12 @@ public sealed class CadTransaction : IDisposable
                 var after = workspace.CaptureEntityStates(targets);
                 if (before.Zip(after).Any(pair => !workspace.Entities.StateEquals(pair.First, pair.Second)))
                 {
+                    // Tool completion belongs inside the same atomic boundary as
+                    // the model mutation. A cleanup/deactivation failure therefore
+                    // restores the entity states instead of reporting a committed
+                    // operation as failed.
+                    complete?.Invoke();
+
                     // History notifications may throw after the entry is installed.
                     var state = workspace.History.CurrentStateId;
                     try

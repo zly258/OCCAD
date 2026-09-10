@@ -102,6 +102,12 @@ public abstract class CadSelectionTransformToolBase : CadTool
     protected void ClearTransformPreview() =>
         ClearReplacementPreview();
 
+    /// <summary>
+    /// Legacy transform commit path for commands whose model operation owns its
+    /// complete transaction. New interactive transforms should use the overload
+    /// that receives the tool-completion callback so model mutation, cleanup and
+    /// history installation share one atomic boundary.
+    /// </summary>
     protected void CommitTransform(Action commit)
     {
         ArgumentNullException.ThrowIfNull(commit);
@@ -112,6 +118,20 @@ public abstract class CadSelectionTransformToolBase : CadTool
             ClearTransformPreview();
             commit();
             Context.Workspace.Tools.CompleteCurrent();
+        }
+
+        engine.Redraw();
+    }
+
+    protected void CommitTransform(Action<Action> commit)
+    {
+        ArgumentNullException.ThrowIfNull(commit);
+        var engine = Context.Engine;
+
+        using (engine.BeginDisplayBatch())
+        {
+            ClearTransformPreview();
+            commit(Context.Workspace.Tools.CompleteCurrent);
         }
 
         engine.Redraw();

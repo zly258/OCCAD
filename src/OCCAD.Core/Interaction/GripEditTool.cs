@@ -158,17 +158,30 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
         var workspace = Context.Workspace;
         try
         {
-            CommitReplacementPreview(() => CadTransaction.ApplyEntities(workspace, [_grip.Entity],
-                "Grip Edit", entity => entity.RestoreGeometrySnapshot(_preview), geometryOnly: true));
+            CommitReplacementPreview(() =>
+                CadTransaction.ApplyEntities(
+                    workspace,
+                    [_grip.Entity],
+                    "Grip Edit",
+                    entity => entity.RestoreGeometrySnapshot(_preview),
+                    geometryOnly: true,
+                    complete: workspace.Tools.CompleteCurrent));
         }
         catch (Exception failure) when (IsRecoverable(failure))
         {
+            // A geometry/native failure while the tool is still active is
+            // recoverable: restore the replacement preview and let the user pick
+            // another point. If deactivation already ran, the transaction has
+            // rolled the entity back and the tool is neutral; propagate that
+            // lifecycle failure instead of resurrecting tool-owned preview state.
+            if (!IsActive)
+                throw;
+
             ShowReplacementPreview([_grip.Entity], [_preview]);
             ShowInvalidGripPrompt();
             return true;
         }
 
-        workspace.Tools.CompleteCurrent();
         return true;
     }
 

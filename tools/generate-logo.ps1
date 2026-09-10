@@ -56,17 +56,98 @@ function New-OccadLogoBitmap {
     return $bitmap
 }
 
-function Convert-ToPngBytes {
-    param([Parameter(Mandatory = $true)][System.Drawing.Bitmap]$Bitmap)
+$icoWriterSource = @'
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
 
-    $stream = [System.IO.MemoryStream]::new()
-    try {
-        $Bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
-        return $stream.ToArray()
+public static class OccadIcoWriter
+{
+    public static void Write(string path, Bitmap[] frames)
+    {
+        if (frames == null || frames.Length == 0)
+            throw new ArgumentException("At least one icon frame is required.", nameof(frames));
+
+        const int headerSize = 6;
+        const int entrySize = 16;
+        var payloads = new List<byte[]>(frames.Length);
+
+        foreach (var bitmap in frames)
+            payloads.Add(BuildDib(bitmap));
+
+        using var stream = File.Create(path);
+        using var writer = new BinaryWriter(stream);
+
+        writer.Write((ushort)0);
+        writer.Write((ushort)1);
+        writer.Write((ushort)frames.Length);
+
+        var offset = headerSize + entrySize * frames.Length;
+        for (var index = 0; index < frames.Length; index++)
+        {
+            var bitmap = frames[index];
+            if (bitmap.Width != bitmap.Height || bitmap.Width > 256)
+                throw new ArgumentException("Icon frames must be square and no larger than 256 pixels.");
+
+            writer.Write(bitmap.Width == 256 ? (byte)0 : (byte)bitmap.Width);
+            writer.Write(bitmap.Height == 256 ? (byte)0 : (byte)bitmap.Height);
+            writer.Write((byte)0);
+            writer.Write((byte)0);
+            writer.Write((ushort)1);
+            writer.Write((ushort)32);
+            writer.Write((uint)payloads[index].Length);
+            writer.Write((uint)offset);
+            offset += payloads[index].Length;
+        }
+
+        foreach (var payload in payloads)
+            writer.Write(payload);
     }
-    finally {
-        $stream.Dispose()
+
+    private static byte[] BuildDib(Bitmap bitmap)
+    {
+        var width = bitmap.Width;
+        var height = bitmap.Height;
+        var xorSize = checked(width * height * 4);
+        var maskStride = ((width + 31) / 32) * 4;
+        var maskSize = checked(maskStride * height);
+
+        using var stream = new MemoryStream(40 + xorSize + maskSize);
+        using var writer = new BinaryWriter(stream);
+
+        writer.Write(40);
+        writer.Write(width);
+        writer.Write(height * 2);
+        writer.Write((ushort)1);
+        writer.Write((ushort)32);
+        writer.Write(0);
+        writer.Write(xorSize);
+        writer.Write(0);
+        writer.Write(0);
+        writer.Write(0);
+        writer.Write(0);
+
+        for (var y = height - 1; y >= 0; y--)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                writer.Write(pixel.B);
+                writer.Write(pixel.G);
+                writer.Write(pixel.R);
+                writer.Write(pixel.A);
+            }
+        }
+
+        writer.Write(new byte[maskSize]);
+        return stream.ToArray();
     }
+}
+'@
+
+if (-not ('OccadIcoWriter' -as [type])) {
+    Add-Type -TypeDefinition $icoWriterSource -ReferencedAssemblies @([System.Drawing.Bitmap].Assembly.Location)
 }
 
 $pngPath = Join-Path $OutputDirectory 'OCCAD.png'
@@ -80,50 +161,55 @@ finally {
     $master.Dispose()
 }
 
-$frames = foreach ($size in $iconSizes) {
-    $bitmap = New-OccadLogoBitmap -Size $size
-    try {
-        [PSCustomObject]@{
-            Size = $size
-            Bytes = Convert-ToPngBytes -Bitmap $bitmap
-        }
-    }
-    finally {
-        $bitmap.Dispose()
-    }
-}
-
-$headerSize = 6
-$entrySize = 16
-$offset = $headerSize + $entrySize * $frames.Count
-$stream = [System.IO.File]::Create($icoPath)
-$writer = [System.IO.BinaryWriter]::new($stream)
+$frames = [System.Collections.Generic.List[System.Drawing.Bitmap]]::new()
 try {
-    $writer.Write([uint16]0)
-    $writer.Write([uint16]1)
-    $writer.Write([uint16]$frames.Count)
-
-    foreach ($frame in $frames) {
-        $dimension = if ($frame.Size -eq 256) { [byte]0 } else { [byte]$frame.Size }
-        $writer.Write($dimension)
-        $writer.Write($dimension)
-        $writer.Write([byte]0)
-        $writer.Write([byte]0)
-        $writer.Write([uint16]1)
-        $writer.Write([uint16]32)
-        $writer.Write([uint32]$frame.Bytes.Length)
-        $writer.Write([uint32]$offset)
-        $offset += $frame.Bytes.Length
+    foreach ($size in $iconSizes) {
+        $frames.Add((New-OccadLogoBitmap -Size $size))
     }
 
-    foreach ($frame in $frames) {
-        $writer.Write($frame.Bytes)
-    }
+    [OccadIcoWriter]::Write(
+        $icoPath,
+        $frames.ToArray())
 }
 finally {
-    $writer.Dispose()
-    $stream.Dispose()
+    foreach ($frame in $frames) {
+        $frame.Dispose()
+    }
 }
+
+function Test-OccadIco {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -lt 6) {
+        throw "Generated ICO is truncated: $Path"
+    }
+
+    $reserved = [BitConverter]::ToUInt16($bytes, 0)
+    $type = [BitConverter]::ToUInt16($bytes, 2)
+    $count = [BitConverter]::ToUInt16($bytes, 4)
+    if ($reserved -ne 0 -or $type -ne 1 -or $count -ne $iconSizes.Count) {
+        throw "Generated ICO header is invalid: $Path"
+    }
+
+    $directoryEnd = 6 + 16 * $count
+    if ($bytes.Length -lt $directoryEnd) {
+        throw "Generated ICO directory is truncated: $Path"
+    }
+
+    for ($index = 0; $index -lt $count; $index++) {
+        $entry = 6 + 16 * $index
+        $length = [BitConverter]::ToUInt32($bytes, $entry + 8)
+        $offset = [BitConverter]::ToUInt32($bytes, $entry + 12)
+        if ($length -eq 0 -or
+            $offset -lt $directoryEnd -or
+            ([uint64]$offset + [uint64]$length) -gt [uint64]$bytes.Length) {
+            throw "Generated ICO frame $index is invalid: $Path"
+        }
+    }
+}
+
+Test-OccadIco -Path $icoPath
 
 Write-Host "[logo] PNG: $pngPath (1024x1024)"
 Write-Host "[logo] ICO: $icoPath ($($iconSizes -join ', ') px)"

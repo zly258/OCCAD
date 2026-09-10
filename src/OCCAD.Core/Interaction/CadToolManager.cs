@@ -234,7 +234,7 @@ public sealed class CadToolManager
             return StepBackCurrent();
 
         if (input.Kind == OcctKeyInputKind.Pressed &&
-            input.Key == OcctKey.Enter &&
+            input.Key is OcctKey.Enter or OcctKey.Space &&
             ActiveTool is not null &&
             SubmitCurrent())
             return true;

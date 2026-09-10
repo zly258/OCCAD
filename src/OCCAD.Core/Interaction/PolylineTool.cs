@@ -39,7 +39,10 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
     protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
         CommitResolvedPoint(pointer, _points.Count == 0 ? null : _points[^1], AcceptPoint);
 
-    public bool TryAcceptPoint(OcctPoint3d point) => AcceptPoint(point);
+    public bool TryAcceptPoint(OcctPoint3d point) =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        AcceptPoint(point);
 
     public bool TryExecuteOption(string input, out bool success, out string? message)
     {

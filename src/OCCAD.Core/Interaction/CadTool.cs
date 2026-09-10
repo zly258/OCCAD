@@ -330,7 +330,15 @@ public abstract class CadTool
             SuppressReplacementPreviewSources(sources);
         }
 
-        Context.Preview.Show(replacements);
+        try
+        {
+            Context.Preview.Show(replacements);
+        }
+        catch
+        {
+            RestoreReplacementPreviewSources();
+            throw;
+        }
     }
 
     protected void ClearReplacementPreview()
@@ -380,9 +388,12 @@ public abstract class CadTool
                     .Visible)
                 continue;
 
-            engine.SetObjectVisible(
+            // Keep the source in the viewer selection structure so hover and
+            // click hit-testing stay stable while only the replacement result
+            // remains visually visible.
+            engine.SetObjectTransparency(
                 source,
-                false);
+                1.0);
             _replacementPreviewSources.Add(entity);
         }
     }
@@ -410,6 +421,12 @@ public abstract class CadTool
                 !engine.ContainsObject(source.Id))
                 continue;
 
+            engine.SetObjectTransparency(
+                source,
+                Math.Clamp(
+                    entity.Transparency,
+                    0.0,
+                    1.0));
             engine.SetObjectVisible(
                 source,
                 Context.Document

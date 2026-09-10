@@ -4,6 +4,7 @@ namespace OCCAD;
 
 public sealed class ExtendTool : CadSelectionTransformToolBase
 {
+    private bool _invalidTargetPrompt;
     public override string Id => "extend";
     public override string DisplayName => "Extend";
     public override CadToolInputKind InputKind =>
@@ -27,6 +28,7 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
 
     protected override void OnTransformStarted()
     {
+        _invalidTargetPrompt = false;
         SetSelectionFilter(
             new CadSelectionFilter(
                 "extend.targets",
@@ -47,6 +49,7 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
 
     protected override bool OnStepBack()
     {
+        _invalidTargetPrompt = false;
         SetSelectionFilter(
             new CadSelectionFilter(
                 "extend.boundaries",
@@ -83,10 +86,18 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
 
     private void UpdatePreview()
     {
-        if (!TryBuild(out _, out var replacement))
+        if (!TryBuild(out var target, out var replacement))
         {
             ClearReplacementPreview();
             return;
+        }
+
+        if (_invalidTargetPrompt)
+        {
+            _invalidTargetPrompt = false;
+            SetPromptLocalized(
+                "Cad.Prompt.extend.Target",
+                "Extend: click near the curve or path endpoint to extend [Esc cancel]");
         }
 
         ShowReplacementPreview([target], [replacement]);
@@ -97,12 +108,14 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
         if (!TryBuild(out var target, out var replacement))
         {
             ClearReplacementPreview();
+            _invalidTargetPrompt = true;
             SetPromptLocalized(
                 "Cad.Prompt.extend.Invalid",
                 "Extend: the hovered curve or path cannot be extended to the selected boundaries.");
             return true;
         }
 
+        _invalidTargetPrompt = false;
         ClearReplacementPreview();
         Context.Workspace.ApplyGeneratedGeometryChange(
             [target],

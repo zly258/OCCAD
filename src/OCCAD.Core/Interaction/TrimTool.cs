@@ -4,6 +4,7 @@ namespace OCCAD;
 
 public sealed class TrimTool : CadSelectionTransformToolBase
 {
+    private bool _invalidTargetPrompt;
     public override string Id => "trim";
     public override string DisplayName => "Trim";
     public override CadToolInputKind InputKind =>
@@ -27,6 +28,7 @@ public sealed class TrimTool : CadSelectionTransformToolBase
 
     protected override void OnTransformStarted()
     {
+        _invalidTargetPrompt = false;
         SetSelectionFilter(
             new CadSelectionFilter(
                 "trim.targets",
@@ -48,6 +50,7 @@ public sealed class TrimTool : CadSelectionTransformToolBase
 
     protected override bool OnStepBack()
     {
+        _invalidTargetPrompt = false;
         SetSelectionFilter(
             new CadSelectionFilter(
                 "trim.boundaries",
@@ -90,6 +93,14 @@ public sealed class TrimTool : CadSelectionTransformToolBase
             return;
         }
 
+        if (_invalidTargetPrompt)
+        {
+            _invalidTargetPrompt = false;
+            SetPromptLocalized(
+                "Cad.Prompt.trim.Target",
+                "Trim: click the curve segment to remove [Esc cancel]");
+        }
+
         ShowReplacementPreview([target], replacements);
     }
 
@@ -98,12 +109,14 @@ public sealed class TrimTool : CadSelectionTransformToolBase
         if (!TryBuild(out var target, out var replacements))
         {
             ClearReplacementPreview();
+            _invalidTargetPrompt = true;
             SetPromptLocalized(
                 "Cad.Prompt.trim.Invalid",
                 "Trim: the hovered curve cannot be trimmed by the selected boundaries.");
             return true;
         }
 
+        _invalidTargetPrompt = false;
         ClearReplacementPreview();
         Context.Workspace.ReplaceEntities(
             [target],

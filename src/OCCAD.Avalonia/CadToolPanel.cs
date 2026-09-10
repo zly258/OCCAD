@@ -275,7 +275,7 @@ internal sealed class CadToolPanel : Border
         var editor = new TextBox
         {
             Tag = ExactPointId,
-            Watermark = "100,200  |  @500,0  |  @1000<30"
+            PlaceholderText = "100,200  |  @500,0  |  @1000<30"
         };
         editor.Classes.Add("cad-input");
         editor.KeyDown += (_, e) =>

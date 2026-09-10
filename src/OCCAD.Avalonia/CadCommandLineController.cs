@@ -8,27 +8,29 @@ using OCCAD;
 namespace OCCAD.Avalonia;
 
 /// <summary>
-/// Compact persistent CAD command line. It intentionally executes registered
-/// actions instead of duplicating tool logic in the UI layer.
+/// Compact persistent CAD command line. Parsing and tool-stage input remain in
+/// CadCommandManager so the UI does not duplicate CAD interaction rules.
 /// </summary>
 internal sealed class CadCommandLineController : IDisposable
 {
     private readonly CadWorkspace _workspace;
+    private readonly CadCommandManager _commands;
     private readonly Panel _host;
     private readonly TextBlock _label = new();
     private readonly TextBox _input = new();
     private readonly TextBlock _feedback = new();
+    private int _historyIndex = -1;
+    private string _historyDraft = string.Empty;
 
     public CadCommandLineController(
         CadWorkspace workspace,
         Panel host)
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
+        _commands = new CadCommandManager(_workspace);
         _host = host ?? throw new ArgumentNullException(nameof(host));
 
         BuildUi();
-        _workspace.Actions.ActionStarted += ActionsChanged;
-        _workspace.Actions.ActionFinished += ActionsChanged;
         _workspace.Actions.ActionFailed += ActionFailed;
     }
 
@@ -40,16 +42,19 @@ internal sealed class CadCommandLineController : IDisposable
 
     public void RefreshLanguage()
     {
-        _label.Text = CadLanguageManager.Text("Cad.Text.Command", "Command");
-        _input.Watermark = CadLanguageManager.Text(
+        var chinese = CadLanguageManager.CurrentLanguage.Equals(
+            "zh-CN",
+            StringComparison.OrdinalIgnoreCase);
+        _label.Text = CadLanguageManager.Text(
+            "Cad.Text.Command",
+            chinese ? "命令" : "Command");
+        _input.PlaceholderText = CadLanguageManager.Text(
             "Cad.Text.CommandWatermark",
-            "Type a command and press Enter");
+            chinese ? "输入命令、坐标或参数，Enter 执行；Tab 补全" : "Type command, coordinate or parameter; Enter executes, Tab completes");
     }
 
     public void Dispose()
     {
-        _workspace.Actions.ActionStarted -= ActionsChanged;
-        _workspace.Actions.ActionFinished -= ActionsChanged;
         _workspace.Actions.ActionFailed -= ActionFailed;
         _input.KeyDown -= InputKeyDown;
         _host.Children.Clear();
@@ -96,7 +101,7 @@ internal sealed class CadCommandLineController : IDisposable
         _feedback.Foreground = CadTheme.Muted;
         _feedback.VerticalAlignment = VerticalAlignment.Center;
         _feedback.Margin = new Thickness(8, 0, 8, 0);
-        _feedback.MaxWidth = 320;
+        _feedback.MaxWidth = 360;
         _feedback.TextTrimming = TextTrimming.CharacterEllipsis;
         Grid.SetColumn(_feedback, 2);
         grid.Children.Add(_feedback);
@@ -107,79 +112,175 @@ internal sealed class CadCommandLineController : IDisposable
 
     private void InputKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape)
+        switch (e.Key)
         {
-            if (_workspace.Tools.ActiveTool is not null)
-                _workspace.Tools.CancelCurrent();
-            _input.Clear();
+            case Key.Escape:
+                if (_workspace.Tools.ActiveTool is not null)
+                    ShowResult(_commands.Execute("ESC"));
+                _input.Text = string.Empty;
+                ResetHistoryNavigation();
+                e.Handled = true;
+                return;
+
+            case Key.Up:
+                NavigateHistory(-1);
+                e.Handled = true;
+                return;
+
+            case Key.Down:
+                NavigateHistory(1);
+                e.Handled = true;
+                return;
+
+            case Key.Tab:
+                CompleteCommand();
+                e.Handled = true;
+                return;
+
+            case Key.Enter:
+                var input = _input.Text;
+                _input.Text = string.Empty;
+                ResetHistoryNavigation();
+                ShowResult(_commands.Execute(input));
+                e.Handled = true;
+                return;
+        }
+    }
+
+    private void NavigateHistory(int direction)
+    {
+        var history = _commands.History;
+        if (history.Count == 0)
+            return;
+
+        if (_historyIndex < 0)
+        {
+            if (direction > 0)
+                return;
+
+            _historyDraft = _input.Text ?? string.Empty;
+            _historyIndex = history.Count - 1;
+        }
+        else if (direction < 0)
+        {
+            if (_historyIndex > 0)
+                _historyIndex--;
+        }
+        else if (_historyIndex < history.Count - 1)
+        {
+            _historyIndex++;
+        }
+        else
+        {
+            _historyIndex = -1;
+        }
+
+        _input.Text = _historyIndex >= 0
+            ? history[_historyIndex]
+            : _historyDraft;
+        _input.CaretIndex = _input.Text?.Length ?? 0;
+    }
+
+    private void CompleteCommand()
+    {
+        var text = _input.Text?.Trim() ?? string.Empty;
+        if (text.Length == 0)
+            return;
+
+        var matches = _commands.Complete(text)
+            .Take(12)
+            .ToArray();
+        if (matches.Length == 0)
+        {
+            _feedback.Text = CadLanguageManager.CurrentLanguage == "zh-CN"
+                ? "无匹配命令"
+                : "No matching command";
+            return;
+        }
+
+        if (matches.Length == 1)
+        {
+            _input.Text = matches[0];
+            _input.CaretIndex = matches[0].Length;
             _feedback.Text = string.Empty;
-            e.Handled = true;
             return;
         }
 
-        if (e.Key != Key.Enter)
-            return;
-
-        var command = _input.Text?.Trim();
-        _input.Clear();
-        e.Handled = true;
-
-        if (string.IsNullOrWhiteSpace(command))
+        var common = LongestCommonPrefix(matches);
+        if (common.Length > text.Length)
         {
-            _feedback.Text = _workspace.Actions.ExecuteLast()
-                ? CadLanguageManager.Text("Cad.Text.CommandRepeated", "Repeated last command")
-                : CadLanguageManager.Text("Cad.Text.NoPreviousCommand", "No previous command");
+            _input.Text = common;
+            _input.CaretIndex = common.Length;
+        }
+
+        _feedback.Text = string.Join("  ", matches.Take(6));
+    }
+
+    private void ResetHistoryNavigation()
+    {
+        _historyIndex = -1;
+        _historyDraft = string.Empty;
+    }
+
+    private static string LongestCommonPrefix(IReadOnlyList<string> values)
+    {
+        if (values.Count == 0)
+            return string.Empty;
+
+        var prefix = values[0];
+        for (var index = 1; index < values.Count && prefix.Length > 0; index++)
+        {
+            var other = values[index];
+            var length = Math.Min(prefix.Length, other.Length);
+            var shared = 0;
+            while (shared < length &&
+                   char.ToUpperInvariant(prefix[shared]) == char.ToUpperInvariant(other[shared]))
+            {
+                shared++;
+            }
+
+            prefix = prefix[..shared];
+        }
+
+        return prefix;
+    }
+
+    private void ShowResult(CadCommandResult result)
+    {
+        var message = CadLanguageManager.CommandMessage(result);
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            _feedback.Text = message;
             return;
         }
 
-        var action = ResolveAction(command);
-        if (action is null)
+        if (!string.IsNullOrWhiteSpace(result.ActionId) &&
+            _workspace.Actions.Find(result.ActionId) is { } action)
         {
-            _feedback.Text = string.Format(
-                CadLanguageManager.Text("Cad.Text.UnknownCommand", "Unknown command: {0}"),
-                command);
-            return;
-        }
-
-        if (!_workspace.Actions.CanExecute(action.Id))
-        {
-            _feedback.Text = string.Format(
-                CadLanguageManager.Text("Cad.Text.CommandUnavailable", "Command unavailable: {0}"),
+            _feedback.Text = CadLanguageManager.Text(
+                $"Cad.Action.{action.Id}",
                 action.DisplayName);
             return;
         }
 
-        if (_workspace.Actions.Execute(action.Id))
-            _feedback.Text = action.DisplayName;
-    }
-
-    private CadAction? ResolveAction(string command)
-    {
-        var direct = _workspace.Actions.Find(command);
-        if (direct is not null)
-            return direct;
-
-        var normalized = Normalize(command);
-        return _workspace.Actions.Actions.FirstOrDefault(action =>
-            Normalize(action.DisplayName) == normalized ||
-            Normalize(action.Id) == normalized);
-    }
-
-    private void ActionsChanged(object? sender, CadActionEventArgs e)
-    {
-        _feedback.Text = e.Action.DisplayName;
+        _feedback.Text = result.Kind switch
+        {
+            CadCommandResultKind.Repeated => CadLanguageManager.CurrentLanguage == "zh-CN"
+                ? "重复上一命令"
+                : "Repeated last command",
+            CadCommandResultKind.Canceled => CadLanguageManager.CurrentLanguage == "zh-CN"
+                ? "已取消"
+                : "Canceled",
+            _ => string.Empty
+        };
     }
 
     private void ActionFailed(object? sender, CadActionFailedEventArgs e)
     {
         _feedback.Text = string.Format(
-            CadLanguageManager.Text("Cad.Text.CommandFailed", "{0} failed"),
+            CadLanguageManager.Text(
+                "Cad.Text.CommandFailed",
+                CadLanguageManager.CurrentLanguage == "zh-CN" ? "{0} 执行失败" : "{0} failed"),
             e.Action.DisplayName);
     }
-
-    private static string Normalize(string value) =>
-        new(value
-            .Where(character => !char.IsWhiteSpace(character) && character is not '-' and not '_')
-            .Select(char.ToUpperInvariant)
-            .ToArray());
 }

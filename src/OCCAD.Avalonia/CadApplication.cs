@@ -49,11 +49,13 @@ public sealed class CadApplication : Application
             CadDiagnostics.Trace("Constructing MainWindow.");
 
             var window = new MainWindow();
-            // Complete all toolbar/status-bar composition before the window is
-            // presented. Runtime OnOpened re-parenting made ordering and style
-            // dependent on lifecycle timing.
+            // Complete shell composition before the window is presented.
+            // The ribbon is applied last so legacy menu/toolbar setup can keep
+            // serving as a migration compatibility layer without remaining
+            // visible in the final industrial CAD shell.
             window.ApplyUiRefinement();
             window.ApplyCompactUiEnhancements();
+            window.ApplyRibbonShell();
 
             CadDiagnostics.Trace("MainWindow constructed.");
 

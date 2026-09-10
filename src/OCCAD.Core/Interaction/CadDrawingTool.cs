@@ -13,15 +13,6 @@ public abstract class CadDrawingTool : CadTool
 
     protected override bool CanCommitCurrentStageCore => true;
 
-    protected new bool CancelOnRightClick(OcctPointerInputEventArgs input)
-    {
-        if (input.Kind != OcctPointerInputKind.Pressed ||
-            input.Button != OcctPointerButton.Right)
-            return false;
-
-        return Context.Workspace.Tools.HandleSecondaryAction();
-    }
-
     protected bool FinishOnDoubleClick(OcctPointerInputEventArgs input)
     {
         if (input.Kind != OcctPointerInputKind.DoubleClicked ||
@@ -131,11 +122,9 @@ public abstract class CadDrawingTool : CadTool
         var committed = entity.Duplicate();
         var engine = Context.Engine;
 
-        // Preview is transient and owned by the active tool.  Commit the
+        // Preview is transient and owned by the active tool. Commit the
         // persistent entity in the same display batch, then let the common
         // tool-deactivation path remove every transient interaction object.
-        // Do not change AutomaticHighlight here: changing global viewer state
-        // during a tool commit was one of the causes of post-command residue.
         using (engine.BeginDisplayBatch())
         {
             Context.Preview.Clear();

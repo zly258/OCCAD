@@ -38,7 +38,7 @@ public sealed partial class MainWindow
     private void InteractionPreferenceChanged(object? sender, EventArgs e) =>
         SaveInteractionPreferences();
 
-    private void PlanePreferenceChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+    private void PlanePreferenceChanged(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e) =>
         SaveInteractionPreferences();
 
     private void RefinementClosed(object? sender, EventArgs e)

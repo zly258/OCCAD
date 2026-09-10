@@ -59,11 +59,11 @@ public sealed class FilletTool : CadTwoCurveCornerToolBase
                     return true;
                 }
 
-                ClearReplacementPreview();
-                Context.Workspace.ReplaceEntities(
-                    [path],
-                    [replacement],
-                    "Fillet");
+                CommitReplacementPreview(
+                    () => Context.Workspace.ReplaceEntities(
+                        [path],
+                        [replacement],
+                        "Fillet"));
                 Context.Workspace.Tools.CompleteCurrent();
                 return true;
             }

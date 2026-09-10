@@ -106,9 +106,9 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
             _points.Count >= 3 ? "Cad.Prompt.Polyline.NextClose" :
                 _points.Count >= 2 ? "Cad.Prompt.Polyline.NextFinish" : "Cad.Prompt.Polyline.Next",
             _points.Count >= 3
-                ? "Polyline: specify next point or [Close] [Enter/right click finish, Esc cancel]"
+                ? "Polyline: specify next point or [Close] [Enter/Space/right click finish, Esc cancel]"
                 : _points.Count >= 2
-                    ? "Polyline: specify next point [Enter/right click finish, Esc cancel]"
+                    ? "Polyline: specify next point [Enter/Space/right click finish, Esc cancel]"
                     : "Polyline: specify next point [Esc cancel]",
             CadPrecisionInputKind.LengthAndAngle);
         UpdatePreview(point);
@@ -133,9 +133,9 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
             _points.Count >= 3 ? "Cad.Prompt.Polyline.NextClose" :
                 _points.Count >= 2 ? "Cad.Prompt.Polyline.NextFinish" : "Cad.Prompt.Polyline.Next",
             _points.Count >= 3
-                ? "Polyline: specify next point or [Close] [Enter/right click finish, Backspace undo, Esc cancel]"
+                ? "Polyline: specify next point or [Close] [Enter/Space/right click finish, Backspace undo, Esc cancel]"
                 : _points.Count >= 2
-                    ? "Polyline: specify next point [Enter/right click finish, Backspace undo, Esc cancel]"
+                    ? "Polyline: specify next point [Enter/Space/right click finish, Backspace undo, Esc cancel]"
                     : "Polyline: specify next point [Backspace undo, Esc cancel]",
             CadPrecisionInputKind.LengthAndAngle);
     }

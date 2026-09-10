@@ -101,7 +101,9 @@ public abstract class CadTool
             Prompt);
 
     public bool HasPreview =>
-        IsActive && Context.Preview.IsVisible;
+        IsActive &&
+        (Context.Preview.IsVisible ||
+         _replacementPreviewSources.Count > 0);
     public virtual bool CanCommitCurrentStage =>
         IsActive &&
         CanCommitCurrentStageCore &&
@@ -347,6 +349,26 @@ public abstract class CadTool
         RestoreReplacementPreviewSources();
     }
 
+    protected void CommitReplacementPreview(Action commit)
+    {
+        ArgumentNullException.ThrowIfNull(commit);
+
+        var sources = _replacementPreviewSources.ToArray();
+        _replacementPreviewSources.Clear();
+
+        try
+        {
+            // Remove transient geometry without restoring the source first.
+            // This prevents a one-frame source flash between preview and commit.
+            Context.Preview.Clear();
+            commit();
+        }
+        finally
+        {
+            RestoreReplacementPreviewSources(sources);
+        }
+    }
+
     private bool MatchesReplacementPreviewSources(
         IReadOnlyList<CadEntity> sources)
     {
@@ -406,8 +428,14 @@ public abstract class CadTool
         var values =
             _replacementPreviewSources.ToArray();
         _replacementPreviewSources.Clear();
+        RestoreReplacementPreviewSources(values);
+    }
 
-        if (Context.Workspace.Engine is not
+    private void RestoreReplacementPreviewSources(
+        IReadOnlyList<CadEntity> values)
+    {
+        if (values.Count == 0 ||
+            Context.Workspace.Engine is not
             { IsInitialized: true } engine)
             return;
 

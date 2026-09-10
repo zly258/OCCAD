@@ -1,3 +1,4 @@
+using System.Drawing;
 using OcctNet;
 
 namespace OCCAD;
@@ -6,6 +7,7 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
 {
     private CadEntity? _first;
     private OcctPoint3d _firstPick;
+    private bool _invalidSecondPrompt;
 
     public override CadToolInputKind InputKind =>
         CadToolInputKind.Selection;
@@ -29,7 +31,9 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
                 $"{Id}.curves",
                 IsSupportedEntity));
         Context.Selection.Clear();
+        Context.Workspace.Preselection.Clear();
         _first = null;
+        _invalidSecondPrompt = false;
         SetStageLocalized(
             0,
             $"Cad.Prompt.{Id}.First",
@@ -68,6 +72,9 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
         {
             _first = entity;
             _firstPick = hit;
+            _invalidSecondPrompt = false;
+            Context.Workspace.Preselection.Clear();
+            ShowFirstEntityPreview();
             SetStageLocalized(
                 1,
                 $"Cad.Prompt.{Id}.Second",
@@ -84,17 +91,19 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
                 out var replacements))
         {
             ClearReplacementPreview();
+            _invalidSecondPrompt = true;
             SetPromptLocalized(
                 $"Cad.Prompt.{Id}.Invalid",
                 $"{DisplayName}: selected curves and parameters do not define a valid corner.");
             return true;
         }
 
-        ClearReplacementPreview();
-        Context.Workspace.ReplaceEntities(
-            [_first, entity],
-            replacements,
-            DisplayName);
+        _invalidSecondPrompt = false;
+        CommitReplacementPreview(
+            () => Context.Workspace.ReplaceEntities(
+                [_first, entity],
+                replacements,
+                DisplayName));
         Context.Workspace.Tools.CompleteCurrent();
         return true;
     }
@@ -108,6 +117,8 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
             return false;
 
         _first = null;
+        _invalidSecondPrompt = false;
+        Context.Workspace.Preselection.Clear();
         ClearReplacementPreview();
         SetStageLocalized(
             0,
@@ -119,12 +130,19 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
     protected override void OnCanceled()
     {
         _first = null;
+        _invalidSecondPrompt = false;
+        Context.Workspace.Preselection.Clear();
     }
 
     protected void RefreshPreview()
     {
-        if (_first is null ||
-            Context.Workspace.Preselection.Current is not
+        if (_first is null)
+        {
+            ClearReplacementPreview();
+            return;
+        }
+
+        if (Context.Workspace.Preselection.Current is not
             {
                 Entity: var second,
                 Point: var hit
@@ -134,10 +152,36 @@ public abstract class CadTwoCurveCornerToolBase : CadTool
             !TryBuild(second, hit, out var replacements))
         {
             ClearReplacementPreview();
+            ShowFirstEntityPreview();
             return;
         }
 
+        if (_invalidSecondPrompt)
+        {
+            _invalidSecondPrompt = false;
+            SetPromptLocalized(
+                $"Cad.Prompt.{Id}.Second",
+                $"{DisplayName}: select second curve and keep side [Backspace undo, Esc cancel]");
+        }
+
         ShowReplacementPreview([_first, second], replacements);
+    }
+
+    private void ShowFirstEntityPreview()
+    {
+        if (_first is null)
+            return;
+
+        var preview = _first.Duplicate();
+        var appearance =
+            Context.Document.ResolveAppearance(_first);
+        preview.ColorByLayer = false;
+        preview.LineWidthByLayer = false;
+        preview.Color = Color.Gold;
+        preview.LineWidth =
+            Math.Max(2.0, appearance.LineWidth + 1.0);
+        preview.Transparency = 0.0;
+        Context.Preview.Show(preview);
     }
 
     protected virtual bool IsSupportedEntity(CadEntity entity) =>

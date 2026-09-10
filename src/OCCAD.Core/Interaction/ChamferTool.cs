@@ -63,11 +63,11 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
                 return true;
             }
 
-            ClearReplacementPreview();
-            Context.Workspace.ReplaceEntities(
-                [chain],
-                [replacement],
-                "Chamfer");
+            CommitReplacementPreview(
+                () => Context.Workspace.ReplaceEntities(
+                    [chain],
+                    [replacement],
+                    "Chamfer"));
             Context.Workspace.Tools.CompleteCurrent();
             return true;
         }

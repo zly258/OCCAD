@@ -116,11 +116,15 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
         }
 
         _invalidTargetPrompt = false;
-        ClearReplacementPreview();
-        Context.Workspace.ApplyGeneratedGeometryChange(
-            [target],
-            "Extend",
-            entity => entity.RestoreGeometrySnapshot(replacement));
+        CommitReplacementPreview(
+            () =>
+            {
+                Context.Workspace.ApplyGeneratedGeometryChange(
+                    [target],
+                    "Extend",
+                    entity => entity.RestoreGeometrySnapshot(replacement));
+                Context.Workspace.Preselection.Clear();
+            });
         SetPromptLocalized(
             "Cad.Prompt.extend.Target",
             "Extend: click near the endpoint to extend [Esc cancel]");

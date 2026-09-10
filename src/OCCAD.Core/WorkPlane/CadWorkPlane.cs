@@ -2,8 +2,17 @@ using OcctNet;
 
 namespace OCCAD;
 
-public enum CadWorkPlanePreset { XY, YZ, XZ, Custom }
-public readonly record struct CadPlanePoint(double X, double Y);
+public enum CadWorkPlanePreset
+{
+    XY,
+    YZ,
+    XZ,
+    Custom
+}
+
+public readonly record struct CadPlanePoint(
+    double X,
+    double Y);
 
 public readonly record struct CadPlaneFrame(
     OcctPoint3d Origin,
@@ -20,6 +29,7 @@ public sealed class CadWorkPlane
     private bool _userPlaneLocked;
     private bool _toolPlaneFixed;
     private bool _gripPlaneFixed;
+
     public CadWorkPlane()
     {
         _userPlane = CreatePresetFrame(
@@ -27,7 +37,9 @@ public sealed class CadWorkPlane
             OcctPoint3d.Origin);
     }
 
-    public bool IsActive => _toolPlane is not null || _gripPlane is not null;
+    public bool IsActive =>
+        _toolPlane is not null ||
+        _gripPlane is not null;
     public bool UserPlaneLocked => _userPlaneLocked;
     public bool ToolPlaneFixed => _toolPlaneFixed;
     public bool GripPlaneFixed => _gripPlaneFixed;
@@ -37,6 +49,10 @@ public sealed class CadWorkPlane
             : _toolPlane is not null
                 ? _toolPlaneFixed
                 : _userPlaneLocked;
+    public bool CanChangeEffectivePlane =>
+        !_userPlaneLocked &&
+        !_toolPlaneFixed &&
+        !_gripPlaneFixed;
 
     public bool IsPlaneLocked => EffectivePlaneFixed;
 
@@ -44,7 +60,9 @@ public sealed class CadWorkPlane
     public CadPlaneFrame? ToolPlane => _toolPlane;
     public CadPlaneFrame? GripPlane => _gripPlane;
     public CadPlaneFrame EffectivePlane =>
-        _gripPlane ?? _toolPlane ?? _userPlane;
+        _gripPlane ??
+        _toolPlane ??
+        _userPlane;
 
     // Preset describes the persistent user plane. A temporary Tool/Grip frame
     // may independently be Custom.
@@ -75,6 +93,9 @@ public sealed class CadWorkPlane
             _gripPlane is null)
             return;
 
+        // Lifecycle cleanup always wins over interaction locks. Fixed means
+        // immutable while active; it never means that a finished tool may keep
+        // a temporary plane alive.
         _gripPlane = null;
         _gripPlaneFixed = false;
         _toolPlane = null;
@@ -84,21 +105,29 @@ public sealed class CadWorkPlane
 
     public void SetUserPlaneLocked(bool value)
     {
-        if (_userPlaneLocked == value) return;
+        if (_userPlaneLocked == value)
+            return;
+
         _userPlaneLocked = value;
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public void SetToolPlaneFixed(bool value)
     {
-        if (_toolPlane is null || _toolPlaneFixed == value) return;
+        if (_toolPlane is null ||
+            _toolPlaneFixed == value)
+            return;
+
         _toolPlaneFixed = value;
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public void SetGripPlaneFixed(bool value)
     {
-        if (_gripPlane is null || _gripPlaneFixed == value) return;
+        if (_gripPlane is null ||
+            _gripPlaneFixed == value)
+            return;
+
         _gripPlaneFixed = value;
         Changed?.Invoke(this, EventArgs.Empty);
     }
@@ -107,11 +136,14 @@ public sealed class CadWorkPlane
         CadWorkPlanePreset preset,
         OcctPoint3d? origin = null)
     {
-        if (_userPlaneLocked) return;
+        if (!CanChangeEffectivePlane)
+            return;
         if (preset == CadWorkPlanePreset.Custom)
+        {
             throw new ArgumentException(
                 "Custom work planes require explicit axes.",
                 nameof(preset));
+        }
 
         var next = CreatePresetFrame(
             preset,
@@ -119,10 +151,12 @@ public sealed class CadWorkPlane
         var changed = _userPlane != next;
         _userPlane = next;
 
-        if (_toolPlane is not null && !_toolPlaneFixed)
+        if (_toolPlane is not null)
         {
             var toolOrigin = origin ?? _toolPlane.Value.Origin;
-            var nextToolPlane = CreatePresetFrame(preset, toolOrigin);
+            var nextToolPlane = CreatePresetFrame(
+                preset,
+                toolOrigin);
             if (_toolPlane != nextToolPlane)
             {
                 _toolPlane = nextToolPlane;
@@ -138,24 +172,36 @@ public sealed class CadWorkPlane
         OcctPoint3d origin,
         OcctVector3d xAxis,
         OcctVector3d yAxis) =>
-        SetUserCustomPlane(origin, xAxis, yAxis);
+        SetUserCustomPlane(
+            origin,
+            xAxis,
+            yAxis);
 
     public void SetUserCustomPlane(
         OcctPoint3d origin,
         OcctVector3d xAxis,
         OcctVector3d yAxis)
     {
-        if (_userPlaneLocked) return;
+        if (!CanChangeEffectivePlane)
+            return;
 
         var next = CreateFrame(
             origin,
             xAxis,
             yAxis,
             CadWorkPlanePreset.Custom);
-        if (_userPlane == next) return;
-
+        var changed = _userPlane != next;
         _userPlane = next;
-        Changed?.Invoke(this, EventArgs.Empty);
+
+        if (_toolPlane is not null &&
+            _toolPlane != next)
+        {
+            _toolPlane = next;
+            changed = true;
+        }
+
+        if (changed)
+            Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public void SetToolPlane(
@@ -164,16 +210,21 @@ public sealed class CadWorkPlane
         OcctVector3d yAxis)
     {
         if (_toolPlane is null)
+        {
             throw new InvalidOperationException(
                 "No Tool work plane is active.");
-        if (_toolPlaneFixed) return;
+        }
+        if (_toolPlaneFixed ||
+            _gripPlaneFixed)
+            return;
 
         var next = CreateFrame(
             origin,
             xAxis,
             yAxis,
             CadWorkPlanePreset.Custom);
-        if (_toolPlane == next) return;
+        if (_toolPlane == next)
+            return;
 
         _toolPlane = next;
         Changed?.Invoke(this, EventArgs.Empty);
@@ -186,8 +237,13 @@ public sealed class CadWorkPlane
         bool fixedPlane = false)
     {
         if (_toolPlane is null)
+        {
             throw new InvalidOperationException(
                 "A Grip plane requires an active Tool plane.");
+        }
+        if (_gripPlane is not null &&
+            _gripPlaneFixed)
+            return;
 
         var next = CreateFrame(
             origin,
@@ -205,7 +261,11 @@ public sealed class CadWorkPlane
 
     public void ClearGripPlane()
     {
-        if (_gripPlane is null && !_gripPlaneFixed) return;
+        if (_gripPlane is null &&
+            !_gripPlaneFixed)
+            return;
+
+        // Cleanup is allowed to clear a fixed temporary frame.
         _gripPlane = null;
         _gripPlaneFixed = false;
         Changed?.Invoke(this, EventArgs.Empty);
@@ -218,12 +278,16 @@ public sealed class CadWorkPlane
 
         if (_gripPlane is { } grip)
         {
-            if (grip.Origin == origin) return;
+            if (_gripPlaneFixed ||
+                grip.Origin == origin)
+                return;
             _gripPlane = WithOrigin(grip, origin);
         }
         else if (_toolPlane is { } tool)
         {
-            if (tool.Origin == origin) return;
+            if (_toolPlaneFixed ||
+                tool.Origin == origin)
+                return;
             _toolPlane = WithOrigin(tool, origin);
         }
         else
@@ -324,9 +388,11 @@ public sealed class CadWorkPlane
 
         var cross = x.Cross(yAxis);
         if (!cross.TryNormalize(out var normal))
+        {
             throw new ArgumentException(
                 "Work-plane axes must not be parallel.",
                 nameof(yAxis));
+        }
 
         var y = normal.Cross(x).Normalized();
         return new CadPlaneFrame(

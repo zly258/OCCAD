@@ -23,7 +23,9 @@ public sealed class CadEntityFilter
 {
     private readonly Func<CadEntity, bool> _predicate;
 
-    public CadEntityFilter(string id, Func<CadEntity, bool> predicate)
+    public CadEntityFilter(
+        string id,
+        Func<CadEntity, bool> predicate)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentNullException.ThrowIfNull(predicate);
@@ -53,9 +55,13 @@ public sealed class CadSelectionChangedEventArgs(
 public sealed class CadSelectionManager
 {
     private readonly CadDocument _document;
+    private readonly CadSelectionPresenter _presenter = new();
     private readonly List<CadEntity> _selected = [];
-    private OcctEngine? _engine;
     private CadEntity? _primary;
+    private int _pixelTolerance = 5;
+    private CadEntityFilterKind _filterKind = CadEntityFilterKind.All;
+    private CadSelectionScope _scope;
+    private CadSubshapeMask _subshapeMask = CadSubshapeMask.All;
 
     public CadSelectionManager(CadDocument document)
     {
@@ -63,15 +69,15 @@ public sealed class CadSelectionManager
         _document.Changed += DocumentChanged;
     }
 
-    private int _pixelTolerance = 5;
     public int PixelTolerance
     {
         get => _pixelTolerance;
         set
         {
-            if (value is < 0 or > 100) throw new ArgumentOutOfRangeException(nameof(value));
+            if (value is < 0 or > 100)
+                throw new ArgumentOutOfRangeException(nameof(value));
             _pixelTolerance = value;
-            if (_engine is { IsInitialized: true } engine) engine.SetSelectionTolerance(value);
+            _presenter.SetPixelTolerance(value);
         }
     }
 
@@ -86,23 +92,22 @@ public sealed class CadSelectionManager
             ? null
             : CadSelectionReference.Entity(_primary);
     public CadEntityFilter? Filter { get; private set; }
-    private CadEntityFilterKind _filterKind = CadEntityFilterKind.All;
 
     public CadEntityFilterKind FilterKind
     {
         get => _filterKind;
         set
         {
-            if (!Enum.IsDefined(value)) throw new ArgumentOutOfRangeException(nameof(value));
-            if (_filterKind == value) return;
+            if (!Enum.IsDefined(value))
+                throw new ArgumentOutOfRangeException(nameof(value));
+            if (_filterKind == value)
+                return;
+
             _filterKind = value;
             RefreshValidity();
             FilterChanged?.Invoke(this, EventArgs.Empty);
         }
     }
-
-    private CadSelectionScope _scope;
-    private CadSubshapeMask _subshapeMask = CadSubshapeMask.All;
 
     public CadSelectionScope Scope
     {
@@ -116,64 +121,55 @@ public sealed class CadSelectionManager
         set => SetScope(_scope, value);
     }
 
-    public void SetScope(CadSelectionScope scope, CadSubshapeMask mask)
+    public event EventHandler<CadSelectionChangedEventArgs>? Changed;
+    public event EventHandler? Cleared;
+    public event EventHandler? FilterChanged;
+
+    public void SetScope(
+        CadSelectionScope scope,
+        CadSubshapeMask mask)
     {
-        if (!Enum.IsDefined(scope)) throw new ArgumentOutOfRangeException(nameof(scope));
-        if ((mask & ~CadSubshapeMask.All) != 0) throw new ArgumentOutOfRangeException(nameof(mask));
-        if (_scope == scope && _subshapeMask == mask) return;
+        if (!Enum.IsDefined(scope))
+            throw new ArgumentOutOfRangeException(nameof(scope));
+        if ((mask & ~CadSubshapeMask.All) != 0)
+            throw new ArgumentOutOfRangeException(nameof(mask));
+        if (_scope == scope && _subshapeMask == mask)
+            return;
+
         _scope = scope;
         _subshapeMask = mask;
         RefreshValidity();
-        SynchronizeSelectionModes();
+        _presenter.SynchronizeModes(
+            _document.Entities,
+            _scope,
+            _subshapeMask);
         FilterChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public bool CanSelectSubshape(CadEntity entity, OcctShapeType type) =>
+    public bool CanSelectSubshape(
+        CadEntity entity,
+        OcctShapeType type) =>
         Scope == CadSelectionScope.Subobject &&
-        CanSelectOwner(entity) && SubshapeMask.Allows(type);
+        CanSelectOwner(entity) &&
+        SubshapeMask.Allows(type);
 
     internal bool CanSelectOwner(CadEntity entity) =>
         _document.Entities.Contains(entity) &&
         _document.IsEntitySelectable(entity) &&
         (Filter is null || Filter.Allows(entity));
 
-    private void SynchronizeSelectionModes()
-    {
-        if (_engine is not { IsInitialized: true } engine) return;
-        engine.SetSelectionMode(OcctSelectionMode.Object);
-        if (Scope == CadSelectionScope.Entity) return;
-        foreach (var entity in _document.Entities)
-            SynchronizeSubshapeModes(entity);
-    }
-
-    private void SynchronizeSubshapeModes(CadEntity entity)
-    {
-        if (_engine is not { IsInitialized: true } engine ||
-            Scope != CadSelectionScope.Subobject || entity.ViewerObject is not { } shape) return;
-        engine.SetSelectionModeActive(shape, OcctSelectionMode.Object, false,
-            OcctSelectionModeConcurrency.Multiple, false);
-        foreach (var mode in Enum.GetValues<OcctSelectionMode>())
-        {
-            if (mode == OcctSelectionMode.Object) continue;
-            var type = Enum.Parse<OcctShapeType>(mode.ToString());
-            engine.SetSelectionModeActive(shape, mode, SubshapeMask.Allows(type),
-                OcctSelectionModeConcurrency.Multiple, false);
-        }
-    }
-
-    public event EventHandler<CadSelectionChangedEventArgs>? Changed;
-    public event EventHandler? Cleared;
-    public event EventHandler? FilterChanged;
-
     public bool CanSelect(CadEntity entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
-        return _document.Entities.Contains(entity) && IsSelectable(entity);
+        return _document.Entities.Contains(entity) &&
+               IsSelectable(entity);
     }
 
     public void SetFilter(CadEntityFilter? filter)
     {
-        if (ReferenceEquals(Filter, filter)) return;
+        if (ReferenceEquals(Filter, filter))
+            return;
+
         Filter = filter;
         RefreshValidity();
         FilterChanged?.Invoke(this, EventArgs.Empty);
@@ -184,13 +180,14 @@ public sealed class CadSelectionManager
     public void AttachEngine(OcctEngine engine)
     {
         ArgumentNullException.ThrowIfNull(engine);
-        if (!engine.IsInitialized)
-            throw new InvalidOperationException("The OCCT engine is not initialized.");
-
-        _engine = engine;
-        engine.SetSelectionTolerance(PixelTolerance);
-        SynchronizeSelectionModes();
-        SyncEngineSelection();
+        _presenter.AttachEngine(
+            engine,
+            PixelTolerance,
+            _scope,
+            _subshapeMask,
+            _document.Entities,
+            _selected,
+            _primary);
     }
 
     public void UpdateFromViewer(
@@ -198,7 +195,8 @@ public sealed class CadSelectionManager
         IOcctObject? primaryObject = null)
     {
         ArgumentNullException.ThrowIfNull(selectedObjects);
-        if (Scope != CadSelectionScope.Entity) return;
+        if (Scope != CadSelectionScope.Entity)
+            return;
 
         var entities = selectedObjects
             .Select(_document.FindByViewerObject)
@@ -215,7 +213,10 @@ public sealed class CadSelectionManager
                 : entities.FirstOrDefault();
         }
 
-        SetSelection(entities, primary, syncEngine: false);
+        SetSelection(
+            entities,
+            primary,
+            syncEngine: false);
     }
 
     public void Select(
@@ -226,7 +227,9 @@ public sealed class CadSelectionManager
         Apply([entity], operation, entity);
     }
 
-    public void Select(CadEntity entity, bool append) =>
+    public void Select(
+        CadEntity entity,
+        bool append) =>
         Select(
             entity,
             append
@@ -241,8 +244,8 @@ public sealed class CadSelectionManager
         ArgumentNullException.ThrowIfNull(entities);
         if (!Enum.IsDefined(operation))
             throw new ArgumentOutOfRangeException(nameof(operation));
-
-        if (Scope != CadSelectionScope.Entity) return;
+        if (Scope != CadSelectionScope.Entity)
+            return;
 
         var requested = entities
             .Distinct()
@@ -285,25 +288,26 @@ public sealed class CadSelectionManager
             target,
             primary);
 
-        SetSelection(target, nextPrimary, syncEngine: true);
+        SetSelection(
+            target,
+            nextPrimary,
+            syncEngine: true);
     }
 
     public void Clear()
     {
-        var hadSelection = _selected.Count > 0 || _primary is not null;
-        if (hadSelection)
-        {
-            SetSelection([], null, syncEngine: true);
-        }
-        else if (_engine is { IsInitialized: true } engine)
-        {
-            engine.ClearSelection();
-        }
+        var hadSelection =
+            _selected.Count > 0 ||
+            _primary is not null;
 
-        // This event represents the user's/API caller's explicit clear intent,
-        // not merely a transition to an empty entity set. Subobject selection is
-        // allowed to exist without entity selection, but an explicit Clear means
-        // clear the complete formal selection state.
+        if (hadSelection)
+            SetSelection([], null, syncEngine: true);
+        else
+            _presenter.ClearSelection();
+
+        // This event represents explicit clear intent, not merely a transition
+        // to an empty entity set. Subobject selection may exist without entity
+        // selection, but explicit Clear means clear all formal selection state.
         Cleared?.Invoke(this, EventArgs.Empty);
     }
 
@@ -313,35 +317,62 @@ public sealed class CadSelectionManager
             .Where(IsSelectable)
             .ToArray();
 
-        if (valid.Length == _selected.Count) return;
+        if (valid.Length == _selected.Count)
+            return;
 
-        var primary = _primary is not null && valid.Contains(_primary)
-            ? _primary
-            : valid.FirstOrDefault();
+        var primary =
+            _primary is not null && valid.Contains(_primary)
+                ? _primary
+                : valid.FirstOrDefault();
 
-        SetSelection(valid, primary, syncEngine: true);
+        SetSelection(
+            valid,
+            primary,
+            syncEngine: true);
     }
 
     private List<CadEntity> Add(IReadOnlyList<CadEntity> values)
     {
         var result = new List<CadEntity>(_selected);
         foreach (var entity in values)
+        {
             if (!result.Contains(entity))
                 result.Add(entity);
+        }
         return result;
     }
 
     private bool IsSelectable(CadEntity entity)
     {
-        if (Scope != CadSelectionScope.Entity || !CanSelectOwner(entity))
+        if (Scope != CadSelectionScope.Entity ||
+            !CanSelectOwner(entity))
             return false;
 
         return _filterKind switch
         {
-            CadEntityFilterKind.Point => entity is CadPointEntity,
-            CadEntityFilterKind.Curve => entity is CadLineEntity or CadPolylineEntity or CadArcEntity or CadCircleEntity or CadEllipseEntity or CadSplineEntity or CadPathEntity,
-            CadEntityFilterKind.Region => entity is CadRegionEntity or CadPolygonEntity or CadRectangleEntity,
-            CadEntityFilterKind.Solid => entity is CadBoxEntity or CadCylinderEntity or CadConeEntity or CadSphereEntity or CadTorusEntity or CadFeatureEntity or CadBooleanEntity or CadImportedShapeEntity,
+            CadEntityFilterKind.Point =>
+                entity is CadPointEntity,
+            CadEntityFilterKind.Curve =>
+                entity is CadLineEntity or
+                    CadPolylineEntity or
+                    CadArcEntity or
+                    CadCircleEntity or
+                    CadEllipseEntity or
+                    CadSplineEntity or
+                    CadPathEntity,
+            CadEntityFilterKind.Region =>
+                entity is CadRegionEntity or
+                    CadPolygonEntity or
+                    CadRectangleEntity,
+            CadEntityFilterKind.Solid =>
+                entity is CadBoxEntity or
+                    CadCylinderEntity or
+                    CadConeEntity or
+                    CadSphereEntity or
+                    CadTorusEntity or
+                    CadFeatureEntity or
+                    CadBooleanEntity or
+                    CadImportedShapeEntity,
             _ => true
         };
     }
@@ -372,10 +403,12 @@ public sealed class CadSelectionManager
         IReadOnlyList<CadEntity> target,
         CadEntity? requestedPrimary)
     {
-        if (requestedPrimary is not null && target.Contains(requestedPrimary))
+        if (requestedPrimary is not null &&
+            target.Contains(requestedPrimary))
             return requestedPrimary;
 
-        if (target.Count == 0) return null;
+        if (target.Count == 0)
+            return null;
 
         if (operation == CadSelectionOperation.Remove &&
             _primary is not null &&
@@ -389,22 +422,34 @@ public sealed class CadSelectionManager
         if (operation == CadSelectionOperation.Toggle)
         {
             for (var index = values.Count - 1; index >= 0; index--)
+            {
                 if (target.Contains(values[index]))
                     return values[index];
+            }
         }
 
-        if (_primary is not null && target.Contains(_primary))
+        if (_primary is not null &&
+            target.Contains(_primary))
             return _primary;
 
         return target[^1];
     }
 
-    private void DocumentChanged(object? sender, CadDocumentChangedEventArgs args)
+    private void DocumentChanged(
+        object? sender,
+        CadDocumentChangedEventArgs args)
     {
         if (args.Entity is { } entity &&
             (args.Kind == CadDocumentChangeKind.Added ||
-             args.Kind == CadDocumentChangeKind.Changed && args.EntityChangeKind == CadEntityChangeKind.Geometry))
-            SynchronizeSubshapeModes(entity);
+             args.Kind == CadDocumentChangeKind.Changed &&
+             args.EntityChangeKind == CadEntityChangeKind.Geometry))
+        {
+            _presenter.SynchronizeSubshapeModes(
+                entity,
+                _scope,
+                _subshapeMask);
+        }
+
         if (args.Kind == CadDocumentChangeKind.Reset)
         {
             SetSelection([], null, syncEngine: false);
@@ -417,13 +462,30 @@ public sealed class CadSelectionManager
             _selected.Contains(removed))
         {
             var remaining = _selected
-                .Where(entity => !ReferenceEquals(entity, removed))
+                .Where(entity =>
+                    !ReferenceEquals(entity, removed))
                 .ToArray();
-            var primary =
-                ReferenceEquals(_primary, removed)
-                    ? remaining.FirstOrDefault()
-                    : _primary;
-            SetSelection(remaining, primary, syncEngine: false);
+            var primary = ReferenceEquals(_primary, removed)
+                ? remaining.FirstOrDefault()
+                : _primary;
+
+            SetSelection(
+                remaining,
+                primary,
+                syncEngine: false);
+            return;
+        }
+
+        if (args.Kind == CadDocumentChangeKind.LayerChanged ||
+            args.Kind == CadDocumentChangeKind.Changed &&
+            args.EntityChangeKind is
+                CadEntityChangeKind.Appearance or
+                CadEntityChangeKind.Metadata)
+        {
+            // Visibility, lock state, selectable state, and layer reassignment
+            // all change selection eligibility. Selection must follow the same
+            // canonical document appearance rules as hit testing/preselection.
+            RefreshValidity();
         }
     }
 
@@ -441,7 +503,12 @@ public sealed class CadSelectionManager
             _selected.SequenceEqual(entities) &&
             ReferenceEquals(_primary, normalizedPrimary))
         {
-            if (syncEngine) SyncEngineSelection();
+            if (syncEngine)
+            {
+                _presenter.SynchronizeSelection(
+                    _selected,
+                    _primary);
+            }
             return;
         }
 
@@ -450,32 +517,16 @@ public sealed class CadSelectionManager
         _primary = normalizedPrimary;
 
         if (syncEngine)
-            SyncEngineSelection();
+        {
+            _presenter.SynchronizeSelection(
+                _selected,
+                _primary);
+        }
 
         Changed?.Invoke(
             this,
             new CadSelectionChangedEventArgs(
                 _selected.ToArray(),
                 _primary));
-    }
-
-    private void SyncEngineSelection()
-    {
-        if (_engine is not { IsInitialized: true } engine)
-            return;
-
-        IReadOnlyList<CadEntity> ordered = _primary is null
-            ? _selected
-            : [_primary, .. _selected.Where(entity => !ReferenceEquals(entity, _primary))];
-
-        var objects = ordered
-            .Select(entity => entity.ViewerObject)
-            .OfType<IOcctObject>()
-            .ToArray();
-
-        if (objects.Length == 0)
-            engine.ClearSelection();
-        else
-            engine.SetSelection(objects);
     }
 }

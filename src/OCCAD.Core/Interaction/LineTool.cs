@@ -13,6 +13,16 @@ public sealed class LineTool : CadDrawingTool, ICadPointInputTool
     protected override bool CanStepBackCore =>
         _start is not null;
 
+    public override bool CanCommitCurrentStage =>
+        _start is { } start &&
+        IsActive &&
+        CadExactInputGeometry.TryResolveLengthAnglePoint(
+            Context.Workspace,
+            start,
+            out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnActivated()
     {
         _start = null;
@@ -34,13 +44,39 @@ public sealed class LineTool : CadDrawingTool, ICadPointInputTool
         return AcceptPoint(Context.ResolvePoint(input.X, input.Y, _start).Point);
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(pointer, _start, AcceptPoint);
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (_start is { } start &&
+            CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                start,
+                out var exactPoint))
+        {
+            return AcceptPoint(exactPoint);
+        }
+
+        return CommitResolvedPoint(pointer, _start, AcceptPoint);
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive &&
         State == CadToolState.Drawing &&
         AcceptPoint(point);
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (_start is { } start &&
+            CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                start,
+                out var exactPoint))
+        {
+            UpdatePreview(start, exactPoint);
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
+    }
 
     protected override bool OnStepBack()
     {

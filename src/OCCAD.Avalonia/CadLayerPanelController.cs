@@ -250,11 +250,7 @@ internal sealed class CadLayerPanelController : IDisposable
             Foreground = CadTheme.Text,
             FontWeight = current ? FontWeight.SemiBold : FontWeight.Normal
         };
-        name.Click += (_, _) =>
-        {
-            _workspace.SetCurrentLayer(layer);
-            _inspectLayer(layer);
-        };
+        name.Click += (_, _) => _inspectLayer(layer);
         Grid.SetColumn(name, 1);
         grid.Children.Add(name);
 

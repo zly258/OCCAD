@@ -81,9 +81,17 @@ public sealed partial class MainWindow
             if (wpLabel is not null)
                 toolbar.Children.Remove(wpLabel);
 
+            var planeEndIndex = toolbar.Children.IndexOf(_planeXz);
+            var trailingSeparator =
+                planeEndIndex >= 0 && planeEndIndex + 1 < toolbar.Children.Count
+                    ? toolbar.Children[planeEndIndex + 1]
+                    : null;
+
             toolbar.Children.Remove(_planeXy);
             toolbar.Children.Remove(_planeYz);
             toolbar.Children.Remove(_planeXz);
+            if (IsToolbarSeparator(trailingSeparator))
+                toolbar.Children.Remove(trailingSeparator!);
         }
 
         if (_workPlaneStatus.Parent is not DockPanel statusPanel)
@@ -122,6 +130,12 @@ public sealed partial class MainWindow
         DockPanel.SetDock(planePanel, Dock.Right);
         statusPanel.Children.Insert(index, planePanel);
     }
+
+    private static bool IsToolbarSeparator(Control? control) =>
+        control is Border
+        {
+            Width: 1
+        };
 
     private static void ConfigureStatusPlaneButton(ToggleButton button)
     {

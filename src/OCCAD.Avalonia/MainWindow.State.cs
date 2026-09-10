@@ -16,7 +16,7 @@ public sealed partial class MainWindow
             _workspace,
             _modelSearch,
             _modelTree,
-            message => _toolStatus.Text = message);
+            message => _commandLine.ShowFeedback(message));
 
     private bool ChineseUi => string.Equals(
         CadLanguageManager.CurrentLanguage,
@@ -207,7 +207,6 @@ public sealed partial class MainWindow
         _workspace.Tracking.Clear();
         _toolPanel.SetTool(_workspace.Tools.ActiveTool);
         RefreshInteractionUi();
-        _viewportInteraction.RefreshCurrentDrawingPointer();
     }
 
     private void DraftingChanged()

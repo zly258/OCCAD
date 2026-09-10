@@ -42,12 +42,26 @@ public sealed partial class MainWindow
 
     private void MoveDraftingTogglesToStatusBar(DockPanel statusPanel)
     {
+        Control? leadingSeparator = null;
+        if (_snapToggle.Parent is StackPanel toolbar)
+        {
+            var snapIndex = toolbar.Children.IndexOf(_snapToggle);
+            if (snapIndex > 0)
+                leadingSeparator = toolbar.Children[snapIndex - 1];
+        }
+
         if (_snapToggle.Parent is Panel snapParent)
             snapParent.Children.Remove(_snapToggle);
         if (_orthoToggle.Parent is Panel orthoParent)
             orthoParent.Children.Remove(_orthoToggle);
         if (_polarToggle.Parent is Panel polarParent)
             polarParent.Children.Remove(_polarToggle);
+
+        if (leadingSeparator?.Parent is Panel separatorParent &&
+            IsToolbarSeparator(leadingSeparator))
+        {
+            separatorParent.Children.Remove(leadingSeparator);
+        }
 
         ConfigureStatusDraftingToggle(_snapToggle);
         ConfigureStatusDraftingToggle(_orthoToggle);
@@ -83,7 +97,7 @@ public sealed partial class MainWindow
     private static void ConfigureStatusDraftingToggle(
         global::Avalonia.Controls.Primitives.ToggleButton button)
     {
-        button.MinWidth = 42;
+        button.MinWidth = 58;
         button.Height = 19;
         button.Padding = new Thickness(5, 0);
         button.Margin = new Thickness(0);

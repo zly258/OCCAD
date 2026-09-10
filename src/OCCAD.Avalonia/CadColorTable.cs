@@ -76,24 +76,21 @@ internal sealed class CadColorTable : UserControl
                 CadLanguageManager.Text(
                     "Cad.Text.StandardColors",
                     "Standard Colors")));
-        root.Children.Add(
-            BuildStandardRow());
+        root.Children.Add(BuildStandardRow());
 
         root.Children.Add(
             SectionLabel(
                 CadLanguageManager.Text(
                     "Cad.Text.IndexColors",
                     "Index Colors")));
-        root.Children.Add(
-            BuildIndexedGrid());
+        root.Children.Add(BuildIndexedGrid());
 
         root.Children.Add(
             SectionLabel(
                 CadLanguageManager.Text(
                     "Cad.Text.GrayColors",
                     "Gray Scale")));
-        root.Children.Add(
-            BuildGrayRow());
+        root.Children.Add(BuildGrayRow());
 
         return root;
     }
@@ -110,10 +107,7 @@ internal sealed class CadColorTable : UserControl
              index < StandardColors.Count;
              index++)
         {
-            var button =
-                CreateColorButton(
-                    StandardColors[index],
-                    28);
+            var button = CreateColorButton(StandardColors[index], 28);
             Grid.SetColumn(button, index);
             grid.Children.Add(button);
         }
@@ -137,10 +131,7 @@ internal sealed class CadColorTable : UserControl
             var column = offset / 10;
             var row = offset % 10;
 
-            var button =
-                CreateColorButton(
-                    entry,
-                    20);
+            var button = CreateColorButton(entry, 20);
             Grid.SetColumn(button, column);
             Grid.SetRow(button, row);
             grid.Children.Add(button);
@@ -168,10 +159,7 @@ internal sealed class CadColorTable : UserControl
              index < GrayColors.Count;
              index++)
         {
-            var button =
-                CreateColorButton(
-                    GrayColors[index],
-                    28);
+            var button = CreateColorButton(GrayColors[index], 28);
             Grid.SetColumn(button, index);
             grid.Children.Add(button);
         }
@@ -191,22 +179,16 @@ internal sealed class CadColorTable : UserControl
             RowSpacing = spacing
         };
 
-        for (var column = 0;
-             column < columns;
-             column++)
+        for (var column = 0; column < columns; column++)
         {
             grid.ColumnDefinitions.Add(
-                new ColumnDefinition(
-                    new GridLength(cell)));
+                new ColumnDefinition(new GridLength(cell)));
         }
 
-        for (var row = 0;
-             row < rows;
-             row++)
+        for (var row = 0; row < rows; row++)
         {
             grid.RowDefinitions.Add(
-                new RowDefinition(
-                    new GridLength(cell)));
+                new RowDefinition(new GridLength(cell)));
         }
 
         return grid;
@@ -225,15 +207,11 @@ internal sealed class CadColorTable : UserControl
             MinHeight = size,
             Padding = new Thickness(0),
             Margin = new Thickness(0),
-            Background =
-                new SolidColorBrush(
-                    ToMediaColor(entry.Color)),
+            Background = new SolidColorBrush(ToMediaColor(entry.Color)),
             BorderBrush = CadTheme.BorderStrong,
             BorderThickness = new Thickness(1),
-            HorizontalAlignment =
-                HorizontalAlignment.Center,
-            VerticalAlignment =
-                VerticalAlignment.Center
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
         };
 
         ToolTip.SetTip(
@@ -248,16 +226,11 @@ internal sealed class CadColorTable : UserControl
         object? sender,
         global::Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (sender is not Button
-            {
-                Tag: AciColor entry
-            })
+        if (sender is not Button { Tag: AciColor entry })
             return;
 
         SelectedColor = entry.Color;
-        ColorChanged?.Invoke(
-            this,
-            EventArgs.Empty);
+        ColorChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void RefreshSelection()
@@ -266,60 +239,52 @@ internal sealed class CadColorTable : UserControl
         {
             var selected =
                 button.Tag is AciColor entry &&
-                entry.Color.ToArgb() ==
-                _selectedColor.ToArgb();
+                entry.Color.ToArgb() == _selectedColor.ToArgb();
 
-            button.BorderBrush =
-                selected
-                    ? CadTheme.Accent
-                    : CadTheme.BorderStrong;
-            button.BorderThickness =
-                selected
-                    ? new Thickness(3)
-                    : new Thickness(1);
+            button.BorderBrush = selected
+                ? CadTheme.Accent
+                : CadTheme.BorderStrong;
+            button.BorderThickness = selected
+                ? new Thickness(3)
+                : new Thickness(1);
         }
     }
 
-    private static Control SectionLabel(
-        string text) =>
+    private static Control SectionLabel(string text) =>
         new Border
         {
             MinHeight = 24,
             Background = CadTheme.Header,
             BorderBrush = CadTheme.Border,
-            BorderThickness =
-                new Thickness(0, 0, 0, 1),
+            BorderThickness = new Thickness(0, 0, 0, 1),
             Padding = new Thickness(6, 0),
             Child = new TextBlock
             {
                 Text = text,
                 FontWeight = FontWeight.SemiBold,
-                VerticalAlignment =
-                    VerticalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
                 Foreground = CadTheme.Text
             }
         };
 
-    private static IReadOnlyList<AciColor>
-        BuildIndexedColors()
+    private static IReadOnlyList<AciColor> BuildIndexedColors()
     {
         var values = new List<AciColor>(240);
+
+        // AutoCAD ACI 10-249 is organized as 24 hue groups with 10 shades.
+        // The value levels correspond to the canonical 255/204/153/127/76
+        // channel steps; odd indices use the half-saturation tint.
         var valueLevels =
-            new[] { 1.0, 1.0, 0.65, 0.65, 0.5, 0.5, 0.30, 0.30, 0.15, 0.15 };
+            new[] { 1.0, 1.0, 0.8, 0.8, 0.6, 0.6, 0.5, 0.5, 0.3, 0.3 };
         var saturationLevels =
             new[] { 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5 };
 
-        for (var hueIndex = 0;
-             hueIndex < 24;
-             hueIndex++)
+        for (var hueIndex = 0; hueIndex < 24; hueIndex++)
         {
             var hue = hueIndex * 15.0;
-            for (var shade = 0;
-                 shade < 10;
-                 shade++)
+            for (var shade = 0; shade < 10; shade++)
             {
-                var index =
-                    10 + hueIndex * 10 + shade;
+                var index = 10 + hueIndex * 10 + shade;
                 values.Add(
                     new AciColor(
                         index,
@@ -342,27 +307,17 @@ internal sealed class CadColorTable : UserControl
         var sector = hue / 60.0;
         var x =
             chroma *
-            (1.0 -
-             Math.Abs(
-                 sector % 2.0 -
-                 1.0));
+            (1.0 - Math.Abs(sector % 2.0 - 1.0));
 
-        var (r1, g1, b1) =
-            sector switch
-            {
-                >= 0 and < 1 =>
-                    (chroma, x, 0.0),
-                >= 1 and < 2 =>
-                    (x, chroma, 0.0),
-                >= 2 and < 3 =>
-                    (0.0, chroma, x),
-                >= 3 and < 4 =>
-                    (0.0, x, chroma),
-                >= 4 and < 5 =>
-                    (x, 0.0, chroma),
-                _ =>
-                    (chroma, 0.0, x)
-            };
+        var (r1, g1, b1) = sector switch
+        {
+            >= 0 and < 1 => (chroma, x, 0.0),
+            >= 1 and < 2 => (x, chroma, 0.0),
+            >= 2 and < 3 => (0.0, chroma, x),
+            >= 3 and < 4 => (0.0, x, chroma),
+            >= 4 and < 5 => (x, 0.0, chroma),
+            _ => (chroma, 0.0, x)
+        };
 
         var m = value - chroma;
         return DrawingColor.FromArgb(
@@ -378,8 +333,7 @@ internal sealed class CadColorTable : UserControl
             0,
             255);
 
-    private static MediaColor ToMediaColor(
-        DrawingColor value) =>
+    private static MediaColor ToMediaColor(DrawingColor value) =>
         MediaColor.FromArgb(
             value.A,
             value.R,

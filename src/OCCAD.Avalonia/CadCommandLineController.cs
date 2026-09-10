@@ -46,6 +46,16 @@ internal sealed class CadCommandLineController : IDisposable
         _input.SelectAll();
     }
 
+    public void ShowFeedback(string? message)
+    {
+        _feedback.Text = message?.Trim() ?? string.Empty;
+        ToolTip.SetTip(
+            _feedback,
+            string.IsNullOrWhiteSpace(_feedback.Text)
+                ? null
+                : _feedback.Text);
+    }
+
     public void RefreshLanguage()
     {
         _label.Text = CadLanguageManager.Text(
@@ -248,9 +258,9 @@ internal sealed class CadCommandLineController : IDisposable
             .ToArray();
         if (matches.Length == 0)
         {
-            _feedback.Text = CadLanguageManager.Text(
+            ShowFeedback(CadLanguageManager.Text(
                 "Cad.Text.NoMatchingCommand",
-                "No matching command");
+                "No matching command"));
             return;
         }
 
@@ -258,7 +268,7 @@ internal sealed class CadCommandLineController : IDisposable
         {
             _input.Text = matches[0];
             _input.CaretIndex = matches[0].Length;
-            _feedback.Text = string.Empty;
+            ShowFeedback(null);
             return;
         }
 
@@ -269,7 +279,7 @@ internal sealed class CadCommandLineController : IDisposable
             _input.CaretIndex = common.Length;
         }
 
-        _feedback.Text = string.Join("  ", matches.Take(6));
+        ShowFeedback(string.Join("  ", matches.Take(6)));
     }
 
     private void ResetHistoryNavigation()
@@ -306,20 +316,20 @@ internal sealed class CadCommandLineController : IDisposable
         var message = CadLanguageManager.CommandMessage(result);
         if (!string.IsNullOrWhiteSpace(message))
         {
-            _feedback.Text = message;
+            ShowFeedback(message);
             return;
         }
 
         if (!string.IsNullOrWhiteSpace(result.ActionId) &&
             _workspace.Actions.Find(result.ActionId) is { } action)
         {
-            _feedback.Text = CadLanguageManager.Text(
+            ShowFeedback(CadLanguageManager.Text(
                 $"Cad.Action.{action.Id}",
-                action.DisplayName);
+                action.DisplayName));
             return;
         }
 
-        _feedback.Text = result.Kind switch
+        ShowFeedback(result.Kind switch
         {
             CadCommandResultKind.Repeated => CadLanguageManager.Text(
                 "Cad.Text.CommandRepeated",
@@ -328,17 +338,17 @@ internal sealed class CadCommandLineController : IDisposable
                 "Cad.Text.CommandCanceled",
                 "Canceled"),
             _ => string.Empty
-        };
+        });
     }
 
     private void ActionFailed(object? sender, CadActionFailedEventArgs e)
     {
-        _feedback.Text = string.Format(
+        ShowFeedback(string.Format(
             CadLanguageManager.Text(
                 "Cad.Text.CommandFailed",
                 "{0} failed"),
             CadLanguageManager.Text(
                 $"Cad.Action.{e.Action.Id}",
-                e.Action.DisplayName));
+                e.Action.DisplayName)));
     }
 }

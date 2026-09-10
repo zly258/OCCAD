@@ -86,10 +86,11 @@ public sealed class InteractionTests
     [DataRow("arc")]
     [DataRow("polyline")]
     [DataRow("move")]
-    [DataRow("trim")]
-    [DataRow("extend")]
-    [DataRow("fillet")]
-    [DataRow("chamfer")]
+    [DataRow("copy")]
+    [DataRow("rotate")]
+    [DataRow("scale")]
+    [DataRow("mirror")]
+    [DataRow("array")]
     public void ActivateCancelRestoresNeutralStateAndSelectionScope(string id)
     {
         using var w = new CadWorkspace();

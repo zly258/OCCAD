@@ -152,18 +152,63 @@ public sealed partial class MainWindow
 
     private void ClearCadCommandAndSelection()
     {
-        if (_workspace.Tools.ActiveTool is not null)
-            _workspace.Tools.CancelCurrent();
+        List<Exception> failures = [];
 
-        _workspace.Selection.Clear();
-        _workspace.Subobjects.Clear();
-        _workspace.Preselection.Clear();
-        _workspace.Snap.Clear();
-        _workspace.Tracking.Clear();
-        ShowStatusFeedback(null);
+        if (_workspace.Tools.ActiveTool is not null)
+            Cleanup(() => _workspace.Tools.CancelCurrent());
+
+        // Escape is the application-level reset gesture. One native cleanup
+        // failure must not prevent the remaining interaction channels from being
+        // cleared, otherwise selection/snap/tracking state can survive a canceled
+        // command and make the next Tool appear corrupted.
+        Cleanup(_workspace.Selection.Clear);
+        Cleanup(_workspace.Subobjects.Clear);
+        Cleanup(_workspace.Preselection.Clear);
+        Cleanup(_workspace.Snap.Clear);
+        Cleanup(_workspace.Tracking.Clear);
+        Cleanup(_workspace.Grips.ClearHot);
+
+        // CadTransientScene deliberately retains a Tool owner while native state
+        // survives cleanup. After the explicit channel pass, retry the neutral
+        // manager path once so a recovered owner is released before the next Tool.
+        if (_workspace.Tools.ActiveTool is null &&
+            _workspace.Transients.CurrentToolOwner != 0)
+        {
+            Cleanup(() => _workspace.Tools.CancelCurrent());
+        }
+
+        if (failures.Count == 0)
+        {
+            ShowStatusFeedback(null);
+        }
+        else
+        {
+            var failure = failures.Count == 1
+                ? failures[0]
+                : new AggregateException("Command cancel cleanup had multiple failures.", failures);
+            CadDiagnostics.Report(failure, "Cancel command");
+            ShowStatusFeedback(failure.GetBaseException().Message);
+        }
+
         RefreshActionUi();
         RefreshOperationStatus();
         _viewport.Focus();
+        return;
+
+        void Cleanup(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception exception)
+                when (exception is not OutOfMemoryException and
+                      not StackOverflowException and
+                      not AccessViolationException)
+            {
+                failures.Add(exception);
+            }
+        }
     }
 
     private void MoveClassicToolOptionsToBottom()

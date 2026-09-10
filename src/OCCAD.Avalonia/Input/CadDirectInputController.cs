@@ -142,7 +142,22 @@ internal sealed class CadDirectInputController
             return;
         }
 
-        var result = _commands.Execute(input);
+        CadCommandResult result;
+        try
+        {
+            result = _commands.Execute(input);
+        }
+        catch (Exception exception)
+            when (exception is not OutOfMemoryException and
+                  not StackOverflowException and
+                  not AccessViolationException)
+        {
+            CadDiagnostics.Report(exception, "Direct input");
+            _message = exception.GetBaseException().Message;
+            _refreshStatus();
+            return;
+        }
+
         var message = CadLanguageManager.CommandMessage(result);
         if (result.Success)
         {

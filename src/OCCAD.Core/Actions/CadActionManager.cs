@@ -91,7 +91,7 @@ public sealed class CadActionManager
                 AddHistory(action.Id);
             return true;
         }
-        catch (Exception exception)
+        catch (Exception exception) when (IsRecoverableActionFailure(exception))
         {
             PublishFailed(action, exception);
             return false;
@@ -151,6 +151,11 @@ public sealed class CadActionManager
             }
         }
     }
+
+    private static bool IsRecoverableActionFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private static bool IsRecoverableObserverFailure(Exception exception) =>
         exception is not OutOfMemoryException and

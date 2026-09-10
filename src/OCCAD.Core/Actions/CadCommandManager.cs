@@ -277,6 +277,9 @@ public sealed class CadCommandManager
                 message: success ? null : "Precision input was rejected.");
         }
         catch (Exception exception)
+            when (exception is not OutOfMemoryException and
+                  not StackOverflowException and
+                  not AccessViolationException)
         {
             result = Result(CadCommandResultKind.Failed, input, message: exception.Message);
         }

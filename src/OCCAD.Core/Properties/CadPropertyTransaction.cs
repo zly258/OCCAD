@@ -142,8 +142,7 @@ public static class CadPropertyTransaction
             var name = rawName.Trim();
             object? value = rawValue;
 
-            if ((string.Equals(name, nameof(CadEntity.LayerId), StringComparison.Ordinal) ||
-                 string.Equals(name, nameof(CadEntity.Layer), StringComparison.Ordinal)) &&
+            if (string.Equals(name, nameof(CadEntity.LayerId), StringComparison.Ordinal) &&
                 value is string layerReference)
             {
                 value = workspace.Layers.GetRequired(layerReference).Id;

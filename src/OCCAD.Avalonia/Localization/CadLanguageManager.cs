@@ -154,42 +154,61 @@ internal static class CadLanguageManager
             return cached;
 
         var assembly = typeof(CadLanguageManager).Assembly;
-        var suffix = $"Localization.Strings.{language}.xml";
-        var resourceName = assembly.GetManifestResourceNames()
-            .SingleOrDefault(name => name.EndsWith(suffix, StringComparison.Ordinal));
-        if (resourceName is null)
-            return Cache[language] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var baseSuffix = $"Localization.Strings.{language}.xml";
+        var resourceMarker = $".Localization.Strings.{language}";
+        var resourceNames = assembly.GetManifestResourceNames()
+            .Where(name =>
+                (name.EndsWith(baseSuffix, StringComparison.Ordinal) ||
+                 name.Contains(resourceMarker + ".", StringComparison.Ordinal)) &&
+                name.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(name =>
+                name.EndsWith(baseSuffix, StringComparison.Ordinal) ? 0 : 1)
+            .ThenBy(name => name, StringComparer.Ordinal)
+            .ToArray();
 
-        using var stream = assembly.GetManifestResourceStream(resourceName)
-            ?? throw new InvalidOperationException($"Localization resource '{resourceName}' cannot be opened.");
-        var document = XDocument.Load(stream);
+        if (resourceNames.Length == 0)
+            return Cache[language] =
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
-        var entries = document
-            .Descendants()
-            .Select(element => new
-            {
-                Key = (string?)element.Attribute(xaml + "Key"),
-                Value = element.Value
-            })
-            .Where(value => !string.IsNullOrWhiteSpace(value.Key))
-            .ToArray();
 
-        var duplicates = entries
-            .GroupBy(value => value.Key!, StringComparer.OrdinalIgnoreCase)
-            .Where(group => group.Count() > 1)
-            .Select(group => group.Key)
-            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (duplicates.Length > 0)
+        foreach (var resourceName in resourceNames)
         {
-            throw new InvalidDataException(
-                $"Localization resource '{resourceName}' contains duplicate keys: {string.Join(", ", duplicates)}");
+            using var stream = assembly.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException(
+                    $"Localization resource '{resourceName}' cannot be opened.");
+            var document = XDocument.Load(stream);
+            var entries = document
+                .Descendants()
+                .Select(element => new
+                {
+                    Key = (string?)element.Attribute(xaml + "Key"),
+                    Value = element.Value
+                })
+                .Where(value => !string.IsNullOrWhiteSpace(value.Key))
+                .ToArray();
+
+            var duplicates = entries
+                .GroupBy(value => value.Key!, StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (duplicates.Length > 0)
+            {
+                throw new InvalidDataException(
+                    $"Localization resource '{resourceName}' contains duplicate keys: {string.Join(", ", duplicates)}");
+            }
+
+            // The primary Strings.<culture>.xml file remains authoritative.
+            // Supplemental resource files only fill missing keys, allowing UI
+            // modules to extend localization without repeatedly editing one
+            // very large dictionary.
+            foreach (var entry in entries)
+                values.TryAdd(entry.Key!, entry.Value);
         }
 
-        var values = entries.ToDictionary(
-            value => value.Key!,
-            value => value.Value,
-            StringComparer.OrdinalIgnoreCase);
         Cache[language] = values;
         return values;
     }

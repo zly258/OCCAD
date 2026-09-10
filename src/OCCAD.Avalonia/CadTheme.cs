@@ -18,14 +18,14 @@ internal static class CadTheme
     public const double StatusHeight = 20.0;
     public const double SplitterThickness = 3.0;
     public const double ModelPanelWidth = 210.0;
-    public const double PropertyPanelWidth = 300.0;
+    public const double PropertyPanelWidth = 320.0;
     public const double ToolPanelWidth = 276.0;
-    public const double PropertyLabelWidth = 104.0;
-    public const double PropertyTitleHeight = 23.0;
-    public const double PropertyCategoryHeaderHeight = 21.0;
-    public const double PropertyRowHeight = 21.0;
+    public const double PropertyLabelWidth = 116.0;
+    public const double PropertyTitleHeight = 24.0;
+    public const double PropertyCategoryHeaderHeight = 22.0;
+    public const double PropertyRowHeight = 23.0;
     public const double PropertyRowIndent = 4.0;
-    public const double PropertyChevronWidth = 13.0;
+    public const double PropertyChevronWidth = 14.0;
     public const double LayerHeaderHeight = 24.0;
     public const double LayerRowHeight = 24.0;
     public const double LayerActionButtonMinWidth = 44.0;
@@ -93,7 +93,8 @@ internal static class CadTheme
             Setters =
             {
                 new Setter(Button.VerticalContentAlignmentProperty, VerticalAlignment.Center),
-                new Setter(Button.HorizontalContentAlignmentProperty, HorizontalAlignment.Center)
+                new Setter(Button.HorizontalContentAlignmentProperty, HorizontalAlignment.Center),
+                new Setter(Button.CornerRadiusProperty, new CornerRadius(0))
             }
         });
 
@@ -102,7 +103,8 @@ internal static class CadTheme
             Setters =
             {
                 new Setter(ToggleButton.VerticalContentAlignmentProperty, VerticalAlignment.Center),
-                new Setter(ToggleButton.HorizontalContentAlignmentProperty, HorizontalAlignment.Center)
+                new Setter(ToggleButton.HorizontalContentAlignmentProperty, HorizontalAlignment.Center),
+                new Setter(ToggleButton.CornerRadiusProperty, new CornerRadius(0))
             }
         });
 
@@ -117,7 +119,8 @@ internal static class CadTheme
                 new Setter(Button.BackgroundProperty, Brushes.Transparent),
                 new Setter(Button.BorderBrushProperty, Brushes.Transparent),
                 new Setter(Button.BorderThicknessProperty, new Thickness(1)),
-                new Setter(Button.ForegroundProperty, Text)
+                new Setter(Button.ForegroundProperty, Text),
+                new Setter(Button.CornerRadiusProperty, new CornerRadius(0))
             }
         });
 
@@ -128,7 +131,8 @@ internal static class CadTheme
                 new Setter(Button.BackgroundProperty, Accent),
                 new Setter(Button.BorderBrushProperty, Accent),
                 new Setter(Button.ForegroundProperty, Brushes.White),
-                new Setter(Button.FontWeightProperty, FontWeight.SemiBold)
+                new Setter(Button.FontWeightProperty, FontWeight.SemiBold),
+                new Setter(Button.CornerRadiusProperty, new CornerRadius(0))
             }
         });
 
@@ -143,7 +147,8 @@ internal static class CadTheme
                 new Setter(ToggleButton.BackgroundProperty, Brushes.Transparent),
                 new Setter(ToggleButton.BorderBrushProperty, Border),
                 new Setter(ToggleButton.BorderThicknessProperty, new Thickness(1)),
-                new Setter(ToggleButton.ForegroundProperty, Text)
+                new Setter(ToggleButton.ForegroundProperty, Text),
+                new Setter(ToggleButton.CornerRadiusProperty, new CornerRadius(0))
             }
         });
 
@@ -153,7 +158,8 @@ internal static class CadTheme
             {
                 new Setter(TextBox.FontSizeProperty, FontSize),
                 new Setter(TextBox.ForegroundProperty, Text),
-                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center)
+                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center),
+                new Setter(TextBox.CornerRadiusProperty, new CornerRadius(0))
             }
         });
 
@@ -176,7 +182,8 @@ internal static class CadTheme
                 new Setter(TextBox.BackgroundProperty, Surface),
                 new Setter(TextBox.BorderBrushProperty, Border),
                 new Setter(TextBox.BorderThicknessProperty, new Thickness(1)),
-                new Setter(TextBox.ForegroundProperty, Text)
+                new Setter(TextBox.ForegroundProperty, Text),
+                new Setter(TextBox.CornerRadiusProperty, new CornerRadius(0))
             }
         });
 
@@ -198,7 +205,8 @@ internal static class CadTheme
                 new Setter(ComboBox.BackgroundProperty, Surface),
                 new Setter(ComboBox.BorderBrushProperty, Border),
                 new Setter(ComboBox.BorderThicknessProperty, new Thickness(1)),
-                new Setter(ComboBox.ForegroundProperty, Text)
+                new Setter(ComboBox.ForegroundProperty, Text),
+                new Setter(ComboBox.CornerRadiusProperty, new CornerRadius(0))
             }
         });
 

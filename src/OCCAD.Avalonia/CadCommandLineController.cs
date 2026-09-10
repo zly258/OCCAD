@@ -8,14 +8,17 @@ using OCCAD;
 namespace OCCAD.Avalonia;
 
 /// <summary>
-/// Compact persistent CAD command line. Parsing and tool-stage input remain in
-/// CadCommandManager so the UI does not duplicate CAD interaction rules.
+/// Persistent CAD command surface. It owns the active command/stage prompt,
+/// command input, completion/history navigation and command feedback. Parsing
+/// and stage commits remain in CadCommandManager/CadToolManager so the UI does
+/// not duplicate interaction rules.
 /// </summary>
 internal sealed class CadCommandLineController : IDisposable
 {
     private readonly CadWorkspace _workspace;
     private readonly CadCommandManager _commands;
     private readonly Panel _host;
+    private readonly TextBlock _prompt = new();
     private readonly TextBlock _label = new();
     private readonly TextBox _input = new();
     private readonly TextBlock _feedback = new();
@@ -32,6 +35,9 @@ internal sealed class CadCommandLineController : IDisposable
 
         BuildUi();
         _workspace.Actions.ActionFailed += ActionFailed;
+        _workspace.Tools.ToolChanged += ToolChanged;
+        _workspace.Tools.ToolUpdated += ToolChanged;
+        RefreshToolPrompt();
     }
 
     public void FocusInput()
@@ -42,20 +48,20 @@ internal sealed class CadCommandLineController : IDisposable
 
     public void RefreshLanguage()
     {
-        var chinese = CadLanguageManager.CurrentLanguage.Equals(
-            "zh-CN",
-            StringComparison.OrdinalIgnoreCase);
         _label.Text = CadLanguageManager.Text(
             "Cad.Text.Command",
-            chinese ? "命令" : "Command");
+            "Command");
         _input.PlaceholderText = CadLanguageManager.Text(
-            "Cad.Text.CommandWatermark",
-            chinese ? "输入命令、坐标或参数，Enter 执行；Tab 补全" : "Type command, coordinate or parameter; Enter executes, Tab completes");
+            "Cad.Text.CommandPrompt",
+            "Type command, coordinate or parameter; Enter executes, Tab completes");
+        RefreshToolPrompt();
     }
 
     public void Dispose()
     {
         _workspace.Actions.ActionFailed -= ActionFailed;
+        _workspace.Tools.ToolChanged -= ToolChanged;
+        _workspace.Tools.ToolUpdated -= ToolChanged;
         _input.KeyDown -= InputKeyDown;
         _host.Children.Clear();
     }
@@ -65,18 +71,20 @@ internal sealed class CadCommandLineController : IDisposable
         _host.Children.Clear();
         _host.IsVisible = true;
 
-        var grid = new Grid
+        _prompt.Height = 20;
+        _prompt.Padding = new Thickness(7, 0);
+        _prompt.FontSize = CadTheme.SmallFontSize;
+        _prompt.FontWeight = FontWeight.SemiBold;
+        _prompt.Foreground = CadTheme.Text;
+        _prompt.Background = CadTheme.PanelAlt;
+        _prompt.VerticalAlignment = VerticalAlignment.Center;
+        _prompt.TextTrimming = TextTrimming.CharacterEllipsis;
+
+        var inputGrid = new Grid
         {
             Height = 28,
             Background = CadTheme.Surface,
             ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto")
-        };
-
-        var topBorder = new Border
-        {
-            BorderBrush = CadTheme.BorderStrong,
-            BorderThickness = new Thickness(0, 1, 0, 0),
-            Child = grid
         };
 
         _label.FontSize = CadTheme.SmallFontSize;
@@ -85,7 +93,7 @@ internal sealed class CadCommandLineController : IDisposable
         _label.VerticalAlignment = VerticalAlignment.Center;
         _label.Margin = new Thickness(7, 0, 6, 0);
         Grid.SetColumn(_label, 0);
-        grid.Children.Add(_label);
+        inputGrid.Children.Add(_label);
 
         _input.Classes.Add("cad-input");
         _input.MinHeight = 22;
@@ -95,7 +103,7 @@ internal sealed class CadCommandLineController : IDisposable
         _input.BorderThickness = new Thickness(1);
         _input.KeyDown += InputKeyDown;
         Grid.SetColumn(_input, 1);
-        grid.Children.Add(_input);
+        inputGrid.Children.Add(_input);
 
         _feedback.FontSize = CadTheme.SmallFontSize;
         _feedback.Foreground = CadTheme.Muted;
@@ -104,10 +112,49 @@ internal sealed class CadCommandLineController : IDisposable
         _feedback.MaxWidth = 360;
         _feedback.TextTrimming = TextTrimming.CharacterEllipsis;
         Grid.SetColumn(_feedback, 2);
-        grid.Children.Add(_feedback);
+        inputGrid.Children.Add(_feedback);
 
-        _host.Children.Add(topBorder);
+        var root = new Grid
+        {
+            Background = CadTheme.Surface
+        };
+        root.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        root.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        root.Children.Add(_prompt);
+        Grid.SetRow(inputGrid, 1);
+        root.Children.Add(inputGrid);
+
+        _host.Children.Add(new Border
+        {
+            BorderBrush = CadTheme.BorderStrong,
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Child = root
+        });
         RefreshLanguage();
+    }
+
+    private void ToolChanged(object? sender, CadToolChangedEventArgs e) =>
+        RefreshToolPrompt();
+
+    private void RefreshToolPrompt()
+    {
+        var commandLabel = CadLanguageManager.Text("Cad.Text.Command", "Command");
+        var tool = _workspace.Tools.ActiveTool;
+        if (tool is null)
+        {
+            _prompt.Text = $"{commandLabel}: {CadLanguageManager.Text("Cad.Text.Ready", "Ready")}";
+            ToolTip.SetTip(_prompt, _prompt.Text);
+            return;
+        }
+
+        var toolName = CadLanguageManager.Text(tool.LocalizationKey, tool.DisplayName);
+        var stepLabel = CadLanguageManager.Text("Cad.Text.Step", "Step");
+        var prompt = tool.Prompt is { } activePrompt
+            ? CadLanguageManager.ToolPrompt(activePrompt)
+            : toolName;
+
+        _prompt.Text = $"{commandLabel}: {toolName}  ·  {stepLabel} {tool.Stage + 1}  —  {prompt}";
+        ToolTip.SetTip(_prompt, _prompt.Text);
     }
 
     private void InputKeyDown(object? sender, KeyEventArgs e)
@@ -138,12 +185,14 @@ internal sealed class CadCommandLineController : IDisposable
                 return;
 
             case Key.Enter:
+            {
                 var input = _input.Text;
                 _input.Text = string.Empty;
                 ResetHistoryNavigation();
                 ShowResult(_commands.Execute(input));
                 e.Handled = true;
                 return;
+            }
         }
     }
 
@@ -192,9 +241,9 @@ internal sealed class CadCommandLineController : IDisposable
             .ToArray();
         if (matches.Length == 0)
         {
-            _feedback.Text = CadLanguageManager.CurrentLanguage == "zh-CN"
-                ? "无匹配命令"
-                : "No matching command";
+            _feedback.Text = CadLanguageManager.Text(
+                "Cad.Text.NoMatchingCommand",
+                "No matching command");
             return;
         }
 
@@ -265,12 +314,12 @@ internal sealed class CadCommandLineController : IDisposable
 
         _feedback.Text = result.Kind switch
         {
-            CadCommandResultKind.Repeated => CadLanguageManager.CurrentLanguage == "zh-CN"
-                ? "重复上一命令"
-                : "Repeated last command",
-            CadCommandResultKind.Canceled => CadLanguageManager.CurrentLanguage == "zh-CN"
-                ? "已取消"
-                : "Canceled",
+            CadCommandResultKind.Repeated => CadLanguageManager.Text(
+                "Cad.Text.CommandRepeated",
+                "Repeated last command"),
+            CadCommandResultKind.Canceled => CadLanguageManager.Text(
+                "Cad.Text.CommandCanceled",
+                "Canceled"),
             _ => string.Empty
         };
     }
@@ -280,7 +329,9 @@ internal sealed class CadCommandLineController : IDisposable
         _feedback.Text = string.Format(
             CadLanguageManager.Text(
                 "Cad.Text.CommandFailed",
-                CadLanguageManager.CurrentLanguage == "zh-CN" ? "{0} 执行失败" : "{0} failed"),
-            e.Action.DisplayName);
+                "{0} failed"),
+            CadLanguageManager.Text(
+                $"Cad.Action.{e.Action.Id}",
+                e.Action.DisplayName));
     }
 }

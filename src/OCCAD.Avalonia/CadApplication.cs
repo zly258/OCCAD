@@ -50,12 +50,15 @@ public sealed class CadApplication : Application
 
             var window = new MainWindow();
             // Complete shell composition before the window is presented.
-            // The ribbon is applied last so legacy menu/toolbar setup can keep
-            // serving as a migration compatibility layer without remaining
-            // visible in the final industrial CAD shell.
+            // Migration presenters are applied after the legacy shell so the
+            // underlying Action/Tool contracts remain stable while the visible
+            // Avalonia UI is replaced incrementally.
             window.ApplyUiRefinement();
             window.ApplyCompactUiEnhancements();
             window.ApplyRibbonShell();
+            window.ApplyFloatingToolPanel();
+            window.ApplyPropertyGridRefinement();
+            window.ApplyCommandStatusRefinement();
 
             CadDiagnostics.Trace("MainWindow constructed.");
 

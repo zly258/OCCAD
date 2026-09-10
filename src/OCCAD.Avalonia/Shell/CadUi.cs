@@ -23,8 +23,8 @@ internal static class CadUi
     public const double HeaderFontSize = 11;
     public const double CompactControlHeight = 24;
     public const double RibbonHeight = 68;
-    public const double ModelPanelWidth = 210;
-    public const double InspectorPanelWidth = 270;
+    public const double ModelPanelWidth = 220;
+    public const double InspectorPanelWidth = 280;
     public const double SplitterWidth = 3;
 
     public static void ConfigureCompactButton(Button button)

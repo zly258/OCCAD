@@ -1,24 +1,33 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
-using Avalonia.Media;
 using OCCAD;
 
 namespace OCCAD.Avalonia;
 
+internal sealed record CadShellCommand(
+    string Text,
+    Func<Task> ExecuteAsync,
+    string? Description = null);
+
 /// <summary>
-/// Minimal command surface. It contains no CAD state and no duplicate command
-/// handlers: every button resolves to a registered Core Action ID.
+/// Minimal command surface. CAD commands resolve to registered Core Action IDs;
+/// only platform document lifecycle commands are injected from the shell.
 /// </summary>
 internal sealed class CadCompactRibbon : Border
 {
     private readonly CadWorkspace _workspace;
     private readonly Action<string> _feedback;
+    private readonly IReadOnlyList<CadShellCommand> _shellCommands;
 
-    public CadCompactRibbon(CadWorkspace workspace, Action<string> feedback)
+    public CadCompactRibbon(
+        CadWorkspace workspace,
+        Action<string> feedback,
+        IReadOnlyList<CadShellCommand>? shellCommands = null)
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         _feedback = feedback ?? throw new ArgumentNullException(nameof(feedback));
+        _shellCommands = shellCommands ?? Array.Empty<CadShellCommand>();
 
         Background = CadUi.Surface;
         BorderBrush = CadUi.Border;
@@ -35,14 +44,7 @@ internal sealed class CadCompactRibbon : Border
             FontSize = CadUi.UiFontSize,
             ItemsSource = new[]
             {
-                Tab("开始",
-                    Action("新建", "file.new"),
-                    Action("撤销", "edit.undo"),
-                    Action("重做", "edit.redo"),
-                    Action("删除", "edit.delete"),
-                    Action("全选", "select.all"),
-                    Action("反选", "select.invert"),
-                    Action("测距", "measure.distance")),
+                StartTab(),
 
                 Tab("绘图",
                     Action("点", "draw.point"),
@@ -106,48 +108,95 @@ internal sealed class CadCompactRibbon : Border
         return tabs;
     }
 
+    private TabItem StartTab()
+    {
+        var buttons = CreateButtonPanel();
+
+        foreach (var command in _shellCommands)
+        {
+            var button = CreateButton(command.Text);
+            if (!string.IsNullOrWhiteSpace(command.Description))
+                ToolTip.SetTip(button, command.Description);
+            button.Click += async (_, _) => await ExecuteShellAsync(command);
+            buttons.Children.Add(button);
+        }
+
+        AddActionButton(buttons, Action("撤销", "edit.undo"));
+        AddActionButton(buttons, Action("重做", "edit.redo"));
+        AddActionButton(buttons, Action("删除", "edit.delete"));
+        AddActionButton(buttons, Action("全选", "select.all"));
+        AddActionButton(buttons, Action("反选", "select.invert"));
+        AddActionButton(buttons, Action("测距", "measure.distance"));
+
+        return CreateTab("开始", buttons);
+    }
+
     private TabItem Tab(string title, params RibbonAction[] actions)
     {
-        var buttons = new StackPanel
+        var buttons = CreateButtonPanel();
+        foreach (var item in actions)
+            AddActionButton(buttons, item);
+        return CreateTab(title, buttons);
+    }
+
+    private void AddActionButton(Panel buttons, RibbonAction item)
+    {
+        var action = _workspace.Actions.Find(item.Id);
+        if (action is null)
+            return;
+
+        var button = CreateButton(item.Text);
+        var shortcut = string.IsNullOrWhiteSpace(action.Shortcut)
+            ? string.Empty
+            : $"  {action.Shortcut}";
+        ToolTip.SetTip(button, $"{action.Description}{shortcut}");
+        button.Click += (_, _) => Execute(item.Id, item.Text);
+        buttons.Children.Add(button);
+    }
+
+    private static StackPanel CreateButtonPanel() =>
+        new()
         {
             Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(4, 3)
         };
 
-        foreach (var item in actions)
+    private static Button CreateButton(string text)
+    {
+        var button = new Button
         {
-            var action = _workspace.Actions.Find(item.Id);
-            if (action is null)
-                continue;
+            Content = text,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            Foreground = CadUi.Text
+        };
+        CadUi.ConfigureCompactButton(button);
+        return button;
+    }
 
-            var button = new Button
-            {
-                Content = item.Text,
-                VerticalContentAlignment = VerticalAlignment.Center,
-                HorizontalContentAlignment = HorizontalAlignment.Center,
-                Foreground = CadUi.Text
-            };
-            CadUi.ConfigureCompactButton(button);
-
-            var shortcut = string.IsNullOrWhiteSpace(action.Shortcut)
-                ? string.Empty
-                : $"  {action.Shortcut}";
-            ToolTip.SetTip(button, $"{action.Description}{shortcut}");
-            button.Click += (_, _) => Execute(item.Id, item.Text);
-            buttons.Children.Add(button);
-        }
-
-        return new TabItem
+    private static TabItem CreateTab(string title, Control content) =>
+        new()
         {
             Header = title,
             Content = new ScrollViewer
             {
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Content = buttons
+                Content = content
             }
         };
+
+    private async Task ExecuteShellAsync(CadShellCommand command)
+    {
+        try
+        {
+            await command.ExecuteAsync();
+        }
+        catch (Exception exception)
+        {
+            _feedback(exception.Message);
+        }
     }
 
     private void Execute(string id, string text)

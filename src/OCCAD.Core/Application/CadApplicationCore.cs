@@ -1,9 +1,8 @@
 namespace OCCAD;
 
 /// <summary>
-/// UI-independent application composition root. It owns one CAD workspace and
-/// one application settings store, and binds settings to the workspace's
-/// authoritative interaction services.
+/// UI-independent application composition root. It owns one CAD workspace,
+/// one document session and one application settings store.
 /// </summary>
 public sealed class CadApplicationCore : IDisposable
 {
@@ -19,11 +18,13 @@ public sealed class CadApplicationCore : IDisposable
     {
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Workspace = new CadWorkspace();
+        Documents = new CadDocumentSession(Workspace);
         _settingsBinding = Settings.Bind(Workspace);
     }
 
     public CadSettingsStore Settings { get; }
     public CadWorkspace Workspace { get; }
+    public CadDocumentSession Documents { get; }
 
     public void LoadSettings(Stream stream)
     {

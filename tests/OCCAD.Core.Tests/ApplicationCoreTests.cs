@@ -4,7 +4,7 @@ namespace OCCAD.Core.Tests;
 public sealed class ApplicationCoreTests
 {
     [TestMethod]
-    public void ApplicationCoreOwnsSettingsAndWorkspaceBinding()
+    public void ApplicationCoreOwnsSettingsWorkspaceAndDocumentSession()
     {
         using var app = new CadApplicationCore();
         app.Settings.Set(CadSettingKeys.SnapSize, 21);
@@ -12,6 +12,7 @@ public sealed class ApplicationCoreTests
 
         Assert.AreEqual(21, app.Workspace.Snap.MarkerSize);
         Assert.AreEqual(17, app.Workspace.Grips.MarkerSize);
+        Assert.AreEqual(CadDocumentSession.UntitledName, app.Documents.DisplayName);
     }
 
     [TestMethod]
@@ -29,5 +30,46 @@ public sealed class ApplicationCoreTests
 
         Assert.AreEqual(13.0, app.Workspace.Selection.PixelTolerance);
         Assert.AreEqual(30.0, app.Workspace.Drafting.PolarIncrementDegrees);
+    }
+
+    [TestMethod]
+    public void DocumentSessionRoundTripsAndTracksSavedState()
+    {
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            $"occad-session-{Guid.NewGuid():N}.occad");
+
+        try
+        {
+            using var app = new CadApplicationCore();
+            var line = new CadLineEntity(default, new(10, 0, 0));
+            app.Workspace.AddEntity(line);
+            Assert.IsTrue(app.Workspace.IsModified);
+
+            app.Documents.Save(path);
+            Assert.IsFalse(app.Workspace.IsModified);
+            Assert.AreEqual(Path.GetFileName(path), app.Documents.DisplayName);
+
+            app.Workspace.TranslateEntities([line], new(5, 0, 0));
+            Assert.IsTrue(app.Workspace.IsModified);
+
+            app.Documents.New();
+            Assert.IsEmpty(app.Workspace.Document.Entities);
+            Assert.IsFalse(app.Workspace.IsModified);
+            Assert.AreEqual(CadDocumentSession.UntitledName, app.Documents.DisplayName);
+
+            app.Documents.Open(path);
+            Assert.HasCount(1, app.Workspace.Document.Entities);
+            Assert.IsFalse(app.Workspace.IsModified);
+            Assert.AreEqual(Path.GetFileName(path), app.Documents.DisplayName);
+            Assert.AreEqual(
+                new OcctNet.OcctPoint3d(10, 0, 0),
+                ((CadLineEntity)app.Workspace.Document.Entities[0]).End);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
     }
 }

@@ -66,7 +66,8 @@ internal sealed class App : Application
         catch (Exception exception) when (
             exception is IOException or
             UnauthorizedAccessException or
-            InvalidDataException)
+            InvalidDataException or
+            System.Text.Json.JsonException)
         {
             System.Diagnostics.Debug.WriteLine(
                 $"OCCAD settings load skipped: {exception.Message}");

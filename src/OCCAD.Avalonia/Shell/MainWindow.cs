@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using OCCAD;
 using OcctNet;
@@ -12,13 +13,56 @@ using OcctNet;
 namespace OCCAD.Avalonia;
 
 /// <summary>
-/// Thin Avalonia adapter around CadApplicationCore. The shell owns layout and
-/// focus only; CAD state, commands, tools, selection and transactions stay in Core.
+/// Thin Avalonia adapter around CadApplicationCore. The shell owns layout,
+/// focus, platform storage pickers and close confirmation only; CAD state,
+/// commands, tools, selection and transactions stay in Core.
 /// </summary>
 internal sealed class MainWindow : Window
 {
+    private static readonly FilePickerFileType OccadDocumentType = new("OCCAD Document")
+    {
+        Patterns = ["*.occad"]
+    };
+
+    private static readonly FilePickerFileType CadExchangeType = new("CAD Exchange")
+    {
+        Patterns = ["*.step", "*.stp", "*.iges", "*.igs", "*.brep", "*.brp", "*.stl", "*.obj", "*.gltf", "*.glb"]
+    };
+
+    private static readonly FilePickerFileType StepType = new("STEP")
+    {
+        Patterns = ["*.step", "*.stp"]
+    };
+
+    private static readonly FilePickerFileType IgesType = new("IGES")
+    {
+        Patterns = ["*.iges", "*.igs"]
+    };
+
+    private static readonly FilePickerFileType BrepType = new("BREP")
+    {
+        Patterns = ["*.brep", "*.brp"]
+    };
+
+    private static readonly FilePickerFileType StlType = new("STL")
+    {
+        Patterns = ["*.stl"]
+    };
+
+    private static readonly FilePickerFileType ObjType = new("OBJ")
+    {
+        Patterns = ["*.obj"]
+    };
+
+    private static readonly FilePickerFileType GltfType = new("glTF")
+    {
+        Patterns = ["*.gltf", "*.glb"]
+    };
+
+    private readonly CadApplicationCore _application;
     private readonly CadWorkspace _workspace;
     private readonly CadSettingsStore _settings;
+    private readonly CadDocumentStorage _documents;
     private readonly CadCommandManager _commands;
     private readonly OcctAvaloniaViewport _viewport = new();
     private readonly TextBlock _prompt = new();
@@ -33,17 +77,19 @@ internal sealed class MainWindow : Window
     private readonly CadViewportController _viewportController;
     private readonly CadInspectorPanel _inspector;
     private int _commandHistoryIndex = -1;
+    private bool _closePromptOpen;
+    private bool _allowClose;
     private bool _disposed;
 
     public MainWindow(CadApplicationCore application)
     {
-        ArgumentNullException.ThrowIfNull(application);
+        _application = application ?? throw new ArgumentNullException(nameof(application));
         _workspace = application.Workspace;
         _settings = application.Settings;
+        _documents = new CadDocumentStorage(application);
         _commands = CadCommandManager.ForWorkspace(_workspace);
         _inspector = new CadInspectorPanel(_workspace, ShowFeedback);
 
-        Title = "OCCAD";
         Width = 1280;
         Height = 820;
         MinWidth = 960;
@@ -70,6 +116,31 @@ internal sealed class MainWindow : Window
                 () => _workspace.Engine?.Redraw(),
                 DispatcherPriority.Loaded);
         };
+
+        Closing += async (_, e) =>
+        {
+            if (_allowClose || !_workspace.IsModified)
+                return;
+
+            e.Cancel = true;
+            if (_closePromptOpen)
+                return;
+
+            _closePromptOpen = true;
+            try
+            {
+                if (await ConfirmCanReplaceDocumentAsync())
+                {
+                    _allowClose = true;
+                    Close();
+                }
+            }
+            finally
+            {
+                _closePromptOpen = false;
+            }
+        };
+
         Closed += (_, _) => DisposeShell();
     }
 
@@ -81,7 +152,10 @@ internal sealed class MainWindow : Window
             Background = CadUi.Window
         };
 
-        var ribbon = new CadCompactRibbon(_workspace, ShowFeedback);
+        var ribbon = new CadCompactRibbon(
+            _workspace,
+            ShowFeedback,
+            CreateShellCommands());
         DockPanel.SetDock(ribbon, Dock.Top);
         root.Children.Add(ribbon);
 
@@ -96,6 +170,16 @@ internal sealed class MainWindow : Window
         root.Children.Add(BuildWorkspace());
         return root;
     }
+
+    private IReadOnlyList<CadShellCommand> CreateShellCommands() =>
+    [
+        new("新建", NewDocumentAsync, "新建 OCCAD 文档  Ctrl+N"),
+        new("打开", OpenDocumentAsync, "打开 OCCAD 文档  Ctrl+O"),
+        new("保存", async () => _ = await SaveDocumentAsync(saveAs: false), "保存  Ctrl+S"),
+        new("另存", async () => _ = await SaveDocumentAsync(saveAs: true), "另存为  Ctrl+Shift+S"),
+        new("导入", ImportAsync, "导入 STEP / IGES / BREP / STL / OBJ / glTF"),
+        new("导出", ExportAsync, "导出当前单选实体")
+    ];
 
     private Control BuildWorkspace()
     {
@@ -282,16 +366,39 @@ internal sealed class MainWindow : Window
             if (args.Kind is CadDomainEventKind.ActiveToolChanged or CadDomainEventKind.ToolStageChanged)
                 RefreshPrompt();
         };
+        _workspace.ModifiedChanged += (_, _) => RefreshStatus();
+        _application.Documents.IdentityChanged += (_, _) => RefreshStatus();
         _workspace.Actions.ActionFailed += (_, args) => ShowFeedback(args.Exception.Message);
     }
 
-    private void ViewportShortcutKeyInput(object? sender, OcctKeyInputEventArgs input)
+    private async void ViewportShortcutKeyInput(object? sender, OcctKeyInputEventArgs input)
     {
         if (input.Handled || input.Kind != OcctKeyInputKind.Pressed || input.IsRepeat)
             return;
 
         if (_workspace.Tools.ActiveTool is null)
         {
+            var shortcut = ShortcutText(input);
+            switch (shortcut)
+            {
+                case "Ctrl+N":
+                    input.Handled = true;
+                    await NewDocumentAsync();
+                    return;
+                case "Ctrl+O":
+                    input.Handled = true;
+                    await OpenDocumentAsync();
+                    return;
+                case "Ctrl+S":
+                    input.Handled = true;
+                    _ = await SaveDocumentAsync(saveAs: false);
+                    return;
+                case "Ctrl+Shift+S":
+                    input.Handled = true;
+                    _ = await SaveDocumentAsync(saveAs: true);
+                    return;
+            }
+
             if (input.Modifiers == OcctInputModifiers.None && input.Key == OcctKey.Escape)
             {
                 _workspace.Selection.Clear();
@@ -303,11 +410,10 @@ internal sealed class MainWindow : Window
             if (input.Modifiers == OcctInputModifiers.None && input.Key == OcctKey.Space)
             {
                 input.Handled = true;
-                ExecuteCommand(string.Empty);
+                ExecuteCoreCommand(string.Empty);
                 return;
             }
 
-            var shortcut = ShortcutText(input);
             if (shortcut is not null && _workspace.Actions.FindByShortcut(shortcut) is not null)
             {
                 input.Handled = true;
@@ -396,7 +502,7 @@ internal sealed class MainWindow : Window
         _commandInput.Focus();
     }
 
-    private void CommandInputKeyDown(object? sender, KeyEventArgs e)
+    private async void CommandInputKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape)
         {
@@ -419,19 +525,61 @@ internal sealed class MainWindow : Window
         if (e.Key != Key.Enter)
             return;
 
-        ExecuteCommand(_commandInput.Text);
+        await ExecuteCommandAsync(_commandInput.Text);
         e.Handled = true;
     }
 
-    private void ExecuteCommand(string? text)
+    private async Task ExecuteCommandAsync(string? text)
+    {
+        var input = text?.Trim() ?? string.Empty;
+        if (_workspace.Tools.ActiveTool is null)
+        {
+            switch (input.ToUpperInvariant())
+            {
+                case "NEW":
+                    ResetCommandInput();
+                    await NewDocumentAsync();
+                    return;
+                case "OPEN":
+                    ResetCommandInput();
+                    await OpenDocumentAsync();
+                    return;
+                case "SAVE":
+                    ResetCommandInput();
+                    _ = await SaveDocumentAsync(saveAs: false);
+                    return;
+                case "SAVEAS":
+                    ResetCommandInput();
+                    _ = await SaveDocumentAsync(saveAs: true);
+                    return;
+                case "IMPORT":
+                    ResetCommandInput();
+                    await ImportAsync();
+                    return;
+                case "EXPORT":
+                    ResetCommandInput();
+                    await ExportAsync();
+                    return;
+            }
+        }
+
+        ExecuteCoreCommand(input);
+    }
+
+    private void ExecuteCoreCommand(string? text)
     {
         var result = _commands.Execute(text);
-        _commandInput.Text = string.Empty;
-        _commandHistoryIndex = -1;
+        ResetCommandInput();
         ShowFeedback(result.Message ?? ResultText(result.Kind));
         RefreshPrompt();
         RefreshStatus();
         _viewport.Focus();
+    }
+
+    private void ResetCommandInput()
+    {
+        _commandInput.Text = string.Empty;
+        _commandHistoryIndex = -1;
     }
 
     private void NavigateCommandHistory(int direction)
@@ -451,6 +599,241 @@ internal sealed class MainWindow : Window
             ? string.Empty
             : history[_commandHistoryIndex];
         _commandInput.CaretIndex = _commandInput.Text?.Length ?? 0;
+    }
+
+    private async Task NewDocumentAsync()
+    {
+        if (!await ConfirmCanReplaceDocumentAsync())
+            return;
+
+        _documents.New();
+        _workspace.Engine?.Redraw();
+        ShowFeedback("已新建文档");
+        RefreshStatus();
+        _viewport.Focus();
+    }
+
+    private async Task OpenDocumentAsync()
+    {
+        if (!await ConfirmCanReplaceDocumentAsync())
+            return;
+        if (!StorageProvider.CanOpen)
+        {
+            ShowFeedback("当前平台不支持打开文件");
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(
+            new FilePickerOpenOptions
+            {
+                Title = "打开 OCCAD 文档",
+                AllowMultiple = false,
+                FileTypeFilter = [OccadDocumentType]
+            });
+        if (files.Count == 0)
+            return;
+
+        try
+        {
+            await _documents.OpenAsync(files[0]);
+            _workspace.Engine?.FitAll();
+            ShowFeedback($"已打开 {_documents.DisplayName}");
+            RefreshStatus();
+        }
+        catch (Exception exception)
+        {
+            files[0].Dispose();
+            ShowFeedback($"打开失败：{exception.Message}");
+        }
+        finally
+        {
+            _viewport.Focus();
+        }
+    }
+
+    private async Task<bool> SaveDocumentAsync(bool saveAs)
+    {
+        IStorageFile? target = null;
+        var pickedTarget = false;
+
+        try
+        {
+            if (!saveAs && _documents.CurrentFile is not null)
+            {
+                await _documents.SaveCurrentAsync();
+                ShowFeedback($"已保存 {_documents.DisplayName}");
+                RefreshStatus();
+                return true;
+            }
+
+            if (!StorageProvider.CanSave)
+            {
+                ShowFeedback("当前平台不支持保存文件");
+                return false;
+            }
+
+            target = await StorageProvider.SaveFilePickerAsync(
+                new FilePickerSaveOptions
+                {
+                    Title = saveAs ? "另存 OCCAD 文档" : "保存 OCCAD 文档",
+                    SuggestedFileName = _documents.DisplayName,
+                    DefaultExtension = "occad",
+                    ShowOverwritePrompt = true,
+                    FileTypeChoices = [OccadDocumentType]
+                });
+            if (target is null)
+                return false;
+
+            pickedTarget = true;
+            await _documents.SaveAsAsync(target);
+            ShowFeedback($"已保存 {_documents.DisplayName}");
+            RefreshStatus();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            if (pickedTarget && !ReferenceEquals(target, _documents.CurrentFile))
+                target?.Dispose();
+            ShowFeedback($"保存失败：{exception.Message}");
+            return false;
+        }
+        finally
+        {
+            _viewport.Focus();
+        }
+    }
+
+    private async Task ImportAsync()
+    {
+        if (_workspace.Tools.ActiveTool is not null)
+        {
+            ShowFeedback("请先结束当前命令再导入");
+            return;
+        }
+        if (!StorageProvider.CanOpen)
+        {
+            ShowFeedback("当前平台不支持导入文件");
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(
+            new FilePickerOpenOptions
+            {
+                Title = "导入 CAD 文件",
+                AllowMultiple = false,
+                FileTypeFilter = [CadExchangeType]
+            });
+        if (files.Count == 0)
+            return;
+
+        using var file = files[0];
+        var path = file.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            ShowFeedback("当前导入器需要本地文件路径");
+            return;
+        }
+
+        try
+        {
+            ShowFeedback($"正在导入 {file.Name}...");
+            var entity = await CadExchangeService.ImportAsync(path);
+            _workspace.AddEntity(entity);
+            _workspace.Engine?.FitAll();
+            ShowFeedback($"已导入 {file.Name}");
+        }
+        catch (Exception exception)
+        {
+            ShowFeedback($"导入失败：{exception.Message}");
+        }
+        finally
+        {
+            RefreshStatus();
+            _viewport.Focus();
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        if (_workspace.Tools.ActiveTool is not null)
+        {
+            ShowFeedback("请先结束当前命令再导出");
+            return;
+        }
+        if (_workspace.Selection.Selected.Count != 1)
+        {
+            ShowFeedback("导出需要选择一个实体");
+            return;
+        }
+        if (!StorageProvider.CanSave)
+        {
+            ShowFeedback("当前平台不支持导出文件");
+            return;
+        }
+
+        var entity = _workspace.Selection.Selected[0];
+        var target = await StorageProvider.SaveFilePickerAsync(
+            new FilePickerSaveOptions
+            {
+                Title = "导出 CAD 文件",
+                SuggestedFileName = $"{SafeFileName(entity.Name)}.step",
+                DefaultExtension = "step",
+                ShowOverwritePrompt = true,
+                FileTypeChoices = [StepType, IgesType, BrepType, StlType, ObjType, GltfType]
+            });
+        if (target is null)
+            return;
+
+        using (target)
+        {
+            var path = target.TryGetLocalPath();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                ShowFeedback("当前导出器需要本地文件路径");
+                return;
+            }
+
+            try
+            {
+                ShowFeedback($"正在导出 {target.Name}...");
+                await CadExchangeService.ExportAsync(_workspace, entity, path);
+                ShowFeedback($"已导出 {target.Name}");
+            }
+            catch (Exception exception)
+            {
+                ShowFeedback($"导出失败：{exception.Message}");
+            }
+            finally
+            {
+                _viewport.Focus();
+            }
+        }
+    }
+
+    private async Task<bool> ConfirmCanReplaceDocumentAsync()
+    {
+        if (!_workspace.IsModified)
+            return true;
+
+        var decision = await new CadSaveChangesDialog(_documents.DisplayName)
+            .ShowDialog<CadSaveChangesDecision>(this);
+
+        return decision switch
+        {
+            CadSaveChangesDecision.Save => await SaveDocumentAsync(saveAs: false),
+            CadSaveChangesDecision.Discard => true,
+            _ => false
+        };
+    }
+
+    private static string SafeFileName(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var safe = new string(value
+            .Select(character => invalid.Contains(character) ? '_' : character)
+            .ToArray())
+            .Trim();
+        return safe.Length == 0 ? "model" : safe;
     }
 
     private void ToggleSnap()
@@ -512,7 +895,7 @@ internal sealed class MainWindow : Window
         _orthoStatus.Content = _workspace.Drafting.OrthogonalTrackingEnabled ? "ORTHO F8" : "ORTHO —";
         _polarStatus.Content = _workspace.Drafting.PolarTrackingEnabled ? "POLAR F10" : "POLAR —";
         _planeStatus.Content = $"{_workspace.WorkPlane.Preset}";
-        Title = _workspace.IsModified ? "OCCAD *" : "OCCAD";
+        Title = $"{_documents.DisplayName}{(_workspace.IsModified ? " *" : string.Empty)} - OCCAD";
     }
 
     private void ShowFeedback(string text)
@@ -611,6 +994,7 @@ internal sealed class MainWindow : Window
         if (_disposed)
             return;
         _disposed = true;
+        _documents.Dispose();
         _viewportController.Dispose();
     }
 }

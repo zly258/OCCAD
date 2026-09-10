@@ -355,9 +355,9 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
                 return point.IsFinite;
             }
 
-            if (_method is CenterRadius or CenterDiameter &&
-                Context.Workspace.Drafting.LengthLockEnabled &&
-                Context.Workspace.Drafting.LockedLength > 1e-9)
+            if (Context.Workspace.Drafting.LengthLockEnabled &&
+                Context.Workspace.Drafting.LockedLength > 1e-9 &&
+                _method is CenterRadius or CenterDiameter or TwoPoints or PointCenter)
             {
                 point = _points[0] +
                         _xAxis * Context.Workspace.Drafting.LockedLength;

@@ -81,11 +81,7 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
             BorderThickness = new Thickness(0),
             Foreground = CadTheme.Muted
         };
-        close.Click += (_, _) =>
-        {
-            HidePanel();
-            UserVisibilityRequested?.Invoke(false);
-        };
+        close.Click += (_, _) => HidePanel();
 
         var headerPanel = new DockPanel
         {
@@ -149,7 +145,6 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
     public bool IsPanelVisible => _tool is not null && IsVisible;
 
     public event EventHandler? PanelVisibilityChanged;
-    public event Action<bool>? UserVisibilityRequested;
 
     public void ShowPanel()
     {

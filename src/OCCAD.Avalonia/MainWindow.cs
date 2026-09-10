@@ -60,6 +60,7 @@ public sealed partial class MainWindow : Window
 
     private readonly TextBlock _selectionStatus = new();
     private readonly TextBlock _coordinateStatus = new();
+    private TextBlock? _workPlaneUiLabel;
     private readonly StackPanel _commandHost = new();
 
     private readonly CadViewportInteractionController _viewportInteraction;
@@ -85,6 +86,7 @@ public sealed partial class MainWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         WindowState = WindowState.Maximized;
         Background = CadTheme.WindowBrush;
+        ApplyWindowLogo();
 
         ApplyApplicationSettingsToCore();
         ConfigureViewport();
@@ -198,6 +200,7 @@ public sealed partial class MainWindow : Window
             if (!_workspace.Snap.Enabled)
                 _workspace.Snap.Clear();
             RefreshInteractionUi();
+            SaveInteractionPreferences();
         };
 
         ConfigureToggle(_orthoToggle);
@@ -208,6 +211,7 @@ public sealed partial class MainWindow : Window
                 _orthoToggle.IsChecked == true;
             _workspace.Tracking.Clear();
             RefreshInteractionUi();
+            SaveInteractionPreferences();
         };
 
         ConfigureToggle(_polarToggle);
@@ -218,6 +222,7 @@ public sealed partial class MainWindow : Window
                 _polarToggle.IsChecked == true;
             _workspace.Tracking.Clear();
             RefreshInteractionUi();
+            SaveInteractionPreferences();
         };
     }
 
@@ -787,10 +792,21 @@ public sealed partial class MainWindow : Window
                     UiText(
                         "Cad.Text.WorkPlaneChangeBlocked",
                         "Finish the active tool before changing the work plane."));
+                RefreshWorkPlaneUi();
+                return;
             }
 
             RefreshWorkPlaneUi();
+            SaveInteractionPreferences();
         };
+    }
+
+    private static void ConfigureStatusPlaneButton(ToggleButton button)
+    {
+        button.MinWidth = 30;
+        button.Height = 19;
+        button.Padding = new Thickness(5, 0);
+        button.Margin = new Thickness(0);
     }
 
     private static void ConfigureStatusText(
@@ -803,6 +819,23 @@ public sealed partial class MainWindow : Window
         text.VerticalAlignment = VerticalAlignment.Center;
         text.TextTrimming = TextTrimming.CharacterEllipsis;
         text.Foreground = CadTheme.Muted;
+    }
+
+    private void ApplyWindowLogo()
+    {
+        try
+        {
+            using var stream = global::Avalonia.Platform.AssetLoader.Open(
+                new Uri("avares://OCCAD/Assets/OCCAD.png"));
+            Icon = new WindowIcon(stream);
+        }
+        catch (Exception exception)
+            when (exception is not OutOfMemoryException and
+                  not StackOverflowException and
+                  not AccessViolationException)
+        {
+            CadDiagnostics.Report(exception, "Window logo");
+        }
     }
 
     private void LanguageChanged(

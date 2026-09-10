@@ -56,15 +56,15 @@ public sealed class SettingsAndSchemaTests
     }
 
     [TestMethod]
-    public void MigratedToolsExposeSchemaWithoutLegacyPanelOverride()
+    public void ActiveParameterisedToolsUseSchemaWithoutLegacyPanelOverride()
     {
         CadTool[] tools =
         [
-            new ChamferTool(),
-            new FilletTool(),
-            new OffsetTool(),
-            new CopyTool(),
-            new TextTool()
+            new CircleTool(),
+            new ArcTool(),
+            new RectangleTool(),
+            new ArrayTool(),
+            new BoxTool()
         ];
 
         foreach (var tool in tools)

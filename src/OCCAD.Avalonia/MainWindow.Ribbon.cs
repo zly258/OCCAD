@@ -44,7 +44,6 @@ public sealed partial class MainWindow
         _workspace.Tools.ToolUpdated += (_, _) => RefreshRibbonState();
         _workspace.History.Changed += (_, _) => RefreshRibbonState();
         _workspace.Layers.Changed += (_, _) => RefreshRibbonState();
-        _toolPanel.PanelVisibilityChanged += (_, _) => RefreshRibbonState();
 
         _ribbon.RefreshState();
         CadDiagnostics.Trace("Custom CAD ribbon shell applied.");
@@ -263,7 +262,7 @@ public sealed partial class MainWindow
                 RibbonToggle("Cad.Text.Model", "模型树", "Model", () => _modelPanel.IsVisible, () => SetModelPanelVisible(!_modelPanel.IsVisible)),
                 RibbonToggle("Cad.Text.Layers", "图层", "Layers", () => _layerPanelBorder.IsVisible, () => SetLayerPanelVisible(!_layerPanelBorder.IsVisible)),
                 RibbonToggle("Cad.Text.Properties", "属性", "Properties", () => _propertyPanelBorder.IsVisible, () => SetPropertyPanelVisible(!_propertyPanelBorder.IsVisible)),
-                RibbonToggle("Cad.Text.ToolParameters", "工具参数", "Tool Parameters", () => _toolPanel.IsPanelVisible, ToggleToolPanel, () => _toolPanel.CanDisplayCurrentTool)),
+                RibbonToggle("Cad.Text.ToolParameters", "工具参数", "Tool Parameters", IsToolPanelVisible, ToggleToolPanel, CanDisplayToolPanel)),
             RibbonGroup(
                 "Cad.Text.Drafting",
                 "绘图辅助",
@@ -341,8 +340,25 @@ public sealed partial class MainWindow
         return CadLanguageManager.Text(resourceKey, fallback);
     }
 
+    private bool CanDisplayToolPanel() =>
+        _floatingToolPanel?.CanDisplayCurrentTool ??
+        _toolPanel.CanDisplayCurrentTool;
+
+    private bool IsToolPanelVisible() =>
+        _floatingToolPanel?.IsPanelVisible ??
+        _toolPanel.IsPanelVisible;
+
     private void ToggleToolPanel()
     {
+        if (_floatingToolPanel is { } floating)
+        {
+            if (floating.IsPanelVisible)
+                floating.HidePanel();
+            else
+                floating.ShowPanel();
+            return;
+        }
+
         if (_toolPanel.IsPanelVisible)
             _toolPanel.HidePanel();
         else

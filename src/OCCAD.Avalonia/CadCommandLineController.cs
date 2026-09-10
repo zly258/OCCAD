@@ -71,14 +71,21 @@ internal sealed class CadCommandLineController : IDisposable
         _host.Children.Clear();
         _host.IsVisible = true;
 
-        _prompt.Height = 20;
-        _prompt.Padding = new Thickness(7, 0);
         _prompt.FontSize = CadTheme.SmallFontSize;
         _prompt.FontWeight = FontWeight.SemiBold;
         _prompt.Foreground = CadTheme.Text;
-        _prompt.Background = CadTheme.PanelAlt;
         _prompt.VerticalAlignment = VerticalAlignment.Center;
         _prompt.TextTrimming = TextTrimming.CharacterEllipsis;
+
+        var promptHost = new Border
+        {
+            Height = 20,
+            Padding = new Thickness(7, 0),
+            Background = CadTheme.PanelAlt,
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = _prompt
+        };
 
         var inputGrid = new Grid
         {
@@ -120,7 +127,7 @@ internal sealed class CadCommandLineController : IDisposable
         };
         root.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
         root.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        root.Children.Add(_prompt);
+        root.Children.Add(promptHost);
         Grid.SetRow(inputGrid, 1);
         root.Children.Add(inputGrid);
 

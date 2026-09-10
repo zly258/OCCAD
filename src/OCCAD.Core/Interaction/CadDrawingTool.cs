@@ -76,6 +76,15 @@ public abstract class CadDrawingTool : CadTool
         HandlePointer(moveEvent);
     }
 
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        // Exact input is a Core interaction, not a UI side effect. Rebuild the
+        // active preview immediately so command-line/MCP/floating-panel callers
+        // all observe the same geometry without requiring another mouse move.
+        RefreshPreviewFromLastPointer();
+        return true;
+    }
+
     protected WorkPlaneFrame CaptureWorkPlaneFrame() =>
         new(
             Context.WorkPlane.Origin,

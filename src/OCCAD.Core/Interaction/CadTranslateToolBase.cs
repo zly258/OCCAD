@@ -94,6 +94,12 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
         return true;
     }
 
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        RefreshTranslatedPreview();
+        return true;
+    }
+
     protected override void ResetTransformState()
     {
         _basePoint = null;

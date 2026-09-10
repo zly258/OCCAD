@@ -98,6 +98,29 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
         return true;
     }
 
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (_basePoint is not null &&
+            Context.Workspace.LastPointerPosition is { } pointer)
+        {
+            RefreshPreviewFromLastPointer(pointer);
+        }
+        return true;
+    }
+
+    protected internal override void RefreshPreviewFromLastPointer(
+        CadPointerPosition pointer)
+    {
+        if (_basePoint is not { } basePoint)
+            return;
+
+        UpdatePreview(
+            Context.ResolvePoint(
+                pointer.X,
+                pointer.Y,
+                basePoint).Point);
+    }
+
     protected override void ResetTransformState()
     {
         _basePoint = null;

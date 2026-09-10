@@ -101,6 +101,16 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
         return true;
     }
 
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (_firstPoint is not null &&
+            Context.Workspace.LastPointerPosition is { } pointer)
+        {
+            RefreshPreviewFromLastPointer(pointer);
+        }
+        return true;
+    }
+
     protected override bool OnStepBack()
     {
         if (_firstPoint is null)

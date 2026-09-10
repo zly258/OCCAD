@@ -83,6 +83,9 @@
     <sys:String x:Key="Cad.Text.Command">命令</sys:String>
     <sys:String x:Key="Cad.Text.CommandPrompt">输入命令、坐标或参数，Enter 执行；Tab 补全</sys:String>
     <sys:String x:Key="Cad.Text.NoMatchingCommand">无匹配命令</sys:String>
+    <sys:String x:Key="Cad.Text.CommandRepeated">已重复上一命令</sys:String>
+    <sys:String x:Key="Cad.Text.CommandCanceled">已取消</sys:String>
+    <sys:String x:Key="Cad.Text.CommandFailed">“{0}”执行失败</sys:String>
     <sys:String x:Key="Cad.Text.Ready">就绪</sys:String>
     <sys:String x:Key="Cad.Text.Prompt">操作提示</sys:String>
     <sys:String x:Key="Cad.Text.Ortho">正交</sys:String>

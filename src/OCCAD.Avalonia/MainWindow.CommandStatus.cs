@@ -19,19 +19,25 @@ public sealed partial class MainWindow
 
         _commandStatusRefinementApplied = true;
 
-        // The command surface is the single owner of active tool prompts and
-        // command history/result feedback. Keep the status bar focused on
-        // persistent drafting state instead of repeating the same message.
-        if (_toolStatus.Parent is Panel toolParent)
-            toolParent.Children.Remove(_toolStatus);
-        if (_historyStatus.Parent is Panel historyParent)
-            historyParent.Children.Remove(_historyStatus);
+        // The command surface owns command prompts, command history/result
+        // feedback and exact-input state. The status bar stays compact and
+        // limited to persistent selection/drafting/work-plane/coordinate state.
+        RemoveStatusText(_toolStatus);
+        RemoveStatusText(_historyStatus);
+        RemoveStatusText(_snapStatus);
+        RemoveStatusText(_precisionStatus);
 
         MoveDraftingTogglesToStatusBar(statusPanel);
         RefreshCommandStatusLanguage();
 
         CadLanguageManager.Changed += CommandStatusLanguageChanged;
         Closed += CommandStatusClosed;
+    }
+
+    private static void RemoveStatusText(Control control)
+    {
+        if (control.Parent is Panel parent)
+            parent.Children.Remove(control);
     }
 
     private void MoveDraftingTogglesToStatusBar(DockPanel statusPanel)
@@ -67,11 +73,11 @@ public sealed partial class MainWindow
         panel.Children.Add(_orthoToggle);
         panel.Children.Add(_polarToggle);
 
-        // Insert near the right-side drafting/coordinate indicators. DockPanel
-        // right docking keeps the central status region available for selection.
         DockPanel.SetDock(panel, Dock.Right);
         var coordinateIndex = statusPanel.Children.IndexOf(_coordinateStatus);
-        statusPanel.Children.Insert(Math.Max(0, coordinateIndex), panel);
+        statusPanel.Children.Insert(
+            coordinateIndex >= 0 ? coordinateIndex + 1 : 0,
+            panel);
     }
 
     private static void ConfigureStatusDraftingToggle(

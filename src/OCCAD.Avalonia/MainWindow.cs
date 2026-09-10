@@ -17,10 +17,6 @@ public sealed partial class MainWindow : Window
 {
     private readonly CadWorkspace _workspace = new();
 
-    // Legacy menu state remains source-compatible until the action/shortcut
-    // helpers are split out of MainWindow.Menu.cs, but it is no longer built
-    // or attached to the visual tree.
-    private readonly Menu _mainMenu = new();
     private readonly ComboBox _layerCombo = new();
     private readonly ToggleButton _planeXy = new();
     private readonly ToggleButton _planeYz = new();
@@ -62,25 +58,9 @@ public sealed partial class MainWindow : Window
     private readonly Border _dynamicHud = new();
     private readonly TextBlock _dynamicValue = new();
 
-    private readonly TextBlock _toolStatus = new();
     private readonly TextBlock _selectionStatus = new();
-    private readonly TextBlock _historyStatus = new();
-    private readonly TextBlock _snapStatus = new();
-    private readonly TextBlock _precisionStatus = new();
-    private readonly TextBlock _workPlaneStatus = new();
     private readonly TextBlock _coordinateStatus = new();
     private readonly StackPanel _commandHost = new();
-
-    private readonly Dictionary<string, List<MenuItem>> _actionItems =
-        new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<CadSnapType, MenuItem> _snapModeItems = [];
-    private readonly Dictionary<double, MenuItem> _polarItems = [];
-    private MenuItem? _chineseMenu;
-    private MenuItem? _englishMenu;
-    private MenuItem? _modelPanelMenu;
-    private MenuItem? _layerPanelMenu;
-    private MenuItem? _propertyPanelMenu;
-    private MenuItem? _toolPanelMenu;
 
     private readonly CadViewportInteractionController _viewportInteraction;
     private readonly CadPropertyInspectorController _propertyInspector;
@@ -181,7 +161,6 @@ public sealed partial class MainWindow : Window
         };
 
         // Ribbon is inserted by ApplyRibbon() before the window is shown.
-        // The shell itself no longer creates the legacy Menu or toolbar.
         var status = BuildStatusBar();
         DockPanel.SetDock(status, Dock.Bottom);
         root.Children.Add(status);
@@ -453,16 +432,57 @@ public sealed partial class MainWindow : Window
 
     private Control BuildStatusBar()
     {
-        ConfigureStatusText(_toolStatus, 156);
-        ConfigureStatusText(_selectionStatus, 92);
-        ConfigureStatusText(_historyStatus, 122);
-        ConfigureStatusText(_snapStatus, 104);
-        ConfigureStatusText(_precisionStatus, 124);
-        ConfigureStatusText(_workPlaneStatus, 118);
+        ConfigureStatusText(_selectionStatus, 120);
         ConfigureStatusText(_coordinateStatus, 214);
-        _toolStatus.Foreground = CadTheme.Text;
+        _selectionStatus.Foreground = CadTheme.Text;
         _coordinateStatus.Foreground = CadTheme.Text;
         _coordinateStatus.TextAlignment = TextAlignment.Right;
+
+        _workPlaneUiLabel = new TextBlock
+        {
+            Foreground = CadTheme.Muted,
+            FontSize = CadTheme.CaptionFontSize,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(5, 0, 3, 0)
+        };
+        ConfigureStatusPlaneButton(_planeXy);
+        ConfigureStatusPlaneButton(_planeYz);
+        ConfigureStatusPlaneButton(_planeXz);
+
+        var planePanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 1,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(2, 0, 6, 0)
+        };
+        planePanel.Children.Add(_workPlaneUiLabel);
+        planePanel.Children.Add(_planeXy);
+        planePanel.Children.Add(_planeYz);
+        planePanel.Children.Add(_planeXz);
+
+        _draftingStatusLabel = new TextBlock
+        {
+            Foreground = CadTheme.Muted,
+            FontSize = CadTheme.CaptionFontSize,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0, 3, 0)
+        };
+        ConfigureStatusDraftingToggle(_snapToggle);
+        ConfigureStatusDraftingToggle(_orthoToggle);
+        ConfigureStatusDraftingToggle(_polarToggle);
+
+        var draftingPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 1,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(2, 0, 5, 0)
+        };
+        draftingPanel.Children.Add(_draftingStatusLabel);
+        draftingPanel.Children.Add(_snapToggle);
+        draftingPanel.Children.Add(_orthoToggle);
+        draftingPanel.Children.Add(_polarToggle);
 
         var panel = new DockPanel
         {
@@ -472,17 +492,11 @@ public sealed partial class MainWindow : Window
 
         DockPanel.SetDock(_coordinateStatus, Dock.Right);
         panel.Children.Add(_coordinateStatus);
-        DockPanel.SetDock(_workPlaneStatus, Dock.Right);
-        panel.Children.Add(_workPlaneStatus);
-        DockPanel.SetDock(_precisionStatus, Dock.Right);
-        panel.Children.Add(_precisionStatus);
-        DockPanel.SetDock(_snapStatus, Dock.Right);
-        panel.Children.Add(_snapStatus);
-        DockPanel.SetDock(_historyStatus, Dock.Right);
-        panel.Children.Add(_historyStatus);
-        DockPanel.SetDock(_selectionStatus, Dock.Right);
+        DockPanel.SetDock(draftingPanel, Dock.Right);
+        panel.Children.Add(draftingPanel);
+        DockPanel.SetDock(planePanel, Dock.Right);
+        panel.Children.Add(planePanel);
         panel.Children.Add(_selectionStatus);
-        panel.Children.Add(_toolStatus);
 
         return new Border
         {

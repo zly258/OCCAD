@@ -216,18 +216,13 @@ public sealed partial class MainWindow
             _orthoToggle.IsEnabled = !explicitDirectionLock;
             _polarToggle.IsEnabled = !explicitDirectionLock;
 
-            foreach (var pair in _snapModeItems)
-                pair.Value.IsChecked = (_workspace.Snap.Modes & pair.Key) != 0;
-
-            foreach (var pair in _polarItems)
-            {
-                pair.Value.IsChecked = Math.Abs(
-                    _workspace.Drafting.PolarIncrementDegrees - pair.Key) <= 1e-12;
-            }
+            ToolTip.SetTip(
+                _polarToggle,
+                $"{UiText("Cad.Text.PolarIncrement", "Polar Increment")}: " +
+                $"{_workspace.Drafting.PolarIncrementDegrees:0}°");
 
             RefreshWorkPlaneUi();
             RefreshSnapStatus();
-            RefreshPrecisionUi();
         }
         finally
         {
@@ -251,31 +246,36 @@ public sealed partial class MainWindow
         var userLocked = _workspace.WorkPlane.UserPlaneLocked;
         var toolFixed = _workspace.WorkPlane.ToolPlaneFixed ||
                         _workspace.WorkPlane.GripPlaneFixed;
-        _workPlaneStatus.Text =
-            userLocked
-                ? $"{label}: {preset} · {UiText("Cad.Text.Locked", "Locked")}"
-                : toolFixed
-                    ? $"{label}: {preset} · {UiText("Cad.Text.ToolFixed", "Tool fixed")}"
-                    : $"{label}: {preset}";
+        var state = userLocked
+            ? UiText("Cad.Text.Locked", "Locked")
+            : toolFixed
+                ? UiText("Cad.Text.ToolFixed", "Tool fixed")
+                : null;
+
+        if (_workPlaneUiLabel is not null)
+        {
+            _workPlaneUiLabel.Text = state is null
+                ? $"{label}:"
+                : $"{label} ({state}):";
+            ToolTip.SetTip(
+                _workPlaneUiLabel,
+                state is null
+                    ? $"{label}: {preset}"
+                    : $"{label}: {preset} · {state}");
+        }
     }
 
     private void RefreshSnapStatus()
     {
         UpdateSnapAperture();
 
+        var objectSnap = UiText("Cad.Text.ObjectSnap", "Object Snap");
+        string detail;
         if (!_workspace.Snap.Enabled)
         {
-            _snapStatus.Text = UiText("Cad.Text.SnapOff", "Snap: off");
-            return;
+            detail = UiText("Cad.Text.SnapOff", "Snap: off");
         }
-
-        if (!_workspace.Snap.Active)
-        {
-            _snapStatus.Text = UiText("Cad.Text.SnapReady", "Snap: ready");
-            return;
-        }
-
-        if (_workspace.Snap.Current is { } snap)
+        else if (_workspace.Snap.Current is { } snap)
         {
             var name = LocalizeSnapType(snap.Type);
             var count = _workspace.Snap.Candidates.Count;
@@ -289,76 +289,20 @@ public sealed partial class MainWindow
                     : "Snap: TEMP {0}",
                 name);
 
-            _snapStatus.Text = count > 1 && index >= 0
+            detail = count > 1 && index >= 0
                 ? $"{current} {index + 1}/{count}"
                 : current;
-            return;
+        }
+        else
+        {
+            detail = UiText("Cad.Text.SnapReady", "Snap: ready");
         }
 
-        _snapStatus.Text = UiText("Cad.Text.SnapReady", "Snap: ready");
+        ToolTip.SetTip(_snapToggle, $"{objectSnap} · {detail}");
     }
 
-    private void RefreshPrecisionUi()
-    {
-        var tool = _workspace.Tools.ActiveTool;
-        if (tool is null)
-        {
-            _precisionStatus.Text = UiText("Cad.Text.PrecisionReady", "Precision: ready");
-            return;
-        }
-
-        var values = new List<string>(3);
-
-        if (_workspace.Drafting.LengthLockEnabled)
-            values.Add($"L={_workspace.Drafting.LockedLength:0.###}");
-
-        if (_workspace.Drafting.AngleLockEnabled)
-            values.Add($"A={_workspace.Drafting.LockedAngleDegrees:0.###}°");
-
-        if (_workspace.Precision.Factor is { } factor)
-            values.Add($"F={factor:0.###}");
-
-        _precisionStatus.Text = values.Count == 0
-            ? UiText("Cad.Text.PrecisionFree", "Precision: free")
-            : UiFormat(
-                "Cad.Text.PrecisionStatus",
-                "Precision: {0}",
-                string.Join("  ", values));
-    }
-
-    private void UpdateHistoryUi()
-    {
-        var undoName = CadLanguageManager.HistoryName(_workspace.History.UndoName);
-        var redoName = CadLanguageManager.HistoryName(_workspace.History.RedoName);
-
-        _historyStatus.Text = _workspace.History.CanUndo
-            ? UiFormat("Cad.Text.HistoryCurrent", "History: {0}", undoName)
-            : UiText("Cad.Text.HistoryEmpty", "History: empty");
-
-        if (_actionItems.TryGetValue("edit.undo", out var undoItems))
-        {
-            var label = UiText("Cad.Text.Undo", "Undo");
-            foreach (var item in undoItems)
-            {
-                item.Header = _workspace.History.CanUndo
-                    ? $"{label} · {undoName}"
-                    : label;
-            }
-        }
-
-        if (_actionItems.TryGetValue("edit.redo", out var redoItems))
-        {
-            var label = UiText("Cad.Text.Redo", "Redo");
-            foreach (var item in redoItems)
-            {
-                item.Header = _workspace.History.CanRedo
-                    ? $"{label} · {redoName}"
-                    : label;
-            }
-        }
-
+    private void UpdateHistoryUi() =>
         RefreshActionUi();
-    }
 
     private void UpdateCoordinateStatus(CadResolvedPoint resolved)
     {

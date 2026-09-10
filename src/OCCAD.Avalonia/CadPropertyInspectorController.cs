@@ -982,6 +982,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         var xEditor = CoordinateEditor(x, isMixed);
         var yEditor = CoordinateEditor(y, isMixed);
         var zEditor = CoordinateEditor(z, isMixed);
+        var editors = new[] { xEditor, yEditor, zEditor };
 
         var grid = new Grid
         {
@@ -1017,7 +1018,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         bool TryCommit(bool rebuildOnInvalid)
         {
-            if (_refreshing)
+            if (_refreshing || _disposed)
                 return false;
 
             if (!CadValueTextConverter.TryParseFiniteDouble(xEditor.Text, out var nextX) ||
@@ -1036,7 +1037,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
             return true;
         }
 
-        foreach (var editor in new[] { xEditor, yEditor, zEditor })
+        foreach (var editor in editors)
         {
             editor.KeyDown += (_, e) =>
             {
@@ -1046,7 +1047,26 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 e.Handled = true;
             };
             editor.LostFocus += (_, _) =>
-                _ = TryCommit(rebuildOnInvalid: !isMixed);
+            {
+                // LostFocus is raised while the focus transition is still in
+                // progress. Defer the decision so Tab between X/Y/Z does not
+                // rebuild the entire PropertyGrid and destroy the next editor.
+                global::Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (_disposed || _refreshing)
+                        return;
+
+                    var focused = TopLevel
+                        .GetTopLevel(_owner)?
+                        .FocusManager?
+                        .GetFocusedElement();
+                    if (editors.Any(candidate =>
+                            ReferenceEquals(candidate, focused)))
+                        return;
+
+                    _ = TryCommit(rebuildOnInvalid: !isMixed);
+                });
+            };
         }
 
         return grid;

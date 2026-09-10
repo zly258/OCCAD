@@ -27,7 +27,6 @@ public sealed partial class MainWindow
         // The shell is Ribbon-first. Layer selection is hosted by Home while
         // drafting/work-plane controls are hosted by the status surface.
         DetachRibbonControl(_layerCombo);
-        ReleaseLegacyMenuState();
 
         _ribbonHost = new Border
         {
@@ -489,20 +488,6 @@ public sealed partial class MainWindow
     {
         if (_ribbonApplied)
             RebuildRibbon();
-    }
-
-    private void ReleaseLegacyMenuState()
-    {
-        _mainMenu.ItemsSource = null;
-        _actionItems.Clear();
-        _snapModeItems.Clear();
-        _polarItems.Clear();
-        _chineseMenu = null;
-        _englishMenu = null;
-        _modelPanelMenu = null;
-        _layerPanelMenu = null;
-        _propertyPanelMenu = null;
-        _toolPanelMenu = null;
     }
 
     private static void DetachRibbonControl(Control control)

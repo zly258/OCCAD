@@ -115,6 +115,8 @@
     <sys:String x:Key="Cad.Prompt.AngleDimension.Line">角度尺寸：指定尺寸弧半径 [Backspace 返回，Esc 取消]</sys:String>
 
     <!-- Radius / diameter dimension -->
+    <sys:String x:Key="Cad.Text.CircularDimension">圆尺寸标注</sys:String>
+    <sys:String x:Key="Cad.ToolPanel.circulardimension.Title">圆尺寸标注</sys:String>
     <sys:String x:Key="Cad.Parameter.circulardimension.Kind">标注类型</sys:String>
     <sys:String x:Key="Cad.Parameter.circulardimension.Kind.Radius">半径标注</sys:String>
     <sys:String x:Key="Cad.Parameter.circulardimension.Kind.Diameter">直径标注</sys:String>

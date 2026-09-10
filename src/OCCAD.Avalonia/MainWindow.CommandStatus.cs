@@ -15,84 +15,14 @@ public sealed partial class MainWindow
         if (_commandStatusRefinementApplied)
             return;
 
-        if (_coordinateStatus.Parent is not DockPanel statusPanel)
-            return;
-
         _commandStatusRefinementApplied = true;
 
-        // The command surface owns command prompts, command history/result
-        // feedback and exact-input state. The status bar stays compact and
-        // limited to persistent selection/drafting/work-plane/coordinate state.
-        RemoveStatusText(_toolStatus);
-        RemoveStatusText(_historyStatus);
-        RemoveStatusText(_snapStatus);
-        RemoveStatusText(_precisionStatus);
-
-        MoveDraftingTogglesToStatusBar(statusPanel);
+        // The status bar is built in its final shape by MainWindow. This pass
+        // only attaches localized drafting menus/tooltips and language updates.
         RefreshCommandStatusLanguage();
 
         CadLanguageManager.Changed += CommandStatusLanguageChanged;
         Closed += CommandStatusClosed;
-    }
-
-    private static void RemoveStatusText(Control control)
-    {
-        if (control.Parent is Panel parent)
-            parent.Children.Remove(control);
-    }
-
-    private void MoveDraftingTogglesToStatusBar(DockPanel statusPanel)
-    {
-        Control? leadingSeparator = null;
-        if (_snapToggle.Parent is StackPanel toolbar)
-        {
-            var snapIndex = toolbar.Children.IndexOf(_snapToggle);
-            if (snapIndex > 0)
-                leadingSeparator = toolbar.Children[snapIndex - 1];
-        }
-
-        if (_snapToggle.Parent is Panel snapParent)
-            snapParent.Children.Remove(_snapToggle);
-        if (_orthoToggle.Parent is Panel orthoParent)
-            orthoParent.Children.Remove(_orthoToggle);
-        if (_polarToggle.Parent is Panel polarParent)
-            polarParent.Children.Remove(_polarToggle);
-
-        if (leadingSeparator?.Parent is Panel separatorParent &&
-            IsToolbarSeparator(leadingSeparator))
-        {
-            separatorParent.Children.Remove(leadingSeparator);
-        }
-
-        ConfigureStatusDraftingToggle(_snapToggle);
-        ConfigureStatusDraftingToggle(_orthoToggle);
-        ConfigureStatusDraftingToggle(_polarToggle);
-
-        _draftingStatusLabel = new TextBlock
-        {
-            Foreground = CadTheme.Muted,
-            FontSize = CadTheme.CaptionFontSize,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(4, 0, 3, 0)
-        };
-
-        var panel = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 1,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(2, 0, 5, 0)
-        };
-        panel.Children.Add(_draftingStatusLabel);
-        panel.Children.Add(_snapToggle);
-        panel.Children.Add(_orthoToggle);
-        panel.Children.Add(_polarToggle);
-
-        DockPanel.SetDock(panel, Dock.Right);
-        var coordinateIndex = statusPanel.Children.IndexOf(_coordinateStatus);
-        statusPanel.Children.Insert(
-            coordinateIndex >= 0 ? coordinateIndex + 1 : 0,
-            panel);
     }
 
     private static void ConfigureStatusDraftingToggle(
@@ -117,11 +47,14 @@ public sealed partial class MainWindow
         _polarToggle.ContextMenu = BuildPolarStatusMenu();
 
         ToolTip.SetTip(
-            _snapToggle,
-            CadLanguageManager.Text("Cad.Text.ObjectSnap", "Object Snap"));
+            _orthoToggle,
+            CadLanguageManager.Text("Cad.Text.Ortho", "Ortho"));
         ToolTip.SetTip(
             _polarToggle,
-            CadLanguageManager.Text("Cad.Text.PolarIncrement", "Polar Increment"));
+            $"{CadLanguageManager.Text("Cad.Text.PolarIncrement", "Polar Increment")}: " +
+            $"{_workspace.Drafting.PolarIncrementDegrees:0}°");
+
+        RefreshSnapStatus();
     }
 
     private ContextMenu BuildSnapStatusMenu()
@@ -131,6 +64,7 @@ public sealed partial class MainWindow
             (CadSnapType.Endpoint, "Cad.Text.SnapEndpoint", "Endpoint"),
             (CadSnapType.Midpoint, "Cad.Text.SnapMidpoint", "Midpoint"),
             (CadSnapType.Center, "Cad.Text.SnapCenter", "Center"),
+            (CadSnapType.Quadrant, "Cad.Text.SnapQuadrant", "Quadrant"),
             (CadSnapType.Vertex, "Cad.Text.SnapVertex", "Vertex"),
             (CadSnapType.Intersection, "Cad.Text.SnapIntersection", "Intersection"),
             (CadSnapType.Perpendicular, "Cad.Text.SnapPerpendicular", "Perpendicular"),

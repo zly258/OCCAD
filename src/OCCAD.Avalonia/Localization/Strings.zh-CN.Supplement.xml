@@ -12,6 +12,19 @@
     <sys:String x:Key="Cad.Text.ToolParameters">工具参数</sys:String>
     <sys:String x:Key="Cad.Text.SelectionMode">选择模式</sys:String>
 
+    <!-- Common CAD vocabulary -->
+    <sys:String x:Key="Cad.Text.Method">绘制方式</sys:String>
+    <sys:String x:Key="Cad.Text.Width">宽度</sys:String>
+    <sys:String x:Key="Cad.Text.Height">高度</sys:String>
+    <sys:String x:Key="Cad.Text.Radius">半径</sys:String>
+    <sys:String x:Key="Cad.Text.Diameter">直径</sys:String>
+    <sys:String x:Key="Cad.Text.Count">数量</sys:String>
+    <sys:String x:Key="Cad.Text.Clockwise">顺时针</sys:String>
+    <sys:String x:Key="Cad.Text.KeepSource">保留源对象</sys:String>
+    <sys:String x:Key="Cad.Text.ByLayer">随层</sys:String>
+    <sys:String x:Key="Cad.Text.Lock">锁定</sys:String>
+    <sys:String x:Key="Cad.Text.StepBack">返回</sys:String>
+
     <!-- Layer table -->
     <sys:String x:Key="Cad.Text.Current">当前</sys:String>
     <sys:String x:Key="Cad.Text.SetCurrentLayer">设为当前图层</sys:String>
@@ -23,11 +36,25 @@
     <sys:String x:Key="Cad.Text.SelectionInitial">选择：0</sys:String>
     <sys:String x:Key="Cad.Text.SelectionWithCount">选择 [{0}]</sys:String>
     <sys:String x:Key="Cad.Text.PropertyUpdateFailed">属性修改失败</sys:String>
+    <sys:String x:Key="Cad.Category.General">常规</sys:String>
+    <sys:String x:Key="Cad.Category.Geometry">几何</sys:String>
     <sys:String x:Key="Cad.Category.Appearance">外观</sys:String>
     <sys:String x:Key="Cad.Category.Placement">定位</sys:String>
     <sys:String x:Key="Cad.Category.Subobject">子对象</sys:String>
     <sys:String x:Key="Cad.Category.Identity">标识</sys:String>
     <sys:String x:Key="Cad.Category.Layer">图层</sys:String>
+    <sys:String x:Key="Cad.Property.Name">名称</sys:String>
+    <sys:String x:Key="Cad.Property.Layer">图层</sys:String>
+    <sys:String x:Key="Cad.Property.Visible">可见</sys:String>
+    <sys:String x:Key="Cad.Property.Color">颜色</sys:String>
+    <sys:String x:Key="Cad.Property.LineStyle">线型</sys:String>
+    <sys:String x:Key="Cad.Property.LineWidth">线宽</sys:String>
+    <sys:String x:Key="Cad.Property.Position">位置</sys:String>
+    <sys:String x:Key="Cad.Property.Center">中心</sys:String>
+    <sys:String x:Key="Cad.Property.Length">长度</sys:String>
+    <sys:String x:Key="Cad.Property.Area">面积</sys:String>
+    <sys:String x:Key="Cad.Property.Radius">半径</sys:String>
+    <sys:String x:Key="Cad.Property.Diameter">直径</sys:String>
     <sys:String x:Key="Cad.Property.SubobjectIndex">索引</sys:String>
     <sys:String x:Key="Cad.Property.SubobjectType">类型</sys:String>
     <sys:String x:Key="Cad.Property.StartPoint">起点</sys:String>
@@ -37,6 +64,14 @@
     <sys:String x:Key="Cad.Property.Opacity">不透明度</sys:String>
     <sys:String x:Key="Cad.Property.LineType">线型</sys:String>
     <sys:String x:Key="Cad.Property.LineWeight">线宽</sys:String>
+
+    <!-- Common enum values -->
+    <sys:String x:Key="Cad.Value.OcctLineStyle.Solid">实线</sys:String>
+    <sys:String x:Key="Cad.Value.OcctLineStyle.Dash">虚线</sys:String>
+    <sys:String x:Key="Cad.Value.OcctLineStyle.Dot">点线</sys:String>
+    <sys:String x:Key="Cad.Value.OcctLineStyle.DashDot">点划线</sys:String>
+    <sys:String x:Key="Cad.Value.OcctDisplayMode.Wireframe">线框</sys:String>
+    <sys:String x:Key="Cad.Value.OcctDisplayMode.Shaded">着色</sys:String>
 
     <!-- Subobject and OCCT values -->
     <sys:String x:Key="Cad.Text.PathSegmentLine">直线段</sys:String>
@@ -75,13 +110,66 @@
     <!-- Floating tool panel -->
     <sys:String x:Key="Cad.Text.Step">步骤</sys:String>
     <sys:String x:Key="Cad.Text.Coordinate">坐标</sys:String>
-    <sys:String x:Key="Cad.Text.Back">返回</sys:String>
     <sys:String x:Key="Cad.Text.SetPoint">设置</sys:String>
     <sys:String x:Key="Cad.Text.HideToolPanel">隐藏工具参数</sys:String>
     <sys:String x:Key="Cad.Text.ExactPointHint">绝对：100,200；相对：@500,0；极坐标：@1000&lt;30</sys:String>
     <sys:String x:Key="Cad.Text.Length">长度</sys:String>
     <sys:String x:Key="Cad.Text.Angle">角度</sys:String>
     <sys:String x:Key="Cad.Text.ScaleFactor">比例</sys:String>
+
+    <!-- Tool parameters and drawing methods -->
+    <sys:String x:Key="Cad.Parameter.circle.Method">绘制方式</sys:String>
+    <sys:String x:Key="Cad.Parameter.circle.Method.CenterRadius">圆心 + 半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.circle.Method.CenterDiameter">圆心 + 直径</sys:String>
+    <sys:String x:Key="Cad.Parameter.circle.Method.TwoPoints">两点定圆</sys:String>
+    <sys:String x:Key="Cad.Parameter.circle.Method.ThreePoints">三点定圆</sys:String>
+    <sys:String x:Key="Cad.Parameter.circle.Method.PointCenter">圆上一点 + 圆心</sys:String>
+    <sys:String x:Key="Cad.Parameter.circle.Radius">半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.circle.Diameter">直径</sys:String>
+
+    <sys:String x:Key="Cad.Parameter.arc.Method">绘制方式</sys:String>
+    <sys:String x:Key="Cad.Parameter.arc.Method.ThreePoints">三点圆弧</sys:String>
+    <sys:String x:Key="Cad.Parameter.arc.Method.CenterStartEnd">圆心 + 起点 + 终点</sys:String>
+    <sys:String x:Key="Cad.Parameter.arc.Method.StartCenterEnd">起点 + 圆心 + 终点</sys:String>
+    <sys:String x:Key="Cad.Parameter.arc.Method.StartEndCenter">起点 + 终点 + 圆心</sys:String>
+    <sys:String x:Key="Cad.Parameter.arc.Method.StartEndPoint">起点 + 终点 + 圆上一点</sys:String>
+    <sys:String x:Key="Cad.Parameter.arc.Method.StartEndTangent">起点 + 终点 + 切线方向</sys:String>
+    <sys:String x:Key="Cad.Parameter.arc.Clockwise">顺时针</sys:String>
+
+    <sys:String x:Key="Cad.Parameter.rectangle.Width">宽度</sys:String>
+    <sys:String x:Key="Cad.Parameter.rectangle.Height">高度</sys:String>
+    <sys:String x:Key="Cad.Parameter.rectangle.Angle">旋转角度</sys:String>
+    <sys:String x:Key="Cad.Parameter.copy.Count">复制数量</sys:String>
+    <sys:String x:Key="Cad.Parameter.mirror.KeepSource">保留源对象</sys:String>
+
+    <sys:String x:Key="Cad.Parameter.regularpolygon.Mode.Inscribed">内接于圆</sys:String>
+    <sys:String x:Key="Cad.Parameter.regularpolygon.Mode.Circumscribed">外切于圆</sys:String>
+    <sys:String x:Key="Cad.Parameter.ellipse.Method.CenterMajorMinor">中心 + 长短轴</sys:String>
+    <sys:String x:Key="Cad.Parameter.ellipse.Method.AxisEndpointsMinor">长轴端点 + 短轴</sys:String>
+
+    <!-- Precision labels -->
+    <sys:String x:Key="Cad.Precision.line.1.Length">长度</sys:String>
+    <sys:String x:Key="Cad.Precision.line.1.Angle">角度</sys:String>
+    <sys:String x:Key="Cad.Precision.move.1.Length">移动距离</sys:String>
+    <sys:String x:Key="Cad.Precision.move.1.Angle">移动角度</sys:String>
+    <sys:String x:Key="Cad.Precision.copy.1.Length">复制距离</sys:String>
+    <sys:String x:Key="Cad.Precision.copy.1.Angle">复制角度</sys:String>
+    <sys:String x:Key="Cad.Precision.rotate.1.Angle">旋转角度</sys:String>
+    <sys:String x:Key="Cad.Precision.scale.1.Factor">比例因子</sys:String>
+    <sys:String x:Key="Cad.Precision.mirror.1.Length">镜像轴长度</sys:String>
+    <sys:String x:Key="Cad.Precision.mirror.1.Angle">镜像轴角度</sys:String>
+    <sys:String x:Key="Cad.Precision.circle.1.Length">半径/直径</sys:String>
+
+    <!-- Additional circle prompts -->
+    <sys:String x:Key="Cad.Prompt.Circle.Diameter">圆：指定直径 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Circle.FirstDiameterPoint">圆：指定直径第一点 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Circle.SecondDiameterPoint">圆：指定直径第二点 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Circle.FirstPoint">圆：指定第一点 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Circle.SecondPoint">圆：指定第二点 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Circle.ThirdPoint">圆：指定第三点 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Circle.EdgePoint">圆：指定圆上一点 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Circle.CenterAfterPoint">圆：指定圆心 [Backspace 返回，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.Circle.Invalid">圆：这些点无法确定有效圆。</sys:String>
 
     <!-- Command/status shell -->
     <sys:String x:Key="Cad.Text.Command">命令</sys:String>
@@ -97,4 +185,21 @@
     <sys:String x:Key="Cad.Text.ToolFixed">工具固定</sys:String>
     <sys:String x:Key="Cad.Text.PrecisionReady">精确输入：就绪</sys:String>
     <sys:String x:Key="Cad.Text.PrecisionFree">精确输入：自由</sys:String>
+
+    <!-- Command feedback -->
+    <sys:String x:Key="Cad.Command.Unknown">未知命令：{0}</sys:String>
+    <sys:String x:Key="Cad.Command.Unavailable">当前状态下命令不可用：{0}</sys:String>
+    <sys:String x:Key="Cad.Command.UnsupportedParameter">不支持的参数：{0}</sys:String>
+    <sys:String x:Key="Cad.Command.Close">闭合</sys:String>
+    <sys:String x:Key="Cad.Command.StepBack">返回上一步</sys:String>
+    <sys:String x:Key="Cad.Command.InputRequired">当前步骤还需要输入。</sys:String>
+    <sys:String x:Key="Cad.Command.NoRepeat">没有可重复的上一命令。</sys:String>
+    <sys:String x:Key="Cad.Command.CannotFinish">当前工具尚不能结束。</sys:String>
+    <sys:String x:Key="Cad.Command.NoPreviousStage">没有可返回的上一步。</sys:String>
+    <sys:String x:Key="Cad.Command.InvalidCoordinates">坐标必须是有限数值。</sys:String>
+    <sys:String x:Key="Cad.Command.RelativeReferenceRequired">相对坐标需要当前工具步骤提供参考点。</sys:String>
+    <sys:String x:Key="Cad.Command.PointRejected">当前步骤不接受点输入。</sys:String>
+    <sys:String x:Key="Cad.Command.InvalidStageInput">当前工具步骤不接受此输入。</sys:String>
+    <sys:String x:Key="Cad.Command.PrecisionRejected">精确输入被当前工具拒绝。</sys:String>
+    <sys:String x:Key="Cad.Command.PolylineCloseRequiresThree">多段线至少需要三个点才能闭合。</sys:String>
 </ResourceDictionary>

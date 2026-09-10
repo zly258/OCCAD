@@ -49,7 +49,6 @@ public sealed partial class MainWindow
         _layerPanel.RefreshLanguage();
         _propertyInspector.RefreshLanguage();
         _commandLine.RefreshLanguage();
-        _toolPanel.RefreshLanguage();
         ModelPanel.RefreshLanguage();
         RefreshRefinementLanguage();
         RefreshCompactToolbarLanguage();
@@ -158,12 +157,9 @@ public sealed partial class MainWindow
 
     private void UpdateToolUi(CadTool? tool)
     {
-        _toolPanel.SetTool(tool);
-
         if (tool is null)
         {
             _viewport.InteractionFeatures = OcctViewportInteractionFeatures.Default;
-            SetOperationStatus(UiText("Cad.Text.Ready", "Ready"));
             _dynamicHud.IsVisible = false;
             _snapAperture.IsVisible = false;
         }
@@ -179,11 +175,6 @@ public sealed partial class MainWindow
 
             _viewport.InteractionFeatures = features;
 
-            var prompt = tool.Prompt is { } activePrompt
-                ? CadLanguageManager.ToolPrompt(activePrompt)
-                : LocalizeToolName(tool);
-            SetOperationStatus(prompt);
-
             if (_workspace.LastResolvedPoint is { } resolved)
                 UpdateDynamicInputHud(resolved);
             else
@@ -195,24 +186,15 @@ public sealed partial class MainWindow
         RefreshPanelMenuState();
     }
 
-    private void SetOperationStatus(string message)
-    {
-        var label = ChineseUi ? "操作提示" : "Prompt";
-        _toolStatus.Text = $"{label}: {message}";
-        ToolTip.SetTip(_toolStatus, _toolStatus.Text);
-    }
-
     private void WorkPlaneChanged()
     {
         _workspace.Tracking.Clear();
-        _toolPanel.SetTool(_workspace.Tools.ActiveTool);
         RefreshInteractionUi();
     }
 
     private void DraftingChanged()
     {
         _workspace.Tracking.Clear();
-        _toolPanel.SetTool(_workspace.Tools.ActiveTool);
         RefreshInteractionUi();
     }
 

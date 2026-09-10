@@ -9,10 +9,9 @@ using OCCAD;
 namespace OCCAD.Avalonia;
 
 /// <summary>
-/// Persistent non-modal parameter panel for the active CAD tool. Unlike the
-/// legacy panel, its lifetime follows the active tool rather than the current
-/// input kind, so selection stages, point stages and precision stages all keep
-/// one continuous interaction surface.
+/// Persistent non-modal parameter panel for the active CAD tool. Its lifetime
+/// follows the active tool rather than the current input kind, so selection,
+/// point, precision and confirmation stages keep one continuous surface.
 /// </summary>
 internal sealed class CadFloatingToolPanel : Border, IDisposable
 {
@@ -240,9 +239,8 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         var prompt = tool.Prompt is { } activePrompt
             ? CadLanguageManager.ToolPrompt(activePrompt)
             : CadLanguageManager.Text(tool.LocalizationKey, tool.DisplayName);
-        var step = IsChinese
-            ? $"步骤 {tool.Stage + 1}"
-            : $"Step {tool.Stage + 1}";
+        var step =
+            $"{CadLanguageManager.Text("Cad.Text.Step", "Step")} {tool.Stage + 1}";
 
         var panel = new StackPanel
         {
@@ -278,7 +276,9 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         var editor = new TextBox
         {
             Tag = ExactPointId,
-            PlaceholderText = "100,200  |  @500,0  |  @1000<30"
+            PlaceholderText = CadLanguageManager.Text(
+                "Cad.Text.ExactPointHint",
+                "100,200 | @500,0 | @1000<30")
         };
         editor.Classes.Add("cad-input");
         editor.KeyDown += (_, e) =>
@@ -290,7 +290,7 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         };
 
         var apply = CompactButton();
-        apply.Content = Localized("Cad.Text.SetPoint", "确定点", "Set");
+        apply.Content = CadLanguageManager.Text("Cad.Text.SetPoint", "Set");
         apply.MinWidth = 50;
         apply.Click += (_, _) => CommitExactPoint(tool, editor);
 
@@ -302,7 +302,7 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         Grid.SetColumn(apply, 1);
         value.Children.Add(apply);
 
-        AddRow(Localized("Cad.Text.Coordinate", "坐标", "Coordinate"), value);
+        AddRow(CadLanguageManager.Text("Cad.Text.Coordinate", "Coordinate"), value);
     }
 
     private void CommitExactPoint(CadTool tool, TextBox editor)
@@ -398,7 +398,7 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
 
         var locked = new CheckBox
         {
-            Content = Localized("Cad.Text.Lock", "锁定", "Lock"),
+            Content = CadLanguageManager.Text("Cad.Text.Lock", "Lock"),
             IsChecked = value.HasValue,
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -434,8 +434,8 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            _workspace.Precision.ClearLock(tool, kind);
-            SetTool(tool, forceRebuild: true);
+            if (!_workspace.Precision.ClearLock(tool, kind))
+                SetTool(tool, forceRebuild: true);
             return;
         }
 
@@ -456,8 +456,9 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
                 new CadPrecisionInput(Factor: number),
             _ => default
         };
-        _workspace.Precision.Apply(tool, input);
-        SetTool(tool, forceRebuild: true);
+
+        if (!_workspace.Precision.Apply(tool, input))
+            SetTool(tool, forceRebuild: true);
     }
 
     private void AddParameterEditors(CadTool tool)
@@ -611,13 +612,13 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         buttons.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
 
-        _back.Content = Localized("Cad.Text.Back", "返回", "Back");
+        _back.Content = CadLanguageManager.Text("Cad.Text.StepBack", "Back");
         _back.IsEnabled = tool.CanStepBack;
         _accept.Content = tool.CanCommitCurrentStage
-            ? Localized("Cad.Text.Accept", "接受", "Accept")
-            : Localized("Cad.Text.Finish", "完成", "Finish");
+            ? CadLanguageManager.Text("Cad.Text.Accept", "Accept")
+            : CadLanguageManager.Text("Cad.Text.Finish", "Finish");
         _accept.IsEnabled = tool.CanCommitCurrentStage || tool.CanFinish;
-        _cancel.Content = Localized("Cad.Text.Cancel", "取消", "Cancel");
+        _cancel.Content = CadLanguageManager.Text("Cad.Text.Cancel", "Cancel");
         _cancel.IsEnabled = tool.CanCancel;
 
         Detach(_back);
@@ -747,17 +748,6 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         button.Classes.Add("cad-compact");
         return button;
     }
-
-    private static bool IsChinese =>
-        CadLanguageManager.CurrentLanguage.StartsWith(
-            "zh",
-            StringComparison.OrdinalIgnoreCase);
-
-    private static string Localized(
-        string key,
-        string chinese,
-        string english) =>
-        CadLanguageManager.Text(key, IsChinese ? chinese : english);
 
     private sealed record ChoiceItem(string Value, string Label)
     {

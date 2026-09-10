@@ -79,7 +79,6 @@ public sealed partial class MainWindow : Window
     private MenuItem? _propertyPanelMenu;
     private MenuItem? _toolPanelMenu;
 
-    private readonly CadToolPanel _toolPanel;
     private readonly CadViewportInteractionController _viewportInteraction;
     private readonly CadPropertyInspectorController _propertyInspector;
     private readonly CadLayerPanelController _layerPanel;
@@ -106,10 +105,6 @@ public sealed partial class MainWindow : Window
         Background = CadTheme.WindowBrush;
 
         ApplyApplicationSettingsToCore();
-
-        _toolPanel = new CadToolPanel(_workspace);
-        _toolPanel.PanelVisibilityChanged += (_, _) =>
-            RefreshPanelMenuState();
         ConfigureViewport();
         CadDiagnostics.Trace(
             "MainWindow viewport configured.");
@@ -495,7 +490,6 @@ public sealed partial class MainWindow : Window
         overlay.Children.Add(_dynamicHud);
 
         _viewportHost.Children.Add(overlay);
-        _viewportHost.Children.Add(_toolPanel);
     }
 
     private Control BuildStatusBar()
@@ -575,10 +569,11 @@ public sealed partial class MainWindow : Window
                     _workspace.AttachEngine(args.Engine);
                     ConfigureEngine(args.Engine);
                     _viewportInteraction.AttachEngine(args.Engine);
-                    _toolStatus.Text = UiFormat(
-                        "Cad.Text.ReadyOcct",
-                        "Ready - OCCT {0}",
-                        OcctEngine.OcctVersion);
+                    _commandLine.ShowFeedback(
+                        UiFormat(
+                            "Cad.Text.ReadyOcct",
+                            "Ready - OCCT {0}",
+                            OcctEngine.OcctVersion));
                     RefreshTree();
                     RefreshActionUi();
 
@@ -594,8 +589,7 @@ public sealed partial class MainWindow : Window
                     if (CadDiagnostics.IsFatal(exception))
                         throw;
 
-                    _toolStatus.Text =
-                        exception.Message;
+                    _commandLine.ShowFeedback(exception.Message);
                     CadErrorWindow.ShowError(
                         exception,
                         "Viewport initialization");
@@ -612,8 +606,7 @@ public sealed partial class MainWindow : Window
                 if (CadDiagnostics.IsFatal(args.Exception))
                     throw args.Exception;
 
-                _toolStatus.Text =
-                    args.Exception.Message;
+                _commandLine.ShowFeedback(args.Exception.Message);
                 CadErrorWindow.ShowError(
                     args.Exception,
                     "Viewport");
@@ -644,8 +637,7 @@ public sealed partial class MainWindow : Window
                 CadDiagnostics.Report(
                     args.Exception,
                     $"Action '{args.Action.Id}'");
-                _toolStatus.Text =
-                    args.Exception.Message;
+                _commandLine.ShowFeedback(args.Exception.Message);
             });
         _workspace.Snap.CurrentChanged += (_, _) =>
             Ui(RefreshSnapStatus);
@@ -825,9 +817,10 @@ public sealed partial class MainWindow : Window
 
             if (!_workspace.Tools.TryChangeDrawingPlane(preset))
             {
-                _toolStatus.Text = UiText(
-                    "Cad.Text.WorkPlaneChangeBlocked",
-                    "Finish the active tool before changing the work plane.");
+                _commandLine.ShowFeedback(
+                    UiText(
+                        "Cad.Text.WorkPlaneChangeBlocked",
+                        "Finish the active tool before changing the work plane."));
             }
 
             RefreshWorkPlaneUi();

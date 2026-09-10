@@ -56,39 +56,126 @@ public sealed class CadSettingsStore
             JsonNode.DeepEquals(current, node))
             return;
 
+        var hadPrevious = _values.TryGetValue(normalized, out var previous);
+        var previousClone = previous?.DeepClone();
         _values[normalized] = node;
-        Changed?.Invoke(this, new CadSettingChangedEventArgs(normalized, node));
+
+        try
+        {
+            PublishChanged(normalized, node);
+        }
+        catch (Exception failure)
+        {
+            if (hadPrevious)
+                _values[normalized] = previousClone;
+            else
+                _values.Remove(normalized);
+
+            var rollbackFailure = TryPublishRollback(
+                normalized,
+                hadPrevious ? previousClone : null);
+            if (rollbackFailure is not null)
+            {
+                throw new AggregateException(
+                    "Setting apply and rollback notification both failed.",
+                    failure,
+                    rollbackFailure);
+            }
+
+            throw;
+        }
     }
 
     public void SetValues(IReadOnlyDictionary<string, JsonNode?> values)
     {
         ArgumentNullException.ThrowIfNull(values);
+
+        var requested = new Dictionary<string, JsonNode?>(StringComparer.Ordinal);
         foreach (var (key, value) in values)
         {
             var normalized = NormalizeKey(key);
-            var clone = value?.DeepClone();
-            if (_values.TryGetValue(normalized, out var current) &&
-                JsonNode.DeepEquals(current, clone))
-                continue;
+            if (!requested.TryAdd(normalized, value?.DeepClone()))
+                throw new ArgumentException(
+                    $"Setting key '{normalized}' is duplicated.",
+                    nameof(values));
+        }
 
-            _values[normalized] = clone;
-            Changed?.Invoke(this, new CadSettingChangedEventArgs(normalized, clone));
+        var changed = requested
+            .Where(pair =>
+                !_values.TryGetValue(pair.Key, out var current) ||
+                !JsonNode.DeepEquals(current, pair.Value))
+            .ToArray();
+        if (changed.Length == 0)
+            return;
+
+        var before = SnapshotMutable();
+        foreach (var pair in changed)
+            _values[pair.Key] = pair.Value?.DeepClone();
+
+        try
+        {
+            foreach (var pair in changed)
+                PublishChanged(pair.Key, pair.Value);
+        }
+        catch (Exception failure)
+        {
+            Restore(before);
+            var rollbackFailures = new List<Exception>();
+            foreach (var pair in changed)
+            {
+                try
+                {
+                    before.TryGetValue(pair.Key, out var restored);
+                    PublishChanged(pair.Key, restored);
+                }
+                catch (Exception rollbackFailure)
+                {
+                    rollbackFailures.Add(rollbackFailure);
+                }
+            }
+
+            if (rollbackFailures.Count > 0)
+            {
+                throw new AggregateException(
+                    "Settings batch apply failed and rollback notification was incomplete.",
+                    new[] { failure }.Concat(rollbackFailures));
+            }
+
+            throw;
         }
     }
 
     public bool Remove(string key)
     {
         var normalized = NormalizeKey(key);
-        if (!_values.Remove(normalized)) return false;
-        Changed?.Invoke(this, new CadSettingChangedEventArgs(normalized, null));
-        return true;
+        if (!_values.TryGetValue(normalized, out var previous))
+            return false;
+
+        var previousClone = previous?.DeepClone();
+        _values.Remove(normalized);
+        try
+        {
+            PublishChanged(normalized, null);
+            return true;
+        }
+        catch (Exception failure)
+        {
+            _values[normalized] = previousClone;
+            var rollbackFailure = TryPublishRollback(normalized, previousClone);
+            if (rollbackFailure is not null)
+            {
+                throw new AggregateException(
+                    "Setting removal and rollback notification both failed.",
+                    failure,
+                    rollbackFailure);
+            }
+
+            throw;
+        }
     }
 
     public IReadOnlyDictionary<string, JsonNode?> Snapshot() =>
-        _values.ToDictionary(
-            static pair => pair.Key,
-            static pair => pair.Value?.DeepClone(),
-            StringComparer.Ordinal);
+        SnapshotMutable();
 
     public void Load(Stream stream)
     {
@@ -123,6 +210,35 @@ public sealed class CadSettingsStore
 
     public CadSettingsBinding Bind(CadWorkspace workspace) =>
         new(workspace, this);
+
+    private Dictionary<string, JsonNode?> SnapshotMutable() =>
+        _values.ToDictionary(
+            static pair => pair.Key,
+            static pair => pair.Value?.DeepClone(),
+            StringComparer.Ordinal);
+
+    private void Restore(IReadOnlyDictionary<string, JsonNode?> snapshot)
+    {
+        _values.Clear();
+        foreach (var (key, value) in snapshot)
+            _values[key] = value?.DeepClone();
+    }
+
+    private void PublishChanged(string key, JsonNode? value) =>
+        Changed?.Invoke(this, new CadSettingChangedEventArgs(key, value));
+
+    private Exception? TryPublishRollback(string key, JsonNode? value)
+    {
+        try
+        {
+            PublishChanged(key, value);
+            return null;
+        }
+        catch (Exception failure)
+        {
+            return failure;
+        }
+    }
 
     private static string NormalizeKey(string key)
     {

@@ -71,7 +71,19 @@ public abstract class CadTool
     public int Stage => _stage;
     public bool IsActive { get; private set; }
     public CadToolPrompt? Prompt { get; private set; }
+
+    /// <summary>
+    /// UI-neutral parameter contract for the active tool. Frontends may render
+    /// this schema in any form without owning or duplicating tool state.
+    /// </summary>
+    public virtual CadToolParameterSchema? ParameterSchema => ParameterPanel;
+
+    /// <summary>
+    /// Compatibility surface for existing tools while implementations migrate
+    /// to ParameterSchema. New consumers must use ParameterSchema.
+    /// </summary>
     public virtual CadToolPanelDescriptor? ParameterPanel => null;
+
     public CadPrecisionInputKind PrecisionInputs =>
         Prompt?.PrecisionInputs ?? CadPrecisionInputKind.None;
     public virtual string PrecisionLengthLabel => "Length";

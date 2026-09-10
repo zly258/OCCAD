@@ -1,13 +1,20 @@
 # OCCAD Documentation
 
-This directory contains OCCAD's long-lived core contracts while the application is being realigned to `OCCTBIM-Source/release-1.0`.
+This directory contains long-lived product and Core implementation contracts. Temporary migration plans, gap matrices, commit logs, local validation transcripts, and UI experiments do not belong here.
 
-- Architecture contract: [OCCTBIM-ALIGNMENT.md](OCCTBIM-ALIGNMENT.md)
-- Alignment matrix: [CORE-ALIGNMENT-MATRIX.md](CORE-ALIGNMENT-MATRIX.md)
-- Core scope: [CORE-SCOPE.md](CORE-SCOPE.md) / [CORE-SCOPE.zh-CN.md](CORE-SCOPE.zh-CN.md)
-- Interaction contracts: [INTERACTION-CONTRACTS.md](INTERACTION-CONTRACTS.md)
-- Interaction lifecycle: [INTERACTION-LIFECYCLE.md](INTERACTION-LIFECYCLE.md)
-- English domain contracts: [en-US/README.md](en-US/README.md)
-- 中文领域契约: [zh-CN/README.md](zh-CN/README.md)
+- English: [en-US/README.md](en-US/README.md)
+- 中文: [zh-CN/README.md](zh-CN/README.md)
 
-The previous Avalonia UI specification has been removed because that UI implementation was deleted. UI is not a source of CAD behavior. It will be specified again only after the core Entity / Property / Layer / Interaction / Grip / Snap / Settings contracts are stable and covered by tests.
+The active architecture baseline is UI-independent. `src/OCCAD.Avalonia` is intentionally reduced to an empty application shell while Core ownership is being stabilized.
+
+`OCCTBIM-Source/release-1.0` is the behavioral and responsibility-boundary reference for Document / Entity / Layer / Property / Tool / Grip / Snap / Settings. OCCAD keeps its C#/.NET/OCCT bridge architecture and does not copy Qt widgets, singleton patterns, database implementation, or class hierarchy literally.
+
+Core rules:
+
+- Entity geometry and document/model state are authoritative.
+- Layer references use stable IDs; names are editable metadata.
+- Property metadata is a Core contract, not a PropertyGrid model.
+- Tool state and parameter schema are UI-neutral.
+- Selection, Snap, Grip, Preview, WorkPlane, History, and Settings each have one Core owner.
+- Native presentation state is derived and must be recoverable/clearable.
+- Avalonia may present and invoke Core, but must not create a second CAD state model.

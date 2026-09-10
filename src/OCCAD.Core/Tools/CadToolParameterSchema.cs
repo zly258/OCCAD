@@ -237,7 +237,7 @@ public sealed record CadChoiceToolParameterDescriptor : CadToolParameterDescript
     public IReadOnlyList<string> Choices { get; }
 }
 
-public class CadToolParameterSchema
+public sealed class CadToolParameterSchema
 {
     public CadToolParameterSchema(
         string title,
@@ -266,18 +266,18 @@ public class CadToolParameterSchema
 
     public string Title { get; }
     public IReadOnlyList<CadToolParameterDescriptor> Parameters { get; }
-}
 
-/// <summary>
-/// Transitional source-compatibility name. Existing tools may keep returning
-/// this type while consumers depend only on CadToolParameterSchema.
-/// </summary>
-public sealed class CadToolPanelDescriptor : CadToolParameterSchema
-{
-    public CadToolPanelDescriptor(
-        string title,
-        IReadOnlyList<CadToolParameterDescriptor> parameters)
-        : base(title, parameters)
+    public CadToolParameterDescriptor? Find(string id)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        return Parameters.FirstOrDefault(parameter =>
+            string.Equals(
+                parameter.Id,
+                id.Trim(),
+                StringComparison.OrdinalIgnoreCase));
     }
+
+    public CadToolParameterDescriptor GetRequired(string id) =>
+        Find(id) ?? throw new KeyNotFoundException(
+            $"Tool parameter '{id}' is not defined by schema '{Title}'.");
 }

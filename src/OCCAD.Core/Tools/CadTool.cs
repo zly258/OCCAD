@@ -76,13 +76,7 @@ public abstract class CadTool
     /// UI-neutral parameter contract for the active tool. Frontends may render
     /// this schema in any form without owning or duplicating tool state.
     /// </summary>
-    public virtual CadToolParameterSchema? ParameterSchema => ParameterPanel;
-
-    /// <summary>
-    /// Compatibility surface for existing tools while implementations migrate
-    /// to ParameterSchema. New consumers must use ParameterSchema.
-    /// </summary>
-    public virtual CadToolPanelDescriptor? ParameterPanel => null;
+    public virtual CadToolParameterSchema? ParameterSchema => null;
 
     public CadPrecisionInputKind PrecisionInputs =>
         Prompt?.PrecisionInputs ?? CadPrecisionInputKind.None;
@@ -202,10 +196,17 @@ public abstract class CadTool
 
     public bool TrySetParameter(string id, string value)
     {
-        if (!IsActive) return false;
+        if (!IsActive)
+            return false;
+
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentNullException.ThrowIfNull(value);
-        return OnSetParameter(id.Trim(), value.Trim());
+
+        var parameterId = id.Trim();
+        if (ParameterSchema?.Find(parameterId) is null)
+            return false;
+
+        return OnSetParameter(parameterId, value.Trim());
     }
 
     public virtual bool HandlePointer(OcctPointerInputEventArgs input) => false;

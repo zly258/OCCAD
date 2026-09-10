@@ -56,34 +56,91 @@ public sealed class SettingsAndSchemaTests
     }
 
     [TestMethod]
-    public void MigratedActiveToolsUseSchemaWithoutLegacyPanelOverride()
+    public void ToolParameterSchemaProvidesCaseInsensitiveLookup()
+    {
+        var schema = new CadToolParameterSchema(
+            "Tool",
+            [new CadBooleanToolParameterDescriptor("enabled", "Enabled", true)]);
+
+        Assert.AreSame(schema.Parameters[0], schema.Find("ENABLED"));
+        Assert.AreSame(schema.Parameters[0], schema.GetRequired(" enabled "));
+        Assert.IsNull(schema.Find("missing"));
+        Assert.Throws<KeyNotFoundException>(() => schema.GetRequired("missing"));
+    }
+
+    [TestMethod]
+    public void ParameterisedProductToolsUseDirectSchemaContract()
     {
         CadTool[] tools =
         [
+            new CircleTool(),
+            new ArcTool(),
             new RectangleTool(),
+            new EllipseTool(),
             new RegularPolygonTool(),
             new ArrayTool(),
+            new CopyTool(),
+            new MirrorTool(),
+            new BoxTool(),
             new CylinderTool(),
             new ConeTool(),
             new SphereTool()
         ];
 
         foreach (var tool in tools)
-        {
             Assert.IsNotNull(tool.ParameterSchema, tool.Id);
-            Assert.IsNull(tool.ParameterPanel, tool.Id);
-        }
     }
 
     [TestMethod]
-    public void LegacyPanelDescriptorIsOnlyASchemaCompatibilityType()
+    public void LegacyToolParameterPanelContractIsRemoved()
     {
-        CadToolParameterSchema schema = new CadToolPanelDescriptor(
-            "Tool",
-            [new CadBooleanToolParameterDescriptor("enabled", "Enabled", true)]);
+        Assert.IsNull(typeof(CadTool).GetProperty("ParameterPanel"));
+        Assert.IsNull(
+            typeof(CadTool).Assembly.GetType(
+                "OCCAD.CadToolPanelDescriptor",
+                throwOnError: false));
+    }
 
-        Assert.AreEqual("Tool", schema.Title);
-        Assert.HasCount(1, schema.Parameters);
-        Assert.AreEqual("enabled", schema.Parameters[0].Id);
+    [TestMethod]
+    public void ToolParameterMutationIsGatedByCurrentSchema()
+    {
+        using var workspace = new CadWorkspace();
+        workspace.Tools.Register<SchemaGateProbeTool>("schema-gate-probe");
+        Assert.IsTrue(workspace.Tools.Activate("schema-gate-probe"));
+
+        var tool = (SchemaGateProbeTool)workspace.Tools.ActiveTool!;
+
+        Assert.IsFalse(tool.TrySetParameter("internal-only", "42"));
+        Assert.AreEqual(0, tool.SetCalls);
+
+        Assert.IsTrue(tool.TrySetParameter("VISIBLE", "42"));
+        Assert.AreEqual(1, tool.SetCalls);
+        Assert.AreEqual("visible", tool.LastId, ignoreCase: true);
+        Assert.AreEqual("42", tool.LastValue);
+    }
+
+    public sealed class SchemaGateProbeTool : CadTool
+    {
+        public override string Id => "schema-gate-probe";
+        public override string DisplayName => "Schema Gate Probe";
+        public override CadToolParameterSchema ParameterSchema =>
+            new(
+                "Schema Gate Probe",
+                [new CadStringToolParameterDescriptor(
+                    "visible",
+                    "Visible",
+                    "default")]);
+
+        public int SetCalls { get; private set; }
+        public string? LastId { get; private set; }
+        public string? LastValue { get; private set; }
+
+        protected override bool OnSetParameter(string id, string value)
+        {
+            SetCalls++;
+            LastId = id;
+            LastValue = value;
+            return true;
+        }
     }
 }

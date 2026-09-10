@@ -107,6 +107,37 @@ public sealed class CenterLineTests
     }
 
     [TestMethod]
+    public void DeletingBothHostsIncludesSharedDependentOnlyOnce()
+    {
+        using var workspace = new CadWorkspace();
+        var first = new CadLineEntity(
+            new(0, 0, 0),
+            new(100, 0, 0));
+        var second = new CadLineEntity(
+            new(0, 20, 0),
+            new(100, 20, 0));
+        workspace.Document.AddRange([first, second]);
+        var center = CadCenterLineEntity.CreateAssociative(first, second);
+        workspace.Document.Add(center);
+        workspace.History.Clear();
+
+        workspace.DeleteEntities([first, second]);
+
+        Assert.IsEmpty(workspace.Document.Entities);
+        Assert.AreEqual("Delete 3", workspace.History.UndoName);
+
+        Assert.IsTrue(workspace.Undo());
+        Assert.HasCount(3, workspace.Document.Entities);
+        Assert.AreEqual(1, workspace.Document.Entities.Count(entity => entity.Id == center.Id));
+        CollectionAssert.AreEquivalent(
+            new[] { first.Id, second.Id },
+            center.SourceEntityIds.ToArray());
+
+        Assert.IsTrue(workspace.Redo());
+        Assert.IsEmpty(workspace.Document.Entities);
+    }
+
+    [TestMethod]
     public void ExtensionAndGripContractMatchesSourceEntity()
     {
         var center = new CadCenterLineEntity(

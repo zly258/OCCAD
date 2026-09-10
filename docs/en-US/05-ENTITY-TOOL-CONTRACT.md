@@ -28,6 +28,14 @@ Every Tool defines stable ID/name, State/Stage, InputKind, Prompt, PrecisionInpu
 
 UI code does not interpret raw Stage integers to create parallel business behavior.
 
+### Tool parameters
+
+`CadTool.ParameterSchema` is the single UI-neutral declaration of parameters that are valid at the current Tool stage. A frontend may render the schema, but it must not own a second parameter model or infer hidden Tool state.
+
+All external parameter mutation flows through `CadTool.TrySetParameter(id, value)`. Command input, Action presets, desktop UI, scripts, and future MCP adapters therefore share the same gate. `TrySetParameter` rejects IDs that are absent from the current `ParameterSchema` before dispatching to the Tool implementation.
+
+The schema is stage-sensitive: when a parameter is no longer valid, the Tool removes it from the schema rather than leaving a writable compatibility surface. There is no framework-specific `ParameterPanel` contract.
+
 ## Preview
 
 Preview uses the same Entity geometry model as the final result where practical. Failed updates retain the last valid preview.
@@ -47,7 +55,7 @@ Do not clear Preview before a mutation that can fail. `CadToolContext.AddEntity`
 
 ## Replacement commit
 
-For Trim/Extend/Fillet/Chamfer-style replacement, keep valid replacement preview and source suppression during mutation. After success, clear transient state and restore source presentation safely. On mutation failure, keep the Tool usable.
+For replacement-style edits, keep valid replacement preview and source suppression during mutation. After success, clear transient state and restore source presentation safely. On mutation failure, keep the Tool usable.
 
 ## Property transaction
 

@@ -1,0 +1,22 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    <sys:String x:Key="Cad.Text.Manage">管理</sys:String>
+    <sys:String x:Key="Cad.Text.Curves">曲线</sys:String>
+    <sys:String x:Key="Cad.Text.Layer">图层</sys:String>
+    <sys:String x:Key="Cad.Text.CurrentLayer">当前图层</sys:String>
+    <sys:String x:Key="Cad.Text.Modeling">建模</sys:String>
+    <sys:String x:Key="Cad.Text.Measure">测量</sys:String>
+    <sys:String x:Key="Cad.Text.Annotate">标注</sys:String>
+    <sys:String x:Key="Cad.Text.Mirror">镜像</sys:String>
+    <sys:String x:Key="Cad.Text.Frustum">圆台</sys:String>
+    <sys:String x:Key="Cad.Text.Ellipsoid">椭球体</sys:String>
+    <sys:String x:Key="Cad.Text.Helix">螺旋线</sys:String>
+    <sys:String x:Key="Cad.Text.Extrude">拉伸</sys:String>
+    <sys:String x:Key="Cad.Text.Text">文字</sys:String>
+    <sys:String x:Key="Cad.Text.LengthDimension">线性标注</sys:String>
+    <sys:String x:Key="Cad.Text.AngleDimension">角度标注</sys:String>
+    <sys:String x:Key="Cad.Text.RadiusDimension">半径标注</sys:String>
+    <sys:String x:Key="Cad.Text.DiameterDimension">直径标注</sys:String>
+    <sys:String x:Key="Cad.Text.Distance">距离</sys:String>
+</ResourceDictionary>

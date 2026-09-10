@@ -49,13 +49,14 @@ public sealed class CadApplication : Application
             CadDiagnostics.Trace("Constructing MainWindow.");
 
             var window = new MainWindow();
-            // Keep the visible shell intentionally traditional: menu + compact
-            // one-line toolbar + viewport/docks + persistent command/status
-            // surfaces. Refinement presenters replace only the interaction
-            // panels that need richer CAD behavior.
+            // The visible shell is a native Avalonia CAD ribbon plus the
+            // viewport/dock workspace and persistent command/status surfaces.
+            // Legacy menu/toolbar controls are retained only long enough for
+            // compatibility state wiring and are removed before the window is shown.
+            window.ApplyRibbon();
             window.ApplyUiRefinement();
-            window.ApplyCompactUiEnhancements();
             window.ApplyFloatingToolPanel();
+            window.ApplyRibbonSynchronization();
             window.ApplyPropertyGridRefinement();
             window.ApplyCommandStatusRefinement();
 

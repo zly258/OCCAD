@@ -11,6 +11,16 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
     public override string Id => "polyline";
     public override string DisplayName => "Polyline";
 
+    public override bool CanCommitCurrentStage =>
+        _points.Count > 0 &&
+        IsActive &&
+        CadExactInputGeometry.TryResolveLengthAnglePoint(
+            Context.Workspace,
+            _points[^1],
+            out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnActivated()
     {
         _points.Clear();
@@ -36,8 +46,22 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
     protected override bool CanFinishCore => _points.Count >= 2;
     protected override bool CanStepBackCore => _points.Count > 0;
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(pointer, _points.Count == 0 ? null : _points[^1], AcceptPoint);
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (_points.Count > 0 &&
+            CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                _points[^1],
+                out var exactPoint))
+        {
+            return AcceptPoint(exactPoint);
+        }
+
+        return CommitResolvedPoint(
+            pointer,
+            _points.Count == 0 ? null : _points[^1],
+            AcceptPoint);
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive &&
@@ -68,6 +92,21 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
         success = true;
         message = "Close";
         return true;
+    }
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (_points.Count > 0 &&
+            CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                _points[^1],
+                out var exactPoint))
+        {
+            UpdatePreview(exactPoint);
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
     }
 
     protected override void OnCanceled() => Reset();

@@ -283,7 +283,9 @@ public abstract class CadTool
     protected void SetSelectionFilter(CadSelectionFilter? filter) => Context.Selection.SetFilter(filter);
     protected void NotifyUpdated() => PublishUpdated();
 
-    protected void ShowReplacementPreview(IReadOnlyList<CadEntity> sources, IReadOnlyList<CadEntity> replacements)
+    protected void ShowReplacementPreview(
+        IReadOnlyList<CadEntity> sources,
+        IReadOnlyList<CadEntity> replacements)
     {
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(replacements);
@@ -437,21 +439,39 @@ public sealed class CadToolContext(CadWorkspace workspace)
     public CadTrackingManager Tracking => Workspace.Tracking;
     public CadSnapManager Snap => Workspace.Snap;
 
-    public CadResolvedPoint ResolvePoint(int x, int y, OcctPoint3d? reference = null, CadSnapResolvePolicy? snapPolicy = null)
+    public CadResolvedPoint ResolvePoint(int x, int y, OcctPoint3d? constraintOrigin = null)
     {
-        var engine = Engine;
-        var point = ContextPoint(engine, x, y, WorkPlane);
-        return Workspace.ResolveDrawingPoint(x, y, point, reference, snapPolicy ?? ActiveTool?.SnapResolvePolicy ?? CadSnapResolvePolicy.KeepExactPoint);
+        var resolved = Workspace.ResolvePoint(
+            x,
+            y,
+            constraintOrigin,
+            ActiveTool?.SnapResolvePolicy ?? CadSnapResolvePolicy.KeepExactPoint);
+
+        if (ActiveTool is not CadDrawingTool || !WorkPlane.IsActive)
+            return resolved;
+
+        var frame = WorkPlane.EffectivePlane;
+        var projected = CadPlaneGeometry.ProjectToPlane(
+            frame.Origin,
+            resolved.Point,
+            frame.XAxis,
+            frame.YAxis);
+        if (!projected.IsFinite)
+            return resolved;
+
+        if (resolved.Snap is not null && projected.DistanceTo(resolved.Point) > 1e-8)
+            Snap.Clear();
+
+        return resolved with
+        {
+            Point = projected,
+            Snap = projected.DistanceTo(resolved.Point) <= 1e-8 ? resolved.Snap : null
+        };
     }
 
-    public void AddEntity(CadEntity entity) => Workspace.AddEntity(entity);
-
-    private static OcctPoint3d ContextPoint(OcctEngine engine, int x, int y, CadWorkPlane workPlane)
+    public void AddEntity(CadEntity entity)
     {
-        ArgumentNullException.ThrowIfNull(engine);
-        ArgumentNullException.ThrowIfNull(workPlane);
-        if (!engine.TryScreenToPlane(x, y, workPlane.EffectivePlane, out var point))
-            throw new InvalidOperationException("The screen point does not intersect the active work plane.");
-        return point;
+        ArgumentNullException.ThrowIfNull(entity);
+        Workspace.AddEntity(entity);
     }
 }

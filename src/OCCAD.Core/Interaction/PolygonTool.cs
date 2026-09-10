@@ -11,6 +11,16 @@ public sealed class PolygonTool : CadDrawingTool, ICadPointInputTool
     public override string Id => "polygon";
     public override string DisplayName => "Polygon";
 
+    public override bool CanCommitCurrentStage =>
+        _points.Count > 0 &&
+        IsActive &&
+        CadExactInputGeometry.TryResolveLengthAnglePoint(
+            Context.Workspace,
+            _points[^1],
+            out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnActivated()
     {
         _points.Clear();
@@ -36,11 +46,40 @@ public sealed class PolygonTool : CadDrawingTool, ICadPointInputTool
     protected override bool CanFinishCore => _points.Count >= 3;
     protected override bool CanStepBackCore => _points.Count > 0;
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(pointer, _points.Count == 0 ? null : _points[^1], AcceptPoint);
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (_points.Count > 0 &&
+            CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                _points[^1],
+                out var exactPoint))
+        {
+            return AcceptPoint(exactPoint);
+        }
+
+        return CommitResolvedPoint(
+            pointer,
+            _points.Count == 0 ? null : _points[^1],
+            AcceptPoint);
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive && State == CadToolState.Drawing && AcceptPoint(point);
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (_points.Count > 0 &&
+            CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                _points[^1],
+                out var exactPoint))
+        {
+            UpdatePreview(exactPoint);
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
+    }
 
     protected override void OnCanceled() => Reset();
 

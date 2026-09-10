@@ -13,6 +13,7 @@ internal sealed class CadApplicationSettings
         CadSnapType.Midpoint |
         CadSnapType.Center |
         CadSnapType.Vertex |
+        CadSnapType.Quadrant |
         CadSnapType.Nearest |
         CadSnapType.Intersection |
         CadSnapType.Perpendicular |

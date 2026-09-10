@@ -9,4 +9,7 @@
     <sys:String x:Key="Cad.Text.Lock">锁定</sys:String>
     <sys:String x:Key="Cad.Text.Unlock">解锁</sys:String>
     <sys:String x:Key="Cad.Text.Properties">属性</sys:String>
+    <sys:String x:Key="Cad.Text.EntityHiddenMessage">对象已隐藏，请先显示后再选择。</sys:String>
+    <sys:String x:Key="Cad.Text.EntityLockedMessage">对象已锁定，请先解锁后再选择。</sys:String>
+    <sys:String x:Key="Cad.Text.EntityNotSelectable">当前对象不可选择。</sys:String>
 </ResourceDictionary>

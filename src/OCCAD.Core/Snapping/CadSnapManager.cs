@@ -11,21 +11,18 @@ public sealed class CadSnapManager
     private const double PriorityTieDistancePixels = 2.0;
     private const double HysteresisPixels = 2.5;
 
-    // Quadrant remains a serialized compatibility flag in CadSnapType, but it
-    // is intentionally excluded from every runtime/user object-snap mode.
     private const CadSnapType RuntimeModes =
         CadSnapType.Endpoint |
         CadSnapType.Midpoint |
         CadSnapType.Center |
         CadSnapType.Vertex |
+        CadSnapType.Quadrant |
         CadSnapType.Nearest |
         CadSnapType.Intersection |
         CadSnapType.Perpendicular |
         CadSnapType.Tangent;
 
-    private const CadSnapType CompatibleModes =
-        RuntimeModes |
-        CadSnapType.Quadrant;
+    private const CadSnapType CompatibleModes = RuntimeModes;
 
     private readonly CadDocument _document;
     private readonly Dictionary<CadEntity, IReadOnlyList<CadSnapPoint>> _snapPointCache = [];
@@ -1008,7 +1005,7 @@ public sealed class CadSnapManager
         CadSnapType.Endpoint or CadSnapType.Vertex => 0,
         CadSnapType.Intersection => 1,
         CadSnapType.Midpoint => 2,
-        CadSnapType.Center => 3,
+        CadSnapType.Center or CadSnapType.Quadrant => 3,
         CadSnapType.Perpendicular => 4,
         CadSnapType.Tangent => 5,
         CadSnapType.Nearest => 6,
@@ -1161,7 +1158,6 @@ public sealed class CadSnapManager
             .Where(static type =>
                 type != CadSnapType.None &&
                 type != CadSnapType.Default &&
-                type != CadSnapType.Quadrant &&
                 (type & RuntimeModes) == type)
             .ToDictionary(
                 static type => type,
@@ -1200,7 +1196,7 @@ public sealed class CadSnapManager
                     CadSnapType.Center =>
                         dx * dx + dy * dy <= radius * radius,
 
-                    CadSnapType.Vertex =>
+                    CadSnapType.Vertex or CadSnapType.Quadrant =>
                         adx + ady <= radius,
 
                     CadSnapType.Intersection =>

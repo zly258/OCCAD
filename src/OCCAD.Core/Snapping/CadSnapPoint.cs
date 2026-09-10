@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using OcctNet;
 
 namespace OCCAD;
@@ -17,9 +17,7 @@ public enum CadSnapType
     Perpendicular = 1 << 7,
     Tangent = 1 << 8,
 
-    // Quadrant is retained as a compatibility flag for entity snap data, but
-    // it is intentionally not part of the user-facing/default object snaps.
-    Default = Endpoint | Midpoint | Center | Vertex
+    Default = Endpoint | Midpoint | Center | Vertex | Quadrant
 }
 
 public enum CadSnapPlaneMode

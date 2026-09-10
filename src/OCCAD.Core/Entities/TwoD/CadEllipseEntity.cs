@@ -112,7 +112,14 @@ public sealed class CadEllipseEntity : CadEntity
     {
         var yAxis = _normal.Cross(_xAxis).Normalized();
         var plane = new CadSnapWorkPlane(_center, _xAxis, yAxis);
-        return [new(this, _center, CadSnapType.Center, 0, plane)];
+        return
+        [
+            new(this, _center, CadSnapType.Center, 0, plane),
+            new(this, _center + _xAxis * _majorRadius, CadSnapType.Quadrant, 1, plane),
+            new(this, _center + yAxis * _minorRadius, CadSnapType.Quadrant, 2, plane),
+            new(this, _center - _xAxis * _majorRadius, CadSnapType.Quadrant, 3, plane),
+            new(this, _center - yAxis * _minorRadius, CadSnapType.Quadrant, 4, plane)
+        ];
     }
 
     public override IReadOnlyList<CadGripPoint> GetGripPoints()

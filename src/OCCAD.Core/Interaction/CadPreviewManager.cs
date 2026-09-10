@@ -26,12 +26,17 @@ public sealed class CadPreviewManager
 
     public IReadOnlyList<CadEntity> Entities => _entities;
     public CadEntity? Entity => _entities.Count == 1 ? _entities[0] : null;
-    public bool IsVisible => _shapes.Count > 0;
+    public bool IsVisible => _shapes.Count > 0 || _ownedTags.Count > 0;
 
     public void AttachEngine(OcctEngine engine)
     {
         ArgumentNullException.ThrowIfNull(engine);
         Clear();
+
+        // Engine recreation destroys the old viewer scene. Any ownership that
+        // could not be explicitly removed from the previous engine must not be
+        // carried into the new engine because object ids/tags are engine-local.
+        _shapes.Clear();
         _ownedTags.Clear();
         _engine = engine;
     }
@@ -65,10 +70,17 @@ public sealed class CadPreviewManager
                 DeleteOwnedObjects(engine);
             }
         }
+        else if (_engine is null || !_engine.IsInitialized)
+        {
+            // With no live viewer there is no presentation that can survive.
+            _shapes.Clear();
+            _ownedTags.Clear();
+        }
 
-        _shapes.Clear();
+        // Logical preview state is always cleared immediately. Presentation
+        // ownership is intentionally retained when viewer deletion failed so a
+        // later Clear/Rebuild can retry instead of leaking an orphan shape.
         _entities.Clear();
-        _ownedTags.Clear();
     }
 
     private void Rebuild(IReadOnlyList<CadEntity> entities)
@@ -79,7 +91,12 @@ public sealed class CadPreviewManager
         using var batch = engine.BeginDisplayBatch();
 
         DeleteOwnedObjects(engine);
-        _shapes.Clear();
+        if (_shapes.Count > 0 || _ownedTags.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "The previous preview presentation could not be removed.");
+        }
+
         _entities.Clear();
 
         var nextShapes = new List<IOcctObject>(entities.Count);
@@ -136,47 +153,61 @@ public sealed class CadPreviewManager
 
     private void DeleteOwnedObjects(OcctEngine engine)
     {
-        // Only delete objects owned by this preview manager.  A previous
-        // implementation scanned every OCCAD.Preview.* tag globally; that
-        // allowed one transient owner to erase another owner's presentation
-        // and made tool transitions non-deterministic.
-        if (_shapes.Count > 0)
+        // Delete each tracked object independently. If deletion fails, keep the
+        // handle/tag so ownership is not lost and the next cleanup can retry.
+        foreach (var shape in _shapes.ToArray())
         {
-            var liveShapes = _shapes
-                .Where(shape => shape is not null && engine.ContainsObject(shape.Id))
-                .ToArray();
-            TryDeleteObjects(engine, liveShapes);
-            _shapes.Clear();
-        }
-
-        if (_ownedTags.Count == 0)
-            return;
-
-        foreach (var tag in _ownedTags.Values.Distinct(StringComparer.Ordinal))
-        {
-            IOcctObject? value;
+            bool exists;
             try
             {
-                value = engine.FindObjectByApplicationTag(tag);
+                exists = shape is not null && engine.ContainsObject(shape.Id);
             }
             catch (Exception exception) when (IsRecoverable(exception))
             {
                 continue;
             }
 
-            if (value is not null)
-                TryDeleteObjects(engine, [value]);
+            if (!exists || TryDeleteObjects(engine, [shape]))
+                _shapes.Remove(shape);
         }
 
-        _ownedTags.Clear();
+        foreach (var pair in _ownedTags.ToArray())
+        {
+            IOcctObject? value;
+            try
+            {
+                value = engine.FindObjectByApplicationTag(pair.Value);
+            }
+            catch (Exception exception) when (IsRecoverable(exception))
+            {
+                continue;
+            }
+
+            if (value is null)
+            {
+                _ownedTags.Remove(pair.Key);
+                continue;
+            }
+
+            if (TryDeleteObjects(engine, [value]))
+                _ownedTags.Remove(pair.Key);
+        }
     }
 
     private void PurgeMissingOwnership(OcctEngine engine)
     {
         foreach (var pair in _ownedTags.ToArray())
         {
-            if (engine.FindObjectByApplicationTag(pair.Value) is null)
-                _ownedTags.Remove(pair.Key);
+            try
+            {
+                if (engine.FindObjectByApplicationTag(pair.Value) is null)
+                    _ownedTags.Remove(pair.Key);
+            }
+            catch (Exception exception) when (IsRecoverable(exception))
+            {
+                // Preserve ownership when the viewer cannot currently answer.
+                // A later Clear/Rebuild will retry the lookup/deletion.
+            }
         }
     }
 
@@ -189,16 +220,18 @@ public sealed class CadPreviewManager
             engine.Delete(values);
     }
 
-    private static void TryDeleteObjects(
+    private static bool TryDeleteObjects(
         OcctEngine engine,
         IEnumerable<IOcctObject> shapes)
     {
         try
         {
             DeleteObjects(engine, shapes);
+            return true;
         }
         catch (Exception exception) when (IsRecoverable(exception))
         {
+            return false;
         }
     }
 

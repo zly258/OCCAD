@@ -68,7 +68,14 @@ public sealed class CadCircleEntity : CadEntity
     {
         var (xAxis, yAxis) = PlaneAxes(_normal);
         var plane = new CadSnapWorkPlane(_center, xAxis, yAxis);
-        return [new(this, _center, CadSnapType.Center, 0, plane)];
+        return
+        [
+            new(this, _center, CadSnapType.Center, 0, plane),
+            new(this, _center + xAxis * _radius, CadSnapType.Quadrant, 1, plane),
+            new(this, _center + yAxis * _radius, CadSnapType.Quadrant, 2, plane),
+            new(this, _center - xAxis * _radius, CadSnapType.Quadrant, 3, plane),
+            new(this, _center - yAxis * _radius, CadSnapType.Quadrant, 4, plane)
+        ];
     }
 
     public override IReadOnlyList<CadGripPoint> GetGripPoints()

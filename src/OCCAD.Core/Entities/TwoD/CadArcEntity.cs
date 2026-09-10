@@ -119,13 +119,30 @@ public sealed class CadArcEntity : CadEntity
     {
         var yAxis = _normal.Cross(_xAxis).Normalized();
         var plane = new CadSnapWorkPlane(_center, _xAxis, yAxis);
-        return
-        [
+        var result = new List<CadSnapPoint>
+        {
             new(this, _center, CadSnapType.Center, 0, plane),
             new(this, Start, CadSnapType.Endpoint, 1, plane),
             new(this, Middle, CadSnapType.Midpoint, 2, plane),
             new(this, End, CadSnapType.Endpoint, 3, plane)
-        ];
+        };
+
+        var index = 4;
+        foreach (var angle in new[] { 0.0, 90.0, 180.0, 270.0 })
+        {
+            var point = PointAt(angle);
+            if (!TryParameterAt(point, out _))
+                continue;
+
+            result.Add(new CadSnapPoint(
+                this,
+                point,
+                CadSnapType.Quadrant,
+                index++,
+                plane));
+        }
+
+        return result;
     }
 
     public override IReadOnlyList<CadGripPoint> GetGripPoints()

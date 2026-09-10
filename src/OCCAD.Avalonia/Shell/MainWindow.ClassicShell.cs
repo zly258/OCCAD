@@ -193,6 +193,16 @@ public sealed partial class MainWindow
             }
         };
 
+        var modify = new MenuItem
+        {
+            Header = Label("修改", "Modify"),
+            ItemsSource = new object[]
+            {
+                ActionMenu("edit.move", Label("移动", "Move")),
+                ActionMenu("edit.delete", Label("删除", "Delete"))
+            }
+        };
+
         var isometric = new MenuItem
         {
             Header = Label("轴测", "Isometric"),
@@ -253,7 +263,7 @@ public sealed partial class MainWindow
 
         var menu = new Menu
         {
-            ItemsSource = new object[] { file, draw, model, view, panels, language }
+            ItemsSource = new object[] { file, draw, model, modify, view, panels, language }
         };
         RefreshClassicPanelState();
         return menu;
@@ -290,6 +300,9 @@ public sealed partial class MainWindow
         secondRow.Children.Add(ActionToolbar("draw.circle.centerradius", Label("圆", "Circle")));
         secondRow.Children.Add(ActionToolbar("draw.arc.threepoints", Label("圆弧", "Arc")));
         secondRow.Children.Add(ActionToolbar("draw.regularpolygon.inscribed", Label("正多边形", "Polygon")));
+        secondRow.Children.Add(ToolbarSeparator());
+        secondRow.Children.Add(ActionToolbar("edit.move", Label("移动", "Move")));
+        secondRow.Children.Add(ActionToolbar("edit.delete", Label("删除", "Delete")));
         secondRow.Children.Add(ToolbarSeparator());
         secondRow.Children.Add(ActionToolbar("solid.box", Label("长方体", "Box")));
         secondRow.Children.Add(ActionToolbar("solid.cylinder", Label("圆柱体", "Cylinder")));
@@ -342,7 +355,7 @@ public sealed partial class MainWindow
 
         try
         {
-            _ = undo ? _workspace.History.Undo() : _workspace.History.Redo();
+            _ = undo ? _workspace.Undo() : _workspace.Redo();
             ShowStatusFeedback(null);
         }
         catch (Exception exception)

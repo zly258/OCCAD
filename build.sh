@@ -22,7 +22,10 @@ case "$(uname -m)" in x86_64|amd64) ;; *) fail "Linux x64 is required; detected 
 require_command dotnet
 require_command git
 
-for name in OcctNet.dll OcctNet.Avalonia.dll bridge-contract.json bridge-manifest.json libOcctNative.so; do
+# Managed assemblies and SDK metadata live at the SDK root. Native OCCT runtime
+# is validated from the portable layout below; requiring a second flat native
+# library here rejects otherwise valid current SDK installations.
+for name in OcctNet.dll OcctNet.Avalonia.dll bridge-contract.json bridge-manifest.json; do
     [[ -f "${BRIDGE_SDK}/${name}" ]] || fail "Installed OcctCSharpBridge SDK is missing '${name}' at '${BRIDGE_SDK}'. Run OcctCSharpBridge ./publish.sh or set OCCTCSHARPBRIDGE_SDK."
 done
 [[ -f "${PORTABLE_ROOT}/package-manifest.json" ]] || fail "Installed SDK is missing portable/package-manifest.json: ${PORTABLE_ROOT}"

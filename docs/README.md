@@ -52,4 +52,4 @@ For UI work:
 
 `CadWorkspace` is the composition root for one CAD session. Document/Entity state is authoritative; OCCT viewer objects are derived presentation. Core owns business state, transaction/history, Tool lifecycle, Selection, Snap, Grip, WorkPlane, and transient ownership. Avalonia is an adapter layer for input, viewport presentation, panels, dialogs, and localization.
 
-The initial product shell is a compact Fluent desktop shell with grouped three-row command buttons, a dark viewport, Model/Layer/Property panels, explicit Chinese/English switching, and a compact drafting status strip. It deliberately does not display a bottom command input box, permanent Ready text, or a large Ribbon.
+The initial product shell is a compact Fluent desktop shell with a compact two-row command toolbar, a dark viewport, Model/Layer/Property panels, explicit Chinese/English switching, and a compact drafting status strip. It deliberately does not display a bottom command input box, permanent Ready text, or a large Ribbon.

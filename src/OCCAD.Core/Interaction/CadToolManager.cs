@@ -363,6 +363,17 @@ public sealed class CadToolManager
 
         List<Exception> failures = [];
         Cleanup(() => workspace.Transients.ClearOwner(workspace.Transients.CurrentToolOwner));
+
+        // ClearOwner is the primary tool-session cleanup. Explicit channel
+        // cleanup below is intentional: if one native presentation operation
+        // failed transiently, retry the affected channels before declaring the
+        // workspace non-neutral. This is especially important for preview and
+        // grip-drag objects that otherwise remain visible after a command ends.
+        Cleanup(workspace.Preview.Clear);
+        Cleanup(workspace.Snap.Clear);
+        Cleanup(workspace.Tracking.Clear);
+        Cleanup(workspace.Grips.ClearDragMarker);
+
         Cleanup(() => workspace.Snap.Active = false);
         Cleanup(() => workspace.Snap.TemporaryModes = null);
         Cleanup(workspace.Preselection.Clear);

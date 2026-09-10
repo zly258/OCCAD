@@ -107,10 +107,33 @@ public sealed class CadPolygonEntity : CadEntity
     public override IReadOnlyList<CadGripPoint> GetGripPoints()
     {
         var plane = CreateGripPlane();
-        var result = new CadGripPoint[_points.Count + 1];
-        result[0] = new CadGripPoint(this, 0, Center(), plane, Kind: CadGripKind.Center);
-        for (var index = 0; index < _points.Count; index++)
-            result[index + 1] = new CadGripPoint(this, index + 1, _points[index], plane, Kind: CadGripKind.Vertex);
+        var count = _points.Count;
+        var result = new List<CadGripPoint>(count * 2 + 1)
+        {
+            new(this, 0, Center(), plane, Kind: CadGripKind.Center)
+        };
+
+        for (var index = 0; index < count; index++)
+        {
+            result.Add(new CadGripPoint(
+                this,
+                index + 1,
+                _points[index],
+                plane,
+                Kind: CadGripKind.Vertex));
+        }
+
+        for (var index = 0; index < count; index++)
+        {
+            var next = (index + 1) % count;
+            result.Add(new CadGripPoint(
+                this,
+                count + 1 + index,
+                Midpoint(_points[index], _points[next]),
+                plane,
+                Kind: CadGripKind.Midpoint));
+        }
+
         return result;
     }
 
@@ -125,20 +148,46 @@ public sealed class CadPolygonEntity : CadEntity
             return;
         }
 
-        var pointIndex = index - 1;
-        if ((uint)pointIndex >= (uint)_points.Count)
+        var count = _points.Count;
+        if (index >= 1 && index <= count)
+        {
+            var pointIndex = index - 1;
+            var projected = ProjectToPlane(targetPoint);
+            if (_points[pointIndex] == projected)
+                return;
+
+            var previous = _points[(pointIndex - 1 + count) % count];
+            var next = _points[(pointIndex + 1) % count];
+            if (projected.DistanceTo(previous) <= PointTolerance ||
+                projected.DistanceTo(next) <= PointTolerance)
+                return;
+
+            _points[pointIndex] = projected;
+            RaiseGeometryChanged(nameof(MoveGrip));
+            return;
+        }
+
+        var segmentIndex = index - (count + 1);
+        if ((uint)segmentIndex >= (uint)count)
             throw new ArgumentOutOfRangeException(nameof(index));
-        if (_points[pointIndex] == targetPoint)
+
+        var nextIndex = (segmentIndex + 1) % count;
+        var currentMid = Midpoint(_points[segmentIndex], _points[nextIndex]);
+        var projectedTarget = ProjectToPlane(targetPoint);
+        var displacement = CadTransformMath.Between(currentMid, projectedTarget);
+        if (displacement.LengthSquared <= 1e-18)
             return;
 
-        var projected = ProjectToPlane(targetPoint);
-        var previous = _points[(pointIndex - 1 + _points.Count) % _points.Count];
-        var next = _points[(pointIndex + 1) % _points.Count];
-        if (projected.DistanceTo(previous) <= PointTolerance ||
-            projected.DistanceTo(next) <= PointTolerance)
+        var movedStart = Translated(_points[segmentIndex], displacement);
+        var movedEnd = Translated(_points[nextIndex], displacement);
+        var previousIndex = (segmentIndex - 1 + count) % count;
+        var afterIndex = (nextIndex + 1) % count;
+        if (movedStart.DistanceTo(_points[previousIndex]) <= PointTolerance ||
+            movedEnd.DistanceTo(_points[afterIndex]) <= PointTolerance)
             return;
 
-        _points[pointIndex] = projected;
+        _points[segmentIndex] = movedStart;
+        _points[nextIndex] = movedEnd;
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 

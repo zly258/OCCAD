@@ -124,28 +124,21 @@ public sealed class CadRegularPolygonEntity : CadEntity
 
     public override IReadOnlyList<CadGripPoint> GetGripPoints()
     {
-        var vertices = Vertices();
         var yAxis = _normal.Cross(_xAxis).Normalized();
         var plane = new CadGripWorkPlane(_center, _xAxis, yAxis);
-        var result = new CadGripPoint[vertices.Count + 1];
-        result[0] = new CadGripPoint(
-            this,
-            0,
-            _center,
-            plane,
-            Kind: CadGripKind.Center);
-        for (var index = 0; index < vertices.Count; index++)
-        {
-            result[index + 1] = new CadGripPoint(
+        var radiusPoint = _center + _xAxis * _radius;
+        return
+        [
+            new(this, 0, _center, plane, Kind: CadGripKind.Center),
+            new(
                 this,
-                index + 1,
-                vertices[index],
+                1,
+                radiusPoint,
                 plane,
                 _center,
                 CadPrecisionInputKind.LengthAndAngle,
-                Kind: CadGripKind.Vertex);
-        }
-        return result;
+                Kind: CadGripKind.Radius)
+        ];
     }
 
     public override void MoveGrip(int index, OcctPoint3d targetPoint)
@@ -159,8 +152,7 @@ public sealed class CadRegularPolygonEntity : CadEntity
             return;
         }
 
-        var vertexIndex = index - 1;
-        if ((uint)vertexIndex >= (uint)_sides)
+        if (index != 1)
             throw new ArgumentOutOfRangeException(nameof(index));
 
         var delta = CadTransformMath.Between(_center, targetPoint);
@@ -173,11 +165,7 @@ public sealed class CadRegularPolygonEntity : CadEntity
         if (radius <= 1e-9 || !planar.TryNormalize(out var direction))
             return;
 
-        var vertexAngle = vertexIndex * 360.0 / _sides;
-        _xAxis = CadTransformMath.RotateVector(
-            direction,
-            _normal,
-            -vertexAngle).Normalized();
+        _xAxis = direction;
         _radius = radius;
         RaiseGeometryChanged(nameof(MoveGrip));
     }

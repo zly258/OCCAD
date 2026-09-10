@@ -99,7 +99,8 @@ Feature Entity 需要 Document context，因此持久化和交互创建分别由
 |---|---|
 | 原生 Avalonia FluentTheme | 是 |
 | Classic Menu | 是 |
-| Single-row Toolbar | 是 |
+| 紧凑两行 Toolbar | 是 |
+| 修改菜单 | 是，Move / Delete |
 | Active Tool Parameter Strip | 是 |
 | Ribbon | 否，已退出产品基线 |
 | 三行分组 Toolbar | 否，已退出产品基线 |
@@ -182,15 +183,23 @@ UI 通过 `TrySetParameter()` 更新 Tool，不直接修改 Tool 私有状态。
 | Layer manager | 是 | 是 | 初版 |
 | Current Layer | 是 | 顶部 ComboBox | 初版 |
 
-## 11. History / Transaction
+## 11. Edit / History / Transaction
 
 | 功能 | Core | 当前 Shell | 状态 |
 |---|---|---|---|
+| Move | `MoveTool` + 原子事务 | 修改菜单 + Toolbar | 初版 |
+| Delete | 是 | 修改菜单 + Toolbar | 初版 |
+| Copy | 事务级 API | 无交互 Tool | 仅基础设施 |
+| Rotate | 事务级 API | 无交互 Tool | 仅基础设施 |
+| Scale | 事务级 API | 无交互 Tool | 仅基础设施 |
+| Mirror | 事务级 API | 无交互 Tool | 仅基础设施 |
 | CadTransaction | 是 | 间接使用 | 基础设施 |
 | CadHistory | 是 | 间接使用 | 基础设施 |
-| Undo | 是 | 无独立顶部按钮 | Core 支持 |
-| Redo | 是 | 无独立顶部按钮 | Core 支持 |
+| Undo | 是 | 独立 Toolbar 按钮 + Ctrl+Z | 初版 |
+| Redo | 是 | 独立 Toolbar 按钮 + Ctrl+Y / Ctrl+Shift+Z | 初版 |
 | Property atomic history | 是 | 是 | 初版基础设施 |
+
+Undo/Redo 的 UI 入口必须调用 `CadWorkspace.Undo()` / `CadWorkspace.Redo()`，不能直接调用 `CadHistory`，确保 Tool、Selection、Subobject、Preselection、Grip 的清理边界一致。
 
 ## 12. Persistence / Exchange
 
@@ -202,7 +211,7 @@ STEP / IGES / BREP / STL / OBJ / glTF 等方向必须按实际 Import/Export 实
 
 除非重新明确进入范围，否则不在当前 Classic Shell 暴露：
 
-- Move / Copy / Rotate / Scale / Mirror；
+- Copy / Rotate / Scale / Mirror；
 - Array；
 - Offset；
 - Trim / Extend；

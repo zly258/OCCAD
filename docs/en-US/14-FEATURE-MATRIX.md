@@ -99,7 +99,8 @@ Feature entities require Document context, so persistence and interactive creati
 |---|---|
 | Native Avalonia FluentTheme | Yes |
 | Classic Menu | Yes |
-| Single-row Toolbar | Yes |
+| Compact two-row Toolbar | Yes |
+| Modify menu | Yes; Move / Delete |
 | Active Tool Parameter Strip | Yes |
 | Ribbon | No; retired from product baseline |
 | Grouped three-row Toolbar | No; retired from product baseline |
@@ -182,15 +183,23 @@ The UI updates the Tool through `TrySetParameter()` and does not mutate Tool-pri
 | Layer manager | Yes | Yes | Initial |
 | Current Layer | Yes | top ComboBox | Initial |
 
-## 11. History / transaction
+## 11. Edit / History / Transaction
 
 | Feature | Core | Current Shell | Status |
 |---|---|---|---|
+| Move | `MoveTool` + atomic transaction | Modify menu + Toolbar | Initial |
+| Delete | Yes | Modify menu + Toolbar | Initial |
+| Copy | Transaction-level API | No interactive Tool | Infrastructure only |
+| Rotate | Transaction-level API | No interactive Tool | Infrastructure only |
+| Scale | Transaction-level API | No interactive Tool | Infrastructure only |
+| Mirror | Transaction-level API | No interactive Tool | Infrastructure only |
 | CadTransaction | Yes | Indirect | Infrastructure |
 | CadHistory | Yes | Indirect | Infrastructure |
-| Undo | Yes | No dedicated top button | Core support |
-| Redo | Yes | No dedicated top button | Core support |
+| Undo | Yes | Dedicated Toolbar button + Ctrl+Z | Initial |
+| Redo | Yes | Dedicated Toolbar button + Ctrl+Y / Ctrl+Shift+Z | Initial |
 | Property atomic history | Yes | Yes | Initial infrastructure |
+
+Undo/Redo UI entry points must call `CadWorkspace.Undo()` / `CadWorkspace.Redo()` rather than invoking `CadHistory` directly, so Tool, Selection, Subobject, Preselection, and Grip cleanup remains consistent.
 
 ## 12. Persistence / exchange
 
@@ -202,7 +211,7 @@ STEP / IGES / BREP / STL / OBJ / glTF directions must be validated independently
 
 Unless explicitly brought back into scope, the current Classic Shell does not expose:
 
-- Move / Copy / Rotate / Scale / Mirror;
+- Copy / Rotate / Scale / Mirror;
 - Array;
 - Offset;
 - Trim / Extend;

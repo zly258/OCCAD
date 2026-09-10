@@ -13,12 +13,43 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
     private OcctVector3d _axis;
     private OcctVector3d _radialAxis;
     private double _majorRadius;
+    private double? _majorRadiusParameter;
+    private double? _tubeRadiusParameter;
     private CadTorusEntity? _preview;
     private WorkPlaneFrame _initialPlane;
 
     public override string Id => "torus";
     public override string DisplayName => "Torus";
+    public override string PrecisionLengthLabel => Stage == 2
+        ? "Tube Radius"
+        : "Major Radius";
+
+    public override CadToolPanelDescriptor ParameterPanel =>
+        new(
+            "Torus",
+            [
+                new CadOptionalDoubleToolParameterDescriptor(
+                    "MajorRadius",
+                    "Major Radius",
+                    _majorRadiusParameter,
+                    1e-9,
+                    double.MaxValue),
+                new CadOptionalDoubleToolParameterDescriptor(
+                    "TubeRadius",
+                    "Tube Radius",
+                    _tubeRadiusParameter,
+                    1e-9,
+                    double.MaxValue)
+            ]);
+
     protected override bool CanStepBackCore => Stage > 0;
+
+    public override bool CanCommitCurrentStage =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        TryResolveExactStagePoint(out _)
+            ? true
+            : base.CanCommitCurrentStage;
 
     protected override void OnActivated()
     {
@@ -56,13 +87,55 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
                 ReferencePoint()).Point);
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(pointer, ReferencePoint(), AcceptPoint);
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+            return AcceptPoint(exactPoint);
+
+        return CommitResolvedPoint(pointer, ReferencePoint(), AcceptPoint);
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive &&
         State == CadToolState.Drawing &&
         AcceptPoint(point);
+
+    protected override bool OnSetParameter(string id, string value)
+    {
+        if (id.Equals("MajorRadius", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryOptionalPositive(value, out var major) ||
+                !CompatibleRadii(major, _tubeRadiusParameter))
+                return false;
+            _majorRadiusParameter = major;
+        }
+        else if (id.Equals("TubeRadius", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryOptionalPositive(value, out var tube) ||
+                !CompatibleRadii(_majorRadiusParameter ?? Positive(_majorRadius), tube))
+                return false;
+            _tubeRadiusParameter = tube;
+        }
+        else
+        {
+            return false;
+        }
+
+        RefreshParameterDrivenPreview();
+        NotifyUpdated();
+        return true;
+    }
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+        {
+            Update(exactPoint);
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
+    }
 
     protected override bool OnStepBack()
     {
@@ -77,6 +150,7 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
                 "Cad.Prompt.Torus.MajorRadius",
                 "Torus: specify major radius [Backspace undo, Esc cancel]",
                 CadPrecisionInputKind.Length);
+            RefreshParameterDrivenPreview();
             return true;
         }
 
@@ -113,21 +187,27 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
                 "Cad.Prompt.Torus.MajorRadius",
                 "Torus: specify major radius [Backspace undo, Esc cancel]",
                 CadPrecisionInputKind.Length);
+            RefreshParameterDrivenPreview();
             return true;
         }
 
         if (Stage == 1)
         {
             var majorPoint = ProjectMajorPoint(point);
-            _majorRadius = CadPlaneGeometry.RadialDistance(
-                _center,
-                majorPoint,
-                _xAxis,
-                _yAxis);
-            if (_majorRadius <= 1e-9)
+            var major = _majorRadiusParameter ??
+                CadPlaneGeometry.RadialDistance(
+                    _center,
+                    majorPoint,
+                    _xAxis,
+                    _yAxis);
+            if (major <= 1e-9 ||
+                !CompatibleRadii(major, _tubeRadiusParameter))
                 return false;
 
-            _majorPoint = majorPoint;
+            _majorRadius = major;
+            _majorPoint = _majorRadiusParameter is not null
+                ? _center + _xAxis * major
+                : majorPoint;
             _radialAxis = CadTransformMath.Normalize(
                 CadTransformMath.Between(_center, _majorPoint),
                 nameof(_majorPoint));
@@ -142,12 +222,14 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
                     _center,
                     _axis,
                     _majorRadius,
-                    _majorRadius * 0.2));
+                    _tubeRadiusParameter ?? _majorRadius * 0.2));
+            RefreshParameterDrivenPreview();
             return true;
         }
 
         var tubePoint = ProjectTubePoint(point);
-        if (_majorPoint.DistanceTo(tubePoint) <= 1e-9)
+        if (_majorPoint.DistanceTo(tubePoint) <= 1e-9 &&
+            _tubeRadiusParameter is null)
             return false;
 
         Update(tubePoint);
@@ -171,12 +253,14 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
         if (Stage == 1)
         {
             var majorPoint = ProjectMajorPoint(point);
-            var major = CadPlaneGeometry.RadialDistance(
-                _center,
-                majorPoint,
-                _xAxis,
-                _yAxis);
-            if (major <= 1e-9)
+            var major = _majorRadiusParameter ??
+                CadPlaneGeometry.RadialDistance(
+                    _center,
+                    majorPoint,
+                    _xAxis,
+                    _yAxis);
+            if (major <= 1e-9 ||
+                !CompatibleRadii(major, _tubeRadiusParameter))
             {
                 _preview = null;
                 Context.Preview.Clear();
@@ -188,7 +272,7 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
                     _center,
                     _axis,
                     major,
-                    major * 0.2));
+                    _tubeRadiusParameter ?? major * 0.2));
             return;
         }
 
@@ -196,9 +280,17 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
             return;
 
         var tubePoint = ProjectTubePoint(point);
-        var minorRadius = ResolveMinorRadius(
-            _majorRadius,
-            _majorPoint.DistanceTo(tubePoint));
+        var requested = _tubeRadiusParameter ??
+            _majorPoint.DistanceTo(tubePoint);
+        if (!CompatibleRadii(_majorRadius, requested))
+        {
+            _preview = null;
+            Context.Preview.Clear();
+            return;
+        }
+
+        var minorRadius = _tubeRadiusParameter ??
+            ResolveMinorRadius(_majorRadius, requested);
         Show(
             new CadTorusEntity(
                 _center,
@@ -206,6 +298,53 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
                 _majorRadius,
                 minorRadius));
     }
+
+    private void RefreshParameterDrivenPreview()
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+        {
+            Update(exactPoint);
+            return;
+        }
+
+        if (Stage > 0 && Context.Workspace.LastPointerPosition is { } pointer)
+        {
+            Update(Context.ResolvePoint(
+                pointer.X,
+                pointer.Y,
+                ReferencePoint()).Point);
+        }
+    }
+
+    private bool TryResolveExactStagePoint(out OcctPoint3d point)
+    {
+        point = default;
+        var radius = Stage switch
+        {
+            1 => _majorRadiusParameter ?? LockedLength(),
+            2 => _tubeRadiusParameter ?? LockedLength(),
+            _ => null
+        };
+        if (radius is not { } value || value <= 1e-9)
+            return false;
+
+        if (Stage == 2 && !CompatibleRadii(_majorRadius, value))
+            return false;
+
+        point = Stage switch
+        {
+            1 => _center + _xAxis * value,
+            2 => _majorPoint + _radialAxis * value,
+            _ => default
+        };
+        return point.IsFinite;
+    }
+
+    private double? LockedLength() =>
+        Context.Workspace.Drafting.LengthLockEnabled &&
+        Context.Workspace.Drafting.LockedLength > 1e-9
+            ? Context.Workspace.Drafting.LockedLength
+            : null;
 
     private OcctPoint3d ProjectMajorPoint(OcctPoint3d point) =>
         CadPlaneGeometry.ProjectToPlane(
@@ -227,6 +366,14 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
         ShowPreview(entity);
     }
 
+    private static bool CompatibleRadii(double? major, double? tube) =>
+        major is null ||
+        tube is null ||
+        tube.Value < major.Value * 0.5;
+
+    private static double? Positive(double value) =>
+        double.IsFinite(value) && value > 1e-9 ? value : null;
+
     private static double ResolveMinorRadius(
         double majorRadius,
         double requestedRadius)
@@ -245,5 +392,26 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
     {
         _preview = null;
         _majorRadius = 0.0;
+        _majorRadiusParameter = null;
+        _tubeRadiusParameter = null;
+    }
+
+    private static bool TryOptionalPositive(string text, out double? value)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            value = null;
+            return true;
+        }
+
+        if (!CadValueTextConverter.TryParseFiniteDouble(text, out var parsed) ||
+            parsed <= 0.0)
+        {
+            value = null;
+            return false;
+        }
+
+        value = parsed;
+        return true;
     }
 }

@@ -10,18 +10,74 @@ public sealed class EllipsoidTool : CadDrawingTool, ICadPointInputTool
     private OcctVector3d _zAxis;
     private double _rx;
     private double _ry;
+    private double? _rxParameter;
+    private double? _ryParameter;
+    private double? _rzParameter;
+    private double? _angleDegrees;
     private CadEllipsoidEntity? _preview;
     private WorkPlaneFrame _initial;
 
     public override string Id => "ellipsoid";
     public override string DisplayName => "Ellipsoid";
+    public override string PrecisionLengthLabel => Stage switch
+    {
+        1 => "X Semi-axis",
+        2 => "Y Semi-axis",
+        3 => "Z Semi-axis",
+        _ => base.PrecisionLengthLabel
+    };
+    public override string PrecisionAngleLabel => Stage == 1
+        ? "Orientation"
+        : base.PrecisionAngleLabel;
+
+    public override CadToolPanelDescriptor ParameterPanel =>
+        new(
+            "Ellipsoid",
+            [
+                new CadOptionalDoubleToolParameterDescriptor(
+                    "XRadius",
+                    "X Semi-axis",
+                    _rxParameter,
+                    1e-9,
+                    double.MaxValue),
+                new CadOptionalDoubleToolParameterDescriptor(
+                    "YRadius",
+                    "Y Semi-axis",
+                    _ryParameter,
+                    1e-9,
+                    double.MaxValue),
+                new CadOptionalDoubleToolParameterDescriptor(
+                    "ZRadius",
+                    "Z Semi-axis",
+                    _rzParameter,
+                    1e-9,
+                    double.MaxValue),
+                new CadOptionalDoubleToolParameterDescriptor(
+                    "Angle",
+                    "Orientation",
+                    _angleDegrees,
+                    -360000.0,
+                    360000.0)
+            ]);
+
     protected override bool CanStepBackCore => Stage > 0;
+
+    public override bool CanCommitCurrentStage =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        TryResolveExactStagePoint(out _)
+            ? true
+            : base.CanCommitCurrentStage;
 
     protected override void OnActivated()
     {
-        _preview = null;
+        ResetState();
         _initial = CaptureWorkPlaneFrame();
-        SetStageLocalized(0, "Cad.Prompt.Ellipsoid.Center", "Ellipsoid: specify center [Esc cancel]");
+        _zAxis = _initial.XAxis.Cross(_initial.YAxis).Normalized();
+        SetStageLocalized(
+            0,
+            "Cad.Prompt.Ellipsoid.Center",
+            "Ellipsoid: specify center [Esc cancel]");
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
@@ -37,11 +93,59 @@ public sealed class EllipsoidTool : CadDrawingTool, ICadPointInputTool
         return Accept(Context.ResolvePoint(input.X, input.Y, Reference()).Point);
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(pointer, Reference(), Accept);
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+            return Accept(exactPoint);
+
+        return CommitResolvedPoint(pointer, Reference(), Accept);
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive && State == CadToolState.Drawing && Accept(point);
+
+    protected override bool OnSetParameter(string id, string value)
+    {
+        if (id.Equals("XRadius", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryOptionalPositive(value, out _rxParameter))
+                return false;
+        }
+        else if (id.Equals("YRadius", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryOptionalPositive(value, out _ryParameter))
+                return false;
+        }
+        else if (id.Equals("ZRadius", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryOptionalPositive(value, out _rzParameter))
+                return false;
+        }
+        else if (id.Equals("Angle", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryOptionalFinite(value, out _angleDegrees))
+                return false;
+        }
+        else
+        {
+            return false;
+        }
+
+        RefreshParameterDrivenPreview();
+        NotifyUpdated();
+        return true;
+    }
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+        {
+            Update(exactPoint);
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
+    }
 
     protected override bool OnStepBack()
     {
@@ -50,24 +154,38 @@ public sealed class EllipsoidTool : CadDrawingTool, ICadPointInputTool
         if (Stage == 3)
         {
             RestoreWorkPlaneFrame(_initial, _center);
-            SetStageLocalized(2, "Cad.Prompt.Ellipsoid.YRadius", "Ellipsoid: specify Y semi-axis [Backspace undo, Esc cancel]", CadPrecisionInputKind.Length);
+            SetStageLocalized(
+                2,
+                "Cad.Prompt.Ellipsoid.YRadius",
+                "Ellipsoid: specify Y semi-axis [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.Length);
+            RefreshParameterDrivenPreview();
             return true;
         }
         if (Stage == 2)
         {
-            SetStageLocalized(1, "Cad.Prompt.Ellipsoid.XRadius", "Ellipsoid: specify X semi-axis [Backspace undo, Esc cancel]", CadPrecisionInputKind.Length);
+            RestoreWorkPlaneFrame(_initial, _center);
+            SetStageLocalized(
+                1,
+                "Cad.Prompt.Ellipsoid.XRadius",
+                "Ellipsoid: specify X semi-axis and orientation [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.LengthAndAngle);
+            RefreshParameterDrivenPreview();
             return true;
         }
         if (Stage == 1)
         {
             RestoreWorkPlaneFrame(_initial);
-            SetStageLocalized(0, "Cad.Prompt.Ellipsoid.Center", "Ellipsoid: specify center [Esc cancel]");
+            SetStageLocalized(
+                0,
+                "Cad.Prompt.Ellipsoid.Center",
+                "Ellipsoid: specify center [Esc cancel]");
             return true;
         }
         return false;
     }
 
-    protected override void OnCanceled() => _preview = null;
+    protected override void OnCanceled() => ResetState();
 
     private OcctPoint3d? Reference() => Stage > 0 ? _center : null;
 
@@ -78,34 +196,50 @@ public sealed class EllipsoidTool : CadDrawingTool, ICadPointInputTool
         {
             _center = point;
             Context.WorkPlane.SetOrigin(point);
-            SetStageLocalized(1, "Cad.Prompt.Ellipsoid.XRadius", "Ellipsoid: specify X semi-axis [Backspace undo, Esc cancel]", CadPrecisionInputKind.Length);
+            SetStageLocalized(
+                1,
+                "Cad.Prompt.Ellipsoid.XRadius",
+                "Ellipsoid: specify X semi-axis and orientation [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.LengthAndAngle);
+            RefreshParameterDrivenPreview();
             return true;
         }
 
         if (Stage == 1)
         {
-            var direction = Planar(point - _center);
-            if (!direction.TryNormalize(out _xAxis)) return false;
-            _rx = direction.Length;
-            _zAxis = _initial.XAxis.Cross(_initial.YAxis).Normalized();
-            _yAxis = _zAxis.Cross(_xAxis).Normalized();
-            Show(_rx, _rx, _rx);
-            SetStageLocalized(2, "Cad.Prompt.Ellipsoid.YRadius", "Ellipsoid: specify Y semi-axis [Backspace undo, Esc cancel]", CadPrecisionInputKind.Length);
+            if (!TrySetPrimaryAxis(point))
+                return false;
+
+            Show(
+                _rx,
+                _ryParameter ?? _rx,
+                _rzParameter ?? _ryParameter ?? _rx);
+            SetStageLocalized(
+                2,
+                "Cad.Prompt.Ellipsoid.YRadius",
+                "Ellipsoid: specify Y semi-axis [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.Length);
+            RefreshParameterDrivenPreview();
             return true;
         }
 
         if (Stage == 2)
         {
-            _ry = Math.Abs((point - _center).Dot(_yAxis));
+            _ry = _ryParameter ?? Math.Abs((point - _center).Dot(_yAxis));
             if (_ry <= 1e-9) return false;
-            Show(_rx, _ry, _ry);
+            Show(_rx, _ry, _rzParameter ?? _ry);
             Context.WorkPlane.SetToolPlaneFixed(false);
             Context.WorkPlane.SetToolPlane(_center, _zAxis, _xAxis);
-            SetStageLocalized(3, "Cad.Prompt.Ellipsoid.ZRadius", "Ellipsoid: specify Z semi-axis [Backspace undo, Esc cancel]", CadPrecisionInputKind.Length);
+            SetStageLocalized(
+                3,
+                "Cad.Prompt.Ellipsoid.ZRadius",
+                "Ellipsoid: specify Z semi-axis [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.Length);
+            RefreshParameterDrivenPreview();
             return true;
         }
 
-        var rz = Math.Abs((point - _center).Dot(_zAxis));
+        var rz = _rzParameter ?? Math.Abs((point - _center).Dot(_zAxis));
         if (rz <= 1e-9) return false;
         Show(_rx, _ry, rz);
         if (_preview is null) return false;
@@ -113,29 +247,145 @@ public sealed class EllipsoidTool : CadDrawingTool, ICadPointInputTool
         return true;
     }
 
+    private bool TrySetPrimaryAxis(OcctPoint3d point)
+    {
+        var direction = Planar(point - _center);
+        var radius = _rxParameter ?? direction.Length;
+        if (!double.IsFinite(radius) || radius <= 1e-9)
+            return false;
+
+        if (_angleDegrees is { } parameterAngle)
+        {
+            _xAxis = AxisFromAngle(parameterAngle);
+        }
+        else if (Context.Workspace.Drafting.AngleLockEnabled &&
+                 double.IsFinite(Context.Workspace.Drafting.LockedAngleDegrees))
+        {
+            _xAxis = AxisFromAngle(Context.Workspace.Drafting.LockedAngleDegrees);
+        }
+        else if (!direction.TryNormalize(out _xAxis))
+        {
+            return false;
+        }
+
+        _rx = radius;
+        _zAxis = _initial.XAxis.Cross(_initial.YAxis).Normalized();
+        _yAxis = _zAxis.Cross(_xAxis).Normalized();
+        return true;
+    }
+
     private void Update(OcctPoint3d point)
     {
         if (Stage == 1)
         {
-            var direction = Planar(point - _center);
-            var radius = direction.Length;
-            if (radius > 1e-9)
-                ShowPreview(new CadEllipsoidEntity(_center, radius, radius, radius));
+            if (TrySetPrimaryAxis(point))
+            {
+                Show(
+                    _rx,
+                    _ryParameter ?? _rx,
+                    _rzParameter ?? _ryParameter ?? _rx);
+            }
             else
+            {
                 Context.Preview.Clear();
+            }
             return;
         }
         if (Stage == 2)
         {
-            var radius = Math.Abs((point - _center).Dot(_yAxis));
-            if (radius > 1e-9) Show(_rx, radius, radius); else Context.Preview.Clear();
+            var radius = _ryParameter ?? Math.Abs((point - _center).Dot(_yAxis));
+            if (radius > 1e-9)
+                Show(_rx, radius, _rzParameter ?? radius);
+            else
+                Context.Preview.Clear();
             return;
         }
         if (Stage == 3)
         {
-            var radius = Math.Abs((point - _center).Dot(_zAxis));
-            if (radius > 1e-9) Show(_rx, _ry, radius); else Context.Preview.Clear();
+            var radius = _rzParameter ?? Math.Abs((point - _center).Dot(_zAxis));
+            if (radius > 1e-9)
+                Show(_rx, _ry, radius);
+            else
+                Context.Preview.Clear();
         }
+    }
+
+    private void RefreshParameterDrivenPreview()
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+        {
+            Update(exactPoint);
+            return;
+        }
+
+        if (Stage > 0 && Context.Workspace.LastPointerPosition is { } pointer)
+        {
+            Update(Context.ResolvePoint(
+                pointer.X,
+                pointer.Y,
+                Reference()).Point);
+        }
+    }
+
+    private bool TryResolveExactStagePoint(out OcctPoint3d point)
+    {
+        point = default;
+        if (Stage == 1)
+        {
+            var radius = _rxParameter ?? LockedLength();
+            var angle = _angleDegrees ?? LockedAngle();
+            if (radius is not { } radiusValue || radiusValue <= 1e-9 ||
+                angle is not { } angleValue || !double.IsFinite(angleValue))
+                return false;
+
+            point = _center + AxisFromAngle(angleValue) * radiusValue;
+            return point.IsFinite;
+        }
+
+        if (Stage == 2)
+        {
+            var radius = _ryParameter ?? LockedLength();
+            if (radius is not { } value || value <= 1e-9)
+                return false;
+
+            point = _center + _yAxis * value;
+            return point.IsFinite;
+        }
+
+        if (Stage == 3)
+        {
+            var radius = _rzParameter ?? LockedLength();
+            if (radius is not { } value || value <= 1e-9)
+                return false;
+
+            point = _center + _zAxis * value;
+            return point.IsFinite;
+        }
+
+        return false;
+    }
+
+    private double? LockedLength() =>
+        Context.Workspace.Drafting.LengthLockEnabled &&
+        Context.Workspace.Drafting.LockedLength > 1e-9
+            ? Context.Workspace.Drafting.LockedLength
+            : null;
+
+    private double? LockedAngle() =>
+        Context.Workspace.Drafting.AngleLockEnabled &&
+        double.IsFinite(Context.Workspace.Drafting.LockedAngleDegrees)
+            ? Context.Workspace.Drafting.LockedAngleDegrees
+            : null;
+
+    private OcctVector3d AxisFromAngle(double angleDegrees)
+    {
+        var radians = angleDegrees * Math.PI / 180.0;
+        var cos = Math.Cos(radians);
+        var sin = Math.Sin(radians);
+        return new OcctVector3d(
+            _initial.XAxis.X * cos + _initial.YAxis.X * sin,
+            _initial.XAxis.Y * cos + _initial.YAxis.Y * sin,
+            _initial.XAxis.Z * cos + _initial.YAxis.Z * sin).Normalized();
     }
 
     private OcctVector3d Planar(OcctVector3d direction)
@@ -146,7 +396,60 @@ public sealed class EllipsoidTool : CadDrawingTool, ICadPointInputTool
 
     private void Show(double x, double y, double z)
     {
-        _preview = new CadEllipsoidEntity(_center, _xAxis, _yAxis, _zAxis, x, y, z);
+        _preview = new CadEllipsoidEntity(
+            _center,
+            _xAxis,
+            _yAxis,
+            _zAxis,
+            x,
+            y,
+            z);
         ShowPreview(_preview);
+    }
+
+    private void ResetState()
+    {
+        _preview = null;
+        _rxParameter = null;
+        _ryParameter = null;
+        _rzParameter = null;
+        _angleDegrees = null;
+    }
+
+    private static bool TryOptionalPositive(string text, out double? value)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            value = null;
+            return true;
+        }
+
+        if (!CadValueTextConverter.TryParseFiniteDouble(text, out var parsed) ||
+            parsed <= 0.0)
+        {
+            value = null;
+            return false;
+        }
+
+        value = parsed;
+        return true;
+    }
+
+    private static bool TryOptionalFinite(string text, out double? value)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            value = null;
+            return true;
+        }
+
+        if (!CadValueTextConverter.TryParseFiniteDouble(text, out var parsed))
+        {
+            value = null;
+            return false;
+        }
+
+        value = parsed;
+        return true;
     }
 }

@@ -516,16 +516,16 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 comboBox.CornerRadius = new CornerRadius(0);
                 break;
 
+            case CheckBox checkBox:
+                checkBox.Margin = new Thickness(5, 0, 0, 0);
+                checkBox.MinHeight = CadTheme.ControlHeight;
+                break;
+
             case Button button:
                 button.Margin = new Thickness(0);
                 button.MinHeight = CadTheme.ControlHeight;
                 button.BorderThickness = new Thickness(0);
                 button.CornerRadius = new CornerRadius(0);
-                break;
-
-            case CheckBox checkBox:
-                checkBox.Margin = new Thickness(5, 0, 0, 0);
-                checkBox.MinHeight = CadTheme.ControlHeight;
                 break;
 
             case TextBlock text:

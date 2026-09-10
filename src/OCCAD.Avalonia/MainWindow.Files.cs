@@ -79,14 +79,15 @@ public sealed partial class MainWindow
             _documentFile = file;
             ResetDocumentUi(fit: true);
             UpdateWindowTitle();
-            _toolStatus.Text = UiFormat(
-                "Cad.Text.Opened",
-                "Opened {0}",
-                file.Name);
+            _commandLine.ShowFeedback(
+                UiFormat(
+                    "Cad.Text.Opened",
+                    "Opened {0}",
+                    file.Name));
         }
         catch (Exception exception)
         {
-            _toolStatus.Text = exception.Message;
+            _commandLine.ShowFeedback(exception.Message);
             await CadMessageDialog.ShowAsync(
                 this,
                 UiText(
@@ -149,15 +150,16 @@ public sealed partial class MainWindow
             _workspace.MarkSaved();
             UpdateWindowTitle();
 
-            _toolStatus.Text = UiFormat(
-                "Cad.Text.Saved",
-                "Saved {0}",
-                file.Name);
+            _commandLine.ShowFeedback(
+                UiFormat(
+                    "Cad.Text.Saved",
+                    "Saved {0}",
+                    file.Name));
             return true;
         }
         catch (Exception exception)
         {
-            _toolStatus.Text = exception.Message;
+            _commandLine.ShowFeedback(exception.Message);
             await CadMessageDialog.ShowAsync(
                 this,
                 UiText(

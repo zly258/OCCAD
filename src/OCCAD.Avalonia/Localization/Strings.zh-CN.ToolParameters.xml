@@ -33,6 +33,24 @@
     <sys:String x:Key="Cad.Precision.cone.1.Length">底面半径</sys:String>
     <sys:String x:Key="Cad.Precision.cone.2.Length">高度</sys:String>
 
+    <!-- Sphere -->
+    <sys:String x:Key="Cad.Parameter.sphere.Radius">半径</sys:String>
+    <sys:String x:Key="Cad.Precision.sphere.1.Length">半径</sys:String>
+
+    <!-- Frustum -->
+    <sys:String x:Key="Cad.Parameter.frustum.BaseRadius">底面半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.frustum.Height">高度</sys:String>
+    <sys:String x:Key="Cad.Parameter.frustum.TopRadius">顶面半径</sys:String>
+    <sys:String x:Key="Cad.Precision.frustum.1.Length">底面半径</sys:String>
+    <sys:String x:Key="Cad.Precision.frustum.2.Length">高度</sys:String>
+    <sys:String x:Key="Cad.Precision.frustum.3.Length">顶面半径</sys:String>
+
+    <!-- Torus -->
+    <sys:String x:Key="Cad.Parameter.torus.MajorRadius">主半径</sys:String>
+    <sys:String x:Key="Cad.Parameter.torus.TubeRadius">管半径</sys:String>
+    <sys:String x:Key="Cad.Precision.torus.1.Length">主半径</sys:String>
+    <sys:String x:Key="Cad.Precision.torus.2.Length">管半径</sys:String>
+
     <!-- Arc prompts used by the multi-method tool -->
     <sys:String x:Key="Cad.Prompt.Arc.Center">圆弧：指定圆心 [Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.Arc.Start">圆弧：指定起点 [Backspace 返回，Esc 取消]</sys:String>

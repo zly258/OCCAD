@@ -29,10 +29,11 @@ public sealed partial class MainWindow
                 border.Child is StackPanel panel &&
                 panel.Children.Contains(_snapToggle));
 
+        // Layer selection belongs to Home. Drafting toggles intentionally stay
+        // attached to the legacy toolbar until CommandStatus moves them to the
+        // status bar; this prevents Ribbon language rebuilds from stealing the
+        // persistent SNAP/ORTHO/POLAR controls back from the status surface.
         DetachRibbonControl(_layerCombo);
-        DetachRibbonControl(_snapToggle);
-        DetachRibbonControl(_orthoToggle);
-        DetachRibbonControl(_polarToggle);
 
         root.Children.Remove(_mainMenu);
         if (legacyToolbar is not null)
@@ -61,9 +62,6 @@ public sealed partial class MainWindow
             return;
 
         DetachRibbonControl(_layerCombo);
-        DetachRibbonControl(_snapToggle);
-        DetachRibbonControl(_orthoToggle);
-        DetachRibbonControl(_polarToggle);
 
         _ribbonActionButtons.Clear();
         _ribbonPanelToggles.Clear();
@@ -95,11 +93,7 @@ public sealed partial class MainWindow
                     FileButton("Cad.Text.Open", "Open", async () => await OpenDocumentAsync()),
                     FileButton("Cad.Text.Save", "Save", async () => await SaveDocumentAsync(saveAs: false)),
                     FileButton("Cad.Text.SaveAs", "Save As", async () => await SaveDocumentAsync(saveAs: true)),
-                    FileButton("Cad.Text.ClearModel", "Clear Model", () =>
-                    {
-                        ExecuteAction("file.clear");
-                        return Task.CompletedTask;
-                    }),
+                    RibbonAction("file.clear", "Cad.Text.ClearModel", "Clear Model"),
                     FileButton("Cad.Text.Exit", "Exit", () =>
                     {
                         Close();
@@ -122,13 +116,7 @@ public sealed partial class MainWindow
                     "Cad.Text.Layer",
                     "Layer",
                     RibbonLabel("Cad.Text.CurrentLayer", "Current Layer"),
-                    _layerCombo),
-                RibbonGroup(
-                    "Cad.Text.Drafting",
-                    "Drafting",
-                    _snapToggle,
-                    _orthoToggle,
-                    _polarToggle)),
+                    _layerCombo)),
 
             RibbonTab(
                 "Cad.Text.Draw",

@@ -158,7 +158,13 @@ public sealed class ArrayTool : CadSelectionTransformToolBase, ICadPointInputToo
     {
         if (id.Equals("Mode", StringComparison.OrdinalIgnoreCase))
         {
-            _mode = value;
+            var normalized = value.Trim();
+            if (string.Equals(normalized, "Rectangular", StringComparison.OrdinalIgnoreCase))
+                _mode = "Rectangular";
+            else if (string.Equals(normalized, "Circular", StringComparison.OrdinalIgnoreCase))
+                _mode = "Circular";
+            else
+                return false;
         }
         else if (id.Equals("Columns", StringComparison.OrdinalIgnoreCase))
         {
@@ -174,13 +180,15 @@ public sealed class ArrayTool : CadSelectionTransformToolBase, ICadPointInputToo
         }
         else if (id.Equals("ColumnSpacing", StringComparison.OrdinalIgnoreCase))
         {
-            if (!CadValueTextConverter.TryParseFiniteDouble(value, out var cs))
+            if (!CadValueTextConverter.TryParseFiniteDouble(value, out var cs) ||
+                cs < -1e6 || cs > 1e6)
                 return false;
             _columnSpacing = cs;
         }
         else if (id.Equals("RowSpacing", StringComparison.OrdinalIgnoreCase))
         {
-            if (!CadValueTextConverter.TryParseFiniteDouble(value, out var rs))
+            if (!CadValueTextConverter.TryParseFiniteDouble(value, out var rs) ||
+                rs < -1e6 || rs > 1e6)
                 return false;
             _rowSpacing = rs;
         }
@@ -192,7 +200,8 @@ public sealed class ArrayTool : CadSelectionTransformToolBase, ICadPointInputToo
         }
         else if (id.Equals("SweepAngle", StringComparison.OrdinalIgnoreCase))
         {
-            if (!CadValueTextConverter.TryParseFiniteDouble(value, out var sweep))
+            if (!CadValueTextConverter.TryParseFiniteDouble(value, out var sweep) ||
+                sweep < -360.0 || sweep > 360.0)
                 return false;
             _sweepAngle = sweep;
         }

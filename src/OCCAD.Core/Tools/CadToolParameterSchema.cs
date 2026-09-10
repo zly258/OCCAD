@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace OCCAD;
 
 /// <summary>
@@ -280,4 +282,109 @@ public sealed class CadToolParameterSchema
     public CadToolParameterDescriptor GetRequired(string id) =>
         Find(id) ?? throw new KeyNotFoundException(
             $"Tool parameter '{id}' is not defined by schema '{Title}'.");
+
+    /// <summary>
+    /// Validates text against the descriptor currently published by the tool
+    /// and returns a canonical value for the tool state machine to consume.
+    /// This keeps UI, script and MCP callers behind the same Core invariant.
+    /// </summary>
+    public bool TryNormalizeValue(
+        string id,
+        string text,
+        out string normalizedValue)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        ArgumentNullException.ThrowIfNull(text);
+
+        normalizedValue = string.Empty;
+        var parameter = Find(id);
+        if (parameter is null)
+            return false;
+
+        var candidate = text.Trim();
+        switch (parameter)
+        {
+            case CadStringToolParameterDescriptor descriptor:
+                if (!descriptor.AllowEmpty && string.IsNullOrWhiteSpace(candidate))
+                    return false;
+                normalizedValue = candidate;
+                return true;
+
+            case CadChoiceToolParameterDescriptor descriptor:
+            {
+                var selected = descriptor.Choices.FirstOrDefault(choice =>
+                    string.Equals(
+                        choice,
+                        candidate,
+                        StringComparison.OrdinalIgnoreCase));
+                if (selected is null)
+                    return false;
+                normalizedValue = selected;
+                return true;
+            }
+
+            case CadIntegerToolParameterDescriptor descriptor:
+            {
+                if ((!int.TryParse(
+                         candidate,
+                         NumberStyles.Integer,
+                         CultureInfo.CurrentCulture,
+                         out var value) &&
+                     !int.TryParse(
+                         candidate,
+                         NumberStyles.Integer,
+                         CultureInfo.InvariantCulture,
+                         out value)) ||
+                    value < descriptor.Minimum ||
+                    value > descriptor.Maximum)
+                {
+                    return false;
+                }
+
+                normalizedValue = value.ToString(CultureInfo.InvariantCulture);
+                return true;
+            }
+
+            case CadDoubleToolParameterDescriptor descriptor:
+            {
+                if (!CadValueTextConverter.TryParseFiniteDouble(candidate, out var value) ||
+                    value < descriptor.Minimum ||
+                    value > descriptor.Maximum)
+                {
+                    return false;
+                }
+
+                normalizedValue = value.ToString("R", CultureInfo.InvariantCulture);
+                return true;
+            }
+
+            case CadOptionalDoubleToolParameterDescriptor descriptor:
+            {
+                if (string.IsNullOrWhiteSpace(candidate))
+                {
+                    normalizedValue = string.Empty;
+                    return true;
+                }
+
+                if (!CadValueTextConverter.TryParseFiniteDouble(candidate, out var value) ||
+                    value < descriptor.Minimum ||
+                    value > descriptor.Maximum)
+                {
+                    return false;
+                }
+
+                normalizedValue = value.ToString("R", CultureInfo.InvariantCulture);
+                return true;
+            }
+
+            case CadBooleanToolParameterDescriptor:
+                if (!bool.TryParse(candidate, out var value))
+                    return false;
+                normalizedValue = value ? "true" : "false";
+                return true;
+
+            default:
+                return false;
+        }
+    }
 }

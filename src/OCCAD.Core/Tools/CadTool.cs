@@ -203,10 +203,14 @@ public abstract class CadTool
         ArgumentNullException.ThrowIfNull(value);
 
         var parameterId = id.Trim();
-        if (ParameterSchema?.Find(parameterId) is null)
+        var schema = ParameterSchema;
+        if (schema is null ||
+            !schema.TryNormalizeValue(parameterId, value, out var normalizedValue))
+        {
             return false;
+        }
 
-        return OnSetParameter(parameterId, value.Trim());
+        return OnSetParameter(parameterId, normalizedValue);
     }
 
     public virtual bool HandlePointer(OcctPointerInputEventArgs input) => false;

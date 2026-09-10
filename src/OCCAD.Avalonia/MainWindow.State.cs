@@ -31,8 +31,11 @@ public sealed partial class MainWindow
         if (_modelHeaderText is not null)
             _modelHeaderText.Text =
                 UiText("Cad.Text.Model", "Model");
-        if (_rightHeaderText is not null)
-            _rightHeaderText.Text =
+        if (_layerHeaderText is not null)
+            _layerHeaderText.Text =
+                UiText("Cad.Text.Layers", "Layers");
+        if (_propertyHeaderText is not null)
+            _propertyHeaderText.Text =
                 UiText("Cad.Text.Properties", "Properties");
 
         _snapToggle.Content = UiText(
@@ -42,7 +45,6 @@ public sealed partial class MainWindow
             "Cad.Text.StatusOrtho",
             "ORTHO");
 
-        RefreshRightTabHeaders();
         _layerPanel.RefreshLanguage();
         _propertyInspector.RefreshLanguage();
         _commandLine.RefreshLanguage();
@@ -54,27 +56,6 @@ public sealed partial class MainWindow
         UpdateHistoryUi();
         RefreshInteractionUi();
         UpdateWindowTitle();
-    }
-
-    private void RefreshRightTabHeaders()
-    {
-        if (_rightTabs.ItemsSource is not IEnumerable<TabItem> items)
-            return;
-
-        var tabs = items.ToArray();
-        if (tabs.Length > 0)
-        {
-            tabs[0].Header = UiText(
-                "Cad.Text.Layers",
-                "Layers");
-        }
-
-        if (tabs.Length > 1)
-        {
-            tabs[1].Header = UiText(
-                "Cad.Text.Properties",
-                "Properties");
-        }
     }
 
     private void ApplyDocumentChangeSet(

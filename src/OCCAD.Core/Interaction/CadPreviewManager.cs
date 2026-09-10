@@ -105,6 +105,9 @@ public sealed class CadPreviewManager
         catch
         {
             TryDeleteObjects(engine, nextShapes);
+            TryDeleteObjects(engine, _shapes);
+            _shapes.Clear();
+            _entities.Clear();
             throw;
         }
 
@@ -114,10 +117,10 @@ public sealed class CadPreviewManager
         }
         catch
         {
-            // Replacement is atomic from the manager's point of view: if the
-            // previous preview cannot be removed, discard the new frame and keep
-            // the previous shape list authoritative.
             TryDeleteObjects(engine, nextShapes);
+            TryDeleteObjects(engine, _shapes);
+            _shapes.Clear();
+            _entities.Clear();
             throw;
         }
 

@@ -36,23 +36,23 @@ internal sealed class CadToolPanel : Border
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
 
-        Width = 326;
-        MaxHeight = 610;
+        Width = 312;
+        MaxHeight = 570;
         HorizontalAlignment = HorizontalAlignment.Left;
         VerticalAlignment = VerticalAlignment.Top;
-        Margin = new Thickness(12);
-        Background = CadTheme.Panel;
-        BorderBrush = CadTheme.Border;
+        Margin = new Thickness(10);
+        Background = CadTheme.Surface;
+        BorderBrush = CadTheme.BorderStrong;
         BorderThickness = new Thickness(1);
-        CornerRadius = new CornerRadius(4);
+        CornerRadius = new CornerRadius(3);
         IsVisible = false;
 
         _title = new TextBlock
         {
             FontWeight = FontWeight.SemiBold,
-            Foreground = Brushes.White,
+            Foreground = CadTheme.Text,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(9, 0)
+            Margin = new Thickness(10, 0)
         };
 
         _close = new Button
@@ -62,7 +62,7 @@ internal sealed class CadToolPanel : Border
             Height = 28,
             Padding = new Thickness(0),
             Background = Brushes.Transparent,
-            Foreground = Brushes.White,
+            Foreground = CadTheme.Muted,
             BorderThickness = new Thickness(0),
             HorizontalContentAlignment = HorizontalAlignment.Center,
             VerticalContentAlignment = VerticalAlignment.Center
@@ -71,7 +71,7 @@ internal sealed class CadToolPanel : Border
 
         var header = new DockPanel
         {
-            Height = 30,
+            Height = 31,
             Background = CadTheme.Header
         };
         DockPanel.SetDock(_close, Dock.Right);
@@ -80,11 +80,12 @@ internal sealed class CadToolPanel : Border
 
         _content = new StackPanel
         {
-            Spacing = 4,
-            Margin = new Thickness(10)
+            Spacing = 3,
+            Margin = new Thickness(9)
         };
 
         _finish = CompactButton();
+        _finish.Classes.Add("cad-primary");
         _finish.Click += (_, _) => FinishTool();
         _cancel = CompactButton();
         _cancel.Click += (_, _) => _workspace.Tools.CancelCurrent();
@@ -92,7 +93,7 @@ internal sealed class CadToolPanel : Border
         _planeState = new TextBlock
         {
             Foreground = CadTheme.Muted,
-            FontSize = 11,
+            FontSize = 10.5,
             VerticalAlignment = VerticalAlignment.Center
         };
         _planeLock = new CheckBox
@@ -136,7 +137,7 @@ internal sealed class CadToolPanel : Border
             _schema = string.Empty;
             _editors.Clear();
             _locks.Clear();
-            _content.Children.Clear();
+            ClearDynamicContent();
             SetPanelVisible(false);
             return;
         }
@@ -218,6 +219,21 @@ internal sealed class CadToolPanel : Border
                            : $"{parameter.Id}:{parameter.GetType().Name}"));
     }
 
+    private void ClearDynamicContent()
+    {
+        DetachReusableControl(_planeState);
+        DetachReusableControl(_planeLock);
+        DetachReusableControl(_finish);
+        DetachReusableControl(_cancel);
+        _content.Children.Clear();
+    }
+
+    private static void DetachReusableControl(Control control)
+    {
+        if (control.Parent is Panel parent)
+            parent.Children.Remove(control);
+    }
+
     private void Rebuild(CadTool tool)
     {
         _refreshing = true;
@@ -233,7 +249,7 @@ internal sealed class CadToolPanel : Border
                     "Cad.Text.CloseToolPanel",
                     "Hide tool parameters"));
 
-            _content.Children.Clear();
+            ClearDynamicContent();
             _editors.Clear();
             _locks.Clear();
 
@@ -283,13 +299,16 @@ internal sealed class CadToolPanel : Border
 
         var row = new Grid
         {
-            Margin = new Thickness(0, 0, 0, 5),
-            ColumnSpacing = 8
+            Margin = new Thickness(0, 0, 0, 6),
+            ColumnSpacing = 8,
+            Background = CadTheme.PanelAlt
         };
         row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
         row.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+        _planeState.Margin = new Thickness(6, 3);
         row.Children.Add(_planeState);
         Grid.SetColumn(_planeLock, 1);
+        _planeLock.Margin = new Thickness(0, 2, 5, 2);
         row.Children.Add(_planeLock);
         _content.Children.Add(row);
         RefreshWorkPlaneState();

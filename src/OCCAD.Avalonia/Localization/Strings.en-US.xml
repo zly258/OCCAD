@@ -651,7 +651,7 @@
     <sys:String x:Key="Cad.Prompt.extrude.Select">Extrude: select a closed planar profile [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.extrude.Selected">Extrude: {0} profile selected [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.extrude.Single">Extrude: select exactly one closed planar profile [Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.extrude.Height">Extrude: set height and direction, then click or press Enter [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.extrude.Height">Extrude: move the pointer to set signed height, click to accept [Backspace profile, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.History.Region">Region</sys:String>
     <sys:String x:Key="Cad.History.Extrude">Extrude</sys:String>
     <sys:String x:Key="Cad.Text.Revolve">Revolve</sys:String>
@@ -678,15 +678,15 @@
     <sys:String x:Key="Cad.Text.Sweep">Sweep</sys:String>
     <sys:String x:Key="Cad.Prompt.sweep.Select">Sweep: select one closed planar profile [Enter accept, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.sweep.Selected">Sweep: {0} profile selected [Enter accept, Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.sweep.Path">Sweep: select a line, arc, helix, open polyline, or mixed path [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.sweep.Path">Sweep: select a line, arc, helix, open polyline, or mixed path [Backspace profile, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.sweep.Invalid">Sweep: the hovered object is not a valid sweep path.</sys:String>
     <sys:String x:Key="Cad.History.Sweep">Sweep</sys:String>
     <sys:String x:Key="Cad.Text.Loft">Loft</sys:String>
     <sys:String x:Key="Cad.ToolPanel.loft.Title">Loft</sys:String>
     <sys:String x:Key="Cad.Parameter.loft.MakeSolid">Solid</sys:String>
     <sys:String x:Key="Cad.Parameter.loft.Ruled">Ruled</sys:String>
-    <sys:String x:Key="Cad.Prompt.loft.Select">Loft: select at least two wire profiles [Enter accept, Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Prompt.loft.Selected">Loft: {0} sections selected [Enter accept, Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.loft.Select">Loft: select sections in order; after two, press Enter or click blank to finish [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.loft.Selected">Loft: {0} sections selected; continue selecting or press Enter/click blank to finish [Backspace removes last]</sys:String>
     <sys:String x:Key="Cad.Prompt.loft.Ready">Loft: review section order and options, then click or press Enter [Esc cancel]</sys:String>
     <sys:String x:Key="Cad.History.Loft">Loft</sys:String>
     <sys:String x:Key="Cad.Text.EdgeFillet">Edge Fillet</sys:String>
@@ -803,6 +803,19 @@
     <sys:String x:Key="Cad.Text.ErrorLog">Log:</sys:String>
     <sys:String x:Key="Cad.Text.Continue">Continue</sys:String>
     <sys:String x:Key="Cad.Text.Exit">Exit</sys:String>
+
+    <sys:String x:Key="Cad.Text.LineWidth">Line width</sys:String>
+    <sys:String x:Key="Cad.Text.LineStyle">Line style</sys:String>
+    <sys:String x:Key="Cad.Text.Current">Current</sys:String>
+    <sys:String x:Key="Cad.Text.Ok">OK</sys:String>
+    <sys:String x:Key="Cad.Text.CustomColor">Custom color</sys:String>
+    <sys:String x:Key="Cad.Text.MoreColors">More colors</sys:String>
+    <sys:String x:Key="Cad.Text.ColorTable">Color table</sys:String>
+    <sys:String x:Key="Cad.Prompt.revolve.AxisStart">Revolve: specify axis start point [Backspace profile, Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.revolve.AxisEnd">Revolve: specify axis end point [Backspace axis start, Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.revolve.Angle">Revolve: move the pointer to set angle, click or press Enter to accept [Backspace axis, Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Prompt.loft.Duplicate">Loft: section already selected; choose another section.</sys:String>
+    <sys:String x:Key="Cad.Prompt.loft.Minimum">Loft: select at least two sections before finishing.</sys:String>
 </ResourceDictionary>
 
 

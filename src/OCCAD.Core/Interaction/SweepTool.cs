@@ -4,6 +4,8 @@ namespace OCCAD;
 
 public sealed class SweepTool : CadSelectionTransformToolBase
 {
+    protected override bool AutoCommitValidSelection => true;
+
     public override string Id => "sweep";
     public override string DisplayName => "Sweep";
     public override CadToolInputKind InputKind =>
@@ -38,7 +40,7 @@ public sealed class SweepTool : CadSelectionTransformToolBase
                 CadSweepEntity.IsPath));
 
         SetStageLocalized(
-            0,
+            1,
             "Cad.Prompt.sweep.Path",
             "Sweep: select a line, arc, helix, open polyline, or mixed path [Esc cancel]");
     }
@@ -78,6 +80,20 @@ public sealed class SweepTool : CadSelectionTransformToolBase
         return true;
     }
 
+    protected override bool CanStepBackCore =>
+        State == CadToolState.Drawing &&
+        Entities.Count == 1;
+
+    protected override bool OnStepBack()
+    {
+        SetSelectionFilter(
+            new CadSelectionFilter(
+                "sweep.profiles",
+                CadPlanarProfileGeometry.IsSupported));
+        RestartSelection();
+        return true;
+    }
+
     protected override void ResetTransformState()
     {
     }
@@ -100,6 +116,7 @@ public sealed class SweepTool : CadSelectionTransformToolBase
             {
                 Entity: var path
             } ||
+            ReferenceEquals(path, Entities[0]) ||
             !CadSweepEntity.IsPath(path))
             return false;
 

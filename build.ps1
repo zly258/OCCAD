@@ -66,7 +66,7 @@ if ($runtimeLayout -eq 'runtime-subdir') {
     Write-Host '[build] Direct EXE:     portable runtime will be copied beside the application.'
 }
 else {
-    Write-Host '[build] Direct EXE:     external OCCT_ROOT/CASROOT is required unless the SDK is switched to a portable layout.' -ForegroundColor Yellow
+    Write-Host '[build] Direct EXE:     flat Bridge SDK; build is valid. Run with -OcctRoot <path> or set OCCT_ROOT/CASROOT.' -ForegroundColor Yellow
 }
 
 & dotnet build $solution -c $Configuration -p:Platform=x64 --nologo

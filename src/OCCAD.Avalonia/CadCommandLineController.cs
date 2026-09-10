@@ -62,15 +62,15 @@ internal sealed class CadCommandLineController : IDisposable
     {
         output = new TextBlock
         {
-            Margin = new Thickness(7, 3, 7, 1),
+            Margin = new Thickness(8, 3, 8, 2),
+            FontSize = 11,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            Foreground = CadTheme.Text
+            Foreground = CadTheme.Muted
         };
 
         input = new TextBox
         {
-            Margin = new Thickness(6, 0, 6, 4),
-            MinHeight = 24,
+            Margin = new Thickness(6, 0, 6, 5),
             VerticalContentAlignment = VerticalAlignment.Center,
             PlaceholderText = ">"
         };
@@ -89,7 +89,7 @@ internal sealed class CadCommandLineController : IDisposable
         {
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
-            Background = CadTheme.Panel,
+            Background = CadTheme.Surface,
             Child = grid
         };
     }

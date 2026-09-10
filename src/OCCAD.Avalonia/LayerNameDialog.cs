@@ -24,7 +24,7 @@ internal sealed class LayerNameDialog : Window
         Height = 150;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Background = CadTheme.WindowBrush;
+        Background = CadTheme.Surface;
 
         _input = new TextBox
         {
@@ -49,6 +49,7 @@ internal sealed class LayerNameDialog : Window
         };
         var ok = Button(
             CadLanguageManager.Text("Cad.Text.Accept", "OK"));
+        ok.Classes.Add("cad-primary");
         ok.Click += (_, _) => Accept();
         var cancel = Button(
             CadLanguageManager.Text("Cad.Text.Cancel", "Cancel"));

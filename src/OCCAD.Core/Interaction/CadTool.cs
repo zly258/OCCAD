@@ -351,6 +351,7 @@ public abstract class CadTool
 
     private void ResetStageTransientState()
     {
+        Context.Preview.Clear();
         Context.Snap.TemporaryModes = null;
         Context.Snap.Clear();
         Context.Tracking.Clear();

@@ -25,7 +25,7 @@ internal sealed class CadErrorWindow : Window
         MinHeight = 300;
         WindowStartupLocation =
             WindowStartupLocation.CenterOwner;
-        Background = CadTheme.WindowBrush;
+        Background = CadTheme.Surface;
 
         var message = new TextBlock
         {
@@ -49,6 +49,7 @@ internal sealed class CadErrorWindow : Window
             AcceptsReturn = true,
             TextWrapping = TextWrapping.Wrap
         };
+        details.Classes.Add("cad-input");
 
         var path = new TextBlock
         {
@@ -70,6 +71,7 @@ internal sealed class CadErrorWindow : Window
             MinWidth = 88
         };
         close.Classes.Add("cad-compact");
+        close.Classes.Add("cad-primary");
         close.Click += (_, _) => Close();
 
         var exit = new Button

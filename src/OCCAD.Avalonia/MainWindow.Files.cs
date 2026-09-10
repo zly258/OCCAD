@@ -92,7 +92,8 @@ public sealed partial class MainWindow
                 UiText(
                     "Cad.Text.OpenDocumentTitle",
                     "Open CAD Document"),
-                exception.Message);
+                exception.Message,
+                kind: CadMessageDialogKind.Error);
         }
     }
 
@@ -162,7 +163,8 @@ public sealed partial class MainWindow
                 UiText(
                     "Cad.Text.SaveDocumentTitle",
                     "Save CAD Document"),
-                exception.Message);
+                exception.Message,
+                kind: CadMessageDialogKind.Error);
             return false;
         }
     }
@@ -201,7 +203,8 @@ public sealed partial class MainWindow
                 "Cad.Text.UnsavedMessage",
                 "Save changes to {0}?",
                 documentName),
-            yesNoCancel: true);
+            yesNoCancel: true,
+            kind: CadMessageDialogKind.Question);
 
         return result switch
         {

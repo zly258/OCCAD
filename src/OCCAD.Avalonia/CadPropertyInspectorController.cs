@@ -152,7 +152,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
                         "Cad.Text.SelectionInitial",
                         "Selection: 0"),
                     Foreground = CadTheme.Muted,
-                    Margin = new Thickness(8)
+                    Margin = new Thickness(10)
                 });
                 return;
             }
@@ -175,7 +175,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 Text = title,
                 FontWeight = FontWeight.SemiBold,
                 Foreground = CadTheme.Text,
-                Margin = new Thickness(8, 7, 8, 8)
+                Margin = new Thickness(8, 7, 8, 6)
             });
 
             if (_subobject is { } subobject)
@@ -190,8 +190,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 _host.Children.Add(new Border
                 {
                     Background = CadTheme.PanelAlt,
-                    Padding = new Thickness(8, 5),
-                    Margin = new Thickness(0, 2, 0, 2),
+                    Padding = new Thickness(8, 4),
+                    Margin = new Thickness(0, 1),
                     Child = new TextBlock
                     {
                         Text = group.Key,
@@ -450,8 +450,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
         _host.Children.Add(new Border
         {
             Background = CadTheme.PanelAlt,
-            Padding = new Thickness(8, 5),
-            Margin = new Thickness(0, 2, 0, 2),
+            Padding = new Thickness(8, 4),
+            Margin = new Thickness(0, 1),
             Child = new TextBlock
             {
                 Text = title,
@@ -474,7 +474,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         var row = new Grid
         {
             ColumnSpacing = 8,
-            Margin = new Thickness(8, 2)
+            Margin = new Thickness(8, 1)
         };
         row.ColumnDefinitions.Add(
             new ColumnDefinition(
@@ -571,7 +571,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 slot.Descriptor.DisplayName),
             Foreground = CadTheme.Text,
             VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            FontSize = 11.5
         };
         if (!string.IsNullOrWhiteSpace(slot.Descriptor.Description))
         {

@@ -651,7 +651,7 @@
     <sys:String x:Key="Cad.Prompt.extrude.Select">拉伸：选择一个闭合平面轮廓 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.extrude.Selected">拉伸：已选择 {0} 个轮廓 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.extrude.Single">拉伸：请仅选择一个闭合平面轮廓 [Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.extrude.Height">拉伸：设置高度和方向后单击或按 Enter [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.extrude.Height">拉伸：移动鼠标设置正/负高度，单击确认 [Backspace 返回轮廓，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.History.Region">面域</sys:String>
     <sys:String x:Key="Cad.History.Extrude">拉伸</sys:String>
     <sys:String x:Key="Cad.Text.Revolve">旋转</sys:String>
@@ -678,15 +678,15 @@
     <sys:String x:Key="Cad.Text.Sweep">扫掠</sys:String>
     <sys:String x:Key="Cad.Prompt.sweep.Select">扫掠：选择一个闭合平面轮廓 [Enter 确认，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.sweep.Selected">扫掠：已选择 {0} 个轮廓 [Enter 确认，Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.sweep.Path">扫掠：选择直线、圆弧、螺旋线、开放多段线或混合路径 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.sweep.Path">扫掠：选择路径（直线、圆弧、螺旋线、开放多段线或混合路径）[Backspace 返回轮廓，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.sweep.Invalid">扫掠：当前悬停对象不是有效的扫掠路径。</sys:String>
     <sys:String x:Key="Cad.History.Sweep">扫掠</sys:String>
     <sys:String x:Key="Cad.Text.Loft">放样</sys:String>
     <sys:String x:Key="Cad.ToolPanel.loft.Title">放样</sys:String>
     <sys:String x:Key="Cad.Parameter.loft.MakeSolid">实体</sys:String>
     <sys:String x:Key="Cad.Parameter.loft.Ruled">直纹</sys:String>
-    <sys:String x:Key="Cad.Prompt.loft.Select">放样：选择至少两个线框轮廓 [Enter 确认，Esc 取消]</sys:String>
-    <sys:String x:Key="Cad.Prompt.loft.Selected">放样：已选择 {0} 个截面 [Enter 确认，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.loft.Select">放样：按顺序选择截面；至少两个后可按 Enter 或单击空白完成 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.loft.Selected">放样：已选择 {0} 个截面；继续选择，或按 Enter/单击空白完成 [Backspace 删除最后一个]</sys:String>
     <sys:String x:Key="Cad.Prompt.loft.Ready">放样：确认截面顺序和参数后单击或按 Enter [Esc 取消]</sys:String>
     <sys:String x:Key="Cad.History.Loft">放样</sys:String>
     <sys:String x:Key="Cad.Text.EdgeFillet">实体圆角</sys:String>
@@ -803,6 +803,19 @@
     <sys:String x:Key="Cad.Text.ErrorLog">日志：</sys:String>
     <sys:String x:Key="Cad.Text.Continue">继续</sys:String>
     <sys:String x:Key="Cad.Text.Exit">退出</sys:String>
+
+    <sys:String x:Key="Cad.Text.LineWidth">线宽</sys:String>
+    <sys:String x:Key="Cad.Text.LineStyle">线型</sys:String>
+    <sys:String x:Key="Cad.Text.Current">当前</sys:String>
+    <sys:String x:Key="Cad.Text.Ok">确定</sys:String>
+    <sys:String x:Key="Cad.Text.CustomColor">自定义颜色</sys:String>
+    <sys:String x:Key="Cad.Text.MoreColors">更多颜色</sys:String>
+    <sys:String x:Key="Cad.Text.ColorTable">颜色表</sys:String>
+    <sys:String x:Key="Cad.Prompt.revolve.AxisStart">旋转建模：指定旋转轴起点 [Backspace 返回轮廓，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.revolve.AxisEnd">旋转建模：指定旋转轴终点 [Backspace 返回轴起点，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.revolve.Angle">旋转建模：移动鼠标设置角度，单击或按 Enter 确认 [Backspace 返回旋转轴，Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Prompt.loft.Duplicate">放样：该截面已选择，请选择其他截面。</sys:String>
+    <sys:String x:Key="Cad.Prompt.loft.Minimum">放样：至少选择两个截面后才能完成。</sys:String>
 </ResourceDictionary>
 
 

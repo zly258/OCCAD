@@ -2,17 +2,18 @@ using OcctNet;
 
 namespace OCCAD;
 
-public sealed class LoftTool : CadSelectionTransformToolBase
+public sealed class LoftTool : CadTool
 {
+    private readonly List<CadEntity> _sections = [];
     private bool _makeSolid = true;
     private bool _ruled;
 
     public override string Id => "loft";
-    public override CadToolInputKind InputKind =>
-        State == CadToolState.WaitForSelect
-            ? CadToolInputKind.Selection
-            : CadToolInputKind.Confirmation;
     public override string DisplayName => "Loft";
+    public override CadToolInputKind InputKind =>
+        CadToolInputKind.Selection;
+    public override CadToolInteractionPolicy InteractionPolicy =>
+        CadToolInteractionPolicy.Selection;
 
     public override CadToolPanelDescriptor ParameterPanel =>
         new(
@@ -28,43 +29,37 @@ public sealed class LoftTool : CadSelectionTransformToolBase
                     _ruled)
             ]);
 
-    protected override bool IsSelectionValid(
-        CadEntity[] entities) =>
-        entities.Length >= 2 &&
-        entities.All(
-            CadPlanarProfileGeometry.IsWireProfile);
-
     protected override void OnActivated()
     {
+        _sections.Clear();
         SetSelectionFilter(
             new CadSelectionFilter(
                 "loft.sections",
                 CadPlanarProfileGeometry.IsWireProfile));
-
-        base.OnActivated();
+        SetState(CadToolState.WaitForSelect);
+        Context.WorkPlane.EndToolPlane();
+        SetPromptLocalized(
+            "Cad.Prompt.loft.Select",
+            "Loft: select sections in order [Enter or blank click finishes after 2, Esc cancel]");
     }
 
-    protected override void OnTransformStarted()
+    protected override void OnCanceled()
     {
-        SetStageLocalized(
-            0,
-            "Cad.Prompt.loft.Ready",
-            "Loft: review section order and options, then click or press Enter [Esc cancel]");
-        RefreshPreview();
+        _sections.Clear();
+    }
+
+    protected override void OnDeactivated()
+    {
+        _sections.Clear();
     }
 
     public override bool HandlePointer(
         OcctPointerInputEventArgs input)
     {
-        if (CancelOnRightClick(input))
-            return true;
-
-        if (State == CadToolState.WaitForSelect)
-            return false;
-
-        if (input.Kind == OcctPointerInputKind.Moved)
+        if (input.Kind == OcctPointerInputKind.Pressed &&
+            input.Button == OcctPointerButton.Right)
         {
-            RefreshPreview();
+            Context.Workspace.Tools.CancelCurrent();
             return true;
         }
 
@@ -72,15 +67,59 @@ public sealed class LoftTool : CadSelectionTransformToolBase
             input.Button != OcctPointerButton.Left)
             return false;
 
-        return CommitLoft();
+        if (Context.Workspace.Preselection.Current is
+            { Entity: var entity } &&
+            CadPlanarProfileGeometry.IsWireProfile(entity))
+        {
+            if (_sections.Contains(entity))
+            {
+                SetPromptLocalized(
+                    "Cad.Prompt.loft.Duplicate",
+                    "Loft: section already selected; choose another section.");
+                return true;
+            }
+
+            _sections.Add(entity);
+            RefreshPreview();
+            UpdatePrompt();
+            return true;
+        }
+
+        if (_sections.Count >= 2)
+            return CommitLoft();
+
+        SetPromptLocalized(
+            "Cad.Prompt.loft.Minimum",
+            "Loft: select at least two sections before finishing.");
+        return true;
     }
 
     protected override bool CanCommitCurrentStageCore =>
-        Entities.Count >= 2;
+        _sections.Count >= 2;
 
     protected override bool OnCommitCurrentStage(
         CadPointerPosition pointer) =>
         CommitLoft();
+
+    protected override bool CanFinishCore =>
+        _sections.Count >= 2;
+
+    protected override bool OnFinish() =>
+        CommitLoft();
+
+    protected override bool CanStepBackCore =>
+        _sections.Count > 0;
+
+    protected override bool OnStepBack()
+    {
+        if (_sections.Count == 0)
+            return false;
+
+        _sections.RemoveAt(_sections.Count - 1);
+        RefreshPreview();
+        UpdatePrompt();
+        return true;
+    }
 
     protected override bool OnSetParameter(
         string id,
@@ -105,10 +144,21 @@ public sealed class LoftTool : CadSelectionTransformToolBase
         return true;
     }
 
-    protected override void ResetTransformState()
+    private void UpdatePrompt()
     {
-        _makeSolid = true;
-        _ruled = false;
+        if (_sections.Count == 0)
+        {
+            SetPromptLocalized(
+                "Cad.Prompt.loft.Select",
+                "Loft: select sections in order [Enter or blank click finishes after 2, Esc cancel]");
+            return;
+        }
+
+        SetPromptLocalized(
+            "Cad.Prompt.loft.Selected",
+            "Loft: {0} sections selected; continue selecting or press Enter/click blank to finish [Backspace removes last]",
+            CadPrecisionInputKind.None,
+            _sections.Count);
     }
 
     private bool CommitLoft()
@@ -136,17 +186,16 @@ public sealed class LoftTool : CadSelectionTransformToolBase
         out CadLoftEntity entity)
     {
         entity = null!;
-
-        if (Entities.Count < 2 ||
-            !Entities.All(
-                CadPlanarProfileGeometry.IsWireProfile))
+        if (_sections.Count < 2 ||
+            _sections.Any(section =>
+                !CadPlanarProfileGeometry.IsWireProfile(section)))
             return false;
 
         entity = new CadLoftEntity(
-            Entities,
+            _sections,
             _makeSolid,
             _ruled);
-        entity.BindSources(Entities);
+        entity.BindSources(_sections);
         return true;
     }
 }

@@ -77,12 +77,14 @@ internal sealed class CadLayerPanelController : IDisposable
         _refreshing = true;
         try
         {
+            if (_search.Parent is Panel searchParent)
+                searchParent.Children.Remove(_search);
             _host.Children.Clear();
 
             var toolbar = new Grid
             {
                 ColumnSpacing = 4,
-                Margin = new Thickness(6)
+                Margin = new Thickness(6, 6, 6, 4)
             };
             toolbar.ColumnDefinitions.Add(
                 new ColumnDefinition(
@@ -115,6 +117,7 @@ internal sealed class CadLayerPanelController : IDisposable
             toolbar.Children.Add(remove);
 
             _host.Children.Add(toolbar);
+            _host.Children.Add(CreateColumnHeader());
 
             var filter = _search.Text?.Trim() ?? string.Empty;
             var layers = _workspace.Layers.Layers
@@ -133,7 +136,7 @@ internal sealed class CadLayerPanelController : IDisposable
 
             var footer = new Grid
             {
-                Margin = new Thickness(6, 5, 6, 7),
+                Margin = new Thickness(6, 5, 6, 6),
                 ColumnSpacing = 5
             };
             footer.ColumnDefinitions.Add(
@@ -170,6 +173,102 @@ internal sealed class CadLayerPanelController : IDisposable
         }
     }
 
+    private Control CreateColumnHeader()
+    {
+        var grid = new Grid
+        {
+            ColumnSpacing = 5,
+            Margin = new Thickness(4, 0),
+            Background = CadTheme.PanelAlt
+        };
+        ConfigureLayerColumns(grid);
+
+        AddHeader(
+            grid,
+            0,
+            CadLanguageManager.Text(
+                "Cad.Text.Name",
+                "Name"),
+            HorizontalAlignment.Left);
+        AddHeader(
+            grid,
+            1,
+            CadLanguageManager.Text(
+                "Cad.Text.LineWidth",
+                "Line width"));
+        AddHeader(
+            grid,
+            2,
+            CadLanguageManager.Text(
+                "Cad.Text.LineStyle",
+                "Line style"));
+        AddHeader(
+            grid,
+            3,
+            CadLanguageManager.Text(
+                "Cad.Text.Visible",
+                "Visible"));
+        AddHeader(
+            grid,
+            4,
+            CadLanguageManager.Text(
+                "Cad.Text.Locked",
+                "Locked"));
+        AddHeader(
+            grid,
+            5,
+            CadLanguageManager.Text(
+                "Cad.Text.Color",
+                "Color"));
+
+        return new Border
+        {
+            Background = CadTheme.PanelAlt,
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(0, 1, 0, 1),
+            Child = grid
+        };
+    }
+
+    private static void ConfigureLayerColumns(Grid grid)
+    {
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(
+                new GridLength(1, GridUnitType.Star)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(66)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(82)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(54)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(54)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(44)));
+    }
+
+    private static void AddHeader(
+        Grid grid,
+        int column,
+        string text,
+        HorizontalAlignment alignment =
+            HorizontalAlignment.Center)
+    {
+        var label = new TextBlock
+        {
+            Text = text,
+            FontSize = 10.5,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = CadTheme.Muted,
+            Margin = new Thickness(5, 4),
+            HorizontalAlignment = alignment,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        Grid.SetColumn(label, column);
+        grid.Children.Add(label);
+    }
+
     private Control CreateLayerRow(CadLayer layer)
     {
         var current = ReferenceEquals(
@@ -180,29 +279,18 @@ internal sealed class CadLayerPanelController : IDisposable
         {
             ColumnSpacing = 5
         };
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(1, GridUnitType.Star)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(66)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(82)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(GridLength.Auto));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(GridLength.Auto));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(36)));
+        ConfigureLayerColumns(grid);
 
         var name = new Button
         {
             Content = layer.Name,
             HorizontalContentAlignment = HorizontalAlignment.Left,
             Background = current
-                ? CadTheme.PanelAlt
+                ? CadTheme.AccentSoft
                 : Brushes.Transparent,
             BorderThickness = new Thickness(0),
-            Padding = new Thickness(6, 3),
+            Padding = new Thickness(6, 2),
+            Foreground = CadTheme.Text,
             FontWeight = current
                 ? FontWeight.SemiBold
                 : FontWeight.Normal
@@ -299,7 +387,7 @@ internal sealed class CadLayerPanelController : IDisposable
         var color = new Button
         {
             Width = 32,
-            MinHeight = 24,
+            MinHeight = 26,
             Padding = new Thickness(0),
             Background = new SolidColorBrush(
                 ToMediaColor(layer.Color)),
@@ -333,12 +421,12 @@ internal sealed class CadLayerPanelController : IDisposable
         return new Border
         {
             Background = current
-                ? new SolidColorBrush(
-                    MediaColor.FromArgb(28, 50, 120, 184))
-                : Brushes.Transparent,
+                ? CadTheme.AccentSoft
+                : CadTheme.Surface,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 0, 0, 1),
             Padding = new Thickness(6, 3),
+            Margin = new Thickness(4, 0),
             Child = grid
         };
     }

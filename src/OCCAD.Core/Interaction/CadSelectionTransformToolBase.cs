@@ -7,6 +7,7 @@ public abstract class CadSelectionTransformToolBase : CadTool
     private CadEntity[] _entities = [];
 
     protected IReadOnlyList<CadEntity> Entities => _entities;
+    protected virtual bool AutoCommitValidSelection => false;
 
     public override bool CanCommitCurrentStage => State == CadToolState.WaitForSelect
         ? IsActive && IsSelectionValid(CurrentSelection())
@@ -74,6 +75,15 @@ public abstract class CadSelectionTransformToolBase : CadTool
     {
     }
 
+    protected void RestartSelection(bool clearSelection = true)
+    {
+        Context.Preview.Clear();
+        _entities = [];
+        if (clearSelection)
+            Context.Selection.Clear();
+        BeginSelection();
+    }
+
     protected void ShowEntityPreview(Action<CadEntity> transform)
     {
         ArgumentNullException.ThrowIfNull(transform);
@@ -115,8 +125,18 @@ public abstract class CadSelectionTransformToolBase : CadTool
         object? sender,
         CadSelectionChangedEventArgs args)
     {
-        if (State == CadToolState.WaitForSelect)
-            UpdateSelectionPrompt(args.Entities.Count);
+        if (State != CadToolState.WaitForSelect)
+            return;
+
+        var selected = CurrentSelection();
+        if (AutoCommitValidSelection &&
+            IsSelectionValid(selected))
+        {
+            BeginTransform(selected);
+            return;
+        }
+
+        UpdateSelectionPrompt(args.Entities.Count);
     }
 
     private void UpdateSelectionPrompt(int count)

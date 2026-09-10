@@ -9,6 +9,7 @@
     <AssemblyName>OCCAD</AssemblyName>
     <RootNamespace>OCCAD.Avalonia</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\OCCAD.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\OCCAD.Core\OCCAD.Core.csproj" />
@@ -25,6 +26,7 @@
       <Private>true</Private>
     </Reference>
     <EmbeddedResource Include="Localization\Strings.*.xml" />
+    <AvaloniaResource Include="Assets\OCCAD.png" />
     <None Include="$(OcctBridgeSdkRoot)\runtime\*" Link="runtime\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(OcctBridgeSdkRoot)\runtime\OcctNative.dll')" />
     <None Include="$(OcctBridgeSdkRoot)\occt\**\*" Link="occt\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(OcctBridgeSdkRoot)\occt')" />
     <None Include="$(OcctBridgeSdkRoot)\bridge-contract.json" Link="bridge-contract.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

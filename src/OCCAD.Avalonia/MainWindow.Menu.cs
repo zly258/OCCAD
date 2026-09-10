@@ -20,18 +20,18 @@ public sealed partial class MainWindow
             Plain(
                 UiText("Cad.Text.Open", "Open"),
                 async () => await OpenDocumentAsync()),
-            Separator(),
+            MenuSeparator(),
             Plain(
                 UiText("Cad.Text.Save", "Save"),
                 async () => await SaveDocumentAsync(saveAs: false)),
             Plain(
                 UiText("Cad.Text.SaveAs", "Save As"),
                 async () => await SaveDocumentAsync(saveAs: true)),
-            Separator(),
+            MenuSeparator(),
             Plain(
                 UiText("Cad.Text.ClearModel", "Clear Model"),
                 ClearModel),
-            Separator(),
+            MenuSeparator(),
             Plain(
                 UiText("Cad.Text.Exit", "Exit"),
                 Close));
@@ -40,11 +40,11 @@ public sealed partial class MainWindow
             UiText("Cad.Text.Edit", "Edit"),
             Action("edit.undo", "Cad.Text.Undo", "Undo"),
             Action("edit.redo", "Cad.Text.Redo", "Redo"),
-            Separator(),
+            MenuSeparator(),
             Action("select", "Cad.Text.Select", "Select"),
             Action("select.all", "Cad.Text.SelectAll", "Select All"),
             Action("select.invert", "Cad.Text.SelectInvert", "Invert Selection"),
-            Separator(),
+            MenuSeparator(),
             Action("edit.delete", "Cad.Text.Delete", "Delete"));
 
         var circle = Menu(
@@ -116,7 +116,7 @@ public sealed partial class MainWindow
                 "draw.regularpolygon",
                 "Cad.Text.RegularPolygon",
                 "Regular Polygon"),
-            Separator(),
+            MenuSeparator(),
             circle,
             arc,
             ellipse,
@@ -151,14 +151,14 @@ public sealed partial class MainWindow
         var model = Menu(
             UiText("Cad.Text.Modeling", "Model"),
             primitives,
-            Separator(),
+            MenuSeparator(),
             Action("model.region", "Cad.Text.Region", "Region"),
             Action("solid.extrude", "Cad.Text.Extrude", "Extrude"),
             Action("solid.revolve", "Cad.Text.Revolve", "Revolve"),
             boolean,
             Action("solid.sweep", "Cad.Text.Sweep", "Sweep"),
             Action("solid.loft", "Cad.Text.Loft", "Loft"),
-            Separator(),
+            MenuSeparator(),
             Action(
                 "solid.edgefillet",
                 "Cad.Text.EdgeFillet",
@@ -218,7 +218,7 @@ public sealed partial class MainWindow
             Action("modify.rotate", "Cad.Text.Rotate", "Rotate"),
             Action("modify.scale", "Cad.Text.Scale", "Scale"),
             Action("modify.mirror", "Cad.Text.Mirror", "Mirror"),
-            Separator(),
+            MenuSeparator(),
             Action("modify.trim", "Cad.Text.Trim", "Trim"),
             Action("modify.extend", "Cad.Text.Extend", "Extend"),
             Action("modify.offset", "Cad.Text.Offset", "Offset"),
@@ -227,7 +227,7 @@ public sealed partial class MainWindow
             Action("modify.break", "Cad.Text.Break", "Break"),
             Action("modify.fillet", "Cad.Text.Fillet", "Fillet"),
             Action("modify.chamfer", "Cad.Text.Chamfer", "Chamfer"),
-            Separator(),
+            MenuSeparator(),
             arrays);
 
         var annotation = Menu(
@@ -248,7 +248,7 @@ public sealed partial class MainWindow
                 "annotation.diameterdimension",
                 "Cad.Text.DiameterDimension",
                 "Diameter Dimension"),
-            Separator(),
+            MenuSeparator(),
             Action(
                 "measure.distance",
                 "Cad.Text.Distance",
@@ -261,14 +261,14 @@ public sealed partial class MainWindow
                 "view.isometric",
                 "Cad.Text.Isometric",
                 "Isometric"),
-            Separator(),
+            MenuSeparator(),
             Action("view.top", "Cad.Text.Top", "Top"),
             Action("view.bottom", "Cad.Text.Bottom", "Bottom"),
             Action("view.front", "Cad.Text.Front", "Front"),
             Action("view.back", "Cad.Text.Back", "Back"),
             Action("view.left", "Cad.Text.Left", "Left"),
             Action("view.right", "Cad.Text.Right", "Right"),
-            Separator(),
+            MenuSeparator(),
             Action(
                 "display.wireframe",
                 "Cad.Text.Wireframe",
@@ -277,7 +277,7 @@ public sealed partial class MainWindow
                 "display.shaded",
                 "Cad.Text.Shaded",
                 "Shaded"),
-            Separator(),
+            MenuSeparator(),
             Action("view.hide", "Cad.Text.Hide", "Hide"),
             Action("view.isolate", "Cad.Text.Isolate", "Isolate"),
             Action("view.showall", "Cad.Text.ShowAll", "Show All"));
@@ -288,22 +288,12 @@ public sealed partial class MainWindow
             value => SetModelPanelVisible(value));
         _layerPanelMenu = CheckItem(
             UiText("Cad.Text.Layers", "Layers"),
-            _rightPanel.IsVisible && _rightTabs.SelectedIndex == 0,
-            value =>
-            {
-                SetRightPanelVisible(value);
-                if (value)
-                    _rightTabs.SelectedIndex = 0;
-            });
+            _layerPanelBorder.IsVisible,
+            SetLayerPanelVisible);
         _propertyPanelMenu = CheckItem(
             UiText("Cad.Text.Properties", "Properties"),
-            _rightPanel.IsVisible && _rightTabs.SelectedIndex == 1,
-            value =>
-            {
-                SetRightPanelVisible(value);
-                if (value)
-                    _rightTabs.SelectedIndex = 1;
-            });
+            _propertyPanelBorder.IsVisible,
+            SetPropertyPanelVisible);
         _toolPanelMenu = CheckItem(
             UiText("Cad.Text.ToolParameters", "Tool Parameters"),
             _toolPanel.IsPanelVisible,
@@ -321,7 +311,7 @@ public sealed partial class MainWindow
             _modelPanelMenu,
             _layerPanelMenu,
             _propertyPanelMenu,
-            Separator(),
+            MenuSeparator(),
             _toolPanelMenu);
 
         _chineseMenu = RadioItem(
@@ -395,7 +385,7 @@ public sealed partial class MainWindow
         var settings = Menu(
             UiText("Cad.Text.Settings", "Settings"),
             language,
-            Separator(),
+            MenuSeparator(),
             snapMenu,
             polar);
 
@@ -531,6 +521,13 @@ public sealed partial class MainWindow
         return item;
     }
 
+    private static global::Avalonia.Controls.Separator MenuSeparator() =>
+        new()
+        {
+            Margin = new global::Avalonia.Thickness(8, 2),
+            Background = CadTheme.Border
+        };
+
     private static MenuItem Menu(
         string header,
         params object[] children) =>
@@ -607,18 +604,12 @@ public sealed partial class MainWindow
             _modelPanelMenu.IsChecked = _modelPanel.IsVisible;
 
         if (_layerPanelMenu is not null)
-        {
             _layerPanelMenu.IsChecked =
-                _rightPanel.IsVisible &&
-                _rightTabs.SelectedIndex == 0;
-        }
+                _layerPanelBorder.IsVisible;
 
         if (_propertyPanelMenu is not null)
-        {
             _propertyPanelMenu.IsChecked =
-                _rightPanel.IsVisible &&
-                _rightTabs.SelectedIndex == 1;
-        }
+                _propertyPanelBorder.IsVisible;
 
         if (_toolPanelMenu is not null)
         {

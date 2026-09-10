@@ -38,10 +38,18 @@ public sealed partial class MainWindow : Window
         new(new GridLength(4));
 
     private readonly Border _rightPanel = new();
-    private TextBlock? _rightHeaderText;
-    private readonly TabControl _rightTabs = new();
+    private readonly Border _layerPanelBorder = new();
+    private readonly Border _propertyPanelBorder = new();
+    private TextBlock? _layerHeaderText;
+    private TextBlock? _propertyHeaderText;
     private readonly StackPanel _layerHost = new();
     private readonly StackPanel _propertyHost = new();
+    private readonly RowDefinition _layerPanelRow =
+        new(new GridLength(0.42, GridUnitType.Star));
+    private readonly RowDefinition _rightPanelSplitterRow =
+        new(new GridLength(4));
+    private readonly RowDefinition _propertyPanelRow =
+        new(new GridLength(0.58, GridUnitType.Star));
     private readonly ColumnDefinition _rightSplitterColumn =
         new(new GridLength(4));
     private readonly ColumnDefinition _rightColumn =
@@ -174,7 +182,8 @@ public sealed partial class MainWindow : Window
             Background = CadTheme.WindowBrush
         };
 
-        _mainMenu.Background = CadTheme.Panel;
+        _mainMenu.Classes.Add("cad-menu");
+        _mainMenu.Background = CadTheme.Toolbar;
         _mainMenu.BorderBrush = CadTheme.Border;
         _mainMenu.BorderThickness = new Thickness(0, 0, 0, 1);
         DockPanel.SetDock(_mainMenu, Dock.Top);
@@ -202,8 +211,8 @@ public sealed partial class MainWindow : Window
         var panel = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 3,
-            Margin = new Thickness(5, 3),
+            Spacing = 2,
+            Margin = new Thickness(5, 2),
             VerticalAlignment = VerticalAlignment.Center
         };
 
@@ -211,8 +220,10 @@ public sealed partial class MainWindow : Window
         {
             Text = "WP",
             Foreground = CadTheme.Muted,
+            FontWeight = FontWeight.SemiBold,
+            FontSize = 10.5,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(2, 0, 1, 0)
+            Margin = new Thickness(3, 0, 2, 0)
         });
 
         ConfigurePlaneButton(_planeXy, "XY", CadWorkPlanePreset.XY);
@@ -221,7 +232,7 @@ public sealed partial class MainWindow : Window
         panel.Children.Add(_planeXy);
         panel.Children.Add(_planeYz);
         panel.Children.Add(_planeXz);
-        panel.Children.Add(Separator());
+        panel.Children.Add(ToolbarSeparator());
 
         _layerCombo.Width = 152;
         _layerCombo.Classes.Add("cad-input");
@@ -234,7 +245,7 @@ public sealed partial class MainWindow : Window
             _workspace.SetCurrentLayer(layer);
         };
         panel.Children.Add(_layerCombo);
-        panel.Children.Add(Separator());
+        panel.Children.Add(ToolbarSeparator());
 
         ConfigureToggle(_snapToggle);
         _snapToggle.IsCheckedChanged += (_, _) =>
@@ -268,9 +279,10 @@ public sealed partial class MainWindow : Window
             RefreshInteractionUi();
         };
         panel.Children.Add(_polarToggle);
-        panel.Children.Add(Separator());
+        panel.Children.Add(ToolbarSeparator());
 
         _finishButton.Classes.Add("cad-compact");
+        _finishButton.Classes.Add("cad-primary");
         _finishButton.Click += (_, _) => FinishCurrentTool();
         _cancelButton.Classes.Add("cad-compact");
         _cancelButton.Click += (_, _) => _workspace.Tools.CancelCurrent();
@@ -279,7 +291,7 @@ public sealed partial class MainWindow : Window
 
         return new Border
         {
-            Background = CadTheme.Panel,
+            Background = CadTheme.Toolbar,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 0, 0, 1),
             Child = panel
@@ -301,7 +313,7 @@ public sealed partial class MainWindow : Window
         grid.ColumnDefinitions.Add(_rightColumn);
 
         _modelPanel.Child = BuildModelPanel();
-        _modelPanel.Background = CadTheme.Panel;
+        _modelPanel.Background = CadTheme.Surface;
         _modelPanel.BorderBrush = CadTheme.Border;
         _modelPanel.BorderThickness = new Thickness(0, 0, 1, 0);
         grid.Children.Add(_modelPanel);
@@ -309,9 +321,9 @@ public sealed partial class MainWindow : Window
         var leftSplitter = new GridSplitter
         {
             Width = 4,
-            Background = CadTheme.WindowBrush,
             ResizeDirection = GridResizeDirection.Columns
         };
+        leftSplitter.Classes.Add("cad-splitter");
         Grid.SetColumn(leftSplitter, 1);
         grid.Children.Add(leftSplitter);
 
@@ -322,14 +334,14 @@ public sealed partial class MainWindow : Window
         var rightSplitter = new GridSplitter
         {
             Width = 4,
-            Background = CadTheme.WindowBrush,
             ResizeDirection = GridResizeDirection.Columns
         };
+        rightSplitter.Classes.Add("cad-splitter");
         Grid.SetColumn(rightSplitter, 3);
         grid.Children.Add(rightSplitter);
 
         _rightPanel.Child = BuildRightPanel();
-        _rightPanel.Background = CadTheme.Panel;
+        _rightPanel.Background = CadTheme.Surface;
         _rightPanel.BorderBrush = CadTheme.Border;
         _rightPanel.BorderThickness = new Thickness(1, 0, 0, 0);
         Grid.SetColumn(_rightPanel, 4);
@@ -348,11 +360,12 @@ public sealed partial class MainWindow : Window
         _modelSearch.PlaceholderText = CadLanguageManager.Text(
             "Cad.Text.FilterModel",
             "Filter model tree");
-        _modelSearch.Margin = new Thickness(6);
+        _modelSearch.Margin = new Thickness(6, 6, 6, 5);
         _modelSearch.Classes.Add("cad-input");
         _modelSearch.TextChanged += (_, _) => RefreshTree();
 
-        _modelTree.Margin = new Thickness(3, 0, 3, 3);
+        _modelTree.Margin = new Thickness(4, 0, 4, 4);
+        _modelTree.Classes.Add("cad-tree");
         _modelTree.SelectionChanged += ModelTreeSelectionChanged;
 
         var grid = new Grid();
@@ -372,43 +385,49 @@ public sealed partial class MainWindow : Window
 
     private Control BuildRightPanel()
     {
-        var header = PanelHeader(
-            CadLanguageManager.Text("Cad.Text.Properties", "Properties"),
-            () => SetRightPanelVisible(false),
-            out _rightHeaderText);
+        _layerPanelBorder.Child = BuildLayerPanel();
+        _layerPanelBorder.Background = CadTheme.Surface;
 
-        var layerScroll = new ScrollViewer
+        _propertyPanelBorder.Child = BuildPropertyPanel();
+        _propertyPanelBorder.Background = CadTheme.Surface;
+
+        var splitter = new GridSplitter
+        {
+            Height = 4,
+            ResizeDirection = GridResizeDirection.Rows
+        };
+        splitter.Classes.Add("cad-splitter");
+
+        var grid = new Grid
+        {
+            Background = CadTheme.Surface
+        };
+        grid.RowDefinitions.Add(_layerPanelRow);
+        grid.RowDefinitions.Add(_rightPanelSplitterRow);
+        grid.RowDefinitions.Add(_propertyPanelRow);
+
+        grid.Children.Add(_layerPanelBorder);
+        Grid.SetRow(splitter, 1);
+        grid.Children.Add(splitter);
+        Grid.SetRow(_propertyPanelBorder, 2);
+        grid.Children.Add(_propertyPanelBorder);
+
+        UpdateRightPanelVisibility();
+        return grid;
+    }
+
+    private Control BuildLayerPanel()
+    {
+        var header = PanelHeader(
+            CadLanguageManager.Text("Cad.Text.Layers", "Layers"),
+            () => SetLayerPanelVisible(false),
+            out _layerHeaderText);
+
+        var scroll = new ScrollViewer
         {
             Content = _layerHost,
             HorizontalScrollBarVisibility =
                 ScrollBarVisibility.Disabled
-        };
-        var propertyScroll = new ScrollViewer
-        {
-            Content = _propertyHost,
-            HorizontalScrollBarVisibility =
-                ScrollBarVisibility.Disabled
-        };
-
-        _rightTabs.SelectionChanged += (_, _) =>
-            RefreshPanelMenuState();
-
-        _rightTabs.ItemsSource = new[]
-        {
-            new TabItem
-            {
-                Header = CadLanguageManager.Text(
-                    "Cad.Text.Layers",
-                    "Layers"),
-                Content = layerScroll
-            },
-            new TabItem
-            {
-                Header = CadLanguageManager.Text(
-                    "Cad.Text.Properties",
-                    "Properties"),
-                Content = propertyScroll
-            }
         };
 
         var grid = new Grid();
@@ -417,14 +436,39 @@ public sealed partial class MainWindow : Window
             new RowDefinition(
                 new GridLength(1, GridUnitType.Star)));
         grid.Children.Add(header);
-        Grid.SetRow(_rightTabs, 1);
-        grid.Children.Add(_rightTabs);
+        Grid.SetRow(scroll, 1);
+        grid.Children.Add(scroll);
+        return grid;
+    }
+
+    private Control BuildPropertyPanel()
+    {
+        var header = PanelHeader(
+            CadLanguageManager.Text("Cad.Text.Properties", "Properties"),
+            () => SetPropertyPanelVisible(false),
+            out _propertyHeaderText);
+
+        var scroll = new ScrollViewer
+        {
+            Content = _propertyHost,
+            HorizontalScrollBarVisibility =
+                ScrollBarVisibility.Disabled
+        };
+
+        var grid = new Grid();
+        grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        grid.RowDefinitions.Add(
+            new RowDefinition(
+                new GridLength(1, GridUnitType.Star)));
+        grid.Children.Add(header);
+        Grid.SetRow(scroll, 1);
+        grid.Children.Add(scroll);
         return grid;
     }
 
     private void BuildViewportHost()
     {
-        _viewportHost.Background = Brushes.Black;
+        _viewportHost.Background = CadTheme.Viewport;
         _viewportHost.ClipToBounds = true;
         _viewportHost.Children.Add(_viewport);
 
@@ -448,11 +492,11 @@ public sealed partial class MainWindow : Window
         _dynamicHud.IsVisible = false;
         _dynamicHud.MinWidth = 112;
         _dynamicHud.MaxWidth = 300;
-        _dynamicHud.Padding = new Thickness(7, 4);
-        _dynamicHud.Background = CadTheme.Panel;
-        _dynamicHud.BorderBrush = CadTheme.Border;
+        _dynamicHud.Padding = new Thickness(8, 4);
+        _dynamicHud.Background = CadTheme.Surface;
+        _dynamicHud.BorderBrush = CadTheme.BorderStrong;
         _dynamicHud.BorderThickness = new Thickness(1);
-        _dynamicHud.CornerRadius = new CornerRadius(2);
+        _dynamicHud.CornerRadius = new CornerRadius(3);
         _dynamicHud.Child = _dynamicValue;
         overlay.Children.Add(_dynamicHud);
 
@@ -469,12 +513,14 @@ public sealed partial class MainWindow : Window
         ConfigureStatusText(_precisionStatus, 120);
         ConfigureStatusText(_workPlaneStatus, 85);
         ConfigureStatusText(_coordinateStatus, 220);
+        _toolStatus.Foreground = CadTheme.Text;
+        _coordinateStatus.Foreground = CadTheme.Text;
         _coordinateStatus.TextAlignment = TextAlignment.Right;
 
         var panel = new DockPanel
         {
             LastChildFill = true,
-            Margin = new Thickness(5, 2)
+            Margin = new Thickness(6, 2)
         };
 
         DockPanel.SetDock(_coordinateStatus, Dock.Right);
@@ -493,7 +539,7 @@ public sealed partial class MainWindow : Window
 
         return new Border
         {
-            Background = CadTheme.PanelAlt,
+            Background = CadTheme.Toolbar,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
             MinHeight = 27,
@@ -631,6 +677,7 @@ public sealed partial class MainWindow : Window
         engine.SetAntialiasing(true);
         engine.SetFaceBoundariesVisible(true, applyExisting: true);
         engine.SetDefaultMaterial(OcctMaterial.Plastified);
+        engine.SetTriedronPosition(OcctCornerPosition.LeftLower);
         engine.SetViewCubeVisible(false);
     }
 
@@ -645,8 +692,7 @@ public sealed partial class MainWindow : Window
     private void InspectLayer(CadLayer layer)
     {
         _propertyInspector.InspectLayer(layer);
-        SetRightPanelVisible(true);
-        _rightTabs.SelectedIndex = 1;
+        SetPropertyPanelVisible(true);
     }
 
     private void SetModelPanelVisible(bool visible)
@@ -661,15 +707,47 @@ public sealed partial class MainWindow : Window
         RefreshPanelMenuState();
     }
 
-    private void SetRightPanelVisible(bool visible)
+    private void SetLayerPanelVisible(bool visible)
     {
-        _rightPanel.IsVisible = visible;
-        _rightColumn.Width = visible
+        _layerPanelBorder.IsVisible = visible;
+        UpdateRightPanelVisibility();
+    }
+
+    private void SetPropertyPanelVisible(bool visible)
+    {
+        _propertyPanelBorder.IsVisible = visible;
+        UpdateRightPanelVisibility();
+    }
+
+    private void UpdateRightPanelVisibility()
+    {
+        var layersVisible = _layerPanelBorder.IsVisible;
+        var propertiesVisible = _propertyPanelBorder.IsVisible;
+        var anyVisible = layersVisible || propertiesVisible;
+
+        _rightPanel.IsVisible = anyVisible;
+        _rightColumn.Width = anyVisible
             ? new GridLength(352)
             : new GridLength(0);
-        _rightSplitterColumn.Width = visible
+        _rightSplitterColumn.Width = anyVisible
             ? new GridLength(4)
             : new GridLength(0);
+
+        _layerPanelRow.Height = layersVisible
+            ? new GridLength(
+                propertiesVisible ? 0.42 : 1.0,
+                GridUnitType.Star)
+            : new GridLength(0);
+        _rightPanelSplitterRow.Height =
+            layersVisible && propertiesVisible
+                ? new GridLength(4)
+                : new GridLength(0);
+        _propertyPanelRow.Height = propertiesVisible
+            ? new GridLength(
+                layersVisible ? 0.58 : 1.0,
+                GridUnitType.Star)
+            : new GridLength(0);
+
         RefreshPanelMenuState();
     }
 
@@ -684,7 +762,7 @@ public sealed partial class MainWindow : Window
             FontWeight = FontWeight.SemiBold,
             Foreground = CadTheme.Text,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0)
+            Margin = new Thickness(9, 0)
         };
         var button = new Button
         {
@@ -693,14 +771,15 @@ public sealed partial class MainWindow : Window
             Height = 27,
             Padding = new Thickness(0),
             Background = Brushes.Transparent,
+            Foreground = CadTheme.Muted,
             BorderThickness = new Thickness(0)
         };
         button.Click += (_, _) => close();
 
         var panel = new DockPanel
         {
-            Height = 29,
-            Background = CadTheme.PanelAlt
+            Height = 30,
+            Background = CadTheme.Header
         };
         DockPanel.SetDock(button, Dock.Right);
         panel.Children.Add(button);
@@ -714,7 +793,7 @@ public sealed partial class MainWindow : Window
         };
     }
 
-    private static Control Separator() =>
+    private static Control ToolbarSeparator() =>
         new Border
         {
             Width = 1,
@@ -725,9 +804,7 @@ public sealed partial class MainWindow : Window
 
     private static void ConfigureToggle(ToggleButton button)
     {
-        button.MinHeight = 25;
-        button.Padding = new Thickness(8, 2);
-        button.Margin = new Thickness(1);
+        button.Classes.Add("cad-toggle");
         button.HorizontalContentAlignment = HorizontalAlignment.Center;
     }
 
@@ -761,10 +838,11 @@ public sealed partial class MainWindow : Window
         double minWidth)
     {
         text.MinWidth = minWidth;
-        text.Margin = new Thickness(5, 0);
+        text.Margin = new Thickness(6, 0);
+        text.FontSize = 11;
         text.VerticalAlignment = VerticalAlignment.Center;
         text.TextTrimming = TextTrimming.CharacterEllipsis;
-        text.Foreground = CadTheme.Text;
+        text.Foreground = CadTheme.Muted;
     }
 
     private void LanguageChanged(

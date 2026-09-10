@@ -490,6 +490,7 @@ public sealed class CadWorkspace : IDisposable
                 after,
                 name));
         Selection.RefreshValidity();
+        Subobjects.RefreshValidity();
     }
 
     public void RecordLayerStateChange(
@@ -509,6 +510,7 @@ public sealed class CadWorkspace : IDisposable
                 after,
                 name));
         Selection.RefreshValidity();
+        Subobjects.RefreshValidity();
     }
 
     public bool Undo()
@@ -771,6 +773,7 @@ public sealed class CadWorkspace : IDisposable
                 after,
                 name));
         Selection.RefreshValidity();
+        Subobjects.RefreshValidity();
     }
 
     private void ApplyStateChange(
@@ -810,6 +813,7 @@ public sealed class CadWorkspace : IDisposable
                     after,
                     name));
             Selection.RefreshValidity();
+        Subobjects.RefreshValidity();
         }
         catch
         {

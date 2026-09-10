@@ -17,7 +17,8 @@ public sealed class TrimTool : CadSelectionTransformToolBase
                     entity is CadLineEntity or
                     CadPolylineEntity or
                     CadCircleEntity or
-                    CadArcEntity));
+                    CadArcEntity or
+                    CadPathEntity));
         base.OnActivated();
     }
 

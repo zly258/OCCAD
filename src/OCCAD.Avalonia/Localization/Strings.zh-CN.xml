@@ -702,6 +702,13 @@
     <sys:String x:Key="Cad.History.EdgeFillet">实体圆角</sys:String>
     <sys:String x:Key="Cad.History.EdgeChamfer">实体倒角</sys:String>
     <sys:String x:Key="Cad.Text.Path">路径</sys:String>
+    <sys:String x:Key="Cad.Text.PathReverse">反转路径</sys:String>
+    <sys:String x:Key="Cad.Text.PathOpen">打开路径</sys:String>
+    <sys:String x:Key="Cad.Text.PathClose">闭合路径</sys:String>
+    <sys:String x:Key="Cad.Text.PathSegmentLine">直线</sys:String>
+    <sys:String x:Key="Cad.Text.PathSegmentArc">圆弧</sys:String>
+    <sys:String x:Key="Cad.Text.PathSegmentStatus">路径段 {0}：{1}</sys:String>
+    <sys:String x:Key="Cad.Text.PropertyUpdateFailed">属性修改失败</sys:String>
     <sys:String x:Key="Cad.Text.RegionHoles">最后选择的主闭合轮廓作为外边界，其余共面闭合轮廓作为孔洞。</sys:String>
     <sys:String x:Key="Cad.Text.Shell">抽壳</sys:String>
     <sys:String x:Key="Cad.Text.ShapeOffset">实体偏移</sys:String>
@@ -740,6 +747,30 @@
     <sys:String x:Key="Cad.Text.StatusPolarValue">{0} {1:G}°</sys:String>
     <sys:String x:Key="Cad.Text.ToolParameters">工具参数</sys:String>
     <sys:String x:Key="Cad.Text.Yes">是</sys:String>
+    <sys:String x:Key="Cad.Property.ProfileHoleCount">孔洞数</sys:String>
+    <sys:String x:Key="Cad.Property.VectorX">方向 X</sys:String>
+    <sys:String x:Key="Cad.Property.VectorY">方向 Y</sys:String>
+    <sys:String x:Key="Cad.Property.VectorZ">方向 Z</sys:String>
+    <sys:String x:Key="Cad.Property.EdgeCount">边数量</sys:String>
+    <sys:String x:Key="Cad.Property.Distance">距离</sys:String>
+    <sys:String x:Key="Cad.Property.RemovedFaceIndex">移除面索引</sys:String>
+    <sys:String x:Key="Cad.Property.Thickness">厚度</sys:String>
+    <sys:String x:Key="Cad.Property.SectionCount">截面数量</sys:String>
+    <sys:String x:Key="Cad.Property.MakeSolid">生成实体</sys:String>
+    <sys:String x:Key="Cad.Property.Ruled">直纹</sys:String>
+    <sys:String x:Key="Cad.Value.CadCircularDimensionKind.Radius">半径</sys:String>
+    <sys:String x:Key="Cad.Value.CadCircularDimensionKind.Diameter">直径</sys:String>
+    <sys:String x:Key="Cad.Text.PathRemoveSegment">删除路径段</sys:String>
+    <sys:String x:Key="Cad.Text.PathSplitSegment">拆分路径段</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectTitle">{0} · {1} {2}</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectCompound">复合体</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectCompSolid">组合实体</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectSolid">实体</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectShell">壳</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectFace">面</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectWire">线框</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectEdge">边</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectVertex">顶点</sys:String>
 </ResourceDictionary>
 
 

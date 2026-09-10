@@ -115,6 +115,23 @@ public sealed partial class MainWindow
         RefreshActionUi();
     }
 
+    private void ApplySubobjectSelection(
+        CadSubobjectSelectionChangedEventArgs args)
+    {
+        if (args.Primary is { } primary)
+        {
+            _propertyInspector.InspectSubobject(primary);
+        }
+        else if (!_propertyInspector.IsInspectingLayer)
+        {
+            _propertyInspector.InspectEntities(
+                _workspace.Selection.Selected.ToArray());
+        }
+
+        UpdateSelectionStatus();
+        RefreshActionUi();
+    }
+
     private void UpdateSelectionStatus()
     {
         var selectionLabel = UiText(
@@ -135,6 +152,19 @@ public sealed partial class MainWindow
                 count,
                 subobjectCount)
             : $"{selectionLabel}: {count}";
+
+        if (_workspace.Subobjects.Primary is { } primary &&
+            primary.TryGetPathSegment(out var pathSegment))
+        {
+            var type = pathSegment.Type == CadPathSegmentType.Line
+                ? UiText("Cad.Text.PathSegmentLine", "Line")
+                : UiText("Cad.Text.PathSegmentArc", "Arc");
+            text += " | " + UiFormat(
+                "Cad.Text.PathSegmentStatus",
+                "Path segment {0}: {1}",
+                pathSegment.Index + 1,
+                type);
+        }
 
         _selectionStatus.Text = text;
 

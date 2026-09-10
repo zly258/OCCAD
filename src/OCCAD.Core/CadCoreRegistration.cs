@@ -176,6 +176,11 @@ internal static class CadCoreRegistration
         actions.Register(new CadToolAction(workspace, "modify.trim", "Trim", "trim"));
         actions.Register(new CadToolAction(workspace, "modify.extend", "Extend", "extend"));
         actions.Register(new CadJoinAction(workspace));
+        actions.Register(new CadPathEditAction(workspace, "modify.path.reverse", "Reverse Path", CadPathEditKind.Reverse));
+        actions.Register(new CadPathEditAction(workspace, "modify.path.open", "Open Path", CadPathEditKind.Open));
+        actions.Register(new CadPathEditAction(workspace, "modify.path.close", "Close Path", CadPathEditKind.Close));
+        actions.Register(new CadPathRemoveSegmentAction(workspace));
+        actions.Register(new CadPathSplitSegmentAction(workspace));
         actions.Register(new CadToolAction(workspace, "modify.break", "Break", "break"));
         actions.Register(new CadToolAction(workspace, "modify.fillet", "Fillet", "fillet"));
         actions.Register(new CadToolAction(workspace, "modify.chamfer", "Chamfer", "chamfer"));

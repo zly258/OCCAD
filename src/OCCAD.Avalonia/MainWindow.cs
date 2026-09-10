@@ -520,12 +520,8 @@ public sealed partial class MainWindow : Window
 
         _workspace.Selection.Changed += (_, args) =>
             Ui(() => ApplySelection(args));
-        _workspace.Subobjects.Changed += (_, _) =>
-            Ui(() =>
-            {
-                UpdateSelectionStatus();
-                RefreshActionUi();
-            });
+        _workspace.Subobjects.Changed += (_, args) =>
+            Ui(() => ApplySubobjectSelection(args));
         _workspace.Preselection.Changed += (_, _) =>
             Ui(UpdateSelectionStatus);
         _workspace.Document.ChangeSetCommitted += (_, args) =>

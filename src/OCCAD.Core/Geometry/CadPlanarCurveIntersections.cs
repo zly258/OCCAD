@@ -38,6 +38,15 @@ internal static class CadPlanarCurveIntersections
                 LineCircle(start, end, arc.Center, arc.Radius, plane, targetSegment)
                     .Where(value => arc.TryParameterAt(value.Point, out _))
                     .ToArray(),
+            CadPathEntity path =>
+                Distinct(
+                    path.Segments.SelectMany(
+                        segment => WithLine(
+                            start,
+                            end,
+                            segment,
+                            plane,
+                            targetSegment))),
             _ => Array.Empty<CadCurveIntersection>()
         };
     }
@@ -70,6 +79,14 @@ internal static class CadPlanarCurveIntersections
                 CircleCircle(center, radius, arc.Center, arc.Radius, plane)
                     .Where(point => arc.TryParameterAt(point, out _))
                     .ToArray(),
+            CadPathEntity path =>
+                DistinctPoints(
+                    path.Segments.SelectMany(
+                        segment => WithCircle(
+                            center,
+                            radius,
+                            segment,
+                            plane))),
             _ => Array.Empty<OcctPoint3d>()
         };
     }
@@ -88,6 +105,9 @@ internal static class CadPlanarCurveIntersections
                 IsCircleOnPlane(circle.Center, circle.Normal, plane),
             CadArcEntity arc =>
                 IsCircleOnPlane(arc.Center, arc.Normal, plane),
+            CadPathEntity path =>
+                path.Segments.All(
+                    segment => IsBoundaryOnPlane(segment, plane)),
             _ => false
         };
 

@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using OCCAD;
+using OcctNet;
 using DrawingColor = System.Drawing.Color;
 using MediaColor = Avalonia.Media.Color;
 
@@ -17,6 +18,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
     private readonly StackPanel _host;
     private CadEntity[] _entities = [];
     private CadLayer? _layer;
+    private CadSubobjectSelection? _subobject;
     private bool _disposed;
     private bool _refreshing;
 
@@ -38,6 +40,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         EnsureNotDisposed();
 
         _layer = null;
+        _subobject = null;
         _entities = entities
             .Distinct()
             .Where(_workspace.Document.Entities.Contains)
@@ -51,7 +54,26 @@ internal sealed class CadPropertyInspectorController : IDisposable
         EnsureNotDisposed();
 
         _entities = [];
+        _subobject = null;
         _layer = layer;
+        Rebuild();
+    }
+
+    public void InspectSubobject(CadSubobjectSelection selection)
+    {
+        EnsureNotDisposed();
+
+        if (!selection.IsValid ||
+            !_workspace.Document.Entities.Contains(selection.Entity) ||
+            !_workspace.Document.IsEntitySelectable(selection.Entity))
+        {
+            InspectEntities([]);
+            return;
+        }
+
+        _layer = null;
+        _subobject = selection;
+        _entities = [selection.Entity];
         Rebuild();
     }
 
@@ -78,7 +100,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         if (args.Contains(CadDocumentChangeKind.Reset))
         {
-            InspectEntities(_workspace.Selection.Selected.ToArray());
+            if (_workspace.Subobjects.Primary is { } primary)
+                InspectSubobject(primary);
+            else
+                InspectEntities(_workspace.Selection.Selected.ToArray());
             return;
         }
 
@@ -106,6 +131,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         _host.Children.Clear();
         _entities = [];
         _layer = null;
+        _subobject = null;
     }
 
     private void Rebuild()
@@ -133,14 +159,16 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
             var title = _layer is not null
                 ? $"{CadLanguageManager.Text("Cad.Text.Layers", "Layers")}: {_layer.Name}"
-                : _entities.Length == 1
-                    ? LocalizeEntityName(_entities[0])
-                    : string.Format(
-                        CultureInfo.CurrentCulture,
-                        CadLanguageManager.Text(
-                            "Cad.Text.SelectionWithCount",
-                            "Selection [{0}]"),
-                        _entities.Length);
+                : _subobject is { } subobject
+                    ? LocalizeSubobjectTitle(subobject)
+                    : _entities.Length == 1
+                        ? LocalizeEntityName(_entities[0])
+                        : string.Format(
+                            CultureInfo.CurrentCulture,
+                            CadLanguageManager.Text(
+                                "Cad.Text.SelectionWithCount",
+                                "Selection [{0}]"),
+                            _entities.Length);
 
             _host.Children.Add(new TextBlock
             {
@@ -531,11 +559,12 @@ internal sealed class CadPropertyInspectorController : IDisposable
         {
             _workspace.AssignEntitiesToLayer(_entities, layerName);
         }
-        catch
+        catch (Exception exception)
         {
             if (!wasModified &&
                 _workspace.History.CurrentStateId == historyState)
                 _workspace.MarkSaved();
+            ShowPropertyError(exception);
         }
 
         Rebuild();
@@ -548,12 +577,16 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         if (_entities.Length > 0)
         {
-            _ = CadPropertyTransaction.TryApply(
-                _workspace,
-                _entities,
-                slot.Descriptor.Name,
-                value,
-                out _);
+            if (!CadPropertyTransaction.TryApply(
+                    _workspace,
+                    _entities,
+                    slot.Descriptor.Name,
+                    value,
+                    out var error) &&
+                error is not null)
+            {
+                ShowPropertyError(error);
+            }
             Rebuild();
             return;
         }
@@ -578,22 +611,83 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 before,
                 $"Property {slot.Descriptor.Name}");
         }
-        catch
+        catch (Exception exception)
         {
             try
             {
                 _layer.RestoreState(before);
             }
-            catch
+            catch (Exception restoreFailure)
             {
+                exception = new AggregateException(
+                    "Property apply and rollback both failed.",
+                    exception,
+                    restoreFailure);
             }
 
             if (!wasModified &&
                 _workspace.History.CurrentStateId == historyState)
                 _workspace.MarkSaved();
+            ShowPropertyError(exception);
         }
 
         Rebuild();
+    }
+
+    private void ShowPropertyError(Exception error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+
+        var messages = error is AggregateException aggregate
+            ? aggregate.Flatten().InnerExceptions
+                .Select(static item => item.GetBaseException().Message)
+                .Where(static message => !string.IsNullOrWhiteSpace(message))
+                .Distinct(StringComparer.CurrentCulture)
+                .ToArray()
+            : [error.GetBaseException().Message];
+
+        _ = CadMessageDialog.ShowAsync(
+            _owner,
+            CadLanguageManager.Text(
+                "Cad.Text.PropertyUpdateFailed",
+                "Property Update Failed"),
+            string.Join(Environment.NewLine, messages));
+    }
+
+    private string LocalizeSubobjectTitle(
+        CadSubobjectSelection selection)
+    {
+        var entityName = LocalizeEntityName(selection.Entity);
+        if (selection.TryGetPathSegment(out var segment))
+        {
+            var type = segment.Type == CadPathSegmentType.Line
+                ? CadLanguageManager.Text(
+                    "Cad.Text.PathSegmentLine",
+                    "Line")
+                : CadLanguageManager.Text(
+                    "Cad.Text.PathSegmentArc",
+                    "Arc");
+            var segmentText = string.Format(
+                CultureInfo.CurrentCulture,
+                CadLanguageManager.Text(
+                    "Cad.Text.PathSegmentStatus",
+                    "Path segment {0}: {1}"),
+                segment.Index + 1,
+                type);
+            return $"{entityName} · {segmentText}";
+        }
+
+        var typeName = CadLanguageManager.Text(
+            $"Cad.Text.Subobject{selection.SubshapeType}",
+            selection.SubshapeType.ToString());
+        return string.Format(
+            CultureInfo.CurrentCulture,
+            CadLanguageManager.Text(
+                "Cad.Text.SubobjectTitle",
+                "{0} · {1} {2}"),
+            entityName,
+            typeName,
+            selection.SubshapeIndex + 1);
     }
 
     private string LocalizeEntityName(CadEntity entity) =>

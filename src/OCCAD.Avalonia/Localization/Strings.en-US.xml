@@ -702,6 +702,13 @@
     <sys:String x:Key="Cad.History.EdgeFillet">Edge Fillet</sys:String>
     <sys:String x:Key="Cad.History.EdgeChamfer">Edge Chamfer</sys:String>
     <sys:String x:Key="Cad.Text.Path">Path</sys:String>
+    <sys:String x:Key="Cad.Text.PathReverse">Reverse Path</sys:String>
+    <sys:String x:Key="Cad.Text.PathOpen">Open Path</sys:String>
+    <sys:String x:Key="Cad.Text.PathClose">Close Path</sys:String>
+    <sys:String x:Key="Cad.Text.PathSegmentLine">Line</sys:String>
+    <sys:String x:Key="Cad.Text.PathSegmentArc">Arc</sys:String>
+    <sys:String x:Key="Cad.Text.PathSegmentStatus">Path segment {0}: {1}</sys:String>
+    <sys:String x:Key="Cad.Text.PropertyUpdateFailed">Property Update Failed</sys:String>
     <sys:String x:Key="Cad.Text.RegionHoles">Select the outer boundary last (primary); other selected coplanar closed profiles become holes.</sys:String>
     <sys:String x:Key="Cad.Text.Shell">Shell</sys:String>
     <sys:String x:Key="Cad.Text.ShapeOffset">Shape Offset</sys:String>
@@ -740,6 +747,30 @@
     <sys:String x:Key="Cad.Text.StatusPolarValue">{0} {1:G}°</sys:String>
     <sys:String x:Key="Cad.Text.ToolParameters">Tool Parameters</sys:String>
     <sys:String x:Key="Cad.Text.Yes">Yes</sys:String>
+    <sys:String x:Key="Cad.Property.ProfileHoleCount">Profile Holes</sys:String>
+    <sys:String x:Key="Cad.Property.VectorX">Vector X</sys:String>
+    <sys:String x:Key="Cad.Property.VectorY">Vector Y</sys:String>
+    <sys:String x:Key="Cad.Property.VectorZ">Vector Z</sys:String>
+    <sys:String x:Key="Cad.Property.EdgeCount">Edge Count</sys:String>
+    <sys:String x:Key="Cad.Property.Distance">Distance</sys:String>
+    <sys:String x:Key="Cad.Property.RemovedFaceIndex">Removed Face</sys:String>
+    <sys:String x:Key="Cad.Property.Thickness">Thickness</sys:String>
+    <sys:String x:Key="Cad.Property.SectionCount">Section Count</sys:String>
+    <sys:String x:Key="Cad.Property.MakeSolid">Solid</sys:String>
+    <sys:String x:Key="Cad.Property.Ruled">Ruled</sys:String>
+    <sys:String x:Key="Cad.Value.CadCircularDimensionKind.Radius">Radius</sys:String>
+    <sys:String x:Key="Cad.Value.CadCircularDimensionKind.Diameter">Diameter</sys:String>
+    <sys:String x:Key="Cad.Text.PathRemoveSegment">Remove Segment</sys:String>
+    <sys:String x:Key="Cad.Text.PathSplitSegment">Split Segment</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectTitle">{0} · {1} {2}</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectCompound">Compound</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectCompSolid">CompSolid</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectSolid">Solid</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectShell">Shell</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectFace">Face</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectWire">Wire</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectEdge">Edge</sys:String>
+    <sys:String x:Key="Cad.Text.SubobjectVertex">Vertex</sys:String>
 </ResourceDictionary>
 
 

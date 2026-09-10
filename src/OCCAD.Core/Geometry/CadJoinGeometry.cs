@@ -41,7 +41,8 @@ internal static class CadJoinGeometry
                 static entity =>
                     entity is not CadLineEntity and
                     not CadArcEntity and
-                    not CadPolylineEntity { Closed: false }))
+                    not CadPolylineEntity { Closed: false } and
+                    not CadPathEntity { Closed: false }))
             return false;
 
         var fragments = entities
@@ -73,6 +74,7 @@ internal static class CadJoinGeometry
             CadLineEntity line => line.CreatePath(segments),
             CadArcEntity arc => arc.CreatePath(segments),
             CadPolylineEntity polyline => polyline.CreatePath(segments),
+            CadPathEntity path => path.CopyWithSegments(segments),
             _ => throw new InvalidOperationException()
         };
         return true;
@@ -84,6 +86,7 @@ internal static class CadJoinGeometry
             CadLineEntity line => line.Start,
             CadArcEntity arc => arc.Start,
             CadPolylineEntity { Closed: false } polyline => polyline.Points[0],
+            CadPathEntity { Closed: false } path => path.Start,
             _ => throw new ArgumentException("Unsupported join entity.", nameof(entity))
         };
 
@@ -93,6 +96,7 @@ internal static class CadJoinGeometry
             CadLineEntity line => line.End,
             CadArcEntity arc => arc.End,
             CadPolylineEntity { Closed: false } polyline => polyline.Points[^1],
+            CadPathEntity { Closed: false } path => path.End,
             _ => throw new ArgumentException("Unsupported join entity.", nameof(entity))
         };
 
@@ -143,10 +147,31 @@ internal static class CadJoinGeometry
                 return;
             }
 
+            case CadPathEntity { Closed: false } path:
+            {
+                var segments = reverse
+                    ? path.Segments
+                        .Reverse()
+                        .Select(ReversePathSegment)
+                    : path.Segments
+                        .Select(CadPathEntity.SnapshotSegment);
+                target.AddRange(segments);
+                return;
+            }
+
             default:
                 throw new InvalidOperationException();
         }
     }
+
+    private static CadEntity ReversePathSegment(CadEntity segment) =>
+        segment switch
+        {
+            CadLineEntity line => line.CreateLine(line.End, line.Start),
+            CadArcEntity arc => arc.ReversedCopy(),
+            _ => throw new InvalidOperationException(
+                "Path contains an unsupported segment.")
+        };
 
     private static bool TryJoinLinear(
         IReadOnlyList<CadEntity> entities,

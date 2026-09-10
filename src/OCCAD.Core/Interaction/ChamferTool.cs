@@ -20,7 +20,8 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
                 "chamfer.curves",
                 static entity =>
                     entity is CadLineEntity or
-                    CadPolylineEntity));
+                    CadPolylineEntity or
+                    CadPathEntity));
     }
 
     public override bool HandlePointer(
@@ -28,18 +29,16 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
     {
         if (Context.Workspace.Preselection.Current is
             {
-                Entity: CadPolylineEntity polyline,
+                Entity: var chain,
                 Point: var hit
-            })
+            } &&
+            chain is CadPolylineEntity or CadPathEntity)
         {
             if (input.Kind == OcctPointerInputKind.Moved)
             {
-                if (CadPolylineChamferGeometry.TryChamfer(
-                        polyline,
+                if (TryChamferChain(
+                        chain,
                         hit,
-                        _firstDistance,
-                        _secondDistance,
-                        Context.WorkPlane,
                         out var preview))
                     Context.Preview.Show(preview);
                 else
@@ -50,12 +49,10 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
             if (input.Kind != OcctPointerInputKind.Pressed ||
                 input.Button != OcctPointerButton.Left)
                 return true;
-            if (!CadPolylineChamferGeometry.TryChamfer(
-                    polyline,
+
+            if (!TryChamferChain(
+                    chain,
                     hit,
-                    _firstDistance,
-                    _secondDistance,
-                    Context.WorkPlane,
                     out var replacement))
             {
                 Context.Preview.Clear();
@@ -67,7 +64,7 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
 
             Context.Preview.Clear();
             Context.Workspace.ReplaceEntities(
-                [polyline],
+                [chain],
                 [replacement],
                 "Chamfer");
             Context.Workspace.Tools.CompleteCurrent();
@@ -75,6 +72,44 @@ public sealed class ChamferTool : CadTwoCurveCornerToolBase
         }
 
         return base.HandlePointer(input);
+    }
+
+    private bool TryChamferChain(
+        CadEntity source,
+        OcctPoint3d hitPoint,
+        out CadEntity replacement)
+    {
+        replacement = null!;
+
+        switch (source)
+        {
+            case CadPolylineEntity polyline:
+                if (!CadPolylineChamferGeometry.TryChamfer(
+                        polyline,
+                        hitPoint,
+                        _firstDistance,
+                        _secondDistance,
+                        Context.WorkPlane,
+                        out var polylineReplacement))
+                    return false;
+                replacement = polylineReplacement;
+                return true;
+
+            case CadPathEntity path:
+                if (!CadPathChamferGeometry.TryChamfer(
+                        path,
+                        hitPoint,
+                        _firstDistance,
+                        _secondDistance,
+                        Context.WorkPlane,
+                        out var pathReplacement))
+                    return false;
+                replacement = pathReplacement;
+                return true;
+
+            default:
+                return false;
+        }
     }
 
     public override CadToolPanelDescriptor ParameterPanel =>

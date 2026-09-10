@@ -12,6 +12,18 @@ public readonly record struct CadSubobjectSelection(
         Entity is not null &&
         SubshapeIndex >= 0 &&
         SubshapeType != OcctShapeType.Shape;
+
+    public bool TryGetPathSegment(
+        out CadPathSegmentInfo segment)
+    {
+        if (Entity is CadPathEntity path &&
+            SubshapeType == OcctShapeType.Edge &&
+            path.TryGetSegmentInfo(SubshapeIndex, out segment))
+            return true;
+
+        segment = default;
+        return false;
+    }
 }
 
 public sealed class CadSubobjectSelectionChangedEventArgs(
@@ -37,6 +49,7 @@ public sealed class CadSubobjectSelectionManager
         _document = document ?? throw new ArgumentNullException(nameof(document));
         _selection = selection ?? throw new ArgumentNullException(nameof(selection));
         _document.Changed += DocumentChanged;
+        _selection.Changed += SelectionChanged;
         _selection.Cleared += SelectionCleared;
         _selection.FilterChanged += SelectionFilterChanged;
     }
@@ -79,6 +92,21 @@ public sealed class CadSubobjectSelectionManager
                 item.SubshapeIndex < 0 ||
                 item.SubshapeType == OcctShapeType.Shape)
                 return;
+        }
+
+        var willAdd =
+            operation is CadSelectionOperation.Replace or
+                CadSelectionOperation.Add ||
+            operation == CadSelectionOperation.Toggle &&
+            index < 0;
+        if (willAdd && _selection.Selected.Count > 0)
+        {
+            // Formal selection is one coherent mode at a time. Subobject
+            // selection keeps its parent Entity context but does not coexist
+            // with whole-Entity selection.
+            _selection.Apply(
+                Array.Empty<CadEntity>(),
+                CadSelectionOperation.Replace);
         }
 
         switch (operation)
@@ -182,6 +210,14 @@ public sealed class CadSubobjectSelectionManager
         if (Primary is { } primary && ReferenceEquals(primary.Entity, entity))
             Primary = _selected.Count == 0 ? null : _selected[^1];
         RaiseChanged();
+    }
+
+    private void SelectionChanged(
+        object? sender,
+        CadSelectionChangedEventArgs args)
+    {
+        if (args.Entities.Count > 0)
+            Clear();
     }
 
     private void SelectionCleared(object? sender, EventArgs args) => Clear();

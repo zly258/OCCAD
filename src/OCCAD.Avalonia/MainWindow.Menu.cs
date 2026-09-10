@@ -188,6 +188,29 @@ public sealed partial class MainWindow
                 "Cad.Text.PathArray",
                 "Path Array"));
 
+        var pathEdit = Menu(
+            UiText("Cad.Text.Path", "Path"),
+            Action(
+                "modify.path.reverse",
+                "Cad.Text.PathReverse",
+                "Reverse Path"),
+            Action(
+                "modify.path.open",
+                "Cad.Text.PathOpen",
+                "Open Path"),
+            Action(
+                "modify.path.close",
+                "Cad.Text.PathClose",
+                "Close Path"),
+            Action(
+                "modify.path.removesegment",
+                "Cad.Text.PathRemoveSegment",
+                "Remove Segment"),
+            Action(
+                "modify.path.splitsegment",
+                "Cad.Text.PathSplitSegment",
+                "Split Segment"));
+
         var modify = Menu(
             UiText("Cad.Text.Modify", "Modify"),
             Action("modify.move", "Cad.Text.Move", "Move"),
@@ -200,6 +223,7 @@ public sealed partial class MainWindow
             Action("modify.extend", "Cad.Text.Extend", "Extend"),
             Action("modify.offset", "Cad.Text.Offset", "Offset"),
             Action("modify.join", "Cad.Text.Join", "Join"),
+            pathEdit,
             Action("modify.break", "Cad.Text.Break", "Break"),
             Action("modify.fillet", "Cad.Text.Fillet", "Fillet"),
             Action("modify.chamfer", "Cad.Text.Chamfer", "Chamfer"),
@@ -343,7 +367,23 @@ public sealed partial class MainWindow
             SnapMode(
                 CadSnapType.Quadrant,
                 "Cad.Text.SnapQuadrant",
-                "Quadrant"));
+                "Quadrant"),
+            SnapMode(
+                CadSnapType.Intersection,
+                "Cad.Text.SnapIntersection",
+                "Intersection"),
+            SnapMode(
+                CadSnapType.Perpendicular,
+                "Cad.Text.SnapPerpendicular",
+                "Perpendicular"),
+            SnapMode(
+                CadSnapType.Nearest,
+                "Cad.Text.SnapNearest",
+                "Nearest"),
+            SnapMode(
+                CadSnapType.Tangent,
+                "Cad.Text.SnapTangent",
+                "Tangent"));
 
         var polar = Menu(
             UiText("Cad.Text.PolarIncrement", "Polar Increment"),

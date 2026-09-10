@@ -17,7 +17,8 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
                     entity is CadLineEntity or
                     CadPolylineEntity or
                     CadCircleEntity or
-                    CadArcEntity));
+                    CadArcEntity or
+                    CadPathEntity));
         base.OnActivated();
     }
 
@@ -29,7 +30,8 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
                 static entity =>
                     entity is CadLineEntity or
                     CadArcEntity or
-                    CadPolylineEntity));
+                    CadPolylineEntity or
+                    CadPathEntity));
         SetStageLocalized(
             0,
             "Cad.Prompt.extend.Target",
@@ -141,11 +143,93 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
                 replacement = polylineReplacement;
                 break;
 
+            case CadPathEntity path:
+                if (!TryExtendPath(
+                        path,
+                        boundaries,
+                        hit,
+                        out var pathReplacement))
+                    return false;
+                replacement = pathReplacement;
+                break;
+
             default:
                 return false;
         }
 
         target = hovered;
         return true;
+    }
+
+    private bool TryExtendPath(
+        CadPathEntity path,
+        IReadOnlyList<CadEntity> boundaries,
+        OcctPoint3d hitPoint,
+        out CadPathEntity replacement)
+    {
+        replacement = null!;
+        if (path.Closed ||
+            path.Segments.Count == 0 ||
+            !CadPlanarCurveIntersections.IsBoundaryOnPlane(
+                path,
+                Context.WorkPlane))
+            return false;
+
+        var extendStart =
+            hitPoint.DistanceTo(path.Start) <=
+            hitPoint.DistanceTo(path.End);
+        var segmentIndex =
+            extendStart
+                ? 0
+                : path.Segments.Count - 1;
+        var source = path.Segments[segmentIndex];
+        var endpoint =
+            extendStart
+                ? path.Start
+                : path.End;
+
+        CadEntity extended;
+        switch (source)
+        {
+            case CadLineEntity line:
+                if (!CadLineEditGeometry.TryExtend(
+                        line,
+                        boundaries,
+                        endpoint,
+                        Context.WorkPlane,
+                        out var lineReplacement))
+                    return false;
+                extended = lineReplacement;
+                break;
+
+            case CadArcEntity arc:
+                if (!CadArcEditGeometry.TryExtend(
+                        arc,
+                        boundaries,
+                        endpoint,
+                        Context.WorkPlane,
+                        out var arcReplacement))
+                    return false;
+                extended = arcReplacement;
+                break;
+
+            default:
+                return false;
+        }
+
+        var segments = path.Segments
+            .Select(CadPathEntity.SnapshotSegment)
+            .ToArray();
+        segments[segmentIndex] = extended;
+        try
+        {
+            replacement = path.CopyWithSegments(segments);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            replacement = null!;
+            return false;
+        }
     }
 }

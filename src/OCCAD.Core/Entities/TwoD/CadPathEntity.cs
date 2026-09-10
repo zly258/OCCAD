@@ -98,6 +98,38 @@ public sealed class CadPathEntity : CadEntity
         return result;
     }
 
+    public bool TryGetSegmentInfo(
+        int segmentIndex,
+        out CadPathSegmentInfo info)
+    {
+        if ((uint)segmentIndex >= (uint)_segments.Count)
+        {
+            info = default;
+            return false;
+        }
+
+        var segment = _segments[segmentIndex];
+        info = segment switch
+        {
+            CadLineEntity line => new CadPathSegmentInfo(
+                segmentIndex,
+                CadPathSegmentType.Line,
+                line.Start,
+                line.End,
+                line.Length),
+            CadArcEntity arc => new CadPathSegmentInfo(
+                segmentIndex,
+                CadPathSegmentType.Arc,
+                arc.Start,
+                arc.End,
+                arc.ArcLength,
+                arc.Middle,
+                arc.Radius),
+            _ => default
+        };
+        return segment is CadLineEntity or CadArcEntity;
+    }
+
     public override IReadOnlyList<CadSnapPoint> GetSnapPoints()
     {
         var result = new List<CadSnapPoint>();
@@ -495,6 +527,132 @@ public sealed class CadPathEntity : CadEntity
             y * scale,
             z * scale);
     }
+
+    internal void SplitSegment(
+        int segmentIndex,
+        OcctPoint3d point)
+    {
+        if ((uint)segmentIndex >= (uint)_segments.Count)
+            throw new ArgumentOutOfRangeException(nameof(segmentIndex));
+        if (!point.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(point));
+
+        var source = _segments[segmentIndex];
+        CadEntity first;
+        CadEntity second;
+
+        switch (source)
+        {
+            case CadLineEntity line:
+            {
+                var direction = line.End - line.Start;
+                var lengthSquared = direction.LengthSquared;
+                if (lengthSquared <= 1e-24)
+                    throw new InvalidOperationException(
+                        "The Path line segment is degenerate.");
+
+                var parameter = Math.Clamp(
+                    (point - line.Start).Dot(direction) / lengthSquared,
+                    0.0,
+                    1.0);
+                if (parameter <= 1e-7 ||
+                    parameter >= 1.0 - 1e-7)
+                {
+                    throw new InvalidOperationException(
+                        "Split point must be inside the Path segment.");
+                }
+
+                var splitPoint = line.Start + direction * parameter;
+                first = line.CreateLine(line.Start, splitPoint);
+                second = line.CreateLine(splitPoint, line.End);
+                break;
+            }
+
+            case CadArcEntity arc:
+            {
+                if (!arc.TryClosestParameter(point, out var parameter) ||
+                    parameter <= 1e-7 ||
+                    parameter >= 1.0 - 1e-7)
+                {
+                    throw new InvalidOperationException(
+                        "Split point must be inside the Path arc.");
+                }
+
+                first = arc.CopyWithParameterRange(0.0, parameter);
+                second = arc.CopyWithParameterRange(parameter, 1.0);
+                break;
+            }
+
+            default:
+                throw new InvalidOperationException(
+                    "Path contains an unsupported segment.");
+        }
+
+        var updated = _segments
+            .Select(SnapshotSegment)
+            .ToList();
+        updated.RemoveAt(segmentIndex);
+        updated.Insert(segmentIndex, second);
+        updated.Insert(segmentIndex, first);
+        ReplaceSegments(updated, nameof(SplitSegment));
+    }
+
+    public void Reverse()
+    {
+        var updated = _segments
+            .AsEnumerable()
+            .Reverse()
+            .Select(ReverseSegment)
+            .ToArray();
+        ReplaceSegments(updated, nameof(Reverse));
+    }
+
+    public void Close()
+    {
+        if (Closed)
+            return;
+
+        var updated = _segments
+            .Select(SnapshotSegment)
+            .ToList();
+        updated.Add(new CadLineEntity(End, Start));
+        ReplaceSegments(updated, nameof(Close));
+    }
+
+    public void Open()
+    {
+        if (!Closed)
+            return;
+        if (_segments.Count <= 1)
+            throw new InvalidOperationException(
+                "A closed Path requires at least two segments to open.");
+
+        var updated = _segments
+            .Take(_segments.Count - 1)
+            .Select(SnapshotSegment)
+            .ToArray();
+        if (updated.Length == 0 ||
+            SegmentStart(updated[0]).DistanceTo(SegmentEnd(updated[^1])) <= JoinTolerance)
+        {
+            throw new InvalidOperationException(
+                "The Path cannot be opened by removing its closing segment.");
+        }
+
+        ReplaceSegments(updated, nameof(Open));
+    }
+
+    private static CadEntity ReverseSegment(
+        CadEntity segment) =>
+        segment switch
+        {
+            CadLineEntity line =>
+                line.CreateLine(line.End, line.Start),
+            CadArcEntity arc =>
+                arc.CreateArc(arc.End, arc.Middle, arc.Start),
+            _ => throw new ArgumentException(
+                "Path segments must be lines or arcs.",
+                nameof(segment))
+        };
 
     internal CadPathEntity CopyWithSegments(
         IEnumerable<CadEntity> segments) =>

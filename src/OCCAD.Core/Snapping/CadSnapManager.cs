@@ -215,6 +215,7 @@ public sealed class CadSnapManager
                          x,
                          y,
                          queryPoint,
+                         workPlane,
                          reference,
                          effectiveModes))
                 Consider(candidate);
@@ -381,6 +382,7 @@ public sealed class CadSnapManager
         int x,
         int y,
         OcctPoint3d queryPoint,
+        CadWorkPlane workPlane,
         OcctPoint3d? reference,
         CadSnapType effectiveModes)
     {
@@ -395,7 +397,9 @@ public sealed class CadSnapManager
               CadSnapType.Center |
               CadSnapType.Quadrant |
               CadSnapType.Nearest |
-              CadSnapType.Perpendicular)) != 0;
+              CadSnapType.Intersection |
+              CadSnapType.Perpendicular |
+              CadSnapType.Tangent)) != 0;
 
         if (!wantsVertex && !wantsEdge)
             return Array.Empty<CadSnapPoint>();
@@ -420,6 +424,7 @@ public sealed class CadSnapManager
             return Array.Empty<CadSnapPoint>();
 
         var result = new List<CadSnapPoint>();
+        var edgeHits = new List<NativeEdgeHit>();
         foreach (var hit in hits)
         {
             var entity = _document.FindByViewerObject(hit.Owner);
@@ -450,6 +455,12 @@ public sealed class CadSnapManager
                 hit.Owner is not OcctShape owner)
                 continue;
 
+            edgeHits.Add(
+                new NativeEdgeHit(
+                    owner,
+                    entity,
+                    hit.SubshapeIndex));
+
             AddExactEdgeCandidates(
                 result,
                 engine,
@@ -457,8 +468,18 @@ public sealed class CadSnapManager
                 entity,
                 hit.SubshapeIndex,
                 queryPoint,
+                workPlane,
                 reference,
                 effectiveModes);
+        }
+
+        if ((effectiveModes & CadSnapType.Intersection) != 0 &&
+            edgeHits.Count > 1)
+        {
+            AddExactEdgeIntersections(
+                result,
+                engine,
+                edgeHits);
         }
 
         return result;
@@ -471,6 +492,7 @@ public sealed class CadSnapManager
         CadEntity entity,
         int edgeIndex,
         OcctPoint3d queryPoint,
+        CadWorkPlane workPlane,
         OcctPoint3d? reference,
         CadSnapType modes)
     {
@@ -510,7 +532,8 @@ public sealed class CadSnapManager
              (CadSnapType.Center |
               CadSnapType.Quadrant |
               CadSnapType.Nearest |
-              CadSnapType.Perpendicular)) != 0;
+              CadSnapType.Perpendicular |
+              CadSnapType.Tangent)) != 0;
         if (!needsCopiedEdge)
             return;
 
@@ -556,6 +579,26 @@ public sealed class CadSnapManager
                             entity,
                             projection.Point,
                             CadSnapType.Perpendicular,
+                            edgeIndex));
+                }
+            }
+
+            if ((modes & CadSnapType.Tangent) != 0 &&
+                reference is { } tangentReference)
+            {
+                foreach (var tangent in engine.GetTangentPoints(
+                             edge,
+                             new OcctPlane3d(
+                                 workPlane.Origin,
+                                 workPlane.Normal),
+                             tangentReference))
+                {
+                    AddUnique(
+                        result,
+                        new CadSnapPoint(
+                            entity,
+                            tangent.Point,
+                            CadSnapType.Tangent,
                             edgeIndex));
                 }
             }
@@ -606,6 +649,67 @@ public sealed class CadSnapManager
         finally
         {
             TryDeleteTemporaryShape(engine, edge);
+        }
+    }
+
+    private static void AddExactEdgeIntersections(
+        List<CadSnapPoint> result,
+        OcctEngine engine,
+        IReadOnlyList<NativeEdgeHit> edgeHits)
+    {
+        var unique = edgeHits
+            .GroupBy(
+                static hit =>
+                    (hit.Owner.Id, hit.EdgeIndex))
+            .Select(static group => group.First())
+            .ToArray();
+        if (unique.Length < 2)
+            return;
+
+        var copies = new OcctShape[unique.Length];
+        try
+        {
+            for (var index = 0; index < unique.Length; index++)
+            {
+                copies[index] = engine.GetSubshapeAt(
+                    unique[index].Owner,
+                    OcctShapeType.Edge,
+                    unique[index].EdgeIndex);
+            }
+
+            for (var firstIndex = 0;
+                 firstIndex < unique.Length;
+                 firstIndex++)
+            {
+                for (var secondIndex = firstIndex + 1;
+                     secondIndex < unique.Length;
+                     secondIndex++)
+                {
+                    foreach (var intersection in engine.IntersectEdges(
+                                 copies[firstIndex],
+                                 copies[secondIndex]))
+                    {
+                        if (intersection.Kind != OcctIntersectionKind.Point)
+                            continue;
+
+                        AddUnique(
+                            result,
+                            new CadSnapPoint(
+                                unique[firstIndex].Entity,
+                                intersection.StartPoint,
+                                CadSnapType.Intersection,
+                                unique[firstIndex].EdgeIndex));
+                    }
+                }
+            }
+        }
+        finally
+        {
+            foreach (var copy in copies)
+            {
+                if (copy.Id > 0)
+                    TryDeleteTemporaryShape(engine, copy);
+            }
         }
     }
 
@@ -795,6 +899,11 @@ public sealed class CadSnapManager
                 yield return center.Point;
         }
     }
+
+    private readonly record struct NativeEdgeHit(
+        OcctShape Owner,
+        CadEntity Entity,
+        int EdgeIndex);
 
     private sealed record CenterProjection(
         OcctPoint3d Eye,

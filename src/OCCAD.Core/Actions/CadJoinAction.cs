@@ -43,6 +43,7 @@ public sealed class CadJoinAction(CadWorkspace workspace)
             static entity =>
                 entity is CadLineEntity or
                 CadArcEntity or
-                CadPolylineEntity { Closed: false });
+                CadPolylineEntity { Closed: false } or
+                CadPathEntity { Closed: false });
     }
 }

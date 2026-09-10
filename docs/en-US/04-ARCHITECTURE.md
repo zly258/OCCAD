@@ -3,29 +3,51 @@
 ## Layers
 
 ```text
-Presentation (Avalonia)
-  MainWindow / Menu / ToolBar / Docks / ToolPanel / CommandLine / StatusBar
-        ↓ observes + invokes
-Application / Interaction
+Presentation — OCCAD.Avalonia
+  MainWindow / Menu / Toolbar / Panels / Dialogs / CommandLine / StatusBar
+        ↓
+Application & Interaction — OCCAD.Core
   Workspace / ActionManager / ToolManager / Selection / Snap / Tracking / Grip / Preview
         ↓
-Domain
-  Document / Entity / Layer / History / Registries / Serialization
+Domain — OCCAD.Core
+  Document / Entity / Layer / History / Registry / Persistence
         ↓
-Geometry & Presentation Bridge
+Geometry & Viewer Bridge
   OcctNet / OcctNet.Avalonia / OcctCSharpBridge / OCCT
 ```
 
-Dependency direction is `Avalonia → Core → OcctNet`. Core never references Avalonia; Entity never references MainWindow; Tool never manipulates UI controls directly.
+Dependency direction is `Avalonia → Core → OcctNet`.
 
-`CadWorkspace` remains the session composition root. Document is the sole persistent Entity owner and final appearance resolver. Entity owns geometry, identity, appearance, transforms, Snap/Grip semantics and persistence. Entity/Tool/Action use explicit registries with stable IDs.
+## Ownership
 
-Action is the instantaneous command entry. Tool is the staged interaction state machine. Stable Tool parameters are described by Core descriptors and rendered by the single Avalonia `CadToolPanel`; Core knows nothing about the concrete Window.
+`CadWorkspace` is the session composition root. Document is the sole persistent Entity owner and final appearance resolver.
 
-Selection, Preselection and SubobjectSelection remain separate. Point resolution remains screen/ray → WorkPlane → Snap → tracking/constraints → final point. Persistent drawing plane, transient Tool plane and Grip plane stay distinct.
+Entity owns stable identity/type, valid geometry, layer, appearance override values + ByLayer flags, placement, Snap/Grip semantics, duplicate/restore/transform behavior, and persistence state.
 
-Preview, Grip, Snap, Preselection and subobject overlays have separate lifecycles. GripEdit works on a duplicate preview and creates one real state/history change on Accept.
+Viewer objects are derived presentation only.
 
-Layer and Property panels are Avalonia views over Core state. Property semantics come from Core `CadPropertyDescriptor`/`CadValueDescriptor`; `TypeDescriptor` is only the Core adapter for CLR properties, not the UI business model. All modifying paths follow Capture → Validate/Build → Apply → History with rollback on failure.
+## Appearance
 
-The Avalonia viewport adapter consumes the official `OcctAvaloniaViewport` from the installed Bridge SDK; OCCAD does not create a second HWND/NativeControlHost wrapper.
+Document resolves effective Color, LineStyle, LineWidth, visibility, and selectability from Entity + Layer state.
+
+## Property / Layer transaction
+
+`CadPropertyCatalog` / `CadPropertyDescriptor` / `CadValueDescriptor` define semantic property metadata. `TypeDescriptor` is only a CLR adapter.
+
+`CadPropertyTransaction` applies Entity edits atomically and handles explicit appearance override semantics. Layer mutations are centralized on `CadWorkspace`; Avalonia does not implement a second rollback/history path.
+
+## Tool / Action
+
+Action is the stable instantaneous command entry. Tool owns Step/Stage, Prompt, InputKind, InteractionPolicy, precision reference/input, WorkPlane strategy, parameters, Preview, Finish/Cancel/StepBack.
+
+`CadToolContext` exposes Core services but does not hide Preview cleanup inside model mutation methods.
+
+## Transient state / redraw
+
+Selection, Preselection, SubobjectSelection, Grip, Snap, Tracking, Preview, selection rectangle, and HUD have separate lifecycles.
+
+Transient preview/source suppression is cleaned after successful model/history mutation or Tool cancellation/deactivation.
+
+Viewer batching/redraw follows the Bridge display-batch contract; OCCAD does not add redundant Redraw calls when Bridge already schedules one.
+
+`OCCTBIM-Source` is used to validate responsibility boundaries and behavior, not copied structurally.

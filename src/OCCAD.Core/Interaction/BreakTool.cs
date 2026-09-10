@@ -32,7 +32,7 @@ public sealed class BreakTool : CadSelectionTransformToolBase, ICadPointInputToo
     protected override void OnTransformStarted()
     {
         _firstPoint = null;
-        Context.Preview.Clear();
+        ClearReplacementPreview();
 
         if (Entities.Count != 1)
         {
@@ -112,7 +112,7 @@ public sealed class BreakTool : CadSelectionTransformToolBase, ICadPointInputToo
 
     protected override bool OnStepBack()
     {
-        Context.Preview.Clear();
+        ClearReplacementPreview();
 
         if (_firstPoint is not null)
         {
@@ -153,18 +153,19 @@ public sealed class BreakTool : CadSelectionTransformToolBase, ICadPointInputToo
                 Context.WorkPlane,
                 out var replacements))
         {
-            Context.Preview.Clear();
+            ClearReplacementPreview();
             SetPromptLocalized(
                 "Cad.Prompt.break.Invalid",
                 "Break: the two points do not define a valid removable segment.");
             return false;
         }
 
-        Context.Preview.Clear();
-        Context.Workspace.ReplaceEntities(
-            [Entities[0]],
-            replacements,
-            "Break");
+        ClearReplacementPreview();
+        CommitReplacementPreview(
+            () => Context.Workspace.ReplaceEntities(
+                [Entities[0]],
+                replacements,
+                "Break"));
         Context.Workspace.Tools.CompleteCurrent();
         return true;
     }
@@ -180,11 +181,13 @@ public sealed class BreakTool : CadSelectionTransformToolBase, ICadPointInputToo
                 Context.WorkPlane,
                 out var replacements))
         {
-            Context.Preview.Show(replacements);
+            ShowReplacementPreview(
+                [Entities[0]],
+                replacements);
         }
         else
         {
-            Context.Preview.Clear();
+            ClearReplacementPreview();
         }
     }
 }

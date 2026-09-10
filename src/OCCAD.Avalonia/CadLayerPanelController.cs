@@ -298,9 +298,10 @@ internal sealed class CadLayerPanelController : IDisposable
                 Math.Abs(value - layer.LineWidth) < 1e-12)
                 return;
 
-            ApplyLayerChange(
-                layer,
-                () => layer.LineWidth = value);
+            TryLayerChange(
+                () => _workspace.SetLayerLineWidth(
+                    layer,
+                    value));
         };
         Grid.SetColumn(width, 4);
         grid.Children.Add(width);
@@ -326,9 +327,10 @@ internal sealed class CadLayerPanelController : IDisposable
                 item.Value == layer.LineStyle)
                 return;
 
-            ApplyLayerChange(
-                layer,
-                () => layer.LineStyle = item.Value);
+            TryLayerChange(
+                () => _workspace.SetLayerLineStyle(
+                    layer,
+                    item.Value));
         };
         Grid.SetColumn(style, 3);
         grid.Children.Add(style);
@@ -344,9 +346,10 @@ internal sealed class CadLayerPanelController : IDisposable
         visible.IsCheckedChanged += (_, _) =>
         {
             if (_refreshing) return;
-            _workspace.SetLayerVisible(
-                layer,
-                visible.IsChecked == true);
+            TryLayerChange(
+                () => _workspace.SetLayerVisible(
+                    layer,
+                    visible.IsChecked == true));
         };
         Grid.SetColumn(visible, 1);
         grid.Children.Add(visible);
@@ -362,9 +365,10 @@ internal sealed class CadLayerPanelController : IDisposable
         locked.IsCheckedChanged += (_, _) =>
         {
             if (_refreshing) return;
-            _workspace.SetLayerLocked(
-                layer,
-                locked.IsChecked == true);
+            TryLayerChange(
+                () => _workspace.SetLayerLocked(
+                    layer,
+                    locked.IsChecked == true));
         };
         Grid.SetColumn(locked, 5);
         grid.Children.Add(locked);
@@ -396,9 +400,10 @@ internal sealed class CadLayerPanelController : IDisposable
                 next.ToArgb() == layer.Color.ToArgb())
                 return;
 
-            ApplyLayerChange(
-                layer,
-                () => layer.Color = next);
+            TryLayerChange(
+                () => _workspace.SetLayerColor(
+                    layer,
+                    next));
         };
         Grid.SetColumn(color, 2);
         grid.Children.Add(color);
@@ -431,8 +436,9 @@ internal sealed class CadLayerPanelController : IDisposable
         {
             _workspace.AddLayer(name.Trim());
         }
-        catch
+        catch (Exception exception)
         {
+            ShowLayerError(exception);
             Rebuild();
         }
     }
@@ -456,8 +462,9 @@ internal sealed class CadLayerPanelController : IDisposable
                 layer,
                 name.Trim());
         }
-        catch
+        catch (Exception exception)
         {
+            ShowLayerError(exception);
             Rebuild();
         }
     }
@@ -472,37 +479,40 @@ internal sealed class CadLayerPanelController : IDisposable
         {
             _workspace.RemoveLayer(layer);
         }
-        catch
+        catch (Exception exception)
         {
+            ShowLayerError(exception);
             Rebuild();
         }
     }
 
-    private void ApplyLayerChange(
-        CadLayer layer,
-        Action change)
+    private void TryLayerChange(Action change)
     {
-        var before = _workspace.CaptureLayerState(layer);
+        ArgumentNullException.ThrowIfNull(change);
+
         try
         {
             change();
-            _workspace.RecordLayerStateChange(
-                layer,
-                before,
-                "Layer Edit");
         }
-        catch
+        catch (Exception exception)
         {
-            try
-            {
-                layer.RestoreState(before);
-            }
-            catch
-            {
-            }
+            ShowLayerError(exception);
         }
 
         Rebuild();
+    }
+
+    private void ShowLayerError(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+
+        _ = CadMessageDialog.ShowAsync(
+            _owner,
+            CadLanguageManager.Text(
+                "Cad.Text.ErrorTitle",
+                "OCCAD Error"),
+            exception.GetBaseException().Message,
+            kind: CadMessageDialogKind.Error);
     }
 
     private static Button CompactButton(string text)

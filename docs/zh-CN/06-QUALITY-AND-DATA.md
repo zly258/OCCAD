@@ -1,37 +1,26 @@
 # 06 质量与数据
 
 ## 稳定性
+普通非法输入、退化几何、Preview、Grip、Property/Layer、文件解析错误不能让应用退出，也不能留下不一致的 Document、Selection、Preview、Grip、WorkPlane、Drafting、History。能在写入前验证的先验证，提交失败时回滚真实状态。Fatal error 不做伪恢复。
 
-普通非法输入、退化几何、Preview 失败、Grip 失败、Property 失败和文件解析失败，不得让应用退出，也不得留下不一致的 Document、Selection、Preview、Grip、WorkPlane、Drafting 或 History 状态。
+## Preview / Grip
+Preview 是 transient，更新失败保留上一帧有效 Preview。Grip 编辑只改 Duplicate Preview；编辑期间抑制真实 source presentation，Accept 时只写回一次并记录一条 History。
 
-使用局部事务边界。修改前验证有限数值、尺寸、向量、索引、拓扑引用、工作平面交点和 Viewer object 生命周期。OutOfMemoryException、StackOverflowException、AccessViolationException 等不可恢复异常不做伪恢复。
+## Redraw / 性能
+Bridge 已 request redraw 或 display batch 已执行 pending redraw 时，不再额外 Redraw。PointerMove 禁止同步 I/O、整面板 Rebuild、重复 marker、重复 Redraw、无意义 delete/recreate、持续修改持久 Geometry。优先 display batch、Snap/Grip cache、增量 UI refresh。
 
-## Preview 与 Grip
-
-Preview 只维护瞬态状态。某一帧构造失败时保留上一帧有效 Preview。Cancel 和完成后必须清理瞬态显示。Grip 编辑只修改独立 Preview 副本；Accept 对真实实体只提交一次原子修改并记录一条 History；Cancel 恢复原状态。
-
-## 性能
-
-PointerMove 热路径避免整面板刷新、重复构造 marker、重复 redraw、同步 I/O 和无条件 delete/recreate。优先使用局部 presentation update、Snap/Grip 缓存、批处理和增量 Tree/Panel 刷新。
-
-大文件加载按读取、解析、模型、显示分阶段，并在底部状态区域显示进度。Viewer 调用遵守 OCCT 线程所有权。
+## 大数据
+大模型/文件拆分 read、parse、model creation、presentation。进度放底部状态区域，不用阻塞式弹窗。OCCT Viewer 调用遵守所属线程。
 
 ## 本地化
+中英文资源 Key 同步。可见 UI 使用稳定资源键；内部 Id、EntityType、ActionId、ToolId、枚举序列化值、Persistence 字段保持语言无关。
 
-中文和英文同等支持。Menu、Tool、ToolPanel、Property、枚举值、提示、错误、状态、Snap 名称、Grip 结果和文件消息使用稳定资源键。内部 ID、EntityType、Action ID 和序列化字段名保持与语言无关。
+## 数值 / 外观
+Model/History/Persistence 保存完整精度。NaN、Infinity、越界、退化方向、非法拓扑 index 在 Core 边界拒绝。
 
-## 数值与单位
+Entity 保存 Color/LineStyle/LineWidth override 和独立 ByLayer flag；最终有效值由 Document + Layer 解析。ByLayer 不销毁 override。多选不同值显示 `—`。
 
-工程数值保存完整模型精度。UI 可以简洁格式化，但不得对模型状态、History 快照和序列化值做永久舍入。解析时在本地拒绝空值、NaN、Infinity 和越界值。
+## History / 发布验证
+UI 修改要么产生一条完整 History，要么不产生。Undo/Redo 恢复前取消 Active Tool 并清理 stale Selection/Subobject/Preselection/Grip。
 
-单位属于显示/解析转换，Entity 存储统一内部值。
-
-## 外观与数据
-
-Color、LineWidth、LineStyle 分别保留 ByLayer 开关和 override 值。开启 ByLayer 不需要销毁已有 override。
-
-序列化使用稳定标识、完整数值精度和与语言无关的枚举/类型值。确有必要的旧文件兼容只能停留在 serializer 边界，不进入 public Entity 或 UI 契约。
-
-## 发布质量
-
-稳定版要求 Release 编译干净，并人工验证代表性的二维绘制、三维建模、编辑、Snap、Grip、Property/Layer、Undo/Redo、Save/Open、语言切换、DPI 缩放和非法输入恢复。该要求属于发布实践，不再维护会快速过期的阶段验收清单。
+发布前人工验证代表性二维/三维、Modify、Snap、Tracking、Grip、Property、Layer、Undo/Redo、Save/Open、语言切换、DPI、Preview cleanup、框选矩形 cleanup、非法输入恢复。仓库不维护庞大临时 smoke/check 脚本。

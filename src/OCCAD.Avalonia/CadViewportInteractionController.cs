@@ -766,8 +766,8 @@ internal sealed class CadViewportInteractionController : IDisposable
 
         try
         {
+            // The Bridge overlay hide call requests its own redraw.
             engine.HideSelectionRectangle();
-            engine.Redraw();
         }
         catch (Exception exception)
             when (IsRecoverableSelectionFailure(exception))

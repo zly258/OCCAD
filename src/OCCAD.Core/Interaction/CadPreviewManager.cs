@@ -51,21 +51,18 @@ public sealed class CadPreviewManager
 
     public void Clear()
     {
-        var redraw = false;
         if (_engine is { IsInitialized: true } engine && _shapes.Count > 0)
         {
+            // Delete requests a redraw and the outer display batch performs it
+            // once on dispose. Do not issue a second explicit Redraw().
             using (engine.BeginDisplayBatch())
             {
                 DeleteObjects(engine, _shapes);
             }
-            redraw = true;
         }
 
         _shapes.Clear();
         _entities.Clear();
-
-        if (redraw && _engine is { IsInitialized: true } redrawEngine)
-            redrawEngine.Redraw();
     }
 
     private void Rebuild(IReadOnlyList<CadEntity> entities)

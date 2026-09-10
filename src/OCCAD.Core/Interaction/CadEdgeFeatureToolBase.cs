@@ -128,11 +128,11 @@ public abstract class CadEdgeFeatureToolBase : CadTool
             return false;
 
         var source = _source!;
-        Context.Preview.Clear();
-        Context.Workspace.ReplaceEntities(
-            [source],
-            [feature],
-            DisplayName);
+        CommitReplacementPreview(
+            () => Context.Workspace.ReplaceEntities(
+                [source],
+                [feature],
+                DisplayName));
         Context.Workspace.Tools.CompleteCurrent();
         return true;
     }
@@ -140,9 +140,11 @@ public abstract class CadEdgeFeatureToolBase : CadTool
     private void RefreshPreview()
     {
         if (TryCreate(out var feature))
-            Context.Preview.Show(feature);
+            ShowReplacementPreview(
+                [_source!],
+                [feature]);
         else
-            Context.Preview.Clear();
+            ClearReplacementPreview();
     }
 
     private bool TryCreate(out CadEntity feature)

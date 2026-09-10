@@ -1,37 +1,27 @@
 # 06 Quality and Data
 
 ## Stability
-
-Recoverable invalid input, degenerate geometry, preview failure, grip failure, property failure, and file parse failure must not terminate the application or leave Document, Selection, Preview, Grip, WorkPlane, Drafting, or History inconsistent.
-
-Use local transaction boundaries. Validate finite values, dimensions, vectors, indices, topology references, work-plane intersections, and viewer-object lifetime before mutation. Do not swallow fatal runtime failures such as OutOfMemoryException, StackOverflowException, or AccessViolationException.
+Recoverable invalid input, degenerate geometry, Preview/Grip/Property/Layer/file failures must not terminate the app or leave inconsistent Document, Selection, Preview, Grip, WorkPlane, Drafting, or History state. Validate before mutation when possible and roll back real-state mutations on failure. Fatal exceptions are not treated as safely recoverable.
 
 ## Preview and Grip
+Preview is transient; failed updates keep the last valid preview. Grip editing modifies a duplicate preview only. The real source presentation is suppressed during edit so source and preview are not drawn together. Accept applies once and records one History entry.
 
-Preview builds transient state only. A failed frame keeps the last valid preview. Cancel and completion remove transient presentation. Grip edit works on a duplicate preview; Accept applies one atomic change to the real entity and records one history item; Cancel restores the original state.
+## Redraw and performance
+Do not add explicit redraws after Bridge operations that already request redraw or after display-batch disposal already performs pending redraw. PointerMove avoids synchronous I/O, panel rebuilds, repeated marker creation, duplicate redraw, unnecessary delete/recreate, and persistent geometry mutation. Prefer display batches, cached Snap/Grip data, and incremental UI refresh.
 
-## Performance
-
-PointerMove must avoid whole-panel refreshes, repeated marker construction, duplicate redraws, synchronous I/O, and unconditional delete/recreate. Prefer local presentation updates, cached snap/grip data, batches, and incremental tree/panel refreshes.
-
-Large loads should separate read/parse/model/presentation stages and expose bottom-status progress. Viewer calls must respect OCCT thread ownership.
+## Large data
+Large file/model operations separate read, parse, model creation, and presentation stages. Progress belongs in the lower application status area. OCCT viewer calls obey their owning UI/viewer thread contract.
 
 ## Localization
+English and Chinese resource maps remain key-synchronized. Visible UI text uses stable localization keys. Internal IDs, EntityType, Action IDs, Tool IDs, enum serialization values, and persistence field names remain language-neutral.
 
-Chinese and English are first-class. Visible Menu, Tool, ToolPanel, Property, enum values, prompts, errors, status, snap names, grip results, and file messages use stable resource keys. Internal IDs, EntityType, Action IDs, and serialization field names stay language-independent.
+## Numeric and appearance data
+Model/history/persistence keep full numeric precision. Reject NaN, Infinity, invalid ranges, degenerate directions, and invalid topology indices at Core boundaries.
 
-## Numeric and unit semantics
+Entity stores Color/LineStyle/LineWidth overrides plus independent ByLayer flags. Effective values come from Document + Layer. ByLayer never destroys the stored override. Multi-selection mixed values display as `—`.
 
-Engineering values keep full model precision. UI formatting may show concise decimals but must not round stored state, history snapshots, or serialized values. Parsing rejects empty, NaN, Infinity, and out-of-range values locally.
+## History
+UI-facing mutations create one coherent History record or none. Property and Layer UI use Core mutation paths. Undo/Redo cancels the active Tool and clears stale Selection/Subobject/Preselection/Grip references before restoring history state.
 
-Units belong to display/parse conversion; entities store canonical values.
-
-## Appearance and data
-
-Color, line width, and line style keep independent ByLayer flags and override values. Turning ByLayer on does not destroy the stored override.
-
-Serialization writes stable identifiers, precise numeric state, and language-independent enum/type values. Compatibility handling, when unavoidable for persisted files, stays at serializer boundaries and does not leak into public entity or UI contracts.
-
-## Release quality
-
-A stable release requires a clean Release build and manual verification of representative 2D drawing, 3D modeling, editing, snapping, grips, property/layer edits, undo/redo, save/open, language switching, DPI scaling, and invalid-input recovery. This is a release practice, not a permanently versioned progress checklist.
+## Release validation
+Manually validate representative 2D/3D drawing, modify operations, Snap, Tracking, Grip, Property, Layer, Undo/Redo, Save/Open, language switching, DPI scaling, Preview cleanup, selection rectangle cleanup, and invalid-input recovery. Do not replace this with large temporary smoke/check script frameworks.

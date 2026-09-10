@@ -208,7 +208,11 @@
     <sys:String x:Key="Cad.Category.Display">显示</sys:String>
     <sys:String x:Key="Cad.Category.General">常规</sys:String>
     <sys:String x:Key="Cad.Category.Geometry">几何</sys:String>
+    <sys:String x:Key="Cad.Category.Transform">变换</sys:String>
+    <sys:String x:Key="Cad.Category.Feature">特征</sys:String>
+    <sys:String x:Key="Cad.Category.Annotation">标注</sys:String>
     <sys:String x:Key="Cad.Category.Measurement">测量</sys:String>
+    <sys:String x:Key="Cad.Category.Source">来源</sys:String>
     <sys:String x:Key="Cad.Category.State">状态</sys:String>
     <sys:String x:Key="Cad.History.LayerColor">图层颜色</sys:String>
     <sys:String x:Key="Cad.History.LayerEdit">图层属性</sys:String>

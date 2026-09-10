@@ -360,8 +360,16 @@ public abstract class CadTool
         commit();
 
         _replacementPreviewSources.Clear();
-        Context.Preview.Clear();
-        RestoreReplacementPreviewSources(sources);
+        try
+        {
+            Context.Preview.Clear();
+        }
+        finally
+        {
+            // A successful model/history commit must never leave its source
+            // presentation transparent even if transient cleanup fails.
+            RestoreReplacementPreviewSources(sources);
+        }
     }
 
     private bool MatchesReplacementPreviewSources(

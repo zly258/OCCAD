@@ -1,177 +1,60 @@
-# 05 Entity and Tool Development Contract
+# 05 Entity and Tool Contract
 
-## 1. Why this contract exists
+## Entity
 
-OCCTBIM-Source gives Entity a complete role—shape, visual state, properties, grips, snaps, edit copies, and serialization—while Tool owns staged input and preview. OCCAD fixes these responsibilities as a stable extension contract so each new entity does not reinvent CAD interaction.
+Each Entity provides stable type/identity, valid geometry, presentation construction, Duplicate/Restore, transforms, Snap/Grip semantics, change notifications, and persistence state.
 
-## 2. Minimum Entity contract
+Geometry setters validate finite values, range/positive constraints, directions, and indices before mutation.
 
-Every Entity provides:
+## Property exposure
 
-- stable type Id;
-- valid geometric fields;
-- `BuildShape(OcctEngine)`;
-- `Duplicate()`;
-- `RestoreGeometry(snapshot)`;
-- `Translate/Rotate/Scale`;
-- `GetSnapPoints()`;
-- `GetGripPoints()`;
-- `MoveGrip(index, targetPoint)`;
-- change events;
-- serializable business state.
+Browsable properties must have ordinary CAD meaning: Type/Name/Layer, meaningful geometry, useful measurements, and effective appearance controls.
 
-Geometry setters validate finite/positive/range constraints before mutating fields. NaN, Infinity, negative radius, and zero direction vectors must not be stored and deferred to BuildShape for failure.
+Hide viewer handles, object IDs, internal selectable/display/material state, feature plumbing, raw serialized BREP size, and similar implementation details.
 
-## 3. File organization
+Color/LineStyle/LineWidth use integrated ByLayer editors. The bool flags remain Core state but are hidden as standalone rows.
 
-Prefer one entity and one principal tool per file:
+## Snap / Grip
 
-```text
-Entities/TwoD/
-  CadLineEntity.cs
-  CadCircleEntity.cs
-  CadArcEntity.cs
-  CadRectangleEntity.cs
-  CadPolylineEntity.cs
-Entities/ThreeD/
-  CadBoxEntity.cs
-  CadCylinderEntity.cs
-Interaction/
-  LineTool.cs
-  CircleTool.cs
-  ArcTool.cs
-  RectangleTool.cs
-  BoxTool.cs
-  CylinderTool.cs
-```
+Entity defines snap and grip semantics. SnapManager only selects candidates. GripManager only displays/hit-tests grips.
 
-Shared geometry algorithms belong in explicit helpers/services, not copied across Tools.
+`MoveGrip` accepts a resolved world point and never processes raw pointer/Snap/Ortho UI input.
 
-## 4. Duplicate and restore
+Grip editing uses a duplicate preview throughout pointer movement.
 
-`Duplicate()` copies complete business state into a new object instance. Identity semantics must be explicit: edit snapshots are not distinguished by identity, while a true Copy operation creates a new Entity Id.
+## Tool
 
-`RestoreGeometry()` restores definition geometry. `RestoreState()` restores full business state including metadata, appearance, and placement. Rigid Move/Rotate use `CadPlacement`; geometry algorithms explicitly convert between local and world space rather than treating raw fields as world coordinates.
+Every Tool defines stable ID/name, State/Stage, InputKind, Prompt, PrecisionInputs, InteractionPolicy, SnapResolvePolicy, precision reference, WorkPlane behavior, parameters, Preview, Finish/Cancel/StepBack.
 
-## 5. Snap contract
+UI code does not interpret raw Stage integers to create parallel business behavior.
 
-Entity defines semantic points/curves. Examples:
+## Preview
 
-- Line: endpoints, midpoint;
-- Circle: center, quadrants, nearest/tangent curve;
-- Arc: endpoints, center, applicable midpoint/quadrants;
-- Polyline: vertices and segment midpoints;
-- 3D primitives: semantically useful points as required.
+Preview uses the same Entity geometry model as the final result where practical. Failed updates retain the last valid preview.
 
-SnapManager performs candidate collection, screen-distance comparison, priority, and policy filtering only.
-
-## 6. Grip contract
-
-Every Grip describes:
-
-- stable `Index`;
-- `Kind`: Control/Vertex/Midpoint/Center/Radius/Axis/Height;
-- `Position`;
-- `ConstraintOrigin`;
-- `WorkPlane`;
-- `PrecisionInputs`.
-
-`MoveGrip` receives the already-resolved world-space target. It does not implement mouse handling, Snap, or Ortho itself.
-
-Examples:
-
-### Line
-
-Start = Vertex; midpoint = whole-line move; end = Vertex.
-
-### Circle
-
-Center = move center; Radius grip = change radius in the defined work plane.
-
-### Box
-
-Corner/base grips control footprint; Height grip follows the height axis; optional move/center grip moves the whole primitive.
-
-The real Entity is never modified continuously during grip drag.
-
-## 7. Minimum Tool contract
-
-Every Tool declares:
-
-- stable Id and localized display name;
-- `CadToolState`;
-- `CadToolStep` with explicit `InputKind`, precision inputs and prompt;
-- whether the current step requires a pointer;
-- pointer behavior and StepBack behavior;
-- `InteractionPolicy` and `SnapResolvePolicy`;
-- precision reference point and work-plane policy;
-- parameter descriptors for ToolPanel;
-- preview construction/update;
-- commit/finish/cancel cleanup.
-
-Enter, right-click, and UI Accept/Finish use `CadToolManager.SubmitCurrent()`; UI code does not interpret raw stage integers.
-
-## 8. Stage values versus stable Tool parameters
-
-### Stage/dynamic values
-
-Pointer position, current length, angle, displacement vector, and similar values produced by pointer + precision. These appear in ToolBar/HUD.
-
-### Stable Tool parameters
-
-Radius, Width, Height, Sides, Mode, etc. These appear in the floating Tool Panel and can update Preview immediately.
-
-If one value can be established by either pointer or panel, both paths update the same Tool field rather than maintaining duplicate states.
-
-## 9. Preview contract
-
-Preview uses the same Entity type and parameter model as the final result. Do not maintain simplified preview geometry that produces a visible jump at commit.
-
-Tool supplies preview business entities; PreviewManager owns presentation.
-
-On preview failure:
-
-- retain the last valid preview;
-- keep the Tool active;
-- allow further pointer/parameter input;
-- report a meaningful status message.
-
-## 10. Commit contract
+## Normal commit
 
 ```text
-Validate current state
-→ create/finalize Entity
-→ apply current layer/appearance semantics
-→ Document add/update in a change set
-→ record one History entry
-→ clear transient presentation
+validate
+→ finalize Entity
+→ apply layer/appearance semantics
+→ Document mutation / History
+→ clear Preview
 → complete Tool
 ```
 
-Do not delete valid preview/original state before final geometry creation succeeds.
+Do not clear Preview before a mutation that can fail. `CadToolContext.AddEntity` performs only the model add.
 
-## 11. Cancel and StepBack
+## Replacement commit
 
-Cancel clears every transient state created by the Tool and restores temporary WorkPlane/locks. It never deletes pre-existing user entities.
+For Trim/Extend/Fillet/Chamfer-style replacement, keep valid replacement preview and source suppression during mutation. After success, clear transient state and restore source presentation safely. On mutation failure, keep the Tool usable.
 
-StepBack returns one stage and is not equivalent to canceling the Tool. Multi-stage Tools such as Polyline must support staged rollback.
+## Property transaction
 
-## 12. Property contract
+`Capture → Validate → Apply → Presentation/Dependency Refresh → History`.
 
-Core properties expose stable business meaning. UI DisplayName/Category/Description comes from localization descriptors rather than Chinese strings embedded in Core attributes.
+Explicit Color/LineStyle/LineWidth edits automatically set the corresponding ByLayer flag false. Toggling ByLayer is itself history-recorded.
 
-Double values display 3 decimals but setters and persistence use full double precision. Color uses ColorDialog. Enums display localized labels while storing the original enum value.
+## Completion
 
-## 13. Validation and errors
-
-All Entity/Tool implementations follow the same rules:
-
-- validate input before state mutation;
-- recoverable failure affects only the current operation;
-- capture before mutating real objects;
-- record History only after success;
-- catch only when a coherent rollback/recovery is performed.
-
-## 14. Completion checklist for a new Entity/Tool
-
-A feature is complete only when it covers Entity geometry/properties, registration, Tool stages/prompts, Preview, Snap, Grip, Precision, Property editor, Layer/ByLayer, Undo/Redo, serialization, Chinese/English localization, degenerate input, cancel/step-back/right-click finish, and navigation while the Tool is active.
+A new Entity/Tool is complete only when geometry, registration, stages, prompt, Preview, Snap, Grip, Precision, Property, Layer/ByLayer, Undo/Redo, persistence, localization, invalid-input handling, Cancel/StepBack/right-click behavior, and navigation coexist correctly.

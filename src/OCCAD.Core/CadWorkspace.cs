@@ -1,4 +1,5 @@
-﻿using OcctNet;
+﻿using System.Drawing;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -302,6 +303,28 @@ public sealed class CadWorkspace : IDisposable
             layer,
             "Layer Lock",
             () => layer.Locked = locked);
+
+    public void SetLayerColor(CadLayer layer, Color color) =>
+        ApplyLayerChange(
+            layer,
+            "Layer Color",
+            () => layer.Color = color);
+
+    public void SetLayerLineStyle(
+        CadLayer layer,
+        OcctLineStyle lineStyle) =>
+        ApplyLayerChange(
+            layer,
+            "Layer Line Style",
+            () => layer.LineStyle = lineStyle);
+
+    public void SetLayerLineWidth(
+        CadLayer layer,
+        double lineWidth) =>
+        ApplyLayerChange(
+            layer,
+            "Layer Line Width",
+            () => layer.LineWidth = lineWidth);
 
     public void HideEntities(IEnumerable<CadEntity> entities)
     {
@@ -854,19 +877,29 @@ public sealed class CadWorkspace : IDisposable
         ArgumentNullException.ThrowIfNull(layer);
         ArgumentNullException.ThrowIfNull(action);
         Layers.GetRequired(layer.Name);
-        var before = layer.CaptureState();
-        action();
-        var after = layer.CaptureState();
-        if (before == after) return;
 
-        History.RecordApplied(
-            new CadLayerStateHistoryEntry(
-                layer,
-                before,
-                after,
-                name));
-        Selection.RefreshValidity();
-        Subobjects.RefreshValidity();
+        var before = layer.CaptureState();
+        try
+        {
+            action();
+            var after = layer.CaptureState();
+            if (before == after)
+                return;
+
+            History.RecordApplied(
+                new CadLayerStateHistoryEntry(
+                    layer,
+                    before,
+                    after,
+                    name));
+            Selection.RefreshValidity();
+            Subobjects.RefreshValidity();
+        }
+        catch
+        {
+            layer.RestoreState(before);
+            throw;
+        }
     }
 
     private void ApplyStateChange(

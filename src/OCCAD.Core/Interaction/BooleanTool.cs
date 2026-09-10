@@ -109,11 +109,11 @@ public sealed class BooleanTool : CadSelectionTransformToolBase
         if (!TryCreate(out var entity))
             return false;
 
-        Context.Preview.Clear();
-        Context.Workspace.ReplaceEntities(
-            Entities,
-            [entity],
-            $"Boolean {_operation}");
+        CommitReplacementPreview(
+            () => Context.Workspace.ReplaceEntities(
+                Entities,
+                [entity],
+                $"Boolean {_operation}"));
         Context.Workspace.Tools.CompleteCurrent();
         return true;
     }
@@ -121,9 +121,11 @@ public sealed class BooleanTool : CadSelectionTransformToolBase
     private void RefreshPreview()
     {
         if (TryCreate(out var entity))
-            Context.Preview.Show(entity);
+            ShowReplacementPreview(
+                Entities,
+                [entity]);
         else
-            Context.Preview.Clear();
+            ClearReplacementPreview();
     }
 
     private bool TryCreate(

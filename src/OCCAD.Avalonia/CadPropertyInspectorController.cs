@@ -616,7 +616,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
         if (semantic is CadValueSemantic.Enum or CadValueSemantic.Choice)
             return CreateEnumEditor(slot, value, isMixed);
         if (semantic == CadValueSemantic.Color)
-            return CreateColorEditor(slot, value);
+            return CreateColorEditor(
+                slot,
+                value,
+                isMixed: isMixed);
         if (CanEditAsText(descriptor))
             return CreateTextEditor(slot, value, isMixed);
 
@@ -642,6 +645,41 @@ internal sealed class CadPropertyInspectorController : IDisposable
         var first = flags.FirstOrDefault();
         var mixedByLayer =
             flags.Any(flag => flag != first);
+
+        var editorValue = value;
+        var editorMixed = isMixed || mixedByLayer;
+        if (!mixedByLayer && first == true)
+        {
+            var resolved = _entities
+                .Select(entity =>
+                {
+                    var appearance =
+                        _workspace.Document
+                            .ResolveAppearance(entity);
+                    return slot.Descriptor.Name switch
+                    {
+                        nameof(CadEntity.Color) =>
+                            (object)appearance.Color,
+                        nameof(CadEntity.LineStyle) =>
+                            appearance.LineStyle,
+                        nameof(CadEntity.LineWidth) =>
+                            appearance.LineWidth,
+                        _ => value
+                    };
+                })
+                .ToArray();
+
+            editorValue =
+                resolved.FirstOrDefault();
+            editorMixed =
+                resolved.Skip(1)
+                    .Any(item =>
+                        !Equals(
+                            editorValue,
+                            item));
+            if (editorMixed)
+                editorValue = null;
+        }
 
         var byLayer = new CheckBox
         {
@@ -677,24 +715,25 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 CadValueSemantic.Color =>
                     CreateColorEditor(
                         slot,
-                        value,
-                        showByLayerText: false),
+                        editorValue,
+                        showByLayerText: false,
+                        isMixed: editorMixed),
                 CadValueSemantic.Enum or
                 CadValueSemantic.Choice =>
                     CreateEnumEditor(
                         slot,
-                        value,
-                        isMixed),
+                        editorValue,
+                        editorMixed),
                 _ when CanEditAsText(slot.Descriptor) =>
                     CreateTextEditor(
                         slot,
-                        value,
-                        isMixed),
+                        editorValue,
+                        editorMixed),
                 _ =>
                     ReadOnlyValue(
                         slot.Descriptor,
-                        value,
-                        isMixed)
+                        editorValue,
+                        editorMixed)
             };
 
         var grid = new Grid
@@ -789,7 +828,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
     private Control CreateColorEditor(
         PropertySlot slot,
         object? value,
-        bool showByLayerText = true)
+        bool showByLayerText = true,
+        bool isMixed = false)
     {
         var entityTargets = slot.Targets
             .OfType<CadEntity>()
@@ -810,11 +850,18 @@ internal sealed class CadPropertyInspectorController : IDisposable
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Left,
             Padding = new Thickness(4, 0),
-            Background = new SolidColorBrush(ToMediaColor(drawing)),
-            Foreground = ColorTextBrush(drawing),
-            Content = byLayer && showByLayerText
-                ? $"{CadLanguageManager.Text("Cad.Text.ByLayer", "ByLayer")} · #{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
-                : $"#{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
+            Background = isMixed
+                ? CadTheme.PanelAlt
+                : new SolidColorBrush(
+                    ToMediaColor(drawing)),
+            Foreground = isMixed
+                ? CadTheme.Muted
+                : ColorTextBrush(drawing),
+            Content = isMixed
+                ? "—"
+                : byLayer && showByLayerText
+                    ? $"{CadLanguageManager.Text("Cad.Text.ByLayer", "ByLayer")} · #{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
+                    : $"#{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
         };
         button.Classes.Add("cad-compact");
         ToolTip.SetTip(

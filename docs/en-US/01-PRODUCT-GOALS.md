@@ -2,42 +2,41 @@
 
 ## Positioning
 
-OCCAD is not an OCCT API demo and does not expose kernel calls directly as UI. It is a lightweight but usable and architecturally complete desktop CAD framework/application base covering stable 2D/3D drawing, editing, selection, snapping, grips, properties, layers, document lifecycle, undo/redo, and viewport interaction.
+OCCAD is a lightweight but architecturally complete desktop CAD framework/application base built on OCCT through OcctCSharpBridge. It is not an OCCT API demo.
 
-The short-term goal is not mature-CAD entity breadth. The core framework must be complete enough that adding Entities, Tools, file formats, or domain modules does not redesign MainWindow or the interaction foundation.
+The goal is a stable CAD foundation where adding an Entity, Tool, file format, or domain module does not require redesigning MainWindow, Selection, Preview, History, Property, Snap, or Grip infrastructure.
 
-## Ideas retained from OCCTBIM-Source
+## Responsibility model
 
-Retain the responsibility boundaries around Document/Model, Entity, Tool, Action, Viewport, Dock, PropertyEditor, Grip, and Snap—not Qt widgets, singleton choices, or exact class names.
+The project keeps the useful boundaries demonstrated by `OCCTBIM-Source`:
 
-Entity is a business object with identity, layer, appearance, geometry, properties, Grip/Snap semantics, copy/restore, and persistence behavior. Tool is a staged Activate → input → Preview → Commit/Cancel/StepBack state machine. Action is the shared command entry for Menu, ToolBar, and shortcuts. Document uniquely owns persistent entity state. Viewport maps input and renders without owning CAD business rules. Grip/Snap semantics come from Entity. Property/Dock observe current Document/Selection rather than maintaining a second model.
+- Document owns persistent entities.
+- Entity owns valid geometry, appearance data, Snap/Grip semantics, copy/restore, and persistence state.
+- Tool owns staged interaction, prompt, input kind, Preview, Finish/Cancel/StepBack.
+- Action is the stable command entry used by menu, shortcuts, and command line.
+- Viewport renders/maps input without owning CAD business rules.
+- Property and Layer mutate Core through explicit transaction/history APIs.
+- Snap chooses candidates; Entity supplies semantic snap geometry.
+- GripManager displays/hit-tests grips; Entity defines grip geometry behavior.
 
-## First usable release
+The reference project is behavioral guidance only; OCCAD does not copy Qt widgets or singleton coupling.
 
-Document: New/Open/Save/SaveAs, modified state, Undo/Redo, rollback-safe failures.
+## Functional baseline
 
-2D: Point, Line, Polyline, Rectangle, Polygon, RegularPolygon, Circle, Arc, Ellipse, Spline through one Tool/Preview/Snap/Precision/Grip/Property/History/Serialization contract.
+The framework maintains one coherent contract across 2D drawing, 3D primitives/features, modify operations, object snap, work planes, tracking, precision input, selection, grips, layers, properties, Undo/Redo, persistence, annotation, and measurement.
 
-3D: Box, Cylinder, Cone, Frustum, Sphere, Torus. Cone and Frustum remain separate Entity/Tool types and are never merged through TopRadius=0 semantics.
+Breadth is secondary to correctness. A command is complete only when Preview, Commit, Cancel, StepBack, selection state, property state, Undo/Redo, localization, and persistence agree.
 
-Editing: complete Delete, Move, Copy, Grip Edit first; extend Rotate, Scale, Mirror through the same framework.
+## UI goal
 
-Selection: Point Pick, Replace/Add/Remove/Toggle, Window/Crossing, Preselection, and consistent Locked/Hidden/Selectable rules.
+The UI target is a compact industrial CAD shell closer to AutoCAD/Inventor density than consumer Fluent layouts: neutral gray tool surfaces, dark viewport, consistent typography/control heights, low/no decorative corner radius, shallow menus, left Model panel, resizable right Layer/Property panels, Command Line above StatusBar, and a non-modal ToolPanel.
 
-Precision: WorkPlane, Snap, ORTHO, POLAR, Axis/Angle/Length locks share one ResolvePoint pipeline.
+## Property goal
 
-Properties/Layers: both ByLayer and custom Color/LineWidth/LineStyle; direct ColorDialog; three-decimal UI display with full precision storage.
+Normal properties expose business-meaningful CAD values only. Viewer handles, IDs, internal selectable state, material/display-mode plumbing, and serialization byte counts do not belong in the normal Property panel.
 
-## UI target
+Color, LineStyle, and LineWidth each have integrated ByLayer state. Editing an explicit value exits that ByLayer mode; re-enabling ByLayer preserves the stored override.
 
-The single shell is native Avalonia compact `Menu + persistent ToolBar + Viewport + Docks + StatusBar + non-modal ToolPanel`. Ribbon and third-party theme shells are not supported targets. Common commands stay shallow; ToolBar owns common stage input; stable Radius/Width/Height-style values belong to ToolPanel.
+## Quality goal
 
-## Non-goals
-
-The current completion gate does not require every DWG/DXF entity, a full parametric solver, BIM discipline systems, broad advanced surface modeling, a plugin marketplace, or large smoke/check script frameworks.
-
-## Quality goals
-
-Recoverable invalid input, degenerate geometry, Grip/Preview/Property/file errors do not terminate the app and roll back safely. Appearance, point resolution, selection, history, preview, and property mutation each have one authoritative path. New basic entities add focused files and registration rather than large MainWindow switches. PointerMove avoids unnecessary delete/recreate; bulk display is batched; large loads are staged with progress. Chinese and English fully cover visible UI while internal IDs remain stable.
-
-A feature is complete only when entry points, Tool lifecycle, preview/final consistency, normal/error exits, Undo/Redo, UI state, localization, persistence, and extensibility all agree.
+Recoverable invalid geometry, Preview, Grip, Property/Layer, and file failures do not terminate the app or leave inconsistent transient state. A feature is complete only when the whole interaction contract is coherent, not merely when an OCCT shape can be created.

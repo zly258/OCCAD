@@ -1,40 +1,70 @@
 # 02 UI Specification
 
-## Direction
+## Visual direction
 
-OCCAD uses a native Avalonia 12 compact CAD desktop shell:
+OCCAD uses a compact industrial CAD shell:
 
 ```text
-Menu: File Edit Draw Modify Model Annotation View Panels Settings
-ToolBar: Work Plane | Current Layer | Snap | Ortho | Polar | Finish | Cancel
-Model Dock | Viewport | Layer / Property Tabs
+Menu
+Compact global toolbar
+┌──────────────┬──────────────────────────────┬─────────────────────┐
+│ Model panel  │          Viewport            │ Layer panel         │
+│              │                              │ splitter            │
+│              │                              │ Property panel      │
+└──────────────┴──────────────────────────────┴─────────────────────┘
 Command Line
-StatusBar: Prompt | Selection | History | Snap | Precision | Work Plane | Coordinate
-+ non-modal ToolPanel
+StatusBar
++ non-modal ToolPanel over the viewport
 ```
 
-The viewport remains the dominant area. The UI uses Fluent Compact density plus a restrained industrial palette; no Ribbon, icon-heavy command surface, or third-party shell/theme framework is part of the architecture.
+The Viewport remains dominant.
 
-## Menu
+## Theme contract
 
-Menus invoke registered Action IDs only. Real command families such as Circle, Arc, Ellipse, Boolean and Array may use one additional submenu; unregistered actions are not presented as usable commands. Object Snap settings expose only modes with completed runtime support.
+`CadTheme` is the single visual-metric source. Major controls do not invent local typography, control height, radius, or panel width.
 
-## ToolBar and ToolPanel
+Baseline: 11 px main UI font, 10/10.5 px secondary text, 22 px compact controls, ~23–24 px headers, restrained light-gray surfaces, dark viewport, blue accent only for active/current state, low/no corner radius, thin separators, and a Segoe UI / Microsoft YaHei UI / CJK fallback font stack.
 
-The toolbar contains only global/current-stage state. Entity/tool-specific parameters live in the single native Avalonia `CadToolPanel`. Its close button hides the panel without canceling the Tool. A new Tool opens its panel again. Parameter edits drive Preview immediately; Finish/Cancel use the Tool lifecycle.
+## Menu / toolbar / ToolPanel
 
-## Docks
+Menus invoke registered Action IDs. Use a submenu only for a real command family.
 
-Model is left. Layer and Property share a compact tabbed right dock instead of two permanently stacked panels. Both docks are views over Workspace state and can be hidden without changing business state.
+The persistent toolbar contains global/current drafting state. Stable Tool-specific Radius/Width/Height/etc. values belong in ToolPanel. ToolPanel shows parameters, precision, work-plane state, Accept/Finish/Cancel; it does not duplicate the full prompt.
 
-Layer editing provides current layer, color, visible, locked, line width and line style using native Avalonia controls. Property editing consumes Core `CadPropertyDescriptor`/`CadValueDescriptor` metadata, supports single/multi-selection, common properties, layer/enum/bool/color editors, concise numeric display and transaction/history rollback. WinForms PropertyGrid is not used.
+## Model / Layer / Property
 
-## Viewport / HUD / Cursor
+Model is left. Layer and Property are independent resizable panels stacked on the right.
 
-`OcctAvaloniaViewport` is the only OCCT host. Drawing uses the custom hollow cross cursor; middle navigation uses the navigation cursor; normal/selection stages use the normal pointer. Snap aperture and dynamic HUD account for Avalonia render scaling so 125%/150% DPI remains aligned with native viewport input.
+Layer UI calls `CadWorkspace` for visibility, lock, color, style, and width; rollback/history stay in Core.
 
-S/F/T change only the work plane. Right click is the CAD secondary action. F3/F8/F10 toggle Snap/Ortho/Polar. Tab cycles snap candidates. ViewCube is hidden; the lower-left trihedron remains.
+Property uses Core descriptors and supports common-property multi-selection.
 
-## Localization
+Appearance rows are compact:
 
-All durable UI text is resolved through the embedded English/Chinese resource maps. Tool prompts, command results, action labels, history names, layer/property labels and panel labels refresh on language change.
+```text
+Color      [ByLayer] [value]
+LineStyle  [ByLayer] [value]
+LineWidth  [ByLayer] [value]
+Transparency
+Visible
+```
+
+ByLayer booleans remain Core state but are not separate rows.
+
+## Prompt ownership
+
+- Command Line: the only full current Tool prompt + typed command input.
+- ToolPanel: parameters/precision/work-plane/Accept/Finish/Cancel.
+- StatusBar: application/tool status, selection, history, snap, precision, work plane, coordinates.
+
+StatusBar may show Ready, active Tool name, errors, or blocked operations, but not the full next-step prompt.
+
+## Viewport / cursor / overlays
+
+`OcctAvaloniaViewport` is the only OCCT host. Drawing uses the hollow cross cursor. Snap aperture and dynamic HUD remain screen-size stable. ViewCube is hidden; the lower-left triedron remains.
+
+Do not issue duplicate explicit redraws after Bridge operations that already request redraw.
+
+## Localization / DPI
+
+All durable UI strings use synchronized English/Chinese resources. Render scaling and viewport input coordinates must remain aligned at common Windows scaling values such as 125% and 150%.

@@ -1,63 +1,25 @@
 # 03 交互规范
 
-## 1. 唯一交互链
+## 唯一交互链
+鼠标、键盘、Command Line、Precision、Snap、Tracking、Grip 全部进入 Workspace 与 Active Tool。MainWindow 不直接修改 Entity 几何。
 
-所有鼠标、键盘、精确输入、Command Line、Snap、Tracking、Grip 都进入当前 Workspace/Tool 交互上下文。MainWindow 不直接修改 Entity 几何。
+## Tool 生命周期
+`Idle → Activate → Drawing/WaitForSelect → Preview → Commit Stage → Next/Complete`。Esc=Cancel；Backspace=StepBack；Enter/Space 按统一 ToolManager 规则接受当前有效非 Point Step 或 Finish；右键有意义时 Finish，否则 Cancel。Point Step 不复用 stale/off-viewport 坐标。
 
-```text
-Menu / Shortcut / Command Line
-              ↓
-       CadActionManager
-              ↓
-        Action / Tool
+## 点解析
+`Screen → view ray / active WorkPlane → Object Snap → Tracking → axis/angle/length constraint → final world point`。Tool 不重复 XY 投影、Polar 和锁定优先级。
 
-Active Tool + Command Line
-              ↓
- Finish / Cancel / StepBack / Precision / Parameter / Point
-              ↓
-        Tool state machine
-```
+## Snap / Selection
+Entity 提供语义 Snap；SnapManager 负责候选排名。Selection、Preselection、SubobjectSelection 独立。左→右为 Window，右→左为 Crossing。Hidden/Locked/Non-selectable 不进入 Formal Selection。
 
-## 2. Tool 生命周期
+## Grip
+Grip 编辑：capture original → duplicate preview → 抑制真实 presentation → 每帧恢复 original 到 preview → MoveGrip(preview) → Preview.Update → Accept → 一次写回真实 Entity → 一条 History → clear preview → restore real presentation。PointerMove 不修改持久 Entity。
 
-统一状态：`Idle → Activate → Drawing/WaitForSelection → Preview Updated → Commit Stage → next/complete`。Esc/Cancel 清理 Preview、Tracking、Snap 临时状态和 Tool 临时工作平面。右键优先提交当前可接受的非 Point Step，其次 Finish，可提交和可结束都不满足时才 Cancel；Enter 与 ToolPanel 的 Accept/Finish 使用同一套 Core 提交规则。Backspace/StepBack 回退一个阶段，不等价于 Cancel。
+## Preview / Commit
+普通 Commit：Validate → Document/History mutation → Clear Preview → Complete Tool。Replacement 操作 mutation 期间保持最后有效 preview 和 source suppression；成功后再 cleanup，失败时 Tool 保持可用。
 
-StepBack 不只回退 Tool 数据，还必须恢复上一阶段对应的临时 WorkPlane frame/origin。精确点接口只有在该点真实被接受时才返回成功；鼠标点击即使几何无效也可以被 UI 消费，但 Tool 应保持当前阶段继续等待输入。
+## Property / Layer
+Entity Property 使用 `Capture → Validate → Apply → refresh → History`。Layer 同样走 Core-owned transaction。直接修改 Color/LineStyle/LineWidth 自动关闭对应 ByLayer；ByLayer 切换也进入 History。
 
-## 3. Command Line 键盘优先级
-
-当 Command Line TextBox 获得焦点：Enter 提交；Up/Down 浏览输入历史；Esc 先清空文本，空文本时取消 Active Tool；Backspace 是正常文本编辑。全局 Tool Backspace/快捷键不得抢占 TextBox 编辑。
-
-Viewport 获得焦点：Enter 在 Idle 时重复最近 repeatable Action；Active Tool 时统一调用 `SubmitCurrent()`，先接受可提交的非 Point Step，其次 Finish；Point Step 不允许用旧鼠标位置代替新点输入。Esc Cancel；Backspace StepBack；F3/F8/F10 保留 Snap/Ortho/Polar。
-
-Command Line 空输入的 Enter 也调用同一个 `SubmitCurrent()`；Selection、Confirmation、Finish 与 Viewport/ToolPanel 使用完全相同的提交优先级。
-
-## 4. 统一点解析
-
-屏幕点必须走：`Screen → view ray → active WorkPlane → object Snap → Tracking → axis/angle/length constraint → final world point`。Tool 不重复 XY 投影或锁轴算法。
-
-文本坐标输入也必须进入等价的 world-point commit contract；禁止为了 Command Line 在 MainWindow 中直接写 Entity 字段。
-
-Command Line 坐标统一遵循工作平面坐标系：`x,y` / `x,y,z` 是 persistent user plane 下的绝对坐标；`@x,y` / `@x,y,z` 以当前 Tool 的 PrecisionReferencePoint 为参考，并沿 effective Tool/Grip frame 的 X/Y/Normal 解释。这样 XY、YZ、XZ 与自定义平面上的二维、三维坐标输入语义保持一致。
-
-## 5. WorkPlane 与视觉提示
-
-S→YZ、F→XZ、T→XY。切换工作平面不改变相机；persistent user plane、temporary tool plane、grip plane 必须分离。
-
-工作平面 X/Y 两条参考轴默认不显示。Tracking guide 仅在 ORTHO/POLAR 得到真实跟踪结果时显示；普通 pointer movement 不绘制 origin→pointer guide。Line/Polyline 等已有几何 Preview 的 Tool 因而不会出现重复指引线。
-
-## 6. Selection / Grip / Preview
-
-Selection 支持 Replace/Add/Remove/Toggle；左→右框为 Window，右→左框为 Crossing。点选与框选必须共享 SelectionManager 和 selectable/visible/locked filter。
-
-Grip 语义属于 Entity。Grip 编辑：捕获原状态 → duplicate preview → MoveGrip(preview) → validate/rebuild → Accept 写回真实 Entity → 单条 History；鼠标移动期间不得持续修改真实 Entity。
-
-Preview 是 transient，不进入 Document/Selection/History。替换 Preview 必须先成功创建新对象，再删除旧对象。
-
-## 7. 导航、属性和异常
-
-Active Tool 期间仍允许平移/缩放/旋转。Property 编辑采用 capture → validate → apply → rebuild/presentation → history，失败恢复旧状态。
-
-鼠标离开 Viewport 时必须失效最后一次 pointer observation，并清理 Preselection、Snap/Tracking candidates、hot Grip、动态输入与捕捉孔径；后续快捷键或 Tool 刷新不得复用视口外的旧坐标。
-
-异常分层处理：Tool/Grip/Property 局部事务负责 rollback；Viewport/UI boundary 负责报告并恢复可操作状态；不可恢复异常不得静默吞掉。
+## Prompt / Error
+完整 Tool Prompt 只由 Command Line 显示。可恢复失败留在 Tool/Grip/Property/Layer 局部事务内；Fatal failure 不做伪恢复。

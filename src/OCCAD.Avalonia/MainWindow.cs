@@ -495,12 +495,14 @@ public sealed partial class MainWindow : Window
 
     private Control BuildStatusBar()
     {
-                ConfigureStatusText(_selectionStatus, 72);
+        ConfigureStatusText(_toolStatus, 126);
+        ConfigureStatusText(_selectionStatus, 72);
         ConfigureStatusText(_historyStatus, 94);
         ConfigureStatusText(_snapStatus, 82);
         ConfigureStatusText(_precisionStatus, 96);
         ConfigureStatusText(_workPlaneStatus, 76);
         ConfigureStatusText(_coordinateStatus, 178);
+        _toolStatus.Foreground = CadTheme.Text;
         _coordinateStatus.Foreground = CadTheme.Text;
         _coordinateStatus.TextAlignment = TextAlignment.Right;
 
@@ -522,6 +524,7 @@ public sealed partial class MainWindow : Window
         panel.Children.Add(_historyStatus);
         DockPanel.SetDock(_selectionStatus, Dock.Right);
         panel.Children.Add(_selectionStatus);
+        panel.Children.Add(_toolStatus);
 
         return new Border
         {

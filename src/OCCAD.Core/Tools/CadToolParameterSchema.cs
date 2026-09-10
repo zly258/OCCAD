@@ -1,5 +1,9 @@
-﻿namespace OCCAD;
+namespace OCCAD;
 
+/// <summary>
+/// UI-neutral parameter metadata exposed by CAD tools. The schema belongs to
+/// Core; a desktop, script, MCP, or other frontend decides how to present it.
+/// </summary>
 public abstract record CadToolParameterDescriptor
 {
     protected CadToolParameterDescriptor(
@@ -10,25 +14,18 @@ public abstract record CadToolParameterDescriptor
         ArgumentException.ThrowIfNullOrWhiteSpace(label);
         Id = id.Trim();
         Label = label.Trim();
-        ValueDescriptor =
-            CadValueDescriptor.Create(
-                Id,
-                typeof(object),
-                semantic:
-                    CadValueSemantic.General);
+        ValueDescriptor = CadValueDescriptor.Create(
+            Id,
+            typeof(object),
+            semantic: CadValueSemantic.General);
     }
 
     public string Id { get; }
     public string Label { get; }
-    public CadValueDescriptor ValueDescriptor
-    {
-        get;
-        protected set;
-    }
+    public CadValueDescriptor ValueDescriptor { get; protected set; }
 }
 
-public sealed record CadStringToolParameterDescriptor
-    : CadToolParameterDescriptor
+public sealed record CadStringToolParameterDescriptor : CadToolParameterDescriptor
 {
     public CadStringToolParameterDescriptor(
         string id,
@@ -40,21 +37,20 @@ public sealed record CadStringToolParameterDescriptor
         ArgumentNullException.ThrowIfNull(value);
         if (!allowEmpty && string.IsNullOrWhiteSpace(value))
             throw new ArgumentException("Value cannot be empty.", nameof(value));
+
         Value = value;
         AllowEmpty = allowEmpty;
-        ValueDescriptor =
-            CadValueDescriptor.Create(
-                Id,
-                typeof(string),
-                semantic:
-                    CadValueSemantic.Text);
+        ValueDescriptor = CadValueDescriptor.Create(
+            Id,
+            typeof(string),
+            semantic: CadValueSemantic.Text);
     }
 
     public string Value { get; }
     public bool AllowEmpty { get; }
 }
-public sealed record CadIntegerToolParameterDescriptor
-    : CadToolParameterDescriptor
+
+public sealed record CadIntegerToolParameterDescriptor : CadToolParameterDescriptor
 {
     public CadIntegerToolParameterDescriptor(
         string id,
@@ -76,14 +72,12 @@ public sealed record CadIntegerToolParameterDescriptor
         Value = value;
         Minimum = minimum;
         Maximum = maximum;
-        ValueDescriptor =
-            CadValueDescriptor.Create(
-                Id,
-                typeof(int),
-                minimum,
-                maximum,
-                semantic:
-                    CadValueSemantic.Integer);
+        ValueDescriptor = CadValueDescriptor.Create(
+            Id,
+            typeof(int),
+            minimum,
+            maximum,
+            semantic: CadValueSemantic.Integer);
     }
 
     public int Value { get; }
@@ -91,8 +85,7 @@ public sealed record CadIntegerToolParameterDescriptor
     public int Maximum { get; }
 }
 
-public sealed record CadDoubleToolParameterDescriptor
-    : CadToolParameterDescriptor
+public sealed record CadDoubleToolParameterDescriptor : CadToolParameterDescriptor
 {
     public CadDoubleToolParameterDescriptor(
         string id,
@@ -102,6 +95,28 @@ public sealed record CadDoubleToolParameterDescriptor
         double maximum)
         : base(id, label)
     {
+        ValidateBounds(minimum, maximum);
+        if (!double.IsFinite(value) || value < minimum || value > maximum)
+            throw new ArgumentOutOfRangeException(
+                nameof(value),
+                "Value must be finite and inside the declared range.");
+
+        Value = value;
+        Minimum = minimum;
+        Maximum = maximum;
+        ValueDescriptor = CadValueDescriptor.Create(
+            Id,
+            typeof(double),
+            minimum,
+            maximum);
+    }
+
+    public double Value { get; }
+    public double Minimum { get; }
+    public double Maximum { get; }
+
+    private static void ValidateBounds(double minimum, double maximum)
+    {
         if (!double.IsFinite(minimum) ||
             !double.IsFinite(maximum) ||
             minimum > maximum)
@@ -110,34 +125,10 @@ public sealed record CadDoubleToolParameterDescriptor
                 nameof(minimum),
                 "Numeric parameter bounds must be finite and ordered.");
         }
-
-        if (!double.IsFinite(value) ||
-            value < minimum ||
-            value > maximum)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(value),
-                "Value must be finite and inside the declared range.");
-        }
-
-        Value = value;
-        Minimum = minimum;
-        Maximum = maximum;
-        ValueDescriptor =
-            CadValueDescriptor.Create(
-                Id,
-                typeof(double),
-                minimum,
-                maximum);
     }
-
-    public double Value { get; }
-    public double Minimum { get; }
-    public double Maximum { get; }
 }
 
-public sealed record CadOptionalDoubleToolParameterDescriptor
-    : CadToolParameterDescriptor
+public sealed record CadOptionalDoubleToolParameterDescriptor : CadToolParameterDescriptor
 {
     public CadOptionalDoubleToolParameterDescriptor(
         string id,
@@ -167,12 +158,11 @@ public sealed record CadOptionalDoubleToolParameterDescriptor
         Value = value;
         Minimum = minimum;
         Maximum = maximum;
-        ValueDescriptor =
-            CadValueDescriptor.Create(
-                Id,
-                typeof(double),
-                minimum,
-                maximum);
+        ValueDescriptor = CadValueDescriptor.Create(
+            Id,
+            typeof(double),
+            minimum,
+            maximum);
     }
 
     public double? Value { get; }
@@ -180,8 +170,7 @@ public sealed record CadOptionalDoubleToolParameterDescriptor
     public double Maximum { get; }
 }
 
-public sealed record CadBooleanToolParameterDescriptor
-    : CadToolParameterDescriptor
+public sealed record CadBooleanToolParameterDescriptor : CadToolParameterDescriptor
 {
     public CadBooleanToolParameterDescriptor(
         string id,
@@ -190,19 +179,16 @@ public sealed record CadBooleanToolParameterDescriptor
         : base(id, label)
     {
         Value = value;
-        ValueDescriptor =
-            CadValueDescriptor.Create(
-                Id,
-                typeof(bool),
-                semantic:
-                    CadValueSemantic.Boolean);
+        ValueDescriptor = CadValueDescriptor.Create(
+            Id,
+            typeof(bool),
+            semantic: CadValueSemantic.Boolean);
     }
 
     public bool Value { get; }
 }
 
-public sealed record CadChoiceToolParameterDescriptor
-    : CadToolParameterDescriptor
+public sealed record CadChoiceToolParameterDescriptor : CadToolParameterDescriptor
 {
     public CadChoiceToolParameterDescriptor(
         string id,
@@ -228,8 +214,8 @@ public sealed record CadChoiceToolParameterDescriptor
                 "Choice parameter must define at least one value.",
                 nameof(choices));
 
-        var selected = normalizedChoices.FirstOrDefault(
-            choice => string.Equals(
+        var selected = normalizedChoices.FirstOrDefault(choice =>
+            string.Equals(
                 choice,
                 value.Trim(),
                 StringComparison.OrdinalIgnoreCase));
@@ -240,22 +226,20 @@ public sealed record CadChoiceToolParameterDescriptor
 
         Value = selected;
         Choices = normalizedChoices;
-        ValueDescriptor =
-            CadValueDescriptor.Create(
-                Id,
-                typeof(string),
-                choices: normalizedChoices,
-                semantic:
-                    CadValueSemantic.Choice);
+        ValueDescriptor = CadValueDescriptor.Create(
+            Id,
+            typeof(string),
+            choices: normalizedChoices,
+            semantic: CadValueSemantic.Choice);
     }
 
     public string Value { get; }
     public IReadOnlyList<string> Choices { get; }
 }
 
-public sealed record CadToolPanelDescriptor
+public class CadToolParameterSchema
 {
-    public CadToolPanelDescriptor(
+    public CadToolParameterSchema(
         string title,
         IReadOnlyList<CadToolParameterDescriptor> parameters)
     {
@@ -284,3 +268,16 @@ public sealed record CadToolPanelDescriptor
     public IReadOnlyList<CadToolParameterDescriptor> Parameters { get; }
 }
 
+/// <summary>
+/// Transitional source-compatibility name. Existing tools may keep returning
+/// this type while consumers depend only on CadToolParameterSchema.
+/// </summary>
+public sealed class CadToolPanelDescriptor : CadToolParameterSchema
+{
+    public CadToolPanelDescriptor(
+        string title,
+        IReadOnlyList<CadToolParameterDescriptor> parameters)
+        : base(title, parameters)
+    {
+    }
+}

@@ -1,20 +1,13 @@
 # OCCAD Documentation
 
-This directory contains OCCAD's long-lived product and implementation contracts. It intentionally avoids sprint notes, commit logs, temporary gap lists, and local validation transcripts.
+This directory contains OCCAD's long-lived core contracts while the application is being realigned to `OCCTBIM-Source/release-1.0`.
 
-- English: [en-US/README.md](en-US/README.md)
-- 中文: [zh-CN/README.md](zh-CN/README.md)
+- Architecture contract: [OCCTBIM-ALIGNMENT.md](OCCTBIM-ALIGNMENT.md)
+- Alignment matrix: [CORE-ALIGNMENT-MATRIX.md](CORE-ALIGNMENT-MATRIX.md)
+- Core scope: [CORE-SCOPE.md](CORE-SCOPE.md) / [CORE-SCOPE.zh-CN.md](CORE-SCOPE.zh-CN.md)
+- Interaction contracts: [INTERACTION-CONTRACTS.md](INTERACTION-CONTRACTS.md)
+- Interaction lifecycle: [INTERACTION-LIFECYCLE.md](INTERACTION-LIFECYCLE.md)
+- English domain contracts: [en-US/README.md](en-US/README.md)
+- 中文领域契约: [zh-CN/README.md](zh-CN/README.md)
 
-Both language trees describe the same seven topics:
-
-1. Product goals
-2. UI specification
-3. Interaction specification
-4. Architecture
-5. Entity and Tool contract
-6. Quality, performance, localization, and data semantics
-7. Code organization and repository hygiene
-
-The current baseline reflects the actual Avalonia implementation: compact industrial styling through `CadTheme`, Command Line as the sole full Tool-prompt surface, resizable Layer/Property panels, integrated ByLayer appearance editors, Core-owned layer/property transactions, atomic Preview commit order, and preview-only Grip pointer edits.
-
-`OCCTBIM-Source/release-1.0` remains a behavioral and architectural reference for Document / Entity / Tool / Action / Grip / Snap / Property responsibility boundaries. OCCAD does not copy its Qt widgets, singleton architecture, or exact class hierarchy.
+The previous Avalonia UI specification has been removed because that UI implementation was deleted. UI is not a source of CAD behavior. It will be specified again only after the core Entity / Property / Layer / Interaction / Grip / Snap / Settings contracts are stable and covered by tests.

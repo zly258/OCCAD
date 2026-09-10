@@ -1,39 +1,26 @@
 using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 
 namespace OCCAD.Avalonia;
 
 internal static class Program
 {
     [STAThread]
-    public static int Main(string[] args)
+    public static void Main(string[] args) =>
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+
+    public static AppBuilder BuildAvaloniaApp() =>
+        AppBuilder.Configure<App>()
+            .UsePlatformDetect();
+}
+
+internal sealed class App : Application
+{
+    public override void OnFrameworkInitializationCompleted()
     {
-        CadDiagnostics.Initialize();
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            desktop.MainWindow = new MainWindow();
 
-        try
-        {
-            CadDiagnostics.Trace(
-                "Starting Avalonia classic desktop lifetime.");
-
-            var exitCode =
-                BuildAvaloniaApp()
-                    .StartWithClassicDesktopLifetime(args);
-
-            CadDiagnostics.Trace(
-                $"Avalonia classic desktop lifetime exited. ExitCode={exitCode}.");
-
-            return exitCode;
-        }
-        catch (Exception exception)
-        {
-            CadDiagnostics.ReportStartupFailure(
-                exception);
-            return 1;
-        }
+        base.OnFrameworkInitializationCompleted();
     }
-
-    private static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder
-            .Configure<CadApplication>()
-            .UsePlatformDetect()
-            .LogToTrace();
 }

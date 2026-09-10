@@ -28,7 +28,7 @@ public abstract class CadEntity
 {
     private readonly string _entityType;
     private string _name;
-    private string _layer = "0";
+    private string _layerId = CadLayer.DefaultId;
     private bool _visible = true;
     private bool _selectable = true;
     private bool _colorByLayer = true;
@@ -71,14 +71,24 @@ public abstract class CadEntity
 
     [Category("General"), DisplayName("Layer")]
     [CadProperty(CadValueSemantic.Layer, Order = 20)]
-    public string Layer
+    public string LayerId
     {
-        get => _layer;
+        get => _layerId;
         set
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(value);
-            SetMetadata(ref _layer, value.Trim());
+            SetMetadata(ref _layerId, value.Trim());
         }
+    }
+
+    /// <summary>
+    /// Compatibility alias for older OCCAD callers. Core code must use LayerId.
+    /// </summary>
+    [Browsable(false)]
+    public string Layer
+    {
+        get => LayerId;
+        set => LayerId = value;
     }
 
     [Category("Display")]
@@ -350,15 +360,9 @@ public abstract class CadEntity
             return;
 
         var placement = _placement;
-        var xAxis =
-            placement.ToWorldVector(
-                OcctVector3d.UnitX);
-        var yAxis =
-            placement.ToWorldVector(
-                OcctVector3d.UnitY);
-        var zAxis =
-            placement.ToWorldVector(
-                OcctVector3d.UnitZ);
+        var xAxis = placement.ToWorldVector(OcctVector3d.UnitX);
+        var yAxis = placement.ToWorldVector(OcctVector3d.UnitY);
+        var zAxis = placement.ToWorldVector(OcctVector3d.UnitZ);
 
         _placement = CadPlacement.Identity;
 
@@ -392,7 +396,7 @@ public abstract class CadEntity
             throw new ArgumentException("Snapshot type does not match.", nameof(snapshot));
 
         var previous = Duplicate();
-        var metadataChanged = _name != snapshot._name || _layer != snapshot._layer;
+        var metadataChanged = _name != snapshot._name || _layerId != snapshot._layerId;
         var appearanceChanged =
             _visible != snapshot._visible ||
             _selectable != snapshot._selectable ||
@@ -447,7 +451,7 @@ public abstract class CadEntity
     {
         ArgumentNullException.ThrowIfNull(target);
         target.Name = Name;
-        target.Layer = Layer;
+        target.LayerId = LayerId;
         target.Visible = Visible;
         target.Selectable = Selectable;
         target.ColorByLayer = ColorByLayer;
@@ -686,7 +690,7 @@ public abstract class CadEntity
     private void ApplyBaseState(CadEntity snapshot)
     {
         _name = snapshot._name;
-        _layer = snapshot._layer;
+        _layerId = snapshot._layerId;
         _visible = snapshot._visible;
         _selectable = snapshot._selectable;
         _colorByLayer = snapshot._colorByLayer;

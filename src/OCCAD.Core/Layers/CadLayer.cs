@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Drawing;
 using System.Runtime.CompilerServices;
 using OcctNet;
@@ -32,7 +32,10 @@ public readonly record struct CadLayerState(
 
 public sealed class CadLayer
 {
+    public const string DefaultId = "0";
+
     private readonly CadLayerManager _owner;
+    private readonly string _id;
     private string _name;
     private Color _color = Color.FromArgb(220, 220, 220);
     private double _lineWidth = 1.0;
@@ -40,19 +43,27 @@ public sealed class CadLayer
     private bool _visible = true;
     private bool _locked;
 
-    internal CadLayer(CadLayerManager owner, string name)
+    internal CadLayer(CadLayerManager owner, string id, string name)
     {
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        _id = id.Trim();
         _name = name.Trim();
     }
+
+    /// <summary>
+    /// Stable document identity. Display-name changes never change this value.
+    /// </summary>
+    [Browsable(false)]
+    public string Id => _id;
 
     [Category("General"), ReadOnly(true)]
     [CadProperty(CadValueSemantic.Text, Order = 0)]
     public string Name => _name;
 
     [Browsable(false)]
-    public bool IsDefault => string.Equals(_name, "0", StringComparison.OrdinalIgnoreCase);
+    public bool IsDefault => string.Equals(_id, DefaultId, StringComparison.OrdinalIgnoreCase);
 
     [Category("Display")]
     [CadProperty(CadValueSemantic.Color, Order = 10)]

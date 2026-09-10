@@ -1,74 +1,110 @@
-# OCCTBIM-Source alignment boundary
+# OCCAD / OCCTBIM-Source architecture alignment
 
-This branch aligns OCCAD with `OCCTBIM-Source/release-1.0` at the architecture, interaction and UI responsibility level. It does not copy the reference repository wholesale and it does not re-enable advanced commands that were intentionally removed from the default core surface.
+Reference baseline: `zly258/OCCTBIM-Source` branch `release-1.0`.
 
-## Architecture rules carried into OCCAD
+This document is the architectural contract for the OCCAD refactor. The goal is semantic alignment with the reference CAD core, not a file-for-file C++ port and not preservation of the previous Avalonia UI structure.
+
+## 1. Refactor order
+
+1. Remove the existing UI implementation and keep only a bootable empty Avalonia shell.
+2. Stabilize the core object model and ownership boundaries.
+3. Align Entity, Property, Layer, Tool/Interaction, Grip, Snap, WorkPlane, Settings and Action/Transaction semantics.
+4. Validate the core without UI-specific behavior.
+5. Rebuild UI as a thin presentation adapter over the aligned core.
+
+UI parity is intentionally deferred until the core contracts are stable.
+
+## 2. Canonical ownership
+
+### Document
+
+`CadDocument` is the aggregate root for persistent drawing state. It owns entity membership, identity lookup, presentation synchronization and committed change publication. UI code must never mutate entity collections directly.
 
 ### Entity
 
-- Entity is persistent document state and owns geometry/data semantics.
-- One concrete Entity stays independently extensible and serializable.
-- Persistence compatibility is separate from whether a command is currently exposed in the UI.
-- Entity code must not own viewport input state, menu state or transient preview lifecycle.
+`CadEntity` is the canonical owner of persistent entity data and geometry semantics. It owns identity, layer reference, appearance overrides, geometry, placement, property exposure, grip definitions and snap definitions. Viewer presentation is a derived representation of entity state.
 
-### Tool
+The reference contract represented by `Entity` is preserved: shape/presentation, layer assignment, appearance, properties, grip points, snap points, edit-copy/new-copy semantics and modification notification all belong to the entity/domain boundary.
 
-- Tool is a staged interaction state machine: activate -> input -> preview -> commit/finish/cancel -> deactivate.
-- A Tool owns only its local staged state and tool-specific replacement-preview ownership.
-- `CadToolManager` owns registration, activation/deactivation, event dispatch and the final neutral interaction reset.
-- Preview, Snap, Tracking, Precision and temporary WorkPlane state are workspace services, not permanent Entity state.
-- Grip editing remains a specialized Tool rather than a second independent interaction system.
+### Property
 
-### Action
+Properties are metadata over canonical entity/layer values; they are not a second state store. Descriptors define name, display metadata, grouping, editor semantic, ordering, read-only state and optional editor constraints. Property mutation must enter through a transaction boundary so multi-selection edits are atomic and undoable.
 
-- Action is the command/application boundary used by menu and command line.
-- UI surfaces execute Action IDs rather than constructing Entity/Tool instances directly.
-- Tool creation remains registry/factory based.
-- Removed advanced commands must not remain as hidden menu or command-line aliases.
+No Avalonia control, panel or view model may own authoritative CAD property values.
 
-### Viewport
+### Layer
 
-- Viewport converts device input to CAD interaction events and renders the scene.
-- Viewport must not contain Entity-specific editing rules.
-- The active Tool receives pointer input before normal selection logic.
-- When no Tool is active, input order is grip -> subobject -> selection/navigation.
-- Window/Crossing selection, snap tolerance and preselection are interaction services and must remain deterministic after tool switching.
+Layer management is a domain service. A layer has stable identity, mutable display name, color, line type/width and visibility/state. The default layer is stable and undeletable. Entity-to-layer references must converge on stable layer identity rather than UI display text.
 
-### Property / Layer / Model panels
+The layer manager is responsible for lookup, current layer, add/remove/update, uniqueness rules, deletion guards and propagation of ByLayer appearance.
 
-The reference UI separates `PropertyDock`, `LayerDock` and `ModelDock`. OCCAD keeps a lighter Avalonia implementation but follows the same ownership boundary:
+### Interaction and Tools
 
-- Model panel owns document-tree presentation and selection synchronization.
-- Layer panel owns layer list/filter/edit presentation.
-- Property panel owns common-property merging, editor selection and batch property apply.
-- MainWindow coordinates panels; business editing must remain in workspace/controllers rather than accumulating in MainWindow.
-- Property editing is semantic (`CadValueSemantic`) rather than relying only on CLR type.
-- Multi-selection shows common properties and mixed values instead of silently choosing one entity.
+`Interaction/` contains the interaction framework only: tool lifecycle, input resolution, preview/transient state, tracking, precision input and manager/registry contracts.
 
-## UI rules carried into OCCAD
+Concrete commands live in `Tools/`. A tool is a state machine with one lifecycle:
 
-- Compact industrial layout, flat controls, no decorative icons.
-- High information density without duplicated status/prompt text.
-- Command interaction text belongs to the command line/HUD; the status bar reports state such as selection, snap, work plane and coordinates.
-- Layer and property surfaces use table/grid visual structure rather than card/form layouts.
-- Selected/current items use restrained highlight; normal rows remain neutral.
-- Dock/panel state can be hidden independently without changing document state.
-- Error dialogs are reserved for operations that actually fail; normal invalid drawing input should be rejected in-place and leave the Tool usable.
+`Activate -> Input -> Preview -> Commit/Finish | Cancel -> Deactivate`
 
-## Explicit non-goals for the current core pass
+No tool owns persistent document state outside a committed transaction. Switching/cancelling a tool must clear every transient object it created.
 
-- Ribbon parity with the Qt reference UI.
-- Full advanced modeling/annotation tool parity.
-- Reintroducing removed Rotate/Scale/Mirror/Array/Boolean/Feature tools before the core interaction regression matrix is stable.
-- Copying OCCTBIM implementation details that conflict with the current OcctCSharpBridge SDK or Avalonia lifecycle.
+### Grip
 
-## Current validation focus
+Grip points are entity-derived data (`entityId + local index + position/constraint`). `CadGripManager` manages visible/active grip state; `GripEditTool` performs the edit as a normal transaction-backed interaction. Grip editing is not a second editing architecture.
 
-1. Point / Line / Polyline / Rectangle / Circle / Arc.
-2. Box / Cylinder / Cone / Sphere.
-3. Move / Copy / GripEdit.
-4. Snap / Tracking / WorkPlane / Precision.
-5. Commit / cancel / tool switch cleanup.
-6. Model / Layer / Property selection synchronization.
-7. Property batch editing and mixed-value behavior.
-8. 125% / 150% DPI and compact panel usability.
+### Snap
+
+Snap points are entity-derived data. `CadSnapManager` owns candidate collection/ranking and enhanced geometric/BRep snapping. Snap results are transient and deterministic. The viewport/UI only renders the chosen snap marker and never computes CAD snap semantics.
+
+### WorkPlane
+
+The active work plane is a core interaction service. Point resolution, snapping, tracking and tools consume the same work-plane state. Camera orientation is not drawing-plane state.
+
+### Settings
+
+`Settings/` owns UI-independent application/drafting settings. `CadSettingsStore` provides key/value persistence semantics corresponding to the reference `SettingsManager`; typed drafting settings remain core data. UI dialogs will only bind to this store after UI reconstruction.
+
+### Action / Transaction / History
+
+Actions are command entry points. Tools and property/layer changes commit through transaction/history boundaries. One logical user operation produces one atomic history record. Preview must never become history.
+
+## 3. Physical project layout
+
+```text
+OCCAD.Core/
+  Actions/          command boundary
+  Document/         document and persistence
+  Entities/         entity base, concrete entities, entity-derived grip/snap data
+  Geometry/         pure geometry algorithms
+  Layers/           layer domain and manager
+  Properties/       property metadata/value conversion
+  Selection/        selection/subobject state
+  Grips/            grip session manager
+  Snapping/         snap candidate engine/geometry
+  WorkPlane/        drawing plane service
+  Interaction/      lifecycle/input/preview/tracking infrastructure
+  Tools/            concrete interactive commands
+  Settings/         application/drafting settings
+  History/          undo/redo records
+```
+
+`OCCAD.Avalonia` is temporarily reduced to `Program + empty MainWindow + manifest`. It must not regain CAD behavior until the core alignment checklist below is complete.
+
+## 4. Alignment checklist
+
+- [ ] Entity layer reference uses stable layer ID throughout document/persistence/tools.
+- [ ] Entity property contract no longer depends on UI implementation details.
+- [ ] Layer manager maps stable ID and name separately and has deletion guards for referenced/current/default layers.
+- [ ] Tool lifecycle has one owner and one transient cleanup path.
+- [ ] Preview scene has explicit ownership and zero residual objects after commit/cancel/switch.
+- [ ] Grip points are entity-derived and grip drag commits atomically.
+- [ ] Snap points/candidates are entity-derived; tolerance is screen-to-world deterministic.
+- [ ] Window/Crossing, preselection and subobject selection are coordinated by the same interaction session.
+- [ ] WorkPlane is independent of camera and shared by input/snap/tools.
+- [ ] Settings are core-owned and persistence is UI-independent.
+- [ ] Core compiles/tests without Avalonia UI behavior.
+- [ ] Only after all above pass: rebuild compact industrial UI from the core contracts.
+
+## 5. Explicit deletion rule
+
+During this refactor, duplicated mechanisms are removed rather than adapted. A UI controller, helper, setting, preview path, snap path or grip path that duplicates a core responsibility must be deleted. Compatibility shims are allowed only at persistence/API boundaries and must be temporary and documented.

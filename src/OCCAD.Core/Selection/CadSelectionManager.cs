@@ -310,9 +310,8 @@ public sealed class CadSelectionManager
         else
             _presenter.ClearSelection();
 
-        // This event represents explicit clear intent, not merely a transition
-        // to an empty entity set. Subobject selection may exist without entity
-        // selection, but explicit Clear means clear all formal selection state.
+        // Explicit Clear means clear all formal selection state, including any
+        // coupled subobject selection managed by the workspace.
         Cleared?.Invoke(this, EventArgs.Empty);
     }
 
@@ -359,25 +358,22 @@ public sealed class CadSelectionManager
                 entity is CadPointEntity,
             CadEntityFilterKind.Curve =>
                 entity is CadLineEntity or
+                    CadCenterLineEntity or
+                    CadCenterMarkEntity or
                     CadPolylineEntity or
                     CadArcEntity or
                     CadCircleEntity or
                     CadEllipseEntity or
-                    CadSplineEntity or
-                    CadPathEntity,
+                    CadSplineEntity,
             CadEntityFilterKind.Region =>
-                entity is CadRegionEntity or
-                    CadPolygonEntity or
+                entity is CadPolygonEntity or
+                    CadRegularPolygonEntity or
                     CadRectangleEntity,
             CadEntityFilterKind.Solid =>
                 entity is CadBoxEntity or
                     CadCylinderEntity or
                     CadConeEntity or
-                    CadSphereEntity or
-                    CadTorusEntity or
-                    CadFeatureEntity or
-                    CadBooleanEntity or
-                    CadImportedShapeEntity,
+                    CadSphereEntity,
             _ => true
         };
     }

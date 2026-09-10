@@ -104,41 +104,21 @@ internal sealed class CadSubobjectReferenceService
             return false;
         }
 
-        var entity = item.Entity;
-        var reference = item.SubshapeReference;
-
-        // CadPathEntity has a stable semantic segment index independent from
-        // OCCT topology reconstruction. Keep that stronger identity when valid.
-        if (entity is CadPathEntity path &&
-            reference.ShapeType == OcctShapeType.Edge &&
-            reference.Index >= 0 &&
-            reference.Index < path.SegmentCount)
-        {
-            refreshed = item with
-            {
-                SubshapeIndex = reference.Index,
-                Point = PathRepresentativePoint(
-                    path,
-                    reference.Index),
-                StableReference = reference
-            };
-            return true;
-        }
-
         if (_engine is not { IsInitialized: true } engine ||
             !CadSubshapeReferenceResolver.TryResolve(
                 engine,
-                entity,
-                reference,
+                item.Entity,
+                item.SubshapeReference,
                 out var resolvedIndex))
         {
             refreshed = default;
             return false;
         }
 
+        var reference = item.SubshapeReference;
         var resolvedReference =
             new CadSubshapeReference(
-                entity.Id,
+                item.Entity.Id,
                 reference.ShapeType,
                 resolvedIndex,
                 reference.Fallback);
@@ -146,7 +126,7 @@ internal sealed class CadSubobjectReferenceService
         var point = item.Point;
         CadSubshapeReferenceResolver.TryGetRepresentativePoint(
             engine,
-            entity,
+            item.Entity,
             resolvedReference,
             out point);
 
@@ -157,24 +137,6 @@ internal sealed class CadSubobjectReferenceService
             StableReference = resolvedReference
         };
         return true;
-    }
-
-    private static OcctPoint3d PathRepresentativePoint(
-        CadPathEntity path,
-        int segmentIndex)
-    {
-        if (!path.TryGetSegmentInfo(
-                segmentIndex,
-                out var segment))
-            return path.ToWorldPoint(path.Start);
-
-        var point = segment.Middle ??
-            new OcctPoint3d(
-                (segment.Start.X + segment.End.X) * 0.5,
-                (segment.Start.Y + segment.End.Y) * 0.5,
-                (segment.Start.Z + segment.End.Z) * 0.5);
-
-        return path.ToWorldPoint(point);
     }
 
     private static bool IsRecoverable(Exception exception) =>

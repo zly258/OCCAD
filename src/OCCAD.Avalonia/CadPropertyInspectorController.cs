@@ -839,9 +839,16 @@ internal sealed class CadPropertyInspectorController : IDisposable
                         editorMixed)
             };
 
+        valueEditor.VerticalAlignment =
+            VerticalAlignment.Center;
+        valueEditor.HorizontalAlignment =
+            HorizontalAlignment.Stretch;
+
         var grid = new Grid
         {
-            ColumnSpacing = 6
+            ColumnSpacing = 7,
+            VerticalAlignment =
+                VerticalAlignment.Center
         };
         grid.ColumnDefinitions.Add(
             new ColumnDefinition(GridLength.Auto));
@@ -860,6 +867,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
     {
         var combo = new ComboBox
         {
+            HorizontalAlignment =
+                HorizontalAlignment.Stretch,
+            VerticalAlignment =
+                VerticalAlignment.Center,
             ItemsSource = _workspace.Layers.Layers
                 .Select(static layer => layer.Name)
                 .ToArray(),
@@ -883,6 +894,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
     {
         var editor = new CheckBox
         {
+            VerticalAlignment =
+                VerticalAlignment.Center,
             IsThreeState = isMixed,
             IsChecked = isMixed ? null : value is bool flag && flag
         };
@@ -912,6 +925,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         var combo = new ComboBox
         {
+            HorizontalAlignment =
+                HorizontalAlignment.Stretch,
+            VerticalAlignment =
+                VerticalAlignment.Center,
             ItemsSource = items,
             SelectedItem = isMixed
                 ? null
@@ -951,6 +968,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         {
             MinHeight = CadTheme.ControlHeight,
             HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center,
             HorizontalContentAlignment = HorizontalAlignment.Left,
             Padding = new Thickness(6, 1),
             Background = isMixed
@@ -990,6 +1008,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
         var descriptor = slot.Descriptor;
         var editor = new TextBox
         {
+            HorizontalAlignment =
+                HorizontalAlignment.Stretch,
+            VerticalAlignment =
+                VerticalAlignment.Center,
             Text = isMixed ? string.Empty : ConvertToText(descriptor, value),
             PlaceholderText = isMixed ? "—" : null
         };

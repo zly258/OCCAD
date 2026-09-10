@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.Media;
 
 namespace OCCAD.Avalonia;
 
@@ -23,7 +24,8 @@ internal enum CadMessageDialogKind
 
 internal sealed class CadMessageDialog : Window
 {
-    private CadDialogResult _result = CadDialogResult.Cancel;
+    private CadDialogResult _result =
+        CadDialogResult.Cancel;
 
     private CadMessageDialog(
         string title,
@@ -32,35 +34,52 @@ internal sealed class CadMessageDialog : Window
         CadMessageDialogKind kind)
     {
         Title = title;
-        Width = 440;
-        MinWidth = 380;
-        MaxWidth = 640;
-        MinHeight = 180;
+        Width = 460;
+        MinWidth = 420;
+        MaxWidth = 680;
+        MinHeight = 170;
         MaxHeight = 520;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         WindowStartupLocation =
             WindowStartupLocation.CenterOwner;
-        Background = CadTheme.Surface;
+        Background = CadTheme.WindowBrush;
 
-        var heading = new TextBlock
+        var statusBrush =
+            StatusBrush(kind);
+        var statusText =
+            StatusText(kind);
+
+        var headerText = new TextBlock
         {
-            Text = title,
-            FontWeight =
-                global::Avalonia.Media.FontWeight.SemiBold,
-            FontSize = CadTheme.FontSize,
+            Text = statusText,
+            FontWeight = FontWeight.SemiBold,
             Foreground = CadTheme.Text,
-            TextWrapping =
-                global::Avalonia.Media.TextWrapping.Wrap
+            VerticalAlignment =
+                VerticalAlignment.Center
+        };
+
+        var header = new Border
+        {
+            MinHeight = 32,
+            Background = CadTheme.Header,
+            BorderBrush = CadTheme.BorderStrong,
+            BorderThickness =
+                new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(
+                CadTheme.DialogPadding,
+                0),
+            Child = headerText
         };
 
         var text = new TextBlock
         {
             Text = message,
-            TextWrapping =
-                global::Avalonia.Media.TextWrapping.Wrap,
+            TextWrapping = TextWrapping.Wrap,
             Foreground = CadTheme.Text,
-            LineHeight = 18
+            LineHeight = 19,
+            VerticalAlignment =
+                VerticalAlignment.Top
         };
 
         var messageHost = new ScrollViewer
@@ -75,60 +94,61 @@ internal sealed class CadMessageDialog : Window
 
         var accent = new Border
         {
-            Width = 3,
-            Background = kind switch
-            {
-                CadMessageDialogKind.Error =>
-                    CadTheme.Accent,
-                CadMessageDialogKind.Warning =>
-                    CadTheme.BorderStrong,
-                CadMessageDialogKind.Question =>
-                    CadTheme.Accent,
-                _ => CadTheme.Border
-            }
+            Width = 4,
+            Background = statusBrush
         };
 
         var body = new Grid
         {
-            ColumnSpacing = 8,
-            Margin = new Thickness(CadTheme.DialogPadding)
+            ColumnSpacing = 10,
+            Margin = new Thickness(
+                CadTheme.DialogPadding,
+                12)
         };
         body.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(3)));
+            new ColumnDefinition(
+                new GridLength(4)));
         body.ColumnDefinitions.Add(
             new ColumnDefinition(
-                new GridLength(1, GridUnitType.Star)));
-        body.RowDefinitions.Add(
-            new RowDefinition(GridLength.Auto));
-        body.RowDefinitions.Add(
-            new RowDefinition(GridLength.Auto));
-
-        Grid.SetRowSpan(accent, 2);
+                new GridLength(
+                    1,
+                    GridUnitType.Star)));
         body.Children.Add(accent);
-        Grid.SetColumn(heading, 1);
-        body.Children.Add(heading);
         Grid.SetColumn(messageHost, 1);
-        Grid.SetRow(messageHost, 1);
         body.Children.Add(messageHost);
 
-        var buttons = BuildButtons(yesNoCancel);
+        var buttons =
+            BuildButtons(yesNoCancel);
         var footer = new Border
         {
-            Background = CadTheme.Toolbar,
+            MinHeight = 44,
+            Background = CadTheme.PanelAlt,
             BorderBrush = CadTheme.Border,
-            BorderThickness = new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(CadTheme.DialogPadding, 6),
+            BorderThickness =
+                new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(
+                CadTheme.DialogPadding,
+                8),
             Child = buttons
         };
 
         var root = new Grid();
         root.RowDefinitions.Add(
             new RowDefinition(
-                new GridLength(1, GridUnitType.Star)));
+                GridLength.Auto));
         root.RowDefinitions.Add(
-            new RowDefinition(GridLength.Auto));
+            new RowDefinition(
+                new GridLength(
+                    1,
+                    GridUnitType.Star)));
+        root.RowDefinitions.Add(
+            new RowDefinition(
+                GridLength.Auto));
+
+        root.Children.Add(header);
+        Grid.SetRow(body, 1);
         root.Children.Add(body);
-        Grid.SetRow(footer, 1);
+        Grid.SetRow(footer, 2);
         root.Children.Add(footer);
         Content = root;
 
@@ -138,7 +158,8 @@ internal sealed class CadMessageDialog : Window
                 return;
 
             args.Handled = true;
-            CloseWith(CadDialogResult.Cancel);
+            CloseWith(
+                CadDialogResult.Cancel);
         };
     }
 
@@ -154,18 +175,23 @@ internal sealed class CadMessageDialog : Window
             message,
             yesNoCancel,
             yesNoCancel &&
-            kind == CadMessageDialogKind.Information
+            kind ==
+            CadMessageDialogKind.Information
                 ? CadMessageDialogKind.Question
                 : kind)
-            .ShowDialog<CadDialogResult>(owner);
+            .ShowDialog<CadDialogResult>(
+                owner);
 
-    private Control BuildButtons(bool yesNoCancel)
+    private Control BuildButtons(
+        bool yesNoCancel)
     {
         var buttons = new StackPanel
         {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Spacing = 4
+            Orientation =
+                Orientation.Horizontal,
+            HorizontalAlignment =
+                HorizontalAlignment.Right,
+            Spacing = 6
         };
 
         if (yesNoCancel)
@@ -176,7 +202,8 @@ internal sealed class CadMessageDialog : Window
                     "Yes"),
                 primary: true);
             yes.Click += (_, _) =>
-                CloseWith(CadDialogResult.Yes);
+                CloseWith(
+                    CadDialogResult.Yes);
             buttons.Children.Add(yes);
 
             var no = Button(
@@ -184,7 +211,8 @@ internal sealed class CadMessageDialog : Window
                     "Cad.Text.No",
                     "No"));
             no.Click += (_, _) =>
-                CloseWith(CadDialogResult.No);
+                CloseWith(
+                    CadDialogResult.No);
             buttons.Children.Add(no);
 
             var cancel = Button(
@@ -192,7 +220,8 @@ internal sealed class CadMessageDialog : Window
                     "Cad.Text.Cancel",
                     "Cancel"));
             cancel.Click += (_, _) =>
-                CloseWith(CadDialogResult.Cancel);
+                CloseWith(
+                    CadDialogResult.Cancel);
             buttons.Children.Add(cancel);
         }
         else
@@ -203,14 +232,16 @@ internal sealed class CadMessageDialog : Window
                     "OK"),
                 primary: true);
             ok.Click += (_, _) =>
-                CloseWith(CadDialogResult.Ok);
+                CloseWith(
+                    CadDialogResult.Ok);
             buttons.Children.Add(ok);
         }
 
         return buttons;
     }
 
-    private void CloseWith(CadDialogResult result)
+    private void CloseWith(
+        CadDialogResult result)
     {
         _result = result;
         Close(_result);
@@ -223,13 +254,56 @@ internal sealed class CadMessageDialog : Window
         var button = new Button
         {
             Content = text,
-            MinWidth = CadTheme.DialogButtonWidth,
+            MinWidth =
+                CadTheme.DialogButtonWidth,
+            MinHeight =
+                CadTheme.ControlHeight,
             HorizontalContentAlignment =
-                HorizontalAlignment.Center
+                HorizontalAlignment.Center,
+            VerticalContentAlignment =
+                VerticalAlignment.Center
         };
         button.Classes.Add("cad-compact");
         if (primary)
             button.Classes.Add("cad-primary");
         return button;
     }
+
+    private static IBrush StatusBrush(
+        CadMessageDialogKind kind) =>
+        kind switch
+        {
+            CadMessageDialogKind.Error =>
+                new SolidColorBrush(
+                    Color.Parse("#C74646")),
+            CadMessageDialogKind.Warning =>
+                new SolidColorBrush(
+                    Color.Parse("#C28A27")),
+            CadMessageDialogKind.Question =>
+                CadTheme.Accent,
+            _ =>
+                CadTheme.BorderStrong
+        };
+
+    private static string StatusText(
+        CadMessageDialogKind kind) =>
+        kind switch
+        {
+            CadMessageDialogKind.Error =>
+                CadLanguageManager.Text(
+                    "Cad.Text.Error",
+                    "Error"),
+            CadMessageDialogKind.Warning =>
+                CadLanguageManager.Text(
+                    "Cad.Text.Warning",
+                    "Warning"),
+            CadMessageDialogKind.Question =>
+                CadLanguageManager.Text(
+                    "Cad.Text.Question",
+                    "Question"),
+            _ =>
+                CadLanguageManager.Text(
+                    "Cad.Text.Information",
+                    "Information")
+        };
 }

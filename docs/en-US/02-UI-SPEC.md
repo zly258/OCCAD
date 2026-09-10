@@ -68,3 +68,10 @@ Do not issue duplicate explicit redraws after Bridge operations that already req
 ## Localization / DPI
 
 All durable UI strings use synchronized English/Chinese resources. Render scaling and viewport input coordinates must remain aligned at common Windows scaling values such as 125% and 150%.
+
+
+## Application preferences
+
+Long-lived user viewport/interaction preferences are application state, not Document state. `Settings → Preferences...` edits and persists scene background, grip/snap marker sizes, grip/snap/selection pixel tolerances, mouse-wheel zoom sensitivity, and viewer display deviation/angle.
+
+Changing a preference applies immediately to the current viewport. Viewer display precision is presentation tessellation quality only and must never be presented as changing CAD model precision.

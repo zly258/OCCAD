@@ -9,52 +9,34 @@ namespace OCCAD.Avalonia;
 
 internal sealed class CadColorTable : UserControl
 {
-    private static readonly DrawingColor[] Colors =
+    private readonly record struct AciColor(
+        int Index,
+        DrawingColor Color);
+
+    private static readonly IReadOnlyList<AciColor> StandardColors =
     [
-        DrawingColor.Black,
-        DrawingColor.FromArgb(64, 64, 64),
-        DrawingColor.FromArgb(96, 96, 96),
-        DrawingColor.FromArgb(128, 128, 128),
-        DrawingColor.FromArgb(160, 160, 160),
-        DrawingColor.FromArgb(192, 192, 192),
-        DrawingColor.FromArgb(224, 224, 224),
-        DrawingColor.White,
+        new(1, DrawingColor.FromArgb(255, 0, 0)),
+        new(2, DrawingColor.FromArgb(255, 255, 0)),
+        new(3, DrawingColor.FromArgb(0, 255, 0)),
+        new(4, DrawingColor.FromArgb(0, 255, 255)),
+        new(5, DrawingColor.FromArgb(0, 0, 255)),
+        new(6, DrawingColor.FromArgb(255, 0, 255)),
+        new(7, DrawingColor.White),
+        new(8, DrawingColor.FromArgb(128, 128, 128)),
+        new(9, DrawingColor.FromArgb(192, 192, 192))
+    ];
 
-        DrawingColor.FromArgb(192, 32, 32),
-        DrawingColor.FromArgb(230, 72, 60),
-        DrawingColor.FromArgb(240, 138, 128),
-        DrawingColor.FromArgb(138, 74, 36),
-        DrawingColor.FromArgb(188, 120, 70),
-        DrawingColor.FromArgb(228, 176, 116),
-        DrawingColor.FromArgb(176, 126, 22),
-        DrawingColor.FromArgb(232, 184, 58),
+    private static readonly IReadOnlyList<AciColor> IndexedColors =
+        BuildIndexedColors();
 
-        DrawingColor.FromArgb(226, 214, 62),
-        DrawingColor.FromArgb(128, 170, 42),
-        DrawingColor.FromArgb(70, 148, 58),
-        DrawingColor.FromArgb(34, 116, 72),
-        DrawingColor.FromArgb(48, 154, 132),
-        DrawingColor.FromArgb(54, 174, 174),
-        DrawingColor.FromArgb(58, 146, 196),
-        DrawingColor.FromArgb(54, 104, 176),
-
-        DrawingColor.FromArgb(68, 76, 188),
-        DrawingColor.FromArgb(92, 66, 180),
-        DrawingColor.FromArgb(132, 72, 186),
-        DrawingColor.FromArgb(174, 72, 176),
-        DrawingColor.FromArgb(196, 76, 146),
-        DrawingColor.FromArgb(208, 88, 114),
-        DrawingColor.FromArgb(112, 84, 84),
-        DrawingColor.FromArgb(132, 110, 98),
-
-        DrawingColor.FromArgb(38, 74, 98),
-        DrawingColor.FromArgb(46, 96, 122),
-        DrawingColor.FromArgb(54, 118, 146),
-        DrawingColor.FromArgb(64, 138, 158),
-        DrawingColor.FromArgb(82, 126, 96),
-        DrawingColor.FromArgb(102, 144, 104),
-        DrawingColor.FromArgb(132, 154, 116),
-        DrawingColor.FromArgb(164, 170, 136)
+    private static readonly IReadOnlyList<AciColor> GrayColors =
+    [
+        new(250, DrawingColor.FromArgb(51, 51, 51)),
+        new(251, DrawingColor.FromArgb(80, 80, 80)),
+        new(252, DrawingColor.FromArgb(105, 105, 105)),
+        new(253, DrawingColor.FromArgb(130, 130, 130)),
+        new(254, DrawingColor.FromArgb(190, 190, 190)),
+        new(255, DrawingColor.FromArgb(255, 255, 255))
     ];
 
     private readonly List<Button> _buttons = [];
@@ -84,59 +66,182 @@ internal sealed class CadColorTable : UserControl
 
     private Control Build()
     {
-        const int columns = 8;
-        var rows =
-            (int)Math.Ceiling(
-                Colors.Length / (double)columns);
-
-        var grid = new Grid
+        var root = new StackPanel
         {
-            ColumnSpacing = 3,
-            RowSpacing = 3
+            Spacing = 6
         };
 
-        for (var column = 0; column < columns; column++)
-            grid.ColumnDefinitions.Add(
-                new ColumnDefinition(
-                    new GridLength(1, GridUnitType.Star)));
-        for (var row = 0; row < rows; row++)
-            grid.RowDefinitions.Add(
-                new RowDefinition(new GridLength(27)));
+        root.Children.Add(
+            SectionLabel(
+                CadLanguageManager.Text(
+                    "Cad.Text.StandardColors",
+                    "Standard Colors")));
+        root.Children.Add(
+            BuildStandardRow());
 
-        for (var index = 0; index < Colors.Length; index++)
+        root.Children.Add(
+            SectionLabel(
+                CadLanguageManager.Text(
+                    "Cad.Text.IndexColors",
+                    "Index Colors")));
+        root.Children.Add(
+            BuildIndexedGrid());
+
+        root.Children.Add(
+            SectionLabel(
+                CadLanguageManager.Text(
+                    "Cad.Text.GrayColors",
+                    "Gray Scale")));
+        root.Children.Add(
+            BuildGrayRow());
+
+        return root;
+    }
+
+    private Control BuildStandardRow()
+    {
+        var grid = CreateGrid(
+            StandardColors.Count,
+            1,
+            28,
+            4);
+
+        for (var index = 0;
+             index < StandardColors.Count;
+             index++)
         {
-            var color = Colors[index];
-            var button = new Button
-            {
-                Tag = color,
-                MinWidth = 24,
-                MinHeight = CadTheme.ControlHeight,
-                Padding = new Thickness(0),
-                Margin = new Thickness(0),
-                Background =
-                    new SolidColorBrush(ToMediaColor(color)),
-                BorderBrush = CadTheme.Border,
-                BorderThickness = new Thickness(1),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
-            };
-
-            ToolTip.SetTip(
-                button,
-                $"RGB {color.R}, {color.G}, {color.B}");
-            button.Click += ColorButtonClicked;
-
-            Grid.SetColumn(
-                button,
-                index % columns);
-            Grid.SetRow(
-                button,
-                index / columns);
+            var button =
+                CreateColorButton(
+                    StandardColors[index],
+                    28);
+            Grid.SetColumn(button, index);
             grid.Children.Add(button);
-            _buttons.Add(button);
         }
 
         return grid;
+    }
+
+    private Control BuildIndexedGrid()
+    {
+        const int columns = 24;
+        const int rows = 10;
+        var grid = CreateGrid(
+            columns,
+            rows,
+            20,
+            1);
+
+        foreach (var entry in IndexedColors)
+        {
+            var offset = entry.Index - 10;
+            var column = offset / 10;
+            var row = offset % 10;
+
+            var button =
+                CreateColorButton(
+                    entry,
+                    20);
+            Grid.SetColumn(button, column);
+            Grid.SetRow(button, row);
+            grid.Children.Add(button);
+        }
+
+        return new Border
+        {
+            Background = CadTheme.PanelAlt,
+            BorderBrush = CadTheme.BorderStrong,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(4),
+            Child = grid
+        };
+    }
+
+    private Control BuildGrayRow()
+    {
+        var grid = CreateGrid(
+            GrayColors.Count,
+            1,
+            28,
+            4);
+
+        for (var index = 0;
+             index < GrayColors.Count;
+             index++)
+        {
+            var button =
+                CreateColorButton(
+                    GrayColors[index],
+                    28);
+            Grid.SetColumn(button, index);
+            grid.Children.Add(button);
+        }
+
+        return grid;
+    }
+
+    private Grid CreateGrid(
+        int columns,
+        int rows,
+        double cell,
+        double spacing)
+    {
+        var grid = new Grid
+        {
+            ColumnSpacing = spacing,
+            RowSpacing = spacing
+        };
+
+        for (var column = 0;
+             column < columns;
+             column++)
+        {
+            grid.ColumnDefinitions.Add(
+                new ColumnDefinition(
+                    new GridLength(cell)));
+        }
+
+        for (var row = 0;
+             row < rows;
+             row++)
+        {
+            grid.RowDefinitions.Add(
+                new RowDefinition(
+                    new GridLength(cell)));
+        }
+
+        return grid;
+    }
+
+    private Button CreateColorButton(
+        AciColor entry,
+        double size)
+    {
+        var button = new Button
+        {
+            Tag = entry,
+            Width = size,
+            Height = size,
+            MinWidth = size,
+            MinHeight = size,
+            Padding = new Thickness(0),
+            Margin = new Thickness(0),
+            Background =
+                new SolidColorBrush(
+                    ToMediaColor(entry.Color)),
+            BorderBrush = CadTheme.BorderStrong,
+            BorderThickness = new Thickness(1),
+            HorizontalAlignment =
+                HorizontalAlignment.Center,
+            VerticalAlignment =
+                VerticalAlignment.Center
+        };
+
+        ToolTip.SetTip(
+            button,
+            $"ACI {entry.Index}   RGB {entry.Color.R}, {entry.Color.G}, {entry.Color.B}");
+        button.Click += ColorButtonClicked;
+        _buttons.Add(button);
+        return button;
     }
 
     private void ColorButtonClicked(
@@ -145,12 +250,14 @@ internal sealed class CadColorTable : UserControl
     {
         if (sender is not Button
             {
-                Tag: DrawingColor color
+                Tag: AciColor entry
             })
             return;
 
-        SelectedColor = color;
-        ColorChanged?.Invoke(this, EventArgs.Empty);
+        SelectedColor = entry.Color;
+        ColorChanged?.Invoke(
+            this,
+            EventArgs.Empty);
     }
 
     private void RefreshSelection()
@@ -158,20 +265,118 @@ internal sealed class CadColorTable : UserControl
         foreach (var button in _buttons)
         {
             var selected =
-                button.Tag is DrawingColor color &&
-                color.ToArgb() ==
-                    _selectedColor.ToArgb();
+                button.Tag is AciColor entry &&
+                entry.Color.ToArgb() ==
+                _selectedColor.ToArgb();
 
             button.BorderBrush =
                 selected
                     ? CadTheme.Accent
-                    : CadTheme.Border;
+                    : CadTheme.BorderStrong;
             button.BorderThickness =
                 selected
-                    ? new Thickness(2)
+                    ? new Thickness(3)
                     : new Thickness(1);
         }
     }
+
+    private static Control SectionLabel(
+        string text) =>
+        new Border
+        {
+            MinHeight = 24,
+            Background = CadTheme.Header,
+            BorderBrush = CadTheme.Border,
+            BorderThickness =
+                new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(6, 0),
+            Child = new TextBlock
+            {
+                Text = text,
+                FontWeight = FontWeight.SemiBold,
+                VerticalAlignment =
+                    VerticalAlignment.Center,
+                Foreground = CadTheme.Text
+            }
+        };
+
+    private static IReadOnlyList<AciColor>
+        BuildIndexedColors()
+    {
+        var values = new List<AciColor>(240);
+        var valueLevels =
+            new[] { 1.0, 1.0, 0.65, 0.65, 0.5, 0.5, 0.30, 0.30, 0.15, 0.15 };
+        var saturationLevels =
+            new[] { 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5 };
+
+        for (var hueIndex = 0;
+             hueIndex < 24;
+             hueIndex++)
+        {
+            var hue = hueIndex * 15.0;
+            for (var shade = 0;
+                 shade < 10;
+                 shade++)
+            {
+                var index =
+                    10 + hueIndex * 10 + shade;
+                values.Add(
+                    new AciColor(
+                        index,
+                        FromHsv(
+                            hue,
+                            saturationLevels[shade],
+                            valueLevels[shade])));
+            }
+        }
+
+        return values;
+    }
+
+    private static DrawingColor FromHsv(
+        double hue,
+        double saturation,
+        double value)
+    {
+        var chroma = value * saturation;
+        var sector = hue / 60.0;
+        var x =
+            chroma *
+            (1.0 -
+             Math.Abs(
+                 sector % 2.0 -
+                 1.0));
+
+        var (r1, g1, b1) =
+            sector switch
+            {
+                >= 0 and < 1 =>
+                    (chroma, x, 0.0),
+                >= 1 and < 2 =>
+                    (x, chroma, 0.0),
+                >= 2 and < 3 =>
+                    (0.0, chroma, x),
+                >= 3 and < 4 =>
+                    (0.0, x, chroma),
+                >= 4 and < 5 =>
+                    (x, 0.0, chroma),
+                _ =>
+                    (chroma, 0.0, x)
+            };
+
+        var m = value - chroma;
+        return DrawingColor.FromArgb(
+            255,
+            Channel(r1 + m),
+            Channel(g1 + m),
+            Channel(b1 + m));
+    }
+
+    private static int Channel(double value) =>
+        Math.Clamp(
+            (int)Math.Round(value * 255.0),
+            0,
+            255);
 
     private static MediaColor ToMediaColor(
         DrawingColor value) =>

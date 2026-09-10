@@ -83,8 +83,8 @@ internal sealed class CadLayerPanelController : IDisposable
 
             var toolbar = new Grid
             {
-                ColumnSpacing = 3,
-                Margin = new Thickness(5, 5, 5, 3)
+                ColumnSpacing = 4,
+                Margin = new Thickness(7, 6, 7, 5)
             };
             toolbar.ColumnDefinitions.Add(
                 new ColumnDefinition(
@@ -134,17 +134,27 @@ internal sealed class CadLayerPanelController : IDisposable
             for (var index = 0; index < layers.Length; index++)
                 _host.Children.Add(CreateLayerRow(layers[index], index));
 
-            _host.Children.Add(new TextBlock
+            _host.Children.Add(new Border
             {
-                Text = string.Format(
-                    System.Globalization.CultureInfo.CurrentCulture,
-                    CadLanguageManager.Text(
-                        "Cad.Text.LayerCurrent",
-                        "Layer: {0}"),
-                    _workspace.Layers.Current.Name),
-                Foreground = CadTheme.Muted,
-                Margin = new Thickness(7, 3, 7, 4),
-                VerticalAlignment = VerticalAlignment.Center
+                MinHeight = CadTheme.LayerHeaderHeight,
+                Background = CadTheme.PanelAlt,
+                BorderBrush = CadTheme.Border,
+                BorderThickness = new Thickness(0, 1, 0, 0),
+                Padding = new Thickness(8, 0),
+                Child = new TextBlock
+                {
+                    Text = string.Format(
+                        System.Globalization.CultureInfo.CurrentCulture,
+                        CadLanguageManager.Text(
+                            "Cad.Text.LayerCurrent",
+                            "Layer: {0}"),
+                        _workspace.Layers.Current.Name),
+                    Foreground = CadTheme.Muted,
+                    VerticalAlignment =
+                        VerticalAlignment.Center,
+                    TextTrimming =
+                        TextTrimming.CharacterEllipsis
+                }
             });
         }
         finally
@@ -157,9 +167,10 @@ internal sealed class CadLayerPanelController : IDisposable
     {
         var grid = new Grid
         {
+            MinHeight = CadTheme.LayerHeaderHeight,
             ColumnSpacing = 3,
-            Margin = new Thickness(5, 0),
-            Background = CadTheme.Toolbar
+            Margin = new Thickness(6, 0),
+            Background = CadTheme.Header
         };
         ConfigureLayerColumns(grid);
 
@@ -203,8 +214,8 @@ internal sealed class CadLayerPanelController : IDisposable
 
         return new Border
         {
-            Background = CadTheme.Toolbar,
-            BorderBrush = CadTheme.Border,
+            Background = CadTheme.Header,
+            BorderBrush = CadTheme.BorderStrong,
             BorderThickness = new Thickness(0, 1, 0, 1),
             Child = grid
         };
@@ -216,15 +227,15 @@ internal sealed class CadLayerPanelController : IDisposable
             new ColumnDefinition(
                 new GridLength(1, GridUnitType.Star)));
         grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(48)));
+            new ColumnDefinition(new GridLength(40)));
         grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(42)));
+            new ColumnDefinition(new GridLength(38)));
         grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(76)));
+            new ColumnDefinition(new GridLength(68)));
         grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(66)));
+            new ColumnDefinition(new GridLength(58)));
         grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(48)));
+            new ColumnDefinition(new GridLength(40)));
     }
 
     private static void AddHeader(
@@ -240,7 +251,7 @@ internal sealed class CadLayerPanelController : IDisposable
             FontSize = CadTheme.SmallFontSize,
             FontWeight = FontWeight.SemiBold,
             Foreground = CadTheme.Muted,
-            Margin = new Thickness(5, 3),
+            Margin = new Thickness(4, 0),
             HorizontalAlignment = alignment,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
@@ -259,7 +270,10 @@ internal sealed class CadLayerPanelController : IDisposable
 
         var grid = new Grid
         {
-            ColumnSpacing = 3
+            MinHeight = CadTheme.LayerRowHeight,
+            ColumnSpacing = 3,
+            VerticalAlignment =
+                VerticalAlignment.Center
         };
         ConfigureLayerColumns(grid);
 
@@ -271,7 +285,9 @@ internal sealed class CadLayerPanelController : IDisposable
                 ? CadTheme.AccentSoft
                 : Brushes.Transparent,
             BorderThickness = new Thickness(0),
-            Padding = new Thickness(6, 2),
+            Padding = new Thickness(6, 1),
+            VerticalContentAlignment =
+                VerticalAlignment.Center,
             Foreground = CadTheme.Text,
             FontWeight = current
                 ? FontWeight.SemiBold
@@ -415,8 +431,9 @@ internal sealed class CadLayerPanelController : IDisposable
                 : CadTheme.Surface,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 0, 0, 1),
-            Padding = new Thickness(5, 2),
-            Margin = new Thickness(3, 0),
+            MinHeight = CadTheme.LayerRowHeight,
+            Padding = new Thickness(6, 1),
+            Margin = new Thickness(0),
             Child = grid
         };
     }
@@ -520,7 +537,14 @@ internal sealed class CadLayerPanelController : IDisposable
         var button = new Button
         {
             Content = text,
-            HorizontalContentAlignment = HorizontalAlignment.Center
+            MinWidth = CadTheme.LayerActionButtonMinWidth,
+            HorizontalContentAlignment =
+                HorizontalAlignment.Center,
+            VerticalContentAlignment =
+                VerticalAlignment.Center,
+            Background = CadTheme.PanelAlt,
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(1)
         };
         button.Classes.Add("cad-compact");
         return button;

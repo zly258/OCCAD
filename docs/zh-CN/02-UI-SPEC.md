@@ -27,3 +27,10 @@ Command Line 唯一显示完整 Tool Prompt；ToolPanel 显示参数/精确输�
 
 ## Viewport / DPI
 唯一 OCCT Host 是 `OcctAvaloniaViewport`。Drawing 使用中心留空十字。Bridge 已 requestRedraw 的操作不再重复 Redraw。125%/150% 缩放下 RenderScaling 与 native viewport input 坐标保持一致。
+
+
+## 应用首选项
+
+长期用户视图/交互偏好属于 Application State，不属于 Document State。`设置 → 首选项...` 统一编辑并持久化场景背景、Grip/Snap Marker 大小、Grip/Snap/Selection 像素容差、鼠标滚轮缩放灵敏度和 Viewer deviation/angle。
+
+设置修改后立即应用到当前 Viewport。“场景显示精度”只表示 Presentation 离散质量，不能解释为修改 CAD 模型数学精度。

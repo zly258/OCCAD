@@ -99,11 +99,26 @@ public abstract class CadDrawingTool : CadTool
         if (entity is null)
             return;
 
-        // Keep the transient preview until the document/history commit
-        // succeeds. CompleteCurrent() owns deactivation and transient cleanup,
-        // so a cleanup failure cannot leave this already-committed Tool active
-        // and accidentally allow the same entity to be committed again.
-        Context.AddEntity(entity.Duplicate());
-        Context.Workspace.Tools.CompleteCurrent();
+        var committed = entity.Duplicate();
+
+        // The transient presentation must be removed before the persistent
+        // document presentation is created. Keeping both across AddEntity()
+        // can leave the last interactive frame alive in the OCCT scene even
+        // though the Tool itself has completed.
+        Context.Preview.Clear();
+
+        try
+        {
+            Context.AddEntity(committed);
+            Context.Workspace.Tools.CompleteCurrent();
+        }
+        catch
+        {
+            // Preserve an interactive retry state if document/history commit
+            // fails after the transient was cleared.
+            if (IsActive)
+                ShowPreview(entity);
+            throw;
+        }
     }
 }

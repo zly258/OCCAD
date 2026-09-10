@@ -105,6 +105,8 @@ public sealed partial class MainWindow : Window
         WindowState = WindowState.Maximized;
         Background = CadTheme.WindowBrush;
 
+        ApplyApplicationSettingsToCore();
+
         _toolPanel = new CadToolPanel(_workspace);
         _toolPanel.PanelVisibilityChanged += (_, _) =>
             RefreshPanelMenuState();
@@ -457,7 +459,10 @@ public sealed partial class MainWindow : Window
 
     private void BuildViewportHost()
     {
-        _viewportHost.Background = CadTheme.Viewport;
+        _viewportHost.Background =
+            new SolidColorBrush(
+                ToMediaColor(
+                    _applicationSettings.SceneBackgroundColor));
         _viewportHost.ClipToBounds = true;
         _viewportHost.Children.Add(_viewport);
 
@@ -548,7 +553,8 @@ public sealed partial class MainWindow : Window
         _viewport.InitialOptions =
             new OcctViewportInitializationOptions
             {
-                BackgroundColor = DrawingColor.Black,
+                BackgroundColor =
+                    _applicationSettings.SceneBackgroundColor,
                 ViewOrientation = OcctViewOrientation.Isometric,
                 Projection = OcctProjectionType.Orthographic,
                 TriedronVisible = true,
@@ -658,15 +664,21 @@ public sealed partial class MainWindow : Window
         KeyDown += MainWindowKeyDown;
     }
 
-    private static void ConfigureEngine(OcctEngine engine)
+    private void ConfigureEngine(OcctEngine engine)
     {
+        ApplyEngineSettings(
+            engine,
+            applyExistingPrecision: true);
+
         using var batch = engine.BeginDisplayBatch();
-        engine.SetGradientBackground(DrawingColor.Black, DrawingColor.Black);
-        engine.SetSelectionTolerance(5);
         engine.SetAntialiasing(true);
-        engine.SetFaceBoundariesVisible(true, applyExisting: true);
-        engine.SetDefaultMaterial(OcctMaterial.Plastified);
-        engine.SetTriedronPosition(OcctCornerPosition.LeftLower);
+        engine.SetFaceBoundariesVisible(
+            true,
+            applyExisting: true);
+        engine.SetDefaultMaterial(
+            OcctMaterial.Plastified);
+        engine.SetTriedronPosition(
+            OcctCornerPosition.LeftLower);
         engine.SetViewCubeVisible(false);
     }
 

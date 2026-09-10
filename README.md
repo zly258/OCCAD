@@ -74,3 +74,12 @@ Entity and Layer edits use Core transaction/history paths so UI edits, Undo/Redo
 - Avoid reflection dispatch, duplicate public APIs, compatibility/migration layers, excessive smoke/check frameworks, GitHub Actions, and artificial suffixes such as `Advanced`, `Extended`, `V1`, or `V2`.
 
 See [docs/README.md](docs/README.md).
+
+
+## Application preferences
+
+`Settings → Preferences...` stores application-level viewport and interaction preferences in `%LOCALAPPDATA%\OCCAD\settings.json`.
+
+Current preferences include scene background, grip marker size and hit tolerance, snap marker size and snap tolerance, selection tolerance, mouse-wheel zoom sensitivity, and OCCT display tessellation precision.
+
+Display precision controls OCCT presentation deviation/angle only. It does **not** change the mathematical precision of BRep, curves, surfaces, dimensions, or saved CAD geometry.

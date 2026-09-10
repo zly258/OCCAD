@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
 
@@ -17,7 +18,7 @@ internal static class CadTheme
     public const double StatusHeight = 24.0;
     public const double SplitterThickness = 4.0;
     public const double ModelPanelWidth = 210.0;
-    public const double PropertyPanelWidth = 330.0;
+    public const double PropertyPanelWidth = 360.0;
     public const double ToolPanelWidth = 304.0;
     public const double PropertyLabelWidth = 112.0;
     public const double PropertyTitleHeight = 30.0;
@@ -25,6 +26,9 @@ internal static class CadTheme
     public const double PropertyRowHeight = 28.0;
     public const double PropertyRowIndent = 14.0;
     public const double PropertyChevronWidth = 16.0;
+    public const double LayerHeaderHeight = 27.0;
+    public const double LayerRowHeight = 30.0;
+    public const double LayerActionButtonMinWidth = 52.0;
     public const double ToolLabelWidth = 100.0;
     public const double DialogButtonWidth = 80.0;
     public const double DialogPadding = 12.0;

@@ -388,6 +388,13 @@ public sealed partial class MainWindow
 
         var settings = Menu(
             UiText("Cad.Text.Settings", "Settings"),
+            Plain(
+                UiText(
+                    "Cad.Text.Preferences",
+                    "Preferences..."),
+                async () =>
+                    await ShowApplicationSettingsAsync()),
+            MenuSeparator(),
             language,
             MenuSeparator(),
             snapMenu,

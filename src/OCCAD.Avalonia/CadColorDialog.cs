@@ -22,12 +22,12 @@ internal sealed class CadColorDialog : Window
         Title = CadLanguageManager.Text(
             "Cad.Text.ColorTable",
             "Color table");
-        Width = 380;
-        MinWidth = 350;
+        Width = 600;
+        MinWidth = 580;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Background = CadTheme.Surface;
+        Background = CadTheme.WindowBrush;
 
         _picker = new ColorPicker
         {
@@ -119,7 +119,7 @@ internal sealed class CadColorDialog : Window
         var content = new StackPanel
         {
             Margin = new Thickness(CadTheme.DialogPadding),
-            Spacing = 7
+            Spacing = 8
         };
         content.Children.Add(_table);
         content.Children.Add(top);

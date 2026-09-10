@@ -18,6 +18,21 @@
     <sys:String x:Key="Cad.Text.Edit">Edit</sys:String>
     <sys:String x:Key="Cad.Text.Panels">Panels</sys:String>
     <sys:String x:Key="Cad.Text.Settings">Settings</sys:String>
+    <sys:String x:Key="Cad.Text.Preferences">Preferences...</sys:String>
+    <sys:String x:Key="Cad.Text.OK">OK</sys:String>
+    <sys:String x:Key="Cad.Text.ResetDefaults">Reset Defaults</sys:String>
+    <sys:String x:Key="Cad.Settings.Scene">Scene</sys:String>
+    <sys:String x:Key="Cad.Settings.SceneBackground">Background</sys:String>
+    <sys:String x:Key="Cad.Settings.DisplayDeviation">Display Precision</sys:String>
+    <sys:String x:Key="Cad.Settings.DisplayDeviationHint">Smaller = finer</sys:String>
+    <sys:String x:Key="Cad.Settings.DisplayAngle">Angular Precision</sys:String>
+    <sys:String x:Key="Cad.Settings.Interaction">Interaction</sys:String>
+    <sys:String x:Key="Cad.Settings.GripSize">Grip Size</sys:String>
+    <sys:String x:Key="Cad.Settings.GripTolerance">Grip Tolerance</sys:String>
+    <sys:String x:Key="Cad.Settings.SnapMarkerSize">Snap Marker Size</sys:String>
+    <sys:String x:Key="Cad.Settings.SnapTolerance">Snap Tolerance</sys:String>
+    <sys:String x:Key="Cad.Settings.SelectionTolerance">Selection Tolerance</sys:String>
+    <sys:String x:Key="Cad.Settings.ZoomSensitivity">Mouse Zoom Sensitivity</sys:String>
     <sys:String x:Key="Cad.Text.Language">Language</sys:String>
     <sys:String x:Key="Cad.Text.Finish">Finish</sys:String>
     <sys:String x:Key="Cad.Text.ObjectSnap">Object Snap</sys:String>

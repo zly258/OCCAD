@@ -74,3 +74,12 @@ Entity 和 Layer 修改统一走 Core Transaction / History，保证 UI 修改�
 - 禁止反射调度、重复 public API、migration/compatibility 层、过度 smoke/check、GitHub Actions，以及 `Advanced`、`Extended`、`V1`、`V2` 等人为后缀。
 
 完整规范见 [docs/README.md](docs/README.md)。
+
+
+## 应用首选项
+
+`设置 → 首选项...` 保存应用级视图与交互偏好，配置文件位于 `%LOCALAPPDATA%\OCCAD\settings.json`。
+
+当前可设置：场景背景、夹点大小、夹点命中容差、捕捉点大小、捕捉容差、选择容差、鼠标滚轮缩放灵敏度，以及 OCCT 场景显示离散精度。
+
+其中“显示精度”只控制 OCCT Presentation 的 deviation/angle，不改变 BRep、曲线、曲面、尺寸或保存后的 CAD 几何数学精度。

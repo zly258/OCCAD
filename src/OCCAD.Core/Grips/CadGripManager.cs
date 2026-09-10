@@ -5,16 +5,20 @@ namespace OCCAD;
 
 public sealed class CadGripManager
 {
-    private const int NormalMarkerSize = 11;
-    private const int HotMarkerSize = 15;
-    private static readonly IReadOnlyDictionary<CadGripKind, byte[]> NormalMarkerPixels =
-        Enum.GetValues<CadGripKind>().ToDictionary(
-            static kind => kind,
-            static kind => CreateMarker(kind, NormalMarkerSize, Color.FromArgb(225, 45, 105, 190)));
-    private static readonly IReadOnlyDictionary<CadGripKind, byte[]> HotMarkerPixels =
-        Enum.GetValues<CadGripKind>().ToDictionary(
-            static kind => kind,
-            static kind => CreateMarker(kind, HotMarkerSize, Color.FromArgb(255, 235, 175, 35)));
+    private const int MinimumMarkerSize = 7;
+    private const int MaximumMarkerSize = 31;
+
+    private int _markerSize = 15;
+    private IReadOnlyDictionary<CadGripKind, byte[]> _normalMarkerPixels =
+        CreateMarkerSet(
+            15,
+            Color.FromArgb(235, 45, 105, 190),
+            circular: false);
+    private IReadOnlyDictionary<CadGripKind, byte[]> _hotMarkerPixels =
+        CreateMarkerSet(
+            19,
+            Color.FromArgb(255, 235, 175, 35),
+            circular: true);
 
     private readonly List<CadGripPoint> _grips = [];
     private readonly List<OcctPoint> _markers = [];
@@ -22,7 +26,48 @@ public sealed class CadGripManager
     private OcctEngine? _engine;
     private int _hotIndex = -1;
 
-    public double PixelTolerance { get; set; } = 8.0;
+    public double PixelTolerance { get; set; } = 10.0;
+
+    public int MarkerSize
+    {
+        get => _markerSize;
+        set
+        {
+            if (value < MinimumMarkerSize ||
+                value > MaximumMarkerSize)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    $"Grip marker size must be between {MinimumMarkerSize} and {MaximumMarkerSize} pixels.");
+            }
+
+            if (_markerSize == value)
+                return;
+
+            _markerSize = value;
+            _normalMarkerPixels =
+                CreateMarkerSet(
+                    _markerSize,
+                    Color.FromArgb(235, 45, 105, 190),
+                    circular: false);
+            _hotMarkerPixels =
+                CreateMarkerSet(
+                    HotMarkerSize,
+                    Color.FromArgb(255, 235, 175, 35),
+                    circular: true);
+
+            if (_engine is { IsInitialized: true } &&
+                _entities.Count > 0)
+            {
+                RebuildMarkers();
+            }
+        }
+    }
+
+    public int HotMarkerSize =>
+        Math.Min(
+            MaximumMarkerSize + 4,
+            _markerSize + 4);
     public IReadOnlyList<CadGripPoint> Grips => _grips;
     public IReadOnlyList<CadEntity> Entities => _entities;
     public CadEntity? Entity => _entities.Count == 1 ? _entities[0] : null;
@@ -114,8 +159,8 @@ public sealed class CadGripManager
                 SetMarkerStyle(
                     engine,
                     previousIndex,
-                    NormalMarkerSize,
-                    NormalMarkerPixels);
+                    MarkerSize,
+                    _normalMarkerPixels);
             }
 
             if (_hotIndex >= 0 &&
@@ -126,7 +171,7 @@ public sealed class CadGripManager
                     engine,
                     _hotIndex,
                     HotMarkerSize,
-                    HotMarkerPixels);
+                    _hotMarkerPixels);
             }
         }
 
@@ -166,8 +211,8 @@ public sealed class CadGripManager
             SetMarkerStyle(
                 engine,
                 previousIndex,
-                NormalMarkerSize,
-                NormalMarkerPixels);
+                MarkerSize,
+                _normalMarkerPixels);
         }
 
         HotChanged?.Invoke(this, EventArgs.Empty);
@@ -229,9 +274,9 @@ public sealed class CadGripManager
             {
                 var marker = engine.AddPointPixmap(
                     gripPoint.Position,
-                    NormalMarkerSize,
-                    NormalMarkerSize,
-                    NormalMarkerPixels[gripPoint.Kind]);
+                    MarkerSize,
+                    MarkerSize,
+                    _normalMarkerPixels[gripPoint.Kind]);
                 engine.SetObjectSelectable(marker, false);
                 engine.SetDisplayPriority(marker, 10);
                 _markers.Add(marker);
@@ -294,8 +339,8 @@ public sealed class CadGripManager
                 SetMarkerStyle(
                     engine,
                     index,
-                    NormalMarkerSize,
-                    NormalMarkerPixels);
+                    MarkerSize,
+                    _normalMarkerPixels);
 
             if (_hotIndex >= 0 &&
                 _hotIndex < _markers.Count)
@@ -304,7 +349,7 @@ public sealed class CadGripManager
                     engine,
                     _hotIndex,
                     HotMarkerSize,
-                    HotMarkerPixels);
+                    _hotMarkerPixels);
             }
         }
     }
@@ -378,10 +423,22 @@ public sealed class CadGripManager
             styles[_grips[index].Kind]);
     }
 
-    private static byte[] CreateMarker(
-        CadGripKind kind,
+    private static IReadOnlyDictionary<CadGripKind, byte[]> CreateMarkerSet(
         int size,
-        Color color)
+        Color color,
+        bool circular) =>
+        Enum.GetValues<CadGripKind>()
+            .ToDictionary(
+                static kind => kind,
+                _ => CreateMarker(
+                    size,
+                    color,
+                    circular));
+
+    private static byte[] CreateMarker(
+        int size,
+        Color color,
+        bool circular)
     {
         var pixels =
             new byte[checked(size * size * 4)];
@@ -397,49 +454,9 @@ public sealed class CadGripManager
                 var adx = Math.Abs(dx);
                 var ady = Math.Abs(dy);
 
-                var draw = kind switch
-                {
-                    CadGripKind.Control =>
-                        Math.Max(adx, ady) == radius,
-
-                    CadGripKind.Vertex =>
-                        Math.Abs(
-                            adx + ady - radius) <= 1,
-
-                    CadGripKind.Midpoint =>
-                        IsTriangleOutline(
-                            dx,
-                            dy,
-                            radius),
-
-                    CadGripKind.Center =>
-                        IsCircleOutline(
-                            dx,
-                            dy,
-                            radius),
-
-                    CadGripKind.Radius =>
-                        Math.Abs(
-                            adx + ady - radius) <= 1 &&
-                        !(adx <= 1 && ady <= 1),
-
-                    CadGripKind.Axis =>
-                        (adx <= 1 && ady >= 2 && ady <= radius) ||
-                        (ady <= 1 && adx >= 2 && adx <= radius),
-
-                    CadGripKind.Height =>
-                        (adx == radius / 2 &&
-                         ady <= radius) ||
-                        (ady == radius &&
-                         adx <= radius / 2),
-
-                    _ =>
-                        Math.Max(adx, ady) == radius
-                };
-
-                // Always keep the snap point itself visible through the grip.
-                if (adx <= 1 && ady <= 1)
-                    draw = false;
+                var draw = circular
+                    ? dx * dx + dy * dy <= radius * radius
+                    : adx <= radius && ady <= radius;
 
                 if (!draw)
                     continue;

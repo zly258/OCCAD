@@ -5,7 +5,8 @@ namespace OCCAD;
 
 public sealed class CadSnapManager
 {
-    private const int MarkerSize = 13;
+    private const int MinimumMarkerSize = 9;
+    private const int MaximumMarkerSize = 31;
     private const int MarkerDisplayPriority = 10;
     private const double PriorityTieDistancePixels = 2.0;
     private const double HysteresisPixels = 2.5;
@@ -19,11 +20,6 @@ public sealed class CadSnapManager
         CadSnapType.Intersection |
         CadSnapType.Perpendicular |
         CadSnapType.Tangent;
-
-    private static readonly IReadOnlyDictionary<CadSnapType, byte[]> MarkerPixels =
-        Enum.GetValues<CadSnapType>()
-            .Where(static type => type != CadSnapType.None && type != CadSnapType.Default)
-            .ToDictionary(static type => type, CreateMarkerPixels);
 
     private readonly CadDocument _document;
     private readonly Dictionary<CadEntity, IReadOnlyList<CadSnapPoint>> _snapPointCache = [];
@@ -40,6 +36,9 @@ public sealed class CadSnapManager
     private int _currentCandidateIndex = -1;
     private int? _lastResolveX;
     private int? _lastResolveY;
+    private int _markerSize = 15;
+    private IReadOnlyDictionary<CadSnapType, byte[]> _markerPixels =
+        CreateMarkerSet(15);
 
     public CadSnapManager(CadDocument document)
     {
@@ -101,6 +100,34 @@ public sealed class CadSnapManager
     public CadSnapType EffectiveModes => TemporaryModes ?? Modes;
 
     public double PixelTolerance { get; set; } = 10.0;
+
+    public int MarkerSize
+    {
+        get => _markerSize;
+        set
+        {
+            if (value < MinimumMarkerSize ||
+                value > MaximumMarkerSize)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    $"Snap marker size must be between {MinimumMarkerSize} and {MaximumMarkerSize} pixels.");
+            }
+
+            if (_markerSize == value)
+                return;
+
+            _markerSize = value;
+            _markerPixels = CreateMarkerSet(value);
+
+            var current = Current;
+            DeleteMarker();
+            if (current is { } snap)
+                ShowMarker(
+                    snap.Position,
+                    snap.Type);
+        }
+    }
     public CadSnapPoint? Current { get; private set; }
     public IReadOnlyList<CadSnapPoint> Candidates => _candidates;
     public int CurrentCandidateIndex => _currentCandidateIndex;
@@ -1076,9 +1103,9 @@ public sealed class CadSnapManager
         if (_engine is not { IsInitialized: true } engine)
             return;
 
-        var pixels = MarkerPixels.TryGetValue(type, out var value)
+        var pixels = _markerPixels.TryGetValue(type, out var value)
             ? value
-            : CreateMarkerPixels(CadSnapType.Endpoint);
+            : CreateMarkerPixels(CadSnapType.Endpoint, MarkerSize);
 
         using var batch = engine.BeginDisplayBatch();
         if (_marker is { } marker &&
@@ -1146,22 +1173,33 @@ public sealed class CadSnapManager
         not StackOverflowException and
         not AccessViolationException;
 
+    private static IReadOnlyDictionary<CadSnapType, byte[]> CreateMarkerSet(
+        int size) =>
+        Enum.GetValues<CadSnapType>()
+            .Where(static type =>
+                type != CadSnapType.None &&
+                type != CadSnapType.Default)
+            .ToDictionary(
+                static type => type,
+                type => CreateMarkerPixels(type, size));
+
     private static byte[] CreateMarkerPixels(
-        CadSnapType type)
+        CadSnapType type,
+        int size)
     {
         var pixels =
-            new byte[MarkerSize * MarkerSize * 4];
+            new byte[size * size * 4];
         var color =
             Color.FromArgb(238, 220, 45, 45);
-        var center = MarkerSize / 2;
-        const int radius = 4;
+        var center = size / 2;
+        var radius = Math.Max(3, center - 2);
 
         for (var y = 0;
-             y < MarkerSize;
+             y < size;
              y++)
         {
             for (var x = 0;
-                 x < MarkerSize;
+                 x < size;
                  x++)
             {
                 var dx = x - center;
@@ -1204,21 +1242,21 @@ public sealed class CadSnapManager
                         ady <= radius,
 
                     CadSnapType.Perpendicular =>
-                        (Math.Abs(dx + 3) <= 1 &&
-                         dy >= -4 &&
-                         dy <= 4) ||
-                        (dx >= -3 &&
-                         dx <= 4 &&
-                         Math.Abs(dy - 3) <= 1),
+                        (Math.Abs(dx + radius - 1) <= 1 &&
+                         dy >= -radius &&
+                         dy <= radius) ||
+                        (dx >= -radius + 1 &&
+                         dx <= radius &&
+                         Math.Abs(dy - radius + 1) <= 1),
 
                     CadSnapType.Tangent =>
                         IsCircleOutline(
                             dx,
                             dy + 1,
-                            3) ||
-                        (Math.Abs(dy + 4) <= 1 &&
-                         dx >= -4 &&
-                         dx <= 4),
+                            Math.Max(2, radius - 1)) ||
+                        (Math.Abs(dy + radius) <= 1 &&
+                         dx >= -radius &&
+                         dx <= radius),
 
                     CadSnapType.Nearest =>
                         (Math.Abs(dx) <= 1 &&
@@ -1240,7 +1278,7 @@ public sealed class CadSnapManager
                     continue;
 
                 var offset =
-                    (y * MarkerSize + x) *
+                    (y * size + x) *
                     4;
                 pixels[offset] = color.B;
                 pixels[offset + 1] = color.G;

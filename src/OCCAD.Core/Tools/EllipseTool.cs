@@ -25,7 +25,7 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
     public override string Id => "ellipse";
     public override string DisplayName => "Ellipse";
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new("Ellipse", BuildParameters());
 
     protected override bool CanStepBackCore => _points.Count > 0;

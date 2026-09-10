@@ -34,7 +34,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
             }
             : base.PrecisionLengthLabel;
 
-    public override CadToolPanelDescriptor ParameterPanel
+    public override CadToolParameterSchema ParameterSchema
     {
         get
         {
@@ -51,7 +51,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
             else if (_method == CenterDiameter)
                 parameters.Add(new CadOptionalDoubleToolParameterDescriptor("Diameter", "Diameter", _diameter, 2e-9, double.MaxValue));
 
-            return new CadToolPanelDescriptor("Circle", parameters);
+            return new CadToolParameterSchema("Circle", parameters);
         }
     }
 

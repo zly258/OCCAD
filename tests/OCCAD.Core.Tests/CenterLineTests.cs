@@ -71,6 +71,42 @@ public sealed class CenterLineTests
     }
 
     [TestMethod]
+    public void DeletingHostRemovesDependentAndUndoRestoresDependencyGraph()
+    {
+        using var workspace = new CadWorkspace();
+        var first = new CadLineEntity(
+            new(0, 0, 0),
+            new(100, 0, 0));
+        var second = new CadLineEntity(
+            new(0, 20, 0),
+            new(100, 20, 0));
+        workspace.Document.AddRange([first, second]);
+        var center = CadCenterLineEntity.CreateAssociative(first, second);
+        workspace.Document.Add(center);
+        workspace.History.Clear();
+
+        workspace.DeleteEntities([first]);
+
+        Assert.IsFalse(workspace.Document.Entities.Contains(first));
+        Assert.IsFalse(workspace.Document.Entities.Contains(center));
+        Assert.IsTrue(workspace.Document.Entities.Contains(second));
+        Assert.AreEqual("Delete 2", workspace.History.UndoName);
+
+        Assert.IsTrue(workspace.Undo());
+        Assert.IsTrue(workspace.Document.Entities.Contains(first));
+        Assert.IsTrue(workspace.Document.Entities.Contains(center));
+        Assert.IsTrue(workspace.Document.Entities.Contains(second));
+        CollectionAssert.AreEquivalent(
+            new[] { first.Id, second.Id },
+            center.SourceEntityIds.ToArray());
+
+        Assert.IsTrue(workspace.Redo());
+        Assert.IsFalse(workspace.Document.Entities.Contains(first));
+        Assert.IsFalse(workspace.Document.Entities.Contains(center));
+        Assert.IsTrue(workspace.Document.Entities.Contains(second));
+    }
+
+    [TestMethod]
     public void ExtensionAndGripContractMatchesSourceEntity()
     {
         var center = new CadCenterLineEntity(

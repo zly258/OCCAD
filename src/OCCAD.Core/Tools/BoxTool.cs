@@ -32,7 +32,7 @@ public sealed class BoxTool : CadDrawingTool, ICadPointInputTool
         ? "Height"
         : "Base Diagonal";
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new("Box", BuildParameters());
 
     protected override bool CanStepBackCore => Stage > 0;

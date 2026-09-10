@@ -78,6 +78,35 @@ public sealed class CenterMarkTests
     }
 
     [TestMethod]
+    public void DeletingHostCircleRemovesMarkAndUndoRestoresBoth()
+    {
+        using var workspace = new CadWorkspace();
+        var circle = new CadCircleEntity(
+            OcctPoint3d.Origin,
+            OcctVector3d.UnitZ,
+            10);
+        workspace.Document.Add(circle);
+        var mark = CadCenterMarkEntity.CreateAssociative(circle);
+        workspace.Document.Add(mark);
+        workspace.History.Clear();
+
+        workspace.DeleteEntities([circle]);
+
+        Assert.IsFalse(workspace.Document.Entities.Contains(circle));
+        Assert.IsFalse(workspace.Document.Entities.Contains(mark));
+        Assert.AreEqual("Delete 2", workspace.History.UndoName);
+
+        Assert.IsTrue(workspace.Undo());
+        Assert.IsTrue(workspace.Document.Entities.Contains(circle));
+        Assert.IsTrue(workspace.Document.Entities.Contains(mark));
+        Assert.AreEqual(circle.Id, mark.HostCircleId);
+
+        Assert.IsTrue(workspace.Redo());
+        Assert.IsFalse(workspace.Document.Entities.Contains(circle));
+        Assert.IsFalse(workspace.Document.Entities.Contains(mark));
+    }
+
+    [TestMethod]
     public void RegistryContainsCenterMarkEntityToolAndAction()
     {
         using var workspace = new CadWorkspace();

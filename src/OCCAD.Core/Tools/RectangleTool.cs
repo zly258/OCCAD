@@ -18,7 +18,7 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
     public override string Id => "rectangle";
     public override string DisplayName => "Rectangle";
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new(
             "Rectangle",
             [

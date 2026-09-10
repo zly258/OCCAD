@@ -12,7 +12,7 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
     public override string DisplayName => "Mirror";
     public override OcctPoint3d? PrecisionReferencePoint => _firstPoint;
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new(
             "Mirror",
             [

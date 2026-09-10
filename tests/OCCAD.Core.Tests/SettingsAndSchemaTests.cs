@@ -56,15 +56,16 @@ public sealed class SettingsAndSchemaTests
     }
 
     [TestMethod]
-    public void ActiveParameterisedToolsUseSchemaWithoutLegacyPanelOverride()
+    public void MigratedActiveToolsUseSchemaWithoutLegacyPanelOverride()
     {
         CadTool[] tools =
         [
-            new CircleTool(),
-            new ArcTool(),
             new RectangleTool(),
+            new RegularPolygonTool(),
             new ArrayTool(),
-            new BoxTool()
+            new CylinderTool(),
+            new ConeTool(),
+            new SphereTool()
         ];
 
         foreach (var tool in tools)

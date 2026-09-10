@@ -37,7 +37,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
             ? _points[0]
             : base.PrecisionReferencePoint;
 
-    public override CadToolPanelDescriptor ParameterPanel =>
+    public override CadToolParameterSchema ParameterSchema =>
         new("Arc", BuildParameters());
 
     protected override bool CanStepBackCore => _points.Count > 0;

@@ -139,7 +139,7 @@ public sealed class SplineTool : CadDrawingTool, ICadPointInputTool
         else
             Context.WorkPlane.SetOrigin(point);
 
-        Context.Preview.Clear();
+        ShowAcceptedSpline();
         SetStageLocalized(
             1,
             _fitPoints.Count >= 2

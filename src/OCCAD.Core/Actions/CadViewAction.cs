@@ -31,6 +31,8 @@ public sealed class CadViewAction : CadAction
             ? "Fit the current model in the viewport"
             : $"Set viewport to {DisplayName}";
 
+    public override string? Shortcut => Id == "view.fit" ? "Home" : null;
+
     public override bool CanExecute() =>
         Workspace.Engine is { IsInitialized: true };
 

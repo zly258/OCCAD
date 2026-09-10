@@ -34,6 +34,12 @@ public readonly record struct CadPlacement
     public OcctPoint3d Position =>
         ToWorldPoint(OcctPoint3d.Origin);
 
+    public (OcctPoint3d Origin, OcctVector3d XAxis, OcctVector3d YAxis, OcctVector3d ZAxis) GetWorldAxes() =>
+        (Position,
+         ToWorldVector(new OcctVector3d(1, 0, 0)),
+         ToWorldVector(new OcctVector3d(0, 1, 0)),
+         ToWorldVector(new OcctVector3d(0, 0, 1)));
+
     public CadPlacement TranslateWorld(OcctVector3d displacement)
     {
         if (!displacement.IsFinite)

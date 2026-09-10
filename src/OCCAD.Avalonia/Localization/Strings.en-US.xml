@@ -49,6 +49,10 @@
     <sys:String x:Key="Cad.Text.SnapIntersection">Intersection</sys:String>
     <sys:String x:Key="Cad.Text.SnapPerpendicular">Perpendicular</sys:String>
     <sys:String x:Key="Cad.Text.SnapTangent">Tangent</sys:String>
+    <sys:String x:Key="Cad.Text.SnapApparentIntersection">Apparent Intersection</sys:String>
+    <sys:String x:Key="Cad.Text.SnapExtension">Extension</sys:String>
+    <sys:String x:Key="Cad.Text.SnapInsertion">Insertion</sys:String>
+    <sys:String x:Key="Cad.Text.SnapNode">Node</sys:String>
     <sys:String x:Key="Cad.Text.Undo">Undo</sys:String>
     <sys:String x:Key="Cad.Text.Redo">Redo</sys:String>
     <sys:String x:Key="Cad.Text.Select">Select</sys:String>
@@ -495,15 +499,20 @@
     <sys:String x:Key="Cad.Prompt.angledimension.Second">Angle dimension: select second line [Backspace undo, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.angledimension.Position">Angle dimension: specify arc position [Backspace undo, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.angledimension.Invalid">Angle dimension: lines must share one endpoint and not be parallel [Esc cancel]</sys:String>
-    <sys:String x:Key="Cad.Text.Angle Dimension">Angle Dimension</sys:String>    <sys:String x:Key="Cad.Category.Display">Display</sys:String>
+    <sys:String x:Key="Cad.Category.Display">Display</sys:String>
     <sys:String x:Key="Cad.Category.General">General</sys:String>
     <sys:String x:Key="Cad.Category.Geometry">Geometry</sys:String>
+    <sys:String x:Key="Cad.Category.Position">Position</sys:String>
+    <sys:String x:Key="Cad.Category.Data">Data</sys:String>
     <sys:String x:Key="Cad.Category.Transform">Transform</sys:String>
     <sys:String x:Key="Cad.Category.Feature">Feature</sys:String>
     <sys:String x:Key="Cad.Category.Annotation">Annotation</sys:String>
     <sys:String x:Key="Cad.Category.Measurement">Measurement</sys:String>
     <sys:String x:Key="Cad.Category.Source">Source</sys:String>
     <sys:String x:Key="Cad.Category.State">State</sys:String>
+    <sys:String x:Key="Cad.Text.Transparent">Transparent</sys:String>
+    <sys:String x:Key="Cad.Text.HiddenLine">Hidden Line</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionFilter">Filter</sys:String>
     <sys:String x:Key="Cad.History.LayerColor">Layer Color</sys:String>
     <sys:String x:Key="Cad.History.LayerLineStyle">Layer Line Style</sys:String>
     <sys:String x:Key="Cad.History.LayerLineWidth">Layer Line Width</sys:String>
@@ -860,6 +869,8 @@
     <sys:String x:Key="Cad.Prompt.grip.Radius">Grip Edit: change radius [Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.grip.Axis">Grip Edit: change axis [Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.grip.Height">Grip Edit: change height [Esc cancel]</sys:String>
+    <sys:String x:Key="Cad.Command.OffsetOrigin">Pick offset base point, then enter the relative displacement.</sys:String>
+    <sys:String x:Key="Cad.Command.OffsetDisplacement">Enter displacement from the offset base point (# uses absolute coordinates).</sys:String>
 </ResourceDictionary>
 
 

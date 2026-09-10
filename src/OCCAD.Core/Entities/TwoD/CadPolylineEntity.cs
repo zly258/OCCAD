@@ -122,15 +122,29 @@ public sealed class CadPolylineEntity : CadEntity
             ? new CadGripWorkPlane(frame.Origin, frame.XAxis, frame.YAxis)
             : null;
 
-        var result = new CadGripPoint[_points.Count];
+        var segmentCount = Closed ? _points.Count : Math.Max(0, _points.Count - 1);
+        var result = new List<CadGripPoint>(_points.Count + segmentCount);
+
         for (var index = 0; index < _points.Count; index++)
         {
-            result[index] = new CadGripPoint(
+            result.Add(new CadGripPoint(
                 this,
                 index,
                 _points[index],
                 plane,
-                Kind: CadGripKind.Vertex);
+                Kind: CadGripKind.Vertex));
+        }
+
+        for (var segIndex = 0; segIndex < segmentCount; segIndex++)
+        {
+            var next = (segIndex + 1) % _points.Count;
+            var mid = Midpoint(_points[segIndex], _points[next]);
+            result.Add(new CadGripPoint(
+                this,
+                _points.Count + segIndex,
+                mid,
+                plane,
+                Kind: CadGripKind.Midpoint));
         }
 
         return result;
@@ -138,7 +152,8 @@ public sealed class CadPolylineEntity : CadEntity
 
     public override void MoveGrip(int index, OcctPoint3d targetPoint)
     {
-        if ((uint)index >= (uint)_points.Count)
+        var segmentCount = Closed ? _points.Count : Math.Max(0, _points.Count - 1);
+        if (index < 0 || index >= _points.Count + segmentCount)
             throw new ArgumentOutOfRangeException(nameof(index));
         if (!targetPoint.IsFinite)
             throw new ArgumentOutOfRangeException(nameof(targetPoint));
@@ -146,26 +161,43 @@ public sealed class CadPolylineEntity : CadEntity
         var candidate = TryGetPlanarFrame(out var frame)
             ? ProjectToPlane(targetPoint, frame)
             : targetPoint;
-        if (_points[index] == candidate)
-            return;
 
-        var previous = index > 0
-            ? _points[index - 1]
-            : Closed
-                ? _points[^1]
-                : (OcctPoint3d?)null;
-        var next = index + 1 < _points.Count
-            ? _points[index + 1]
-            : Closed
-                ? _points[0]
-                : (OcctPoint3d?)null;
-        if ((previous is { } before &&
-             before.DistanceTo(candidate) <= PointTolerance) ||
-            (next is { } after &&
-             after.DistanceTo(candidate) <= PointTolerance))
-            return;
+        if (index < _points.Count)
+        {
+            if (_points[index] == candidate)
+                return;
 
-        _points[index] = candidate;
+            var previous = index > 0
+                ? _points[index - 1]
+                : Closed
+                    ? _points[^1]
+                    : (OcctPoint3d?)null;
+            var next = index + 1 < _points.Count
+                ? _points[index + 1]
+                : Closed
+                    ? _points[0]
+                    : (OcctPoint3d?)null;
+            if ((previous is { } before &&
+                 before.DistanceTo(candidate) <= PointTolerance) ||
+                (next is { } after &&
+                 after.DistanceTo(candidate) <= PointTolerance))
+                return;
+
+            _points[index] = candidate;
+        }
+        else
+        {
+            var segIndex = index - _points.Count;
+            var nextIndex = (segIndex + 1) % _points.Count;
+            var currentMid = Midpoint(_points[segIndex], _points[nextIndex]);
+            var displacement = CadTransformMath.Between(currentMid, candidate);
+            if (displacement.LengthSquared <= 1e-18)
+                return;
+
+            _points[segIndex] = Translated(_points[segIndex], displacement);
+            _points[nextIndex] = Translated(_points[nextIndex], displacement);
+        }
+
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 

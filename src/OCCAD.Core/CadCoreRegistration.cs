@@ -83,12 +83,21 @@ internal static class CadCoreRegistration
         tools.Register<TorusTool>("torus");
         tools.Register<HelixTool>("helix");
         tools.Register<ExtrudeTool>("extrude");
+        tools.Register<RevolveTool>("revolve");
+        tools.Register<SweepTool>("sweep");
+        tools.Register<LoftTool>("loft");
 
         tools.Register<MoveTool>("move");
         tools.Register<CopyTool>("copy");
         tools.Register<RotateTool>("rotate");
         tools.Register<ScaleTool>("scale");
         tools.Register<MirrorTool>("mirror");
+        tools.Register<ArrayTool>("array");
+        tools.Register<OffsetTool>("offset");
+        tools.Register<TrimTool>("trim");
+        tools.Register<ExtendTool>("extend");
+        tools.Register<FilletTool>("fillet");
+        tools.Register<ChamferTool>("chamfer");
 
         return tools;
     }
@@ -120,6 +129,8 @@ internal static class CadCoreRegistration
         actions.Register(new CadViewAction(workspace, "view.right", "Right", OcctNet.OcctViewOrientation.Right));
         actions.Register(new CadDisplayModeAction(workspace, "display.wireframe", "Wireframe", OcctNet.OcctDisplayMode.Wireframe));
         actions.Register(new CadDisplayModeAction(workspace, "display.shaded", "Shaded", OcctNet.OcctDisplayMode.Shaded));
+        actions.Register(new CadTransparencyAction(workspace));
+        actions.Register(new CadHiddenLineAction(workspace));
 
         actions.Register(new CadToolAction(workspace, "draw.point", "Point", "point"));
         actions.Register(new CadToolAction(workspace, "draw.line", "Line", "line"));
@@ -164,12 +175,21 @@ internal static class CadCoreRegistration
         actions.Register(new CadToolAction(workspace, "solid.torus", "Torus", "torus"));
         actions.Register(new CadToolAction(workspace, "curve.helix", "Helix", "helix"));
         actions.Register(new CadToolAction(workspace, "feature.extrude", "Extrude", "extrude"));
+        actions.Register(new CadToolAction(workspace, "feature.revolve", "Revolve", "revolve"));
+        actions.Register(new CadToolAction(workspace, "feature.sweep", "Sweep", "sweep"));
+        actions.Register(new CadToolAction(workspace, "feature.loft", "Loft", "loft"));
 
         actions.Register(new CadToolAction(workspace, "modify.move", "Move", "move"));
         actions.Register(new CadToolAction(workspace, "modify.copy", "Copy", "copy"));
         actions.Register(new CadToolAction(workspace, "modify.rotate", "Rotate", "rotate"));
         actions.Register(new CadToolAction(workspace, "modify.scale", "Scale", "scale"));
         actions.Register(new CadToolAction(workspace, "modify.mirror", "Mirror", "mirror"));
+        actions.Register(new CadToolAction(workspace, "modify.array", "Array", "array"));
+        actions.Register(new CadToolAction(workspace, "modify.offset", "Offset", "offset"));
+        actions.Register(new CadToolAction(workspace, "modify.trim", "Trim", "trim"));
+        actions.Register(new CadToolAction(workspace, "modify.extend", "Extend", "extend"));
+        actions.Register(new CadToolAction(workspace, "modify.fillet", "Fillet", "fillet"));
+        actions.Register(new CadToolAction(workspace, "modify.chamfer", "Chamfer", "chamfer"));
         actions.Register(new CadToolAction(workspace, "measure.distance", "Distance", "distance"));
     }
 }

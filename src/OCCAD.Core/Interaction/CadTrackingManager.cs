@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using OcctNet;
 
 namespace OCCAD;
@@ -7,6 +7,8 @@ public sealed class CadTrackingManager
 {
     private OcctEngine? _engine;
     private OcctOverlay? _guide;
+
+    public bool HasTransient => Current is not null || _guide is not null;
 
     public CadTrackingResult? Current { get; private set; }
 

@@ -159,11 +159,13 @@ public sealed class CadSubobjectSelectionManager
         if (!Enum.IsDefined(operation))
             throw new ArgumentOutOfRangeException(nameof(operation));
 
+        if (!item.IsValid) return;
         item = Stabilize(item);
         var index = FindIndex(item);
-        if (operation is CadSelectionOperation.Replace or CadSelectionOperation.Add or CadSelectionOperation.Toggle)
+        if (operation is CadSelectionOperation.Replace or CadSelectionOperation.Add ||
+            operation == CadSelectionOperation.Toggle && index < 0)
         {
-            if (!_selection.CanSelect(item.Entity) ||
+            if (!_selection.CanSelectSubshape(item.Entity, item.SubshapeType) ||
                 item.SubshapeIndex < 0 ||
                 item.SubshapeType == OcctShapeType.Shape)
                 return;
@@ -226,7 +228,7 @@ public sealed class CadSubobjectSelectionManager
 
     public void RefreshValidity()
     {
-        var changed = _selected.RemoveAll(item => !_selection.CanSelect(item.Entity)) > 0;
+        var changed = _selected.RemoveAll(item => !_selection.CanSelectSubshape(item.Entity, item.SubshapeType)) > 0;
         if (!changed) return;
 
         if (Primary is { } primary && FindIndex(primary) < 0)

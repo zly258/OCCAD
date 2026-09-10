@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using OcctNet;
 
 namespace OCCAD;
@@ -710,6 +710,18 @@ public sealed class CadDocument
         _viewerObjects.Remove(shape.Id);
         if (_engine is { IsInitialized: true } engine && engine.ContainsObject(shape.Id)) engine.Delete(shape);
         entity.ViewerObject = null;
+    }
+
+    public void Regenerate()
+    {
+        if (_engine is not { IsInitialized: true } engine)
+            return;
+
+        using var batch = engine.BeginDisplayBatch();
+        foreach (var entity in _entities.ToArray())
+        {
+            RebuildPresentation(entity);
+        }
     }
 }
 

@@ -49,6 +49,10 @@
     <sys:String x:Key="Cad.Text.SnapIntersection">交点</sys:String>
     <sys:String x:Key="Cad.Text.SnapPerpendicular">垂足</sys:String>
     <sys:String x:Key="Cad.Text.SnapTangent">切点</sys:String>
+    <sys:String x:Key="Cad.Text.SnapApparentIntersection">外观交点</sys:String>
+    <sys:String x:Key="Cad.Text.SnapExtension">延伸线</sys:String>
+    <sys:String x:Key="Cad.Text.SnapInsertion">插入点</sys:String>
+    <sys:String x:Key="Cad.Text.SnapNode">节点</sys:String>
     <sys:String x:Key="Cad.Text.Undo">撤销</sys:String>
     <sys:String x:Key="Cad.Text.Redo">重做</sys:String>
     <sys:String x:Key="Cad.Text.Select">选择</sys:String>
@@ -223,14 +227,19 @@
     <sys:String x:Key="Cad.Text.SaveDocumentTitle">保存 CAD 文档</sys:String>
     <sys:String x:Key="Cad.Text.ActionUnavailable">当前状态下无法执行“{0}”。</sys:String>
     <sys:String x:Key="Cad.Category.Display">显示</sys:String>
-    <sys:String x:Key="Cad.Category.General">常规</sys:String>
+    <sys:String x:Key="Cad.Category.General">基本信息</sys:String>
     <sys:String x:Key="Cad.Category.Geometry">几何</sys:String>
+    <sys:String x:Key="Cad.Category.Position">位置</sys:String>
+    <sys:String x:Key="Cad.Category.Data">数据</sys:String>
     <sys:String x:Key="Cad.Category.Transform">变换</sys:String>
     <sys:String x:Key="Cad.Category.Feature">特征</sys:String>
     <sys:String x:Key="Cad.Category.Annotation">标注</sys:String>
     <sys:String x:Key="Cad.Category.Measurement">测量</sys:String>
     <sys:String x:Key="Cad.Category.Source">来源</sys:String>
     <sys:String x:Key="Cad.Category.State">状态</sys:String>
+    <sys:String x:Key="Cad.Text.Transparent">透明</sys:String>
+    <sys:String x:Key="Cad.Text.HiddenLine">隐藏线</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionFilter">过滤器</sys:String>
     <sys:String x:Key="Cad.History.LayerColor">图层颜色</sys:String>
     <sys:String x:Key="Cad.History.LayerLineStyle">图层线型</sys:String>
     <sys:String x:Key="Cad.History.LayerLineWidth">图层线宽</sys:String>
@@ -860,6 +869,8 @@
     <sys:String x:Key="Cad.Prompt.grip.Radius">夹点编辑：调整半径 [Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.grip.Axis">夹点编辑：调整轴方向 [Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.grip.Height">夹点编辑：调整高度 [Esc 取消]</sys:String>
+    <sys:String x:Key="Cad.Command.OffsetOrigin">指定偏移基点，然后输入相对位移。</sys:String>
+    <sys:String x:Key="Cad.Command.OffsetDisplacement">输入相对偏移基点的位移（# 表示绝对坐标）。</sys:String>
 </ResourceDictionary>
 
 

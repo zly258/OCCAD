@@ -1,4 +1,4 @@
-﻿namespace OCCAD;
+namespace OCCAD;
 
 public enum CadLayerManagerChangeKind
 {
@@ -144,6 +144,19 @@ public sealed class CadLayerManager
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.Reset,
                 _current));
+    }
+
+    internal void RestoreSnapshot(IReadOnlyList<CadLayer> layers,
+        IReadOnlyList<CadLayerState> states, CadLayer current)
+    {
+        foreach (var layer in _layers) layer.Changed -= LayerChanged;
+        _layers.Clear();
+        _layers.AddRange(layers);
+        for (var i = 0; i < layers.Count; i++) layers[i].RenameCore(states[i].Name);
+        for (var i = 0; i < layers.Count; i++) layers[i].RestoreState(states[i]);
+        _current = current;
+        foreach (var layer in _layers) layer.Changed += LayerChanged;
+        Changed?.Invoke(this, new(CadLayerManagerChangeKind.Reset, current));
     }
 
     internal int IndexOf(CadLayer layer)

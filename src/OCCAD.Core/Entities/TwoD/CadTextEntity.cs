@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Text.Json.Nodes;
 using OcctNet;
 
@@ -122,7 +122,7 @@ public sealed class CadTextEntity : CadEntity
     }
 
     public override IReadOnlyList<CadSnapPoint> GetSnapPoints() =>
-        [new(this, _position, CadSnapType.Vertex, 0)];
+        [new(this, _position, CadSnapType.Insertion, 0)];
 
     public override IReadOnlyList<CadGripPoint> GetGripPoints() =>
         [new(this, 0, _position, Kind: CadGripKind.Center)];

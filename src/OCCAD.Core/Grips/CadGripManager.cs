@@ -26,7 +26,119 @@ public sealed class CadGripManager
     private OcctEngine? _engine;
     private int _hotIndex = -1;
 
-    public double PixelTolerance { get; set; } = 10.0;
+    private OcctPoint? _dragMarker;
+    private byte[]? _dragMarkerPixels;
+    public bool HasDragTransient => _dragMarker is not null;
+
+    internal void ShowDragMarker(OcctPoint3d point)
+    {
+        if (!point.IsFinite ||
+            _engine is not { IsInitialized: true } engine)
+            return;
+
+        ClearDragMarker();
+        if (_dragMarker is not null)
+            throw new InvalidOperationException("Previous grip drag marker could not be removed.");
+
+        var size = Math.Min(35, HotMarkerSize + 2);
+        _dragMarkerPixels ??= CreateCircularMarkerPixels(
+            size,
+            Color.FromArgb(255, 245, 178, 35));
+
+        var createdMarker = engine.AddPointPixmap(
+            point,
+            size,
+            size,
+            _dragMarkerPixels);
+
+        _dragMarker = createdMarker;
+        engine.SetObjectSelectable(createdMarker, false);
+        engine.SetDisplayPriority(createdMarker, 10);
+    }
+
+    internal void UpdateDragMarker(OcctPoint3d point)
+    {
+        if (!point.IsFinite)
+            return;
+
+        var engine = _engine;
+        if (engine is not { IsInitialized: true })
+            return;
+
+        if (_dragMarker is not { } marker ||
+            !engine.ContainsObject(marker.Id))
+        {
+            ShowDragMarker(point);
+            return;
+        }
+
+        engine.UpdatePoints([
+            new OcctPointStateUpdate(
+                marker,
+                point,
+                true)
+        ]);
+    }
+
+    internal void ClearDragMarker()
+    {
+        var marker = _dragMarker;
+        if (marker is not { } existingMarker ||
+            _engine is not { IsInitialized: true } engine ||
+            !engine.ContainsObject(existingMarker.Id))
+        {
+            _dragMarker = null;
+            return;
+        }
+
+        try
+        {
+            engine.Delete(existingMarker);
+            _dragMarker = null;
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException and not AccessViolationException)
+        {
+        }
+    }
+
+    private static byte[] CreateCircularMarkerPixels(
+        int size,
+        Color color)
+    {
+        var pixels = new byte[size * size * 4];
+        var center = size / 2;
+        var radius = Math.Max(2, center - 1);
+
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var dx = x - center;
+                var dy = y - center;
+                if (dx * dx + dy * dy > radius * radius)
+                    continue;
+
+                var offset = (y * size + x) * 4;
+                pixels[offset] = color.B;
+                pixels[offset + 1] = color.G;
+                pixels[offset + 2] = color.R;
+                pixels[offset + 3] = color.A;
+            }
+        }
+
+        return pixels;
+    }
+
+    private double _pixelTolerance = 10.0;
+    public double PixelTolerance
+    {
+        get => _pixelTolerance;
+        set
+        {
+            if (!double.IsFinite(value) || value <= 0) throw new ArgumentOutOfRangeException(nameof(value));
+            _pixelTolerance = value;
+        }
+    }
 
     public int MarkerSize
     {
@@ -45,6 +157,7 @@ public sealed class CadGripManager
                 return;
 
             _markerSize = value;
+            _dragMarkerPixels = null;
             _normalMarkerPixels =
                 CreateMarkerSet(
                     _markerSize,
@@ -84,6 +197,8 @@ public sealed class CadGripManager
         if (ReferenceEquals(_engine, engine)) return;
 
         ClearMarkers();
+        ClearDragMarker();
+        _dragMarker = null;
         _engine = engine;
         if (_entities.Count > 0)
             RebuildMarkers();

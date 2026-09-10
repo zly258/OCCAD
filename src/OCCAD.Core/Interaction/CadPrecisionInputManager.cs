@@ -1,4 +1,8 @@
-﻿namespace OCCAD;
+using OcctNet;
+
+namespace OCCAD;
+
+public enum CadPointInputMode { Absolute, Relative, Polar, Offset }
 
 public readonly record struct CadPrecisionInput(
     double? Length = null,
@@ -21,6 +25,53 @@ public sealed class CadPrecisionInputManager
     }
 
     public double? Factor { get; private set; }
+    public CadPointInputMode PointMode { get; private set; }
+    public bool AwaitingOffsetOrigin { get; private set; }
+    public OcctPoint3d? OffsetOrigin { get; private set; }
+
+    public void BeginOffset()
+    {
+        PointMode = CadPointInputMode.Offset;
+        AwaitingOffsetOrigin = true;
+        OffsetOrigin = null;
+    }
+
+    internal bool CaptureOffsetOrigin(OcctPoint3d point)
+    {
+        if (!AwaitingOffsetOrigin || !point.IsFinite) return false;
+        OffsetOrigin = point;
+        AwaitingOffsetOrigin = false;
+        return true;
+    }
+
+    public void ResetPointInput()
+    {
+        PointMode = CadPointInputMode.Absolute;
+        AwaitingOffsetOrigin = false;
+        OffsetOrigin = null;
+    }
+
+    public bool TryResolvePoint(string? text, CadWorkspace workspace, out CadResolvedPoint resolved)
+    {
+        resolved = default;
+        var tool = workspace.Tools.ActiveTool;
+        if (tool?.CurrentStep.InputKind != CadToolInputKind.Point) return false;
+        var reference = OffsetOrigin ?? tool.PrecisionReferencePoint ??
+            workspace.LastResolvedPoint?.Point ?? workspace.WorkPlane.Origin;
+        var value = text?.Trim();
+        if (OffsetOrigin is not null && !string.IsNullOrEmpty(value) &&
+            !value.StartsWith('@') && !value.StartsWith('#')) value = "@" + value;
+        if (!CadCoordinateInputParser.TryParse(value, reference, workspace.WorkPlane, out var input)) return false;
+        if (OffsetOrigin is null && !AwaitingOffsetOrigin)
+            PointMode = input.Mode switch
+            {
+                CadCoordinateInputMode.RelativeCartesian => CadPointInputMode.Relative,
+                CadCoordinateInputMode.RelativePolar or CadCoordinateInputMode.AbsolutePolar => CadPointInputMode.Polar,
+                _ => CadPointInputMode.Absolute
+            };
+        resolved = new(input.Point, null);
+        return true;
+    }
 
     public bool Apply(
         CadTool? tool,

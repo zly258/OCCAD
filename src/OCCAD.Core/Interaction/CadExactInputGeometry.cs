@@ -7,7 +7,7 @@ namespace OCCAD;
 /// requiring a previous mouse sample. This keeps command-line, floating-panel
 /// and pointer input on the same Core tool state machine.
 /// </summary>
-internal static class CadExactInputGeometry
+public static class CadExactInputGeometry
 {
     public static bool TryResolveLengthAnglePoint(
         CadWorkspace workspace,

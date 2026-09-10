@@ -19,3 +19,9 @@ Entity Property 走 `CadPropertyTransaction`；Layer Color/Style/Width/Visible/L
 
 ## 仓库卫生
 根构建入口保持 `build.ps1`、`run.ps1`、`publish.ps1`。日常 Build 不 Build/Sync Bridge，不默认跑大型 smoke/check。除非策略改变，不加 GitHub Actions。不提交 build output、本地日志、临时截图、migration script、动态 icon 生成链和一次性 validation artifact。文档只描述长期契约。
+
+## 当前目录布局
+
+Avalonia: `Application/`, `Shell/`, `Viewport/`, `Input/{Cursor,DynamicInput,CommandLine}/`, `Panels/{Properties,Layers,Tools,Model}/`, `Dialogs/`, `Localization/`, `Theming/`, `Diagnostics/`. 命名空间和 Core/Avalonia 程序集边界保持不变。
+
+事务、输入、临时显示、事件和描述符的职责见[交互契约](../INTERACTION-CONTRACTS.md)。

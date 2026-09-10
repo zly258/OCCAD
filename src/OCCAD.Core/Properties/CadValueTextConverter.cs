@@ -115,10 +115,15 @@ public static class CadValueTextConverter
     }
 
     public static bool TryParseFiniteDouble(
-        string text,
+        string? text,
         out double value)
     {
-        ArgumentNullException.ThrowIfNull(text);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            value = 0.0;
+            return false;
+        }
+
         return TryParseFinite(text.Trim(), out value);
     }
 

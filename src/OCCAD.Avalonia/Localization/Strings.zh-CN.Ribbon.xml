@@ -21,4 +21,18 @@
     <sys:String x:Key="Cad.Text.RadiusDimension">半径标注</sys:String>
     <sys:String x:Key="Cad.Text.DiameterDimension">直径标注</sys:String>
     <sys:String x:Key="Cad.Text.Distance">距离</sys:String>
+    <sys:String x:Key="Cad.Text.EntityFilterAll">全部对象</sys:String>
+    <sys:String x:Key="Cad.Text.EntityFilterPoints">点对象</sys:String>
+    <sys:String x:Key="Cad.Text.EntityFilterCurves">曲线对象</sys:String>
+    <sys:String x:Key="Cad.Text.EntityFilterRegions">面域对象</sys:String>
+    <sys:String x:Key="Cad.Text.EntityFilterSolids">实体对象</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionScope">选择范围</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionScopeEntity">对象</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionScopeVertex">顶点</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionScopeEdge">边</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionScopeWire">线框</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionScopeFace">面</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionScopeShell">壳</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionScopeSolid">体</sys:String>
+    <sys:String x:Key="Cad.Text.SelectionScopeSubobject">全部子对象</sys:String>
 </ResourceDictionary>

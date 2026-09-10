@@ -19,3 +19,9 @@ Entity property edits go through `CadPropertyTransaction`. Layer color/style/wid
 
 ## Repository hygiene
 Keep root build surface small: `build.ps1`, `run.ps1`, `publish.ps1`. Daily build does not rebuild/sync Bridge or automatically run large smoke/check frameworks. Do not add GitHub Actions unless policy changes. Do not commit build output, local logs, temporary screenshots, migration scripts, generated icon pipelines, or one-off validation artifacts. Documentation describes stable contracts, not commit-by-commit progress.
+
+## Current directory layout
+
+Avalonia: `Application/`, `Shell/`, `Viewport/`, `Input/{Cursor,DynamicInput,CommandLine}/`, `Panels/{Properties,Layers,Tools,Model}/`, `Dialogs/`, `Localization/`, `Theming/`, `Diagnostics/`. Namespaces and the Core/Avalonia assembly boundary are unchanged.
+
+See [interaction contracts](../INTERACTION-CONTRACTS.md) for transaction, input, transient, event and descriptor ownership.

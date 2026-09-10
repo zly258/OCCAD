@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using OcctNet;
 
 namespace OCCAD;
@@ -12,12 +12,14 @@ public readonly record struct CadPointerPosition(int X, int Y);
 
 public sealed class CadWorkspace : IDisposable
 {
+    private readonly CadPointResolver _pointResolver;
     private bool _isModified;
     private bool _suppressModifiedTracking;
     private long _savedHistoryStateId;
 
     public CadWorkspace()
     {
+        _pointResolver = new CadPointResolver(this);
         Entities = CadCoreRegistration.CreateEntityRegistry();
         Layers = new CadLayerManager();
         Document = new CadDocument(Layers);
@@ -31,6 +33,12 @@ public sealed class CadWorkspace : IDisposable
         Precision = new CadPrecisionInputManager(Drafting, Tracking);
         Preview = new CadPreviewManager(Document);
         Grips = new CadGripManager();
+        Transients = new CadTransientScene();
+        Transients.Register(CadTransientChannel.ToolPreview, Preview.Clear, () => Preview.HasTransient);
+        Transients.Register(CadTransientChannel.Snap, Snap.Clear, () => Snap.HasTransient);
+        Transients.Register(CadTransientChannel.Tracking, Tracking.Clear, () => Tracking.HasTransient);
+        Transients.Register(CadTransientChannel.GripDrag, Grips.ClearDragMarker, () => Grips.HasDragTransient);
+        Transients.Register(CadTransientChannel.Preselection, Preselection.Clear, () => Preselection.Current is not null);
         History = new CadHistory();
 
         var toolRegistry = CadCoreRegistration.CreateToolRegistry();
@@ -44,6 +52,7 @@ public sealed class CadWorkspace : IDisposable
         Layers.Changed += LayersChangedForModification;
         History.Changed += HistoryChangedForModification;
         _savedHistoryStateId = History.CurrentStateId;
+        Events = new CadWorkspaceEvents(this);
     }
 
     public CadEntityRegistry Entities { get; }
@@ -59,6 +68,8 @@ public sealed class CadWorkspace : IDisposable
     public CadPrecisionInputManager Precision { get; }
     public CadPreviewManager Preview { get; }
     public CadGripManager Grips { get; }
+    public CadTransientScene Transients { get; }
+    public CadWorkspaceEvents Events { get; }
     public CadHistory History { get; }
     public CadToolManager Tools { get; }
     public CadActionManager Actions { get; }
@@ -122,7 +133,7 @@ public sealed class CadWorkspace : IDisposable
     {
         ArgumentNullException.ThrowIfNull(entity);
         entity.Layer = Layers.Current.Name;
-        History.Execute(
+        CadTransaction.Execute(this,
             new CadAddEntitiesHistoryEntry(
                 Document,
                 [entity],
@@ -140,7 +151,7 @@ public sealed class CadWorkspace : IDisposable
         if (values.Length == 0)
             return values;
 
-        History.Execute(
+        CadTransaction.Execute(this,
             new CadAddEntitiesHistoryEntry(
                 Document,
                 values,
@@ -169,7 +180,7 @@ public sealed class CadWorkspace : IDisposable
         Subobjects.Clear();
         Preselection.Clear();
         Grips.Clear();
-        History.Execute(
+        CadTransaction.Execute(this,
             new CadReplaceEntitiesHistoryEntry(
                 Document,
                 sources,
@@ -200,7 +211,7 @@ public sealed class CadWorkspace : IDisposable
         Subobjects.Clear();
         Preselection.Clear();
         Grips.Clear();
-        History.Execute(new CadRemoveEntitiesHistoryEntry(Document, values));
+        CadTransaction.Execute(this, new CadRemoveEntitiesHistoryEntry(Document, values));
     }
 
     public void ClearModel()
@@ -215,7 +226,7 @@ public sealed class CadWorkspace : IDisposable
 
         var entities = Document.Entities.ToArray();
         if (entities.Length == 0) return;
-        History.Execute(new CadRemoveEntitiesHistoryEntry(Document, entities));
+        CadTransaction.Execute(this, new CadRemoveEntitiesHistoryEntry(Document, entities));
     }
 
     public CadLayer AddLayer(string name, bool makeCurrent = true)
@@ -251,7 +262,7 @@ public sealed class CadWorkspace : IDisposable
         var before = Layers.Current;
         if (ReferenceEquals(before, layer)) return;
 
-        History.Execute(
+        CadTransaction.Execute(this,
             new CadSetCurrentLayerHistoryEntry(
                 Layers,
                 before,
@@ -277,7 +288,7 @@ public sealed class CadWorkspace : IDisposable
                 $"Layer '{layer.Name}' contains {entities.Count} " +
                 "entities and cannot be removed.");
 
-        History.Execute(new CadRemoveLayerHistoryEntry(Layers, layer));
+        CadTransaction.Execute(this, new CadRemoveLayerHistoryEntry(Layers, layer));
     }
 
     public void AssignEntitiesToLayer(
@@ -390,6 +401,41 @@ public sealed class CadWorkspace : IDisposable
             requireSelectable: false);
     }
 
+    public void SetTransparency(double transparency)
+    {
+        var targets = (Selection.Selected.Count > 0
+                ? Selection.Selected
+                : Document.Entities)
+            .ToArray();
+
+        ApplyStateChange(
+            targets,
+            $"Display Transparency {transparency:P0}",
+            entity =>
+            {
+                entity.DisplayMode = OcctDisplayMode.Shaded;
+                entity.Transparency = Math.Clamp(transparency, 0.0, 1.0);
+            },
+            requireSelectable: false);
+    }
+
+    public void SetHiddenLineMode()
+    {
+        var targets = (Selection.Selected.Count > 0
+                ? Selection.Selected
+                : Document.Entities)
+            .ToArray();
+
+        ApplyStateChange(
+            targets,
+            "Display Hidden Line",
+            entity =>
+            {
+                entity.DisplayMode = OcctDisplayMode.Wireframe;
+            },
+            requireSelectable: false);
+    }
+
     public void TranslateEntities(
         IEnumerable<CadEntity> entities,
         OcctVector3d displacement)
@@ -464,7 +510,7 @@ public sealed class CadWorkspace : IDisposable
             }
         }
 
-        History.Execute(
+        CadTransaction.Execute(this,
             new CadAddEntitiesHistoryEntry(
                 Document,
                 copies,
@@ -480,7 +526,7 @@ public sealed class CadWorkspace : IDisposable
         ArgumentNullException.ThrowIfNull(entities);
         var sources = EditableEntities(entities).ToArray();
         var copies = CadRectangularArray.CreateCopies(sources, columns, rows, columnStep, rowStep);
-        History.Execute(new CadAddEntitiesHistoryEntry(Document, copies, "Rectangular Array"));
+        CadTransaction.Execute(this, new CadAddEntitiesHistoryEntry(Document, copies, "Rectangular Array"));
         return copies;
     }
     public IReadOnlyList<CadEntity> CreateCircularArray(IEnumerable<CadEntity> entities, OcctPoint3d center,
@@ -488,7 +534,7 @@ public sealed class CadWorkspace : IDisposable
     {
         ArgumentNullException.ThrowIfNull(entities);
         var copies = CadCircularArray.CreateCopies(EditableEntities(entities).ToArray(), center, axis, count, sweep, rotateItems, reference);
-        History.Execute(new CadAddEntitiesHistoryEntry(Document, copies, "Circular Array"));
+        CadTransaction.Execute(this, new CadAddEntitiesHistoryEntry(Document, copies, "Circular Array"));
         return copies;
     }
     public IReadOnlyList<CadEntity> CreatePathArray(IEnumerable<CadEntity> entities, CadEntity pathEntity,
@@ -501,7 +547,7 @@ public sealed class CadWorkspace : IDisposable
         if (sources.Contains(pathEntity)) throw new ArgumentException("The path cannot also be a source object.", nameof(pathEntity));
         using var path = new CadArrayPath(pathEntity);
         var copies = CadPathArray.CreateCopies(sources, path, spacing, reference, forward, up, align);
-        History.Execute(new CadAddEntitiesHistoryEntry(Document, copies, "Path Array"));
+        CadTransaction.Execute(this, new CadAddEntitiesHistoryEntry(Document, copies, "Path Array"));
         return copies;
     }
     public IReadOnlyList<CadEntity> MirrorEntities(IEnumerable<CadEntity> entities, OcctPoint3d origin,
@@ -511,7 +557,7 @@ public sealed class CadWorkspace : IDisposable
         var sources = EditableEntities(entities).ToArray();
         var copies = sources.Select(entity => entity.MirroredCopy(origin, normal)).ToArray();
         if (copies.Length == 0) return copies;
-        if (keepSource) History.Execute(new CadAddEntitiesHistoryEntry(Document, copies, "Mirror"));
+        if (keepSource) CadTransaction.Execute(this, new CadAddEntitiesHistoryEntry(Document, copies, "Mirror"));
         else
         {
             var geometry = sources.Zip(copies).ToDictionary(pair => pair.First, pair => pair.Second);
@@ -519,6 +565,9 @@ public sealed class CadWorkspace : IDisposable
         }
         return keepSource ? copies : sources;
     }
+
+    public CadTransaction BeginTransaction(string name = "Modify") => new(this, name);
+
     public IReadOnlyList<CadEntity> CaptureEntityStates(
         IEnumerable<CadEntity> entities)
     {
@@ -590,8 +639,10 @@ public sealed class CadWorkspace : IDisposable
         Subobjects.Clear();
         Preselection.Clear();
         Grips.Clear();
-        using var changes = Document.BeginChangeSet();
-        return History.Undo();
+        bool changed;
+        using (Document.BeginChangeSet()) changed = History.Undo();
+        if (changed) SetModified(History.CurrentStateId != _savedHistoryStateId);
+        return changed;
     }
 
     public bool Redo()
@@ -601,8 +652,10 @@ public sealed class CadWorkspace : IDisposable
         Subobjects.Clear();
         Preselection.Clear();
         Grips.Clear();
-        using var changes = Document.BeginChangeSet();
-        return History.Redo();
+        bool changed;
+        using (Document.BeginChangeSet()) changed = History.Redo();
+        if (changed) SetModified(History.CurrentStateId != _savedHistoryStateId);
+        return changed;
     }
 
     public void ResetDocument()
@@ -636,87 +689,19 @@ public sealed class CadWorkspace : IDisposable
     internal void ObservePointer(int x, int y) =>
         LastPointerPosition = new CadPointerPosition(x, y);
 
-    public CadResolvedPoint ResolvePoint(
-        int x,
-        int y,
-        OcctPoint3d? constraintOrigin = null,
+    public CadResolvedPoint ResolvePoint(int x, int y, OcctPoint3d? constraintOrigin = null,
         CadSnapResolvePolicy snapPolicy = default)
     {
         ObservePointer(x, y);
-        var engine = Engine ??
-            throw new InvalidOperationException("No OCCT engine is attached.");
-
-        OcctPoint3d point;
-        if (WorkPlane.IsActive)
-        {
-            var ray = engine.GetViewRay(x, y);
-            if (!WorkPlane.TryIntersect(ray, out point))
-                throw new InvalidOperationException(
-                    "The view ray is parallel to the active work plane.");
-        }
-        else
-        {
-            point = engine.ScreenToWorld(x, y);
-        }
-
-        var snap = Snap.Resolve(
-            x,
-            y,
-            point,
-            WorkPlane,
-            constraintOrigin,
-            snapPolicy);
-        if (snap is { } value)
-        {
-            point = value.Position;
-            // Hovering a snap target must not replace the drawing frame or unlock it.
-            // Tools capture their frame when activated; only an explicit plane change
-            // may reinitialize that frame before the first point.
-        }
-
-        CadTrackingResult? tracking = null;
-        if (constraintOrigin is { } trackingOrigin)
-        {
-            if (snap is null)
-                tracking = Drafting.Track(
-                    WorkPlane,
-                    trackingOrigin,
-                    point);
-            if (tracking is { } tracked)
-                point = tracked.Point;
-
-            var constrained = Drafting.Constrain(
-                WorkPlane,
-                trackingOrigin,
-                point);
-            if (snap is not null && constrained.DistanceTo(point) > 1e-9)
-            {
-                // An explicit dimension wins over an incompatible object snap.
-                snap = null;
-                Snap.Clear();
-            }
-            point = constrained;
-
-            tracking = tracking is { } activeTracking
-                ? activeTracking with { Point = point }
-                : Drafting.ConstraintGuide(
-                    WorkPlane,
-                    trackingOrigin,
-                    point);
-        }
-
-        if (constraintOrigin is not null)
-            Tracking.Update(WorkPlane, point, tracking);
-        else
-            Tracking.Clear();
-
-        var resolved = new CadResolvedPoint(point, snap, tracking);
+        var resolved = _pointResolver.Resolve(x, y, constraintOrigin, snapPolicy);
         LastResolvedPoint = resolved;
         return resolved;
     }
 
     public void Dispose()
     {
+        Events.Dispose();
+        Transients.ClearAll();
         Selection.Changed -= FormalSelectionChanged;
         Subobjects.Changed -= SubobjectSelectionChanged;
         Document.ChangeSetCommitted -= DocumentChangedForModification;
@@ -815,6 +800,8 @@ public sealed class CadWorkspace : IDisposable
         SetModified(args.StateId != _savedHistoryStateId);
     }
 
+    internal void RestoreModifiedState(bool value) => SetModified(value);
+
     private void SetModified(bool value)
     {
         if (_isModified == value) return;
@@ -832,63 +819,8 @@ public sealed class CadWorkspace : IDisposable
             .ToArray();
     }
 
-    private void ApplyGeometryChange(
-        IEnumerable<CadEntity> entities,
-        string name,
-        Action<CadEntity> action)
-    {
-        ArgumentNullException.ThrowIfNull(entities);
-        ArgumentNullException.ThrowIfNull(action);
-        var targets = entities.Distinct().ToArray();
-        if (targets.Length == 0) return;
-
-        var before = targets
-            .Select(static entity => entity.Duplicate())
-            .ToArray();
-        using var changes = Document.BeginChangeSet();
-        try
-        {
-            foreach (var entity in targets)
-                action(entity);
-
-            var after = targets
-                .Select(static entity => entity.Duplicate())
-                .ToArray();
-            History.RecordApplied(
-                new CadGeometryHistoryEntry(
-                    targets,
-                    before,
-                    after,
-                    name));
-        }
-        catch (Exception failure)
-        {
-            var failures =
-                new List<Exception> { failure };
-            for (var index = 0; index < targets.Length; index++)
-            {
-                try
-                {
-                    targets[index]
-                        .RestoreGeometrySnapshot(
-                            before[index]);
-                }
-                catch (Exception restoreFailure)
-                {
-                    failures.Add(restoreFailure);
-                }
-            }
-
-            if (failures.Count > 1)
-            {
-                throw new AggregateException(
-                    "Geometry change and rollback both failed.",
-                    failures);
-            }
-
-            throw;
-        }
-    }
+    private void ApplyGeometryChange(IEnumerable<CadEntity> entities, string name, Action<CadEntity> action) =>
+        CadTransaction.ApplyEntities(this, entities.Distinct().ToArray(), name, action, geometryOnly: true);
 
     private void ApplyLayerChange(
         CadLayer layer,
@@ -934,70 +866,11 @@ public sealed class CadWorkspace : IDisposable
         }
     }
 
-    private void ApplyStateChange(
-        IEnumerable<CadEntity> entities,
-        string name,
-        Action<CadEntity> action,
-        bool requireSelectable = true)
+    private void ApplyStateChange(IEnumerable<CadEntity> entities, string name,
+        Action<CadEntity> action, bool requireSelectable = true)
     {
-        ArgumentNullException.ThrowIfNull(entities);
-        ArgumentNullException.ThrowIfNull(action);
-
-        var candidates = entities
-            .Distinct()
-            .Where(Document.Entities.Contains);
-        var targets = (requireSelectable
-                ? candidates.Where(Document.IsEntitySelectable)
-                : candidates)
-            .ToArray();
-        if (targets.Length == 0) return;
-
-        var before = targets
-            .Select(static entity => entity.Duplicate())
-            .ToArray();
-        using var changes = Document.BeginChangeSet();
-        try
-        {
-            foreach (var entity in targets)
-                action(entity);
-
-            var after = targets
-                .Select(static entity => entity.Duplicate())
-                .ToArray();
-            History.RecordApplied(
-                new CadEntityStateHistoryEntry(
-                    targets,
-                    before,
-                    after,
-                    name));
-            Selection.RefreshValidity();
-            Subobjects.RefreshValidity();
-        }
-        catch (Exception failure)
-        {
-            var failures =
-                new List<Exception> { failure };
-            for (var index = 0; index < targets.Length; index++)
-            {
-                try
-                {
-                    targets[index]
-                        .RestoreState(before[index]);
-                }
-                catch (Exception restoreFailure)
-                {
-                    failures.Add(restoreFailure);
-                }
-            }
-
-            if (failures.Count > 1)
-            {
-                throw new AggregateException(
-                    "Entity state change and rollback both failed.",
-                    failures);
-            }
-
-            throw;
-        }
+        var targets = entities.Distinct().Where(Document.Entities.Contains)
+            .Where(entity => !requireSelectable || Document.IsEntitySelectable(entity)).ToArray();
+        CadTransaction.ApplyEntities(this, targets, name, action);
     }
 }

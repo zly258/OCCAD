@@ -1,4 +1,4 @@
-﻿namespace OCCAD;
+namespace OCCAD;
 
 public interface ICadHistoryEntry
 {
@@ -50,6 +50,21 @@ public sealed class CadHistory
 
     public event EventHandler<CadHistoryChangedEventArgs>? Changed;
 
+    internal bool RecordingSuspended { get; private set; }
+
+    internal void SuspendRecording()
+    {
+        if (RecordingSuspended) throw new InvalidOperationException("Nested batch transactions are not supported.");
+        RecordingSuspended = true;
+    }
+
+    internal void ResumeRecording() => RecordingSuspended = false;
+
+    private void EnsureNoTransaction()
+    {
+        if (RecordingSuspended) throw new InvalidOperationException("Finish the transaction before changing history.");
+    }
+
     public void Execute(ICadHistoryEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
@@ -61,6 +76,7 @@ public sealed class CadHistory
     {
         ArgumentNullException.ThrowIfNull(entry);
 
+        if (RecordingSuspended) return;
         var record = new CadHistoryRecord(
             entry,
             CurrentStateId,
@@ -74,6 +90,7 @@ public sealed class CadHistory
 
     public bool Undo()
     {
+        EnsureNoTransaction();
         if (!_undo.TryPeek(out var record)) return false;
 
         record.Entry.Undo();
@@ -86,6 +103,7 @@ public sealed class CadHistory
 
     public bool Redo()
     {
+        EnsureNoTransaction();
         if (!_redo.TryPeek(out var record)) return false;
 
         record.Entry.Redo();
@@ -98,6 +116,7 @@ public sealed class CadHistory
 
     public void Clear()
     {
+        EnsureNoTransaction();
         var changed =
             _undo.Count > 0 ||
             _redo.Count > 0 ||

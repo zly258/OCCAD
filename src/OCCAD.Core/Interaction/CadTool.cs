@@ -34,14 +34,13 @@ public readonly record struct CadToolStep(
 public readonly record struct CadToolInteractionPolicy(
     bool SelectionEnabled,
     bool PreselectionEnabled,
-    bool SubobjectEnabled,
     bool GripEnabled)
 {
     public static CadToolInteractionPolicy Drawing =>
-        new(false, false, false, false);
+        new(false, false, false);
 
     public static CadToolInteractionPolicy Selection =>
-        new(true, true, false, false);
+        new(true, true, false);
 }
 
 public readonly record struct CadToolInteractionState(
@@ -64,8 +63,9 @@ public abstract class CadTool
 
     private CadToolState _state = CadToolState.Idle;
     private int _stage;
-    private CadSelectionFilter? _previousSelectionFilter;
-    private readonly List<CadEntity> _replacementPreviewSources = [];
+    private CadEntityFilter? _previousSelectionFilter;
+    private CadSelectionScope _previousSelectionScope;
+    private CadSubshapeMask _previousSubshapeMask;
 
     public CadToolState State => _state;
     public int Stage => _stage;
@@ -85,6 +85,8 @@ public abstract class CadTool
         State == CadToolState.WaitForSelect
             ? CadToolInteractionPolicy.Selection
             : CadToolInteractionPolicy.Drawing;
+    public virtual CadSelectionScope SelectionScope => CadSelectionScope.Entity;
+    public virtual CadSubshapeMask SubshapeMask => CadSubshapeMask.All;
     public virtual string PrecisionAngleLabel => "Angle";
     public virtual string PrecisionFactorLabel => "Factor";
 
@@ -98,7 +100,7 @@ public abstract class CadTool
 
     public bool HasPreview =>
         IsActive &&
-        (Context.Preview.IsVisible || _replacementPreviewSources.Count > 0);
+        Context.Preview.HasTransient;
     public virtual bool CanCommitCurrentStage =>
         IsActive &&
         CanCommitCurrentStageCore &&
@@ -118,6 +120,9 @@ public abstract class CadTool
         _state = CadToolState.Drawing;
         _stage = 0;
         _previousSelectionFilter = Context.Selection.Filter;
+        _previousSelectionScope = Context.Selection.Scope;
+        _previousSubshapeMask = Context.Selection.SubshapeMask;
+        Context.Selection.SetScope(SelectionScope, SubshapeMask);
         Context.ActiveTool = this;
         Context.WorkPlane.BeginToolPlane(Context.WorkPlane.Origin);
         Context.Snap.Active = true;
@@ -136,8 +141,9 @@ public abstract class CadTool
 
         // Tool-local cleanup belongs here. Workspace-wide transient state is
         // reset exactly once by CadToolManager.ResetNeutralInteractionState().
-        TryCleanup(RestoreReplacementPreviewSources);
+        TryCleanup(Context.Preview.Clear);
         TryCleanup(() => Context.Selection.SetFilter(_previousSelectionFilter));
+        TryCleanup(() => Context.Selection.SetScope(_previousSelectionScope, _previousSubshapeMask));
 
         Prompt = null;
         IsActive = false;
@@ -158,6 +164,10 @@ public abstract class CadTool
             catch (Exception exception) { failure ??= exception; }
         }
     }
+
+    internal bool CommitCurrentStage(CadResolvedPoint point) =>
+        IsActive && CurrentStep.InputKind == CadToolInputKind.Point &&
+        this is ICadPointInputTool input && input.TryAcceptPoint(point.Point);
 
     internal virtual bool CommitCurrentStage()
     {
@@ -280,95 +290,27 @@ public abstract class CadTool
     protected internal virtual void OnWorkPlaneChanged() { }
     protected internal virtual void RefreshPreviewFromLastPointer(CadPointerPosition pointer) { }
 
-    protected void SetSelectionFilter(CadSelectionFilter? filter) => Context.Selection.SetFilter(filter);
+    protected void SetSelectionFilter(CadEntityFilter? filter) => Context.Selection.SetFilter(filter);
     protected void NotifyUpdated() => PublishUpdated();
 
     protected void ShowReplacementPreview(
         IReadOnlyList<CadEntity> sources,
-        IReadOnlyList<CadEntity> replacements)
-    {
-        ArgumentNullException.ThrowIfNull(sources);
-        ArgumentNullException.ThrowIfNull(replacements);
+        IReadOnlyList<CadEntity> replacements) =>
+        Context.Preview.ShowReplacement(sources, replacements);
 
-        if (!MatchesReplacementPreviewSources(sources))
-        {
-            RestoreReplacementPreviewSources();
-            SuppressReplacementPreviewSources(sources);
-        }
-
-        try { Context.Preview.Show(replacements); }
-        catch
-        {
-            RestoreReplacementPreviewSources();
-            throw;
-        }
-    }
-
-    protected void ClearReplacementPreview()
-    {
-        Context.Preview.Clear();
-        RestoreReplacementPreviewSources();
-    }
+    protected void ClearReplacementPreview() => Context.Preview.Clear();
 
     protected void CommitReplacementPreview(Action commit)
     {
         ArgumentNullException.ThrowIfNull(commit);
-        var sources = _replacementPreviewSources.ToArray();
-        commit();
-        _replacementPreviewSources.Clear();
-        try { Context.Preview.Clear(); }
-        finally { RestoreReplacementPreviewSources(sources); }
-    }
-
-    private bool MatchesReplacementPreviewSources(IReadOnlyList<CadEntity> sources)
-    {
-        if (_replacementPreviewSources.Count != sources.Count) return false;
-        for (var index = 0; index < sources.Count; index++)
-            if (!ReferenceEquals(_replacementPreviewSources[index], sources[index]))
-                return false;
-        return true;
-    }
-
-    private void SuppressReplacementPreviewSources(IReadOnlyList<CadEntity> sources)
-    {
-        if (sources.Count == 0 || Context.Workspace.Engine is not { IsInitialized: true } engine)
-            return;
-
-        using var batch = engine.BeginDisplayBatch();
-        foreach (var entity in sources)
+        var engine = Context.Workspace.Engine;
+        using (engine?.BeginDisplayBatch())
         {
-            if (_replacementPreviewSources.Contains(entity)) continue;
-            if (entity.ViewerObject is not { } source ||
-                !engine.ContainsObject(source.Id) ||
-                !Context.Document.ResolveAppearance(entity).Visible)
-                continue;
-
-            engine.SetObjectTransparency(source, 1.0);
-            _replacementPreviewSources.Add(entity);
-        }
-    }
-
-    private void RestoreReplacementPreviewSources()
-    {
-        if (_replacementPreviewSources.Count == 0) return;
-        var values = _replacementPreviewSources.ToArray();
-        _replacementPreviewSources.Clear();
-        RestoreReplacementPreviewSources(values);
-    }
-
-    private void RestoreReplacementPreviewSources(IReadOnlyList<CadEntity> values)
-    {
-        if (values.Count == 0 || Context.Workspace.Engine is not { IsInitialized: true } engine)
-            return;
-
-        using var batch = engine.BeginDisplayBatch();
-        foreach (var entity in values)
-        {
-            if (entity.ViewerObject is not { } source || !engine.ContainsObject(source.Id))
-                continue;
-
-            engine.SetObjectTransparency(source, Math.Clamp(entity.Transparency, 0.0, 1.0));
-            engine.SetObjectVisible(source, Context.Document.ResolveAppearance(entity).Visible);
+            Context.Preview.Clear();
+            if (Context.Preview.HasTransient)
+                throw new InvalidOperationException("Replacement preview cleanup is incomplete.");
+            try { commit(); }
+            finally { engine?.Redraw(); }
         }
     }
 
@@ -392,10 +334,17 @@ public abstract class CadTool
         Context.Workspace.Drafting.AngleLockEnabled = true;
     }
 
-    protected virtual bool CanCommitCurrentStageCore => false;
+    protected virtual bool CanCommitCurrentStageCore =>
+        this is ICadPointInputTool || InputKind == CadToolInputKind.Confirmation ||
+        InputKind == CadToolInputKind.Selection && Context.Workspace.Preselection.Current is not null;
     protected virtual bool CanFinishCore => false;
     protected virtual bool CanStepBackCore => false;
-    protected virtual bool OnCommitCurrentStage(CadPointerPosition pointer) => false;
+    protected virtual bool OnCommitCurrentStage(CadPointerPosition pointer) =>
+        InputKind == CadToolInputKind.Point && this is ICadPointInputTool pointInput
+            ? pointInput.TryAcceptPoint(Context.ResolvePoint(pointer.X, pointer.Y, PrecisionReferencePoint).Point)
+            : InputKind is CadToolInputKind.Selection or CadToolInputKind.Confirmation && HandlePointer(new(
+                OcctPointerInputKind.Pressed, OcctPointerButton.Left, OcctPointerButtons.Left,
+                pointer.X, pointer.Y, 0, OcctInputModifiers.None));
     protected virtual bool OnFinish() => false;
     protected virtual bool OnStepBack() => false;
     protected virtual bool OnPrecisionInputApplied(CadPrecisionInput input) => true;

@@ -233,11 +233,10 @@ public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputToo
             return false;
         }
 
-        Context.Workspace.ScaleEntities(
+        CommitTransform(() => Context.Workspace.ScaleEntities(
             Entities,
             _basePoint.Value,
-            factor);
-        Context.Workspace.Tools.CompleteCurrent();
+            factor));
         return true;
     }
 

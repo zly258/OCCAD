@@ -6,7 +6,8 @@ public enum CadCoordinateInputMode
 {
     AbsoluteCartesian,
     RelativeCartesian,
-    RelativePolar
+    RelativePolar,
+    AbsolutePolar
 }
 
 public readonly record struct CadCoordinateInput(
@@ -39,16 +40,16 @@ public static class CadCoordinateInputParser
 
         var value = text.Trim();
         var relative = value.StartsWith('@');
-        if (relative)
+        if (relative || value.StartsWith('#'))
             value = value[1..].Trim();
 
-        if (relative && value.Contains('<', StringComparison.Ordinal))
-            return TryParseRelativePolar(value, reference, workPlane, out input);
+        if (value.Contains('<', StringComparison.Ordinal))
+            return TryParsePolar(value, reference, workPlane, relative, out input);
 
         if (!TryParseCartesian(value, out var x, out var y, out var z, out var hasZ))
             return false;
 
-        var frame = workPlane.EffectivePlane;
+        var frame = relative ? workPlane.EffectivePlane : workPlane.UserPlane;
         if (!frame.XAxis.Cross(frame.YAxis).TryNormalize(out var normal))
             return false;
 
@@ -77,10 +78,11 @@ public static class CadCoordinateInputParser
         return point.IsFinite;
     }
 
-    private static bool TryParseRelativePolar(
+    private static bool TryParsePolar(
         string value,
         OcctPoint3d reference,
         CadWorkPlane workPlane,
+        bool relative,
         out CadCoordinateInput input)
     {
         input = default;
@@ -93,17 +95,17 @@ public static class CadCoordinateInputParser
         if (!TryDouble(value[(separator + 1)..], out var angleDegrees))
             return false;
 
-        var frame = workPlane.EffectivePlane;
+        var frame = relative ? workPlane.EffectivePlane : workPlane.UserPlane;
         var radians = angleDegrees * Math.PI / 180.0;
         var direction =
             frame.XAxis * Math.Cos(radians) +
             frame.YAxis * Math.Sin(radians);
-        var point = reference + direction * distance;
+        var point = (relative ? reference : frame.Origin) + direction * distance;
         if (!point.IsFinite)
             return false;
 
         input = new CadCoordinateInput(
-            CadCoordinateInputMode.RelativePolar,
+            relative ? CadCoordinateInputMode.RelativePolar : CadCoordinateInputMode.AbsolutePolar,
             point,
             distance,
             angleDegrees);
@@ -121,7 +123,7 @@ public static class CadCoordinateInputParser
         hasZ = false;
 
         var parts = value
-            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            .Split(',', StringSplitOptions.TrimEntries);
         if (parts.Length is not (2 or 3))
             return false;
 

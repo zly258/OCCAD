@@ -8,7 +8,6 @@ public sealed class CadSnapManager
     private const int MinimumMarkerSize = 9;
     private const int MaximumMarkerSize = 31;
     private const int MarkerDisplayPriority = 10;
-    private const double PriorityTieDistancePixels = 2.0;
     private const double HysteresisPixels = 2.5;
 
     private const CadSnapType RuntimeModes =
@@ -20,7 +19,11 @@ public sealed class CadSnapManager
         CadSnapType.Nearest |
         CadSnapType.Intersection |
         CadSnapType.Perpendicular |
-        CadSnapType.Tangent;
+        CadSnapType.Tangent |
+        CadSnapType.ApparentIntersection |
+        CadSnapType.Extension |
+        CadSnapType.Insertion |
+        CadSnapType.Node;
 
     private const CadSnapType CompatibleModes = RuntimeModes;
 
@@ -40,8 +43,9 @@ public sealed class CadSnapManager
     private int? _lastResolveX;
     private int? _lastResolveY;
     private int _markerSize = 15;
+    private Color _markerColor = Color.FromArgb(245, 220, 45, 45);
     private IReadOnlyDictionary<CadSnapType, byte[]> _markerPixels =
-        CreateMarkerSet(15);
+        CreateMarkerSet(15, Color.FromArgb(245, 220, 45, 45));
 
     public CadSnapManager(CadDocument document)
     {
@@ -109,7 +113,16 @@ public sealed class CadSnapManager
     public CadSnapType EffectiveModes =>
         NormalizeModes(TemporaryModes ?? Modes);
 
-    public double PixelTolerance { get; set; } = 10.0;
+    private double _pixelTolerance = 10.0;
+    public double PixelTolerance
+    {
+        get => _pixelTolerance;
+        set
+        {
+            if (!double.IsFinite(value) || value <= 0) throw new ArgumentOutOfRangeException(nameof(value));
+            _pixelTolerance = value;
+        }
+    }
 
     public int MarkerSize
     {
@@ -128,7 +141,7 @@ public sealed class CadSnapManager
                 return;
 
             _markerSize = value;
-            _markerPixels = CreateMarkerSet(value);
+            _markerPixels = CreateMarkerSet(value, _markerColor);
 
             var current = Current;
             DeleteMarker();
@@ -138,6 +151,28 @@ public sealed class CadSnapManager
                     snap.Type);
         }
     }
+
+    public Color MarkerColor
+    {
+        get => _markerColor;
+        set
+        {
+            if (_markerColor == value)
+                return;
+
+            _markerColor = value;
+            _markerPixels = CreateMarkerSet(_markerSize, value);
+
+            var current = Current;
+            DeleteMarker();
+            if (current is { } snap)
+                ShowMarker(
+                    snap.Position,
+                    snap.Type);
+        }
+    }
+
+    public bool HasTransient => Current is not null || _marker is not null || _candidates.Count > 0;
 
     public CadSnapPoint? Current { get; private set; }
     public IReadOnlyList<CadSnapPoint> Candidates => _candidates;
@@ -240,24 +275,13 @@ public sealed class CadSnapManager
 
             ranked.Sort(static (left, right) =>
             {
-                var leftDistance = Math.Sqrt(left.DistanceSquared);
-                var rightDistance = Math.Sqrt(right.DistanceSquared);
-
-                if (Math.Abs(leftDistance - rightDistance) >
-                    PriorityTieDistancePixels)
-                    return leftDistance.CompareTo(rightDistance);
-
                 var result = left.Priority.CompareTo(right.Priority);
                 if (result != 0)
                     return result;
 
-                result = left.DepthDistanceSquared.CompareTo(
-                    right.DepthDistanceSquared);
-                if (result != 0)
-                    return result;
-
-                result = left.DistanceSquared.CompareTo(
-                    right.DistanceSquared);
+                result = left.DistanceSquared.CompareTo(right.DistanceSquared);
+                if (result != 0) return result;
+                result = left.DepthDistanceSquared.CompareTo(right.DepthDistanceSquared);
                 return result != 0
                     ? result
                     : left.Order.CompareTo(right.Order);
@@ -290,7 +314,7 @@ public sealed class CadSnapManager
                     var currentDistance = Math.Sqrt(
                         ranked[index].DistanceSquared);
 
-                    if (currentDistance <=
+                    if (ranked[index].Priority == ranked[0].Priority && currentDistance <=
                         bestDistance + HysteresisPixels)
                     {
                         hysteresisIndex = index;
@@ -1002,14 +1026,13 @@ public sealed class CadSnapManager
 
     internal static int PriorityGroup(CadSnapType type) => type switch
     {
-        CadSnapType.Endpoint or CadSnapType.Vertex => 0,
-        CadSnapType.Intersection => 1,
-        CadSnapType.Midpoint => 2,
-        CadSnapType.Center or CadSnapType.Quadrant => 3,
-        CadSnapType.Perpendicular => 4,
-        CadSnapType.Tangent => 5,
-        CadSnapType.Nearest => 6,
-        _ => 7
+        CadSnapType.Endpoint or CadSnapType.Vertex or CadSnapType.Intersection => 0,
+        CadSnapType.Midpoint or CadSnapType.Center => 1,
+        CadSnapType.Perpendicular or CadSnapType.Tangent => 2,
+        CadSnapType.Quadrant or CadSnapType.Extension or CadSnapType.Insertion or
+            CadSnapType.Node or CadSnapType.ApparentIntersection => 3,
+        CadSnapType.Nearest => 4,
+        _ => 12
     };
 
     private static CadSnapType NormalizeModes(CadSnapType value) =>
@@ -1081,7 +1104,7 @@ public sealed class CadSnapManager
 
         var pixels = _markerPixels.TryGetValue(type, out var value)
             ? value
-            : CreateMarkerPixels(CadSnapType.Endpoint, MarkerSize);
+            : CreateMarkerPixels(CadSnapType.Endpoint, MarkerSize, _markerColor);
 
         using var batch = engine.BeginDisplayBatch();
         if (_marker is { } marker &&
@@ -1136,14 +1159,11 @@ public sealed class CadSnapManager
                 using var batch = engine.BeginDisplayBatch();
                 engine.Delete(marker);
             }
+            _marker = null;
+            _markerType = null;
         }
         catch (Exception exception) when (IsRecoverableSnapFailure(exception))
         {
-        }
-        finally
-        {
-            _marker = null;
-            _markerType = null;
         }
     }
 
@@ -1153,7 +1173,8 @@ public sealed class CadSnapManager
         not AccessViolationException;
 
     private static IReadOnlyDictionary<CadSnapType, byte[]> CreateMarkerSet(
-        int size) =>
+        int size,
+        Color color) =>
         Enum.GetValues<CadSnapType>()
             .Where(static type =>
                 type != CadSnapType.None &&
@@ -1161,14 +1182,14 @@ public sealed class CadSnapManager
                 (type & RuntimeModes) == type)
             .ToDictionary(
                 static type => type,
-                type => CreateMarkerPixels(type, size));
+                type => CreateMarkerPixels(type, size, color));
 
     private static byte[] CreateMarkerPixels(
         CadSnapType type,
-        int size)
+        int size,
+        Color color)
     {
         var pixels = new byte[size * size * 4];
-        var color = Color.FromArgb(245, 220, 45, 45);
         var center = size / 2;
         var radius = Math.Max(3, center - 2);
         var stroke = Math.Max(1, size / 7);
@@ -1182,9 +1203,7 @@ public sealed class CadSnapManager
                 var adx = Math.Abs(dx);
                 var ady = Math.Abs(dy);
 
-                // Object-snap glyphs are intentionally solid. At small CAD
-                // marker sizes outline-only glyphs become ambiguous on dark
-                // scenes and under DPI scaling.
+                // Object-snap glyphs are intentionally solid/high-contrast.
                 var draw = type switch
                 {
                     CadSnapType.Endpoint =>
@@ -1204,9 +1223,24 @@ public sealed class CadSnapManager
                         adx <= radius &&
                         ady <= radius,
 
+                    CadSnapType.ApparentIntersection =>
+                        (Math.Abs(adx - ady) <= stroke && adx <= radius && ady <= radius) ||
+                        (Math.Max(adx, ady) <= radius && Math.Max(adx, ady) >= radius - stroke),
+
+                    CadSnapType.Extension =>
+                        ady <= stroke && (adx <= stroke || Math.Abs(adx - (radius - stroke)) <= stroke),
+
+                    CadSnapType.Insertion =>
+                        (Math.Max(Math.Abs(dx + 2), Math.Abs(dy - 2)) <= Math.Max(2, radius - 2) &&
+                         Math.Max(Math.Abs(dx + 2), Math.Abs(dy - 2)) >= Math.Max(1, radius - 2 - stroke)) ||
+                        (Math.Max(Math.Abs(dx - 2), Math.Abs(dy + 2)) <= Math.Max(2, radius - 2) &&
+                         Math.Max(Math.Abs(dx - 2), Math.Abs(dy + 2)) >= Math.Max(1, radius - 2 - stroke)),
+
                     CadSnapType.Perpendicular =>
-                        (adx >= radius - stroke && ady <= radius) ||
-                        (ady >= radius - stroke && adx <= radius),
+                        (dx >= -radius && dx <= -radius + stroke * 2 && dy <= radius) ||
+                        (dy >= radius - stroke * 2 && dy <= radius && dx >= -radius) ||
+                        (dx >= -radius && dx <= -radius + radius / 2 && Math.Abs(dy - (radius - radius / 2)) <= stroke) ||
+                        (dy <= radius && dy >= radius - radius / 2 && Math.Abs(dx - (-radius + radius / 2)) <= stroke),
 
                     CadSnapType.Tangent =>
                         dx * dx + (dy + 1) * (dy + 1) <=
@@ -1214,9 +1248,12 @@ public sealed class CadSnapManager
                             Math.Max(2, radius - 1) ||
                         (Math.Abs(dy + radius) <= stroke && adx <= radius),
 
+                    CadSnapType.Node =>
+                        (dx * dx + dy * dy <= radius * radius &&
+                         (dx * dx + dy * dy >= (radius - stroke) * (radius - stroke) || Math.Abs(adx - ady) <= stroke)),
+
                     CadSnapType.Nearest =>
-                        (adx <= stroke && ady <= radius) ||
-                        (ady <= stroke && adx <= radius),
+                        adx <= ady && ady <= radius,
 
                     _ =>
                         Math.Max(adx, ady) <= radius

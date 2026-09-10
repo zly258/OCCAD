@@ -62,66 +62,23 @@ public static class CadPropertyTransaction
             return true;
         }
 
-        var before = workspace.CaptureEntityStates(targets);
-        var wasModified = workspace.IsModified;
-        var historyState = workspace.History.CurrentStateId;
-        Exception? failure = null;
-
-        using (workspace.Document.BeginChangeSet())
+        try
         {
-            try
+            var byEntity = targets.Select((entity, index) => (entity, descriptor: descriptors[index]))
+                .ToDictionary(pair => pair.entity, pair => pair.descriptor);
+            CadTransaction.ApplyEntities(workspace, targets, $"Property {propertyName}", entity =>
             {
-                for (var index = 0; index < targets.Length; index++)
-                {
-                    ApplyAppearanceOverride(
-                        targets[index],
-                        propertyName);
-                    descriptors[index].SetValue(
-                        targets[index],
-                        value);
-                }
-
-                workspace.RecordEntityStateChange(
-                    targets,
-                    before,
-                    $"Property {propertyName}");
-            }
-            catch (Exception exception)
-            {
-                var failures = new List<Exception> { exception };
-
-                for (var index = 0; index < targets.Length; index++)
-                {
-                    try
-                    {
-                        targets[index].RestoreState(before[index]);
-                    }
-                    catch (Exception restoreFailure)
-                    {
-                        failures.Add(restoreFailure);
-                    }
-                }
-
-                failure = failures.Count == 1
-                    ? exception
-                    : new AggregateException(
-                        "Property apply and rollback both failed.",
-                        failures);
-            }
+                ApplyAppearanceOverride(entity, propertyName);
+                byEntity[entity].SetValue(entity, value);
+            });
+            error = null;
+            return true;
         }
-
-        if (failure is not null)
+        catch (Exception failure)
         {
-            if (!wasModified &&
-                workspace.History.CurrentStateId == historyState)
-                workspace.MarkSaved();
-
             error = failure;
             return false;
         }
-
-        error = null;
-        return true;
     }
     private static bool RequiresAppearanceOverride(
         CadEntity entity,

@@ -69,7 +69,7 @@ public sealed class ExtrudeTool :
     protected override void OnActivated()
     {
         SetSelectionFilter(
-            new CadSelectionFilter(
+            new CadEntityFilter(
                 "extrude.profiles",
                 CadPlanarProfileGeometry.IsSupported));
 
@@ -161,7 +161,7 @@ public sealed class ExtrudeTool :
     protected override bool OnStepBack()
     {
         SetSelectionFilter(
-            new CadSelectionFilter(
+            new CadEntityFilter(
                 "extrude.profiles",
                 CadPlanarProfileGeometry.IsSupported));
         RestartSelection();

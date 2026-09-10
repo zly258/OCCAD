@@ -60,7 +60,8 @@ public sealed class CadToolManager
 
     public bool CanChangeDrawingPlane =>
         !_context.WorkPlane.UserPlaneLocked &&
-        !_context.WorkPlane.ToolPlaneFixed;
+        !_context.WorkPlane.ToolPlaneFixed &&
+        !_context.WorkPlane.GripPlaneFixed;
 
     public bool TryChangeDrawingPlane(CadWorkPlanePreset preset)
     {
@@ -125,6 +126,9 @@ public sealed class CadToolManager
 
         try
         {
+            if (input.Kind == OcctPointerInputKind.Pressed && input.Button == OcctPointerButton.Left &&
+                !(tool.State == CadToolState.WaitForSelect && tool.InteractionPolicy.SelectionEnabled))
+                return SubmitCurrent(pointer: input);
             return tool.HandlePointer(input);
         }
         catch (Exception exception) when (IsRecoverablePointerFailure(exception))
@@ -139,24 +143,13 @@ public sealed class CadToolManager
         }
     }
 
-    public bool CommitPoint(OcctPoint3d point)
-    {
-        if (!point.IsFinite)
-            return false;
+    public bool CommitPoint(OcctPoint3d point) => SubmitCurrent(new CadResolvedPoint(point, null));
 
-        var tool = ActiveTool;
-        if (tool is not ICadPointInputTool pointInput ||
-            tool.CurrentStep.InputKind != CadToolInputKind.Point)
-            return false;
+    public bool SubmitPointText(string? text) =>
+        _context.Workspace.Precision.TryResolvePoint(text, _context.Workspace, out var point) &&
+        SubmitCurrent(point);
 
-        return pointInput.TryAcceptPoint(point);
-    }
-
-    public bool CommitCurrentStage()
-    {
-        var tool = ActiveTool;
-        return tool?.CommitCurrentStage() == true;
-    }
+    public bool CommitCurrentStage() => SubmitCurrent();
 
     public bool FinishCurrent()
     {
@@ -164,21 +157,66 @@ public sealed class CadToolManager
         return tool?.Finish() == true;
     }
 
+    public bool BeginOffsetInput()
+    {
+        if (ActiveTool?.CurrentStep.InputKind != CadToolInputKind.Point) return false;
+        _context.Workspace.Precision.BeginOffset();
+        ToolUpdated?.Invoke(this, new(ActiveTool));
+        return true;
+    }
+
     public bool StepBackCurrent()
     {
+        if (_context.Workspace.Precision.PointMode == CadPointInputMode.Offset)
+        {
+            _context.Workspace.Precision.ResetPointInput();
+            ToolUpdated?.Invoke(this, new(ActiveTool));
+            return true;
+        }
         var tool = ActiveTool;
         return tool?.StepBack() == true;
     }
 
-    public bool SubmitCurrent()
+    public bool SubmitCurrent(CadResolvedPoint? point = null, OcctPointerInputEventArgs? pointer = null)
     {
         var tool = ActiveTool;
         if (tool is null)
             return false;
 
-        if (TrySubmitCurrentStep(tool))
-            return true;
-
+        var precision = _context.Workspace.Precision;
+        if (point is { } resolved)
+        {
+            if (!resolved.Point.IsFinite || tool.CurrentStep.InputKind != CadToolInputKind.Point) return false;
+            if (precision.CaptureOffsetOrigin(resolved.Point))
+            {
+                ToolUpdated?.Invoke(this, new(tool));
+                return true;
+            }
+            var accepted = tool.CommitCurrentStage(resolved);
+            if (accepted)
+            {
+                var wasOffset = precision.PointMode == CadPointInputMode.Offset;
+                precision.ResetPointInput();
+                if (wasOffset && ReferenceEquals(ActiveTool, tool))
+                    ToolUpdated?.Invoke(this, new(tool));
+            }
+            return accepted;
+        }
+        if (precision.AwaitingOffsetOrigin && _context.Workspace.LastPointerPosition is { } position)
+            return SubmitCurrent(_context.ResolvePoint(position.X, position.Y));
+        if (tool.CanCommitCurrentStage)
+        {
+            var accepted = tool.CommitCurrentStage();
+            if (accepted)
+            {
+                var wasOffset = precision.PointMode == CadPointInputMode.Offset;
+                precision.ResetPointInput();
+                if (wasOffset && ReferenceEquals(ActiveTool, tool))
+                    ToolUpdated?.Invoke(this, new(tool));
+            }
+            return accepted;
+        }
+        if (pointer is not null) return tool.HandlePointer(pointer);
         return tool.CanFinish && FinishCurrent();
     }
 
@@ -216,7 +254,7 @@ public sealed class CadToolManager
 
         if (input.Kind == OcctKeyInputKind.Pressed &&
             input.Key == OcctKey.Backspace &&
-            ActiveTool is { CanStepBack: true })
+            (ActiveTool is { CanStepBack: true } || _context.Workspace.Precision.PointMode == CadPointInputMode.Offset))
             return StepBackCurrent();
 
         if (input.Kind == OcctKeyInputKind.Pressed &&
@@ -225,24 +263,12 @@ public sealed class CadToolManager
             SubmitCurrent())
             return true;
 
+        if (input.Kind == OcctKeyInputKind.Pressed && input.Key == OcctKey.O &&
+            input.Modifiers == OcctInputModifiers.None && ActiveTool?.CurrentStep.InputKind == CadToolInputKind.Point)
+        {
+            return BeginOffsetInput();
+        }
         return ActiveTool?.HandleKey(input) == true;
-    }
-
-    private bool TrySubmitCurrentStep(CadTool tool)
-    {
-        ArgumentNullException.ThrowIfNull(tool);
-
-        // A point stage may still be committed without another mouse click
-        // when the pointer has already established the direction/location and
-        // precision locks (length/angle/factor) have produced the exact
-        // preview. CadTool.CanCommitCurrentStage already verifies that a
-        // pointer sample exists for pointer-driven stages, so do not reject
-        // those stages here. This keeps mouse, Enter/Space and ToolPanel
-        // Accept on the same Tool state-machine path.
-        if (!tool.CanCommitCurrentStage)
-            return false;
-
-        return CommitCurrentStage();
     }
 
     private void SetActive(CadTool tool)
@@ -250,12 +276,12 @@ public sealed class CadToolManager
         _transitioning = true;
 
         var workspace = _context.Workspace;
-        workspace.Preselection.Clear();
-        workspace.Subobjects.Clear();
-        workspace.Grips.Clear();
-
+        workspace.Transients.BeginToolSession();
         try
         {
+            workspace.Preselection.Clear();
+            workspace.Subobjects.Clear();
+            workspace.Grips.Clear();
             tool.Activate(_context);
         }
         catch (Exception activationFailure)
@@ -272,7 +298,7 @@ public sealed class CadToolManager
 
             try
             {
-                ResetNeutralInteractionState();
+                ResetNeutralInteractionState(tool.Id);
             }
             catch (Exception exception)
             {
@@ -319,7 +345,7 @@ public sealed class CadToolManager
             ActiveTool = null;
             try
             {
-                ResetNeutralInteractionState();
+                ResetNeutralInteractionState(tool.Id);
             }
             catch (Exception exception)
             {
@@ -335,24 +361,55 @@ public sealed class CadToolManager
             ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
-    private void ResetNeutralInteractionState()
+    private void ResetNeutralInteractionState(string? toolId = null)
     {
         var workspace = _context.Workspace;
 
-        workspace.Preview.Clear();
-        workspace.Tracking.Clear();
-        workspace.Snap.Clear();
-        workspace.Snap.Active = false;
-        workspace.Preselection.Clear();
-        workspace.Precision.ResetFactor();
-        workspace.Drafting.ResetTransientLocks();
-        workspace.WorkPlane.EndToolPlane();
-        workspace.ClearPointerObservation();
+        List<Exception> failures = [];
+        Cleanup(() => workspace.Transients.ClearOwner(workspace.Transients.CurrentToolOwner));
+        Cleanup(() => workspace.Snap.Active = false);
+        Cleanup(() => workspace.Snap.TemporaryModes = null);
+        Cleanup(workspace.Preselection.Clear);
+        Cleanup(workspace.Precision.ResetFactor);
+        Cleanup(workspace.Precision.ResetPointInput);
+        Cleanup(workspace.Drafting.ResetTransientLocks);
+        Cleanup(workspace.WorkPlane.EndToolPlane);
+        Cleanup(workspace.ClearPointerObservation);
 
         if (workspace.Engine is { IsInitialized: true } engine)
         {
-            engine.SetAutomaticHighlight(true);
-            engine.Redraw();
+            Cleanup(() => engine.SetAutomaticHighlight(true));
+            Cleanup(engine.Redraw);
+        }
+
+        System.Diagnostics.Debug.Assert(NeutralStateViolations.Count == 0,
+            $"Transient state leaked by {toolId ?? "idle cleanup"}: {string.Join(", ", NeutralStateViolations)}");
+        if (failures.Count > 0)
+            throw new AggregateException("Tool neutral-state cleanup failed.", failures);
+
+        void Cleanup(Action action)
+        {
+            try { action(); }
+            catch (Exception exception) { failures.Add(exception); }
+        }
+    }
+
+    public IReadOnlyList<string> NeutralStateViolations
+    {
+        get
+        {
+            var workspace = _context.Workspace;
+            List<string> violations = [];
+            if (ActiveTool is not null) violations.Add("ActiveTool");
+            if (workspace.Transients.HasToolTransient) violations.Add("TransientScene");
+            if (workspace.Grips.HasDragTransient) violations.Add("GripDrag");
+            if (workspace.Preview.HasTransient) violations.Add("Preview");
+            if (workspace.Snap.HasTransient || workspace.Snap.Active || workspace.Snap.TemporaryModes is not null) violations.Add("Snap");
+            if (workspace.Tracking.HasTransient) violations.Add("Tracking");
+            if (workspace.WorkPlane.IsActive) violations.Add("WorkPlane");
+            if (workspace.Preselection.Current is not null) violations.Add("Preselection");
+            if (workspace.LastPointerPosition is not null || workspace.LastResolvedPoint is not null) violations.Add("Pointer");
+            return violations;
         }
     }
 

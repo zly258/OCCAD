@@ -29,13 +29,11 @@ public sealed class CadCommandManager
         WorkspaceManagers = new();
 
     private readonly CadWorkspace _workspace;
-    private readonly Dictionary<string, string> _aliases = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> _history = [];
 
     private CadCommandManager(CadWorkspace workspace)
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
-        RegisterDefaults();
     }
 
     /// <summary>
@@ -56,7 +54,7 @@ public sealed class CadCommandManager
     public IEnumerable<string> Complete(string prefix)
     {
         var normalized = prefix?.Trim() ?? string.Empty;
-        return _aliases.Keys
+        return _workspace.Actions.Commands.SelectMany(command => command.Aliases.Append(command.Id)).Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(value => value.StartsWith(normalized, StringComparison.OrdinalIgnoreCase))
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase);
     }
@@ -97,7 +95,7 @@ public sealed class CadCommandManager
             TryExecuteToolInput(activeTool, input, out var toolResult))
             return toolResult;
 
-        if (!_aliases.TryGetValue(input, out var actionId))
+        if (_workspace.Actions.ResolveCommand(input) is not { } command)
             return Result(
                 CadCommandResultKind.Failed,
                 input,
@@ -105,6 +103,7 @@ public sealed class CadCommandManager
                 messageKey: "Cad.Command.Unknown",
                 messageArguments: [input]);
 
+        var actionId = command.Id;
         if (_workspace.Actions.Find(actionId) is null)
             return Result(
                 CadCommandResultKind.Failed,
@@ -164,6 +163,15 @@ public sealed class CadCommandManager
             return true;
         }
 
+        if (input.Equals("O", StringComparison.OrdinalIgnoreCase) && tool.CurrentStep.InputKind == CadToolInputKind.Point)
+        {
+            _workspace.Tools.BeginOffsetInput();
+            result = Result(CadCommandResultKind.InputApplied, input,
+                message: "Pick offset base point, then enter the relative displacement.",
+                messageKey: "Cad.Command.OffsetOrigin");
+            return true;
+        }
+
         if (TryPoint(tool, input, out result))
             return true;
 
@@ -197,25 +205,7 @@ public sealed class CadCommandManager
             return false;
         }
 
-        var reference =
-            tool.PrecisionReferencePoint ??
-            _workspace.LastResolvedPoint?.Point ??
-            _workspace.WorkPlane.Origin;
-
-        if (!CadCoordinateInputParser.TryParse(
-                input,
-                reference,
-                _workspace.WorkPlane,
-                out var coordinate))
-        {
-            result = Result(
-                CadCommandResultKind.Failed,
-                input,
-                message: "Coordinate values must be finite numbers.");
-            return true;
-        }
-
-        var success = _workspace.Tools.CommitPoint(coordinate.Point);
+        var success = _workspace.Tools.SubmitPointText(input);
         result = Result(
             success ? CadCommandResultKind.InputApplied : CadCommandResultKind.Failed,
             input,
@@ -295,76 +285,6 @@ public sealed class CadCommandManager
 
     private static bool TryParseDouble(string text, out double value) =>
         CadValueTextConverter.TryParseFiniteDouble(text, out value);
-
-    private void RegisterDefaults()
-    {
-        Alias("DISTANCE", "measure.distance", "DIST", "DI");
-
-        Alias("POINT", "draw.point", "PO");
-        Alias("LINE", "draw.line", "L");
-        Alias("POLYLINE", "draw.polyline", "PL");
-        Alias("RECTANGLE", "draw.rectangle", "REC");
-        Alias("POLYGON", "draw.polygon", "PG");
-        Alias("REGULARPOLYGON", "draw.regularpolygon", "RPOLY");
-        Alias("CIRCLE", "draw.circle", "C");
-        Alias("ARC", "draw.arc", "A");
-        Alias("ELLIPSE", "draw.ellipse", "EL");
-        Alias("SPLINE", "draw.spline", "SPL");
-
-        Alias("TEXT", "annotate.text", "DTEXT");
-        Alias("DIMLINEAR", "annotate.length", "DLI");
-        Alias("DIMANGULAR", "annotate.angle", "DAN");
-        Alias("DIMRADIUS", "annotate.radius", "DRA");
-        Alias("DIMDIAMETER", "annotate.diameter", "DDI");
-
-        Alias("BOX", "solid.box", "B");
-        Alias("CYLINDER", "solid.cylinder", "CYL");
-        Alias("CONE", "solid.cone", "CN");
-        Alias("FRUSTUM", "solid.frustum", "FRU");
-        Alias("SPHERE", "solid.sphere", "SPH");
-        Alias("ELLIPSOID", "solid.ellipsoid", "ELLIP");
-        Alias("TORUS", "solid.torus", "TOR");
-        Alias("HELIX", "curve.helix", "HX");
-        Alias("EXTRUDE", "feature.extrude", "EXT");
-
-        Alias("MOVE", "modify.move", "M");
-        Alias("COPY", "modify.copy", "CO");
-        Alias("ROTATE", "modify.rotate", "RO");
-        Alias("SCALE", "modify.scale", "SC");
-        Alias("MIRROR", "modify.mirror", "MI");
-        Alias("DELETE", "edit.delete", "ERASE");
-
-        Alias("UNDO", "edit.undo", "U");
-        Alias("REDO", "edit.redo");
-
-        Alias("SELECT", "select");
-        Alias("SELECTALL", "select.all");
-        Alias("SELECTINVERT", "select.invert");
-
-        Alias("FIT", "view.fit", "ZE");
-        Alias("ISOMETRIC", "view.isometric", "ISO");
-        Alias("TOP", "view.top");
-        Alias("BOTTOM", "view.bottom");
-        Alias("FRONT", "view.front");
-        Alias("BACK", "view.back");
-        Alias("LEFT", "view.left");
-        Alias("RIGHT", "view.right");
-        Alias("WIREFRAME", "display.wireframe", "WF");
-        Alias("SHADED", "display.shaded", "SHADE");
-        Alias("HIDE", "view.hide");
-        Alias("ISOLATE", "view.isolate");
-        Alias("SHOWALL", "view.showall");
-    }
-
-    private void Alias(string command, string actionId, params string[] aliases)
-    {
-        if (_workspace.Actions.Find(actionId) is null)
-            return;
-
-        _aliases.Add(command, actionId);
-        foreach (var alias in aliases)
-            _aliases.Add(alias, actionId);
-    }
 
     private void AddHistory(string input)
     {

@@ -52,8 +52,11 @@ public abstract class CadSelectionTransformToolBase : CadTool
         return true;
     }
 
-    protected override void OnCanceled() =>
+    protected override void OnCanceled()
+    {
+        ClearTransformPreview();
         ResetTransformState();
+    }
 
     protected override void OnDeactivated()
     {
@@ -98,6 +101,21 @@ public abstract class CadSelectionTransformToolBase : CadTool
 
     protected void ClearTransformPreview() =>
         ClearReplacementPreview();
+
+    protected void CommitTransform(Action commit)
+    {
+        ArgumentNullException.ThrowIfNull(commit);
+        var engine = Context.Engine;
+
+        using (engine.BeginDisplayBatch())
+        {
+            ClearTransformPreview();
+            commit();
+            Context.Workspace.Tools.CompleteCurrent();
+        }
+
+        engine.Redraw();
+    }
 
     private void BeginSelection()
     {

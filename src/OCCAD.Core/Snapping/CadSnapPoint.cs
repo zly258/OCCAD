@@ -16,8 +16,12 @@ public enum CadSnapType
     Intersection = 1 << 6,
     Perpendicular = 1 << 7,
     Tangent = 1 << 8,
+    ApparentIntersection = 1 << 9,
+    Extension = 1 << 10,
+    Insertion = 1 << 11,
+    Node = 1 << 12,
 
-    Default = Endpoint | Midpoint | Center | Vertex | Quadrant
+    Default = Endpoint | Midpoint | Center | Vertex | Quadrant | Intersection
 }
 
 public enum CadSnapPlaneMode

@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -150,8 +150,7 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
             return false;
         }
 
-        Commit(displacement);
-        Context.Workspace.Tools.CompleteCurrent();
+        CommitTransform(() => Commit(displacement));
         return true;
     }
 

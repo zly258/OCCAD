@@ -57,7 +57,7 @@ public sealed class CadSplineEntity : CadEntity
             var type =
                 !Periodic && (index == 0 || index == _fitPoints.Count - 1)
                     ? CadSnapType.Endpoint
-                    : CadSnapType.Vertex;
+                    : CadSnapType.Node | CadSnapType.Vertex;
             result.Add(new CadSnapPoint(
                 this,
                 _fitPoints[index],

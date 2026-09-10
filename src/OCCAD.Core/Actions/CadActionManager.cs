@@ -1,4 +1,4 @@
-﻿namespace OCCAD;
+namespace OCCAD;
 
 public sealed class CadActionManager
 {
@@ -7,6 +7,11 @@ public sealed class CadActionManager
     private readonly Dictionary<string, CadAction> _shortcuts =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> _history = [];
+    private readonly Dictionary<string, CadCommandDescriptor> _commands = new(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyCollection<CadCommandDescriptor> Commands => _commands.Values;
+    public CadCommandDescriptor? Describe(string id) => _commands.GetValueOrDefault(id);
+    public CadCommandDescriptor? ResolveCommand(string text) => Describe(text) ??
+        Commands.FirstOrDefault(command => command.Aliases.Contains(text, StringComparer.OrdinalIgnoreCase));
     private const int HistoryLimit = 20;
 
     public IReadOnlyCollection<CadAction> Actions => _actions.Values;
@@ -32,6 +37,7 @@ public sealed class CadActionManager
         }
 
         _actions.Add(action.Id, action);
+        _commands.Add(action.Id, new CadCommandDescriptor(action));
         if (shortcut is not null)
             _shortcuts.Add(shortcut, action);
     }

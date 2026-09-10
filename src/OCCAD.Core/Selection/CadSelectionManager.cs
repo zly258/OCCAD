@@ -10,11 +10,20 @@ public enum CadSelectionOperation
     Toggle
 }
 
-public sealed class CadSelectionFilter
+public enum CadEntityFilterKind
+{
+    All = 0,
+    Point = 1,
+    Curve = 2,
+    Region = 3,
+    Solid = 4
+}
+
+public sealed class CadEntityFilter
 {
     private readonly Func<CadEntity, bool> _predicate;
 
-    public CadSelectionFilter(string id, Func<CadEntity, bool> predicate)
+    public CadEntityFilter(string id, Func<CadEntity, bool> predicate)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentNullException.ThrowIfNull(predicate);
@@ -54,6 +63,18 @@ public sealed class CadSelectionManager
         _document.Changed += DocumentChanged;
     }
 
+    private int _pixelTolerance = 5;
+    public int PixelTolerance
+    {
+        get => _pixelTolerance;
+        set
+        {
+            if (value is < 0 or > 100) throw new ArgumentOutOfRangeException(nameof(value));
+            _pixelTolerance = value;
+            if (_engine is { IsInitialized: true } engine) engine.SetSelectionTolerance(value);
+        }
+    }
+
     public IReadOnlyList<CadEntity> Selected => _selected;
     public IReadOnlyList<CadSelectionReference> References =>
         _selected
@@ -64,7 +85,81 @@ public sealed class CadSelectionManager
         _primary is null
             ? null
             : CadSelectionReference.Entity(_primary);
-    public CadSelectionFilter? Filter { get; private set; }
+    public CadEntityFilter? Filter { get; private set; }
+    private CadEntityFilterKind _filterKind = CadEntityFilterKind.All;
+
+    public CadEntityFilterKind FilterKind
+    {
+        get => _filterKind;
+        set
+        {
+            if (!Enum.IsDefined(value)) throw new ArgumentOutOfRangeException(nameof(value));
+            if (_filterKind == value) return;
+            _filterKind = value;
+            RefreshValidity();
+            FilterChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private CadSelectionScope _scope;
+    private CadSubshapeMask _subshapeMask = CadSubshapeMask.All;
+
+    public CadSelectionScope Scope
+    {
+        get => _scope;
+        set => SetScope(value, _subshapeMask);
+    }
+
+    public CadSubshapeMask SubshapeMask
+    {
+        get => _subshapeMask;
+        set => SetScope(_scope, value);
+    }
+
+    public void SetScope(CadSelectionScope scope, CadSubshapeMask mask)
+    {
+        if (!Enum.IsDefined(scope)) throw new ArgumentOutOfRangeException(nameof(scope));
+        if ((mask & ~CadSubshapeMask.All) != 0) throw new ArgumentOutOfRangeException(nameof(mask));
+        if (_scope == scope && _subshapeMask == mask) return;
+        _scope = scope;
+        _subshapeMask = mask;
+        RefreshValidity();
+        SynchronizeSelectionModes();
+        FilterChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public bool CanSelectSubshape(CadEntity entity, OcctShapeType type) =>
+        Scope == CadSelectionScope.Subobject &&
+        CanSelectOwner(entity) && SubshapeMask.Allows(type);
+
+    internal bool CanSelectOwner(CadEntity entity) =>
+        _document.Entities.Contains(entity) &&
+        _document.IsEntitySelectable(entity) &&
+        (Filter is null || Filter.Allows(entity));
+
+    private void SynchronizeSelectionModes()
+    {
+        if (_engine is not { IsInitialized: true } engine) return;
+        engine.SetSelectionMode(OcctSelectionMode.Object);
+        if (Scope == CadSelectionScope.Entity) return;
+        foreach (var entity in _document.Entities)
+            SynchronizeSubshapeModes(entity);
+    }
+
+    private void SynchronizeSubshapeModes(CadEntity entity)
+    {
+        if (_engine is not { IsInitialized: true } engine ||
+            Scope != CadSelectionScope.Subobject || entity.ViewerObject is not { } shape) return;
+        engine.SetSelectionModeActive(shape, OcctSelectionMode.Object, false,
+            OcctSelectionModeConcurrency.Multiple, false);
+        foreach (var mode in Enum.GetValues<OcctSelectionMode>())
+        {
+            if (mode == OcctSelectionMode.Object) continue;
+            var type = Enum.Parse<OcctShapeType>(mode.ToString());
+            engine.SetSelectionModeActive(shape, mode, SubshapeMask.Allows(type),
+                OcctSelectionModeConcurrency.Multiple, false);
+        }
+    }
 
     public event EventHandler<CadSelectionChangedEventArgs>? Changed;
     public event EventHandler? Cleared;
@@ -76,7 +171,7 @@ public sealed class CadSelectionManager
         return _document.Entities.Contains(entity) && IsSelectable(entity);
     }
 
-    public void SetFilter(CadSelectionFilter? filter)
+    public void SetFilter(CadEntityFilter? filter)
     {
         if (ReferenceEquals(Filter, filter)) return;
         Filter = filter;
@@ -93,6 +188,8 @@ public sealed class CadSelectionManager
             throw new InvalidOperationException("The OCCT engine is not initialized.");
 
         _engine = engine;
+        engine.SetSelectionTolerance(PixelTolerance);
+        SynchronizeSelectionModes();
         SyncEngineSelection();
     }
 
@@ -101,6 +198,7 @@ public sealed class CadSelectionManager
         IOcctObject? primaryObject = null)
     {
         ArgumentNullException.ThrowIfNull(selectedObjects);
+        if (Scope != CadSelectionScope.Entity) return;
 
         var entities = selectedObjects
             .Select(_document.FindByViewerObject)
@@ -143,6 +241,8 @@ public sealed class CadSelectionManager
         ArgumentNullException.ThrowIfNull(entities);
         if (!Enum.IsDefined(operation))
             throw new ArgumentOutOfRangeException(nameof(operation));
+
+        if (Scope != CadSelectionScope.Entity) return;
 
         var requested = entities
             .Distinct()
@@ -231,9 +331,20 @@ public sealed class CadSelectionManager
         return result;
     }
 
-    private bool IsSelectable(CadEntity entity) =>
-        _document.IsEntitySelectable(entity) &&
-        (Filter?.Allows(entity) ?? true);
+    private bool IsSelectable(CadEntity entity)
+    {
+        if (Scope != CadSelectionScope.Entity || !CanSelectOwner(entity))
+            return false;
+
+        return _filterKind switch
+        {
+            CadEntityFilterKind.Point => entity is CadPointEntity,
+            CadEntityFilterKind.Curve => entity is CadLineEntity or CadPolylineEntity or CadArcEntity or CadCircleEntity or CadEllipseEntity or CadSplineEntity or CadPathEntity,
+            CadEntityFilterKind.Region => entity is CadRegionEntity or CadPolygonEntity or CadRectangleEntity,
+            CadEntityFilterKind.Solid => entity is CadBoxEntity or CadCylinderEntity or CadConeEntity or CadSphereEntity or CadTorusEntity or CadFeatureEntity or CadBooleanEntity or CadImportedShapeEntity,
+            _ => true
+        };
+    }
 
     private List<CadEntity> Remove(IReadOnlyList<CadEntity> values)
     {
@@ -290,6 +401,10 @@ public sealed class CadSelectionManager
 
     private void DocumentChanged(object? sender, CadDocumentChangedEventArgs args)
     {
+        if (args.Entity is { } entity &&
+            (args.Kind == CadDocumentChangeKind.Added ||
+             args.Kind == CadDocumentChangeKind.Changed && args.EntityChangeKind == CadEntityChangeKind.Geometry))
+            SynchronizeSubshapeModes(entity);
         if (args.Kind == CadDocumentChangeKind.Reset)
         {
             SetSelection([], null, syncEngine: false);

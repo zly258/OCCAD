@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 
 namespace OCCAD;
 
@@ -121,6 +121,15 @@ public sealed class CadEntityRegistry
                 $"Entity '{descriptor.Id}' does not define persistence.");
         return ValidateCreated(descriptor, descriptor.ReadGeometry(geometry));
     }
+
+    public bool StateEquals(CadEntity left, CadEntity right) =>
+        left.Name == right.Name && left.Layer == right.Layer &&
+        left.Visible == right.Visible && left.Selectable == right.Selectable &&
+        left.Color == right.Color && left.ColorByLayer == right.ColorByLayer &&
+        left.LineWidth == right.LineWidth && left.LineWidthByLayer == right.LineWidthByLayer &&
+        left.LineStyle == right.LineStyle && left.LineStyleByLayer == right.LineStyleByLayer &&
+        left.Transparency == right.Transparency && left.DisplayMode == right.DisplayMode &&
+        left.Material == right.Material && GeometryEquals(left, right);
 
     public bool GeometryEquals(
         CadEntity left,

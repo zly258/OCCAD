@@ -5,6 +5,7 @@ namespace OCCAD;
 public sealed class CadPreviewManager
 {
     private readonly List<CadEntity> _entities = [];
+    private readonly List<CadEntity> _replacementSources = [];
     private readonly CadDocument? _document;
     private static long _nextOwnerId;
 
@@ -26,6 +27,7 @@ public sealed class CadPreviewManager
 
     public IReadOnlyList<CadEntity> Entities => _entities;
     public CadEntity? Entity => _entities.Count == 1 ? _entities[0] : null;
+    public bool HasTransient => IsVisible || _entities.Count > 0 || _replacementSources.Count > 0;
     public bool IsVisible => _shapes.Count > 0 || _ownedTags.Count > 0;
 
     public void AttachEngine(OcctEngine engine)
@@ -51,6 +53,7 @@ public sealed class CadPreviewManager
     {
         ArgumentNullException.ThrowIfNull(entities);
         var nextEntities = entities.ToArray();
+        ValidatePreviewEntities(nextEntities);
         Rebuild(nextEntities);
         _entities.Clear();
         _entities.AddRange(nextEntities);
@@ -60,7 +63,83 @@ public sealed class CadPreviewManager
 
     public void Update(IEnumerable<CadEntity> entities) => Show(entities);
 
+    private void ValidatePreviewEntities(IEnumerable<CadEntity> entities)
+    {
+        foreach (var entity in entities)
+        {
+            ArgumentNullException.ThrowIfNull(entity);
+            if (_document?.Entities.Contains(entity) == true)
+                throw new ArgumentException("Preview requires independent entities, not document entities.", nameof(entities));
+        }
+    }
+
+    public void ShowReplacement(IReadOnlyList<CadEntity> sources, IReadOnlyList<CadEntity> replacements)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        ArgumentNullException.ThrowIfNull(replacements);
+        ValidatePreviewEntities(replacements);
+        try
+        {
+            if (!_replacementSources.SequenceEqual(sources))
+            {
+                RestoreReplacementSources();
+                if (_engine is { IsInitialized: true } engine)
+                {
+                    using var batch = engine.BeginDisplayBatch();
+                    foreach (var entity in sources.Distinct())
+                    {
+                        if (entity.ViewerObject is not { } source || !engine.ContainsObject(source.Id)) continue;
+                        // Register before mutation; failed native calls can have partial effects.
+                        _replacementSources.Add(entity);
+                        engine.SetObjectTransparency(source, 1.0);
+                    }
+                }
+            }
+            Show(replacements);
+        }
+        catch
+        {
+            Clear();
+            throw;
+        }
+    }
+
+    private void RestoreReplacementSources()
+    {
+        if (_engine is not { IsInitialized: true } engine)
+        {
+            _replacementSources.Clear();
+            return;
+        }
+        List<Exception> failures = [];
+        foreach (var entity in _replacementSources.ToArray())
+        {
+            try
+            {
+                if (entity.ViewerObject is { } source && engine.ContainsObject(source.Id))
+                {
+                    engine.SetObjectTransparency(source, Math.Clamp(entity.Transparency, 0.0, 1.0));
+                    engine.SetObjectVisible(source, _document?.ResolveAppearance(entity).Visible ?? entity.Visible);
+                }
+                _replacementSources.Remove(entity);
+            }
+            catch (Exception exception) when (IsRecoverable(exception)) { failures.Add(exception); }
+        }
+        if (failures.Count > 0)
+            throw new AggregateException("Replacement source restoration failed; ownership retained for retry.", failures);
+    }
+
     public void Clear()
+    {
+        try { ClearPresentation(); }
+        finally
+        {
+            _entities.Clear();
+            RestoreReplacementSources();
+        }
+    }
+
+    private void ClearPresentation()
     {
         if (_engine is { IsInitialized: true } engine &&
             (_shapes.Count > 0 || _ownedTags.Count > 0))
@@ -133,8 +212,10 @@ public sealed class CadPreviewManager
         }
         catch
         {
-            TryDeleteObjects(engine, nextShapes);
+            if (!TryDeleteObjects(engine, nextShapes))
+                PreserveLiveShapes(engine, nextShapes);
             PurgeMissingOwnership(engine);
+            PurgeMissingShapes(engine);
             throw;
         }
 
@@ -157,10 +238,13 @@ public sealed class CadPreviewManager
         // handle/tag so ownership is not lost and the next cleanup can retry.
         foreach (var shape in _shapes.ToArray())
         {
+            if (shape is null)
+                continue;
+
             bool exists;
             try
             {
-                exists = shape is not null && engine.ContainsObject(shape.Id);
+                exists = engine.ContainsObject(shape.Id);
             }
             catch (Exception exception) when (IsRecoverable(exception))
             {
@@ -191,6 +275,49 @@ public sealed class CadPreviewManager
 
             if (TryDeleteObjects(engine, [value]))
                 _ownedTags.Remove(pair.Key);
+        }
+
+        // A shape deletion can fail first and then succeed through its
+        // application tag. Remove such stale handles before deciding cleanup
+        // failed, otherwise Rebuild would reject one unnecessary extra cycle.
+        PurgeMissingShapes(engine);
+    }
+
+    private void PreserveLiveShapes(
+        OcctEngine engine,
+        IEnumerable<IOcctObject> shapes)
+    {
+        foreach (var shape in shapes)
+        {
+            var keep = true;
+            try
+            {
+                keep = engine.ContainsObject(shape.Id);
+            }
+            catch (Exception exception) when (IsRecoverable(exception))
+            {
+                // The viewer could not answer. Retaining the handle is safer
+                // than losing ownership of a potentially live preview object.
+            }
+
+            if (keep && !_shapes.Any(existing => existing.Id == shape.Id))
+                _shapes.Add(shape);
+        }
+    }
+
+    private void PurgeMissingShapes(OcctEngine engine)
+    {
+        foreach (var shape in _shapes.ToArray())
+        {
+            try
+            {
+                if (!engine.ContainsObject(shape.Id))
+                    _shapes.Remove(shape);
+            }
+            catch (Exception exception) when (IsRecoverable(exception))
+            {
+                // Preserve ownership and retry on the next cleanup.
+            }
         }
     }
 

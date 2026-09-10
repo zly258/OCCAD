@@ -1,4 +1,3 @@
-using System.Drawing;
 using OcctNet;
 
 namespace OCCAD;
@@ -8,8 +7,6 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
     private readonly CadGripPoint _grip;
     private CadEntity? _before;
     private CadEntity? _preview;
-    private OcctPoint? _dragMarker;
-    private byte[]? _dragMarkerPixels;
     private bool _invalidGrip;
     private CadPrecisionInputKind _effectivePrecisionInputs;
 
@@ -49,19 +46,21 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
         }
         else
         {
+            var axes = _grip.Entity.Placement.GetWorldAxes();
             Context.WorkPlane.SetGripPlane(
                 _grip.Position,
-                Context.WorkPlane.XAxis,
-                Context.WorkPlane.YAxis);
+                axes.XAxis,
+                axes.YAxis,
+                true);
         }
 
         ShowReplacementPreview([_grip.Entity], [_preview]);
-        ShowDragMarker(_grip.Position);
+        Context.Workspace.Grips.ShowDragMarker(_grip.Position);
     }
 
     protected override void OnDeactivated()
     {
-        ClearDragMarker();
+        Context.Workspace.Grips.ClearDragMarker();
         ClearReplacementPreview();
     }
 
@@ -157,44 +156,14 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
             return false;
 
         var workspace = Context.Workspace;
-        var actualBefore = _grip.Entity.Duplicate();
-        var wasModified = workspace.IsModified;
-        var historyState = workspace.History.CurrentStateId;
-        Exception? failure = null;
-
-        using (workspace.Document.BeginChangeSet())
+        try
         {
-            try
-            {
-                _grip.Entity.RestoreGeometrySnapshot(_preview);
-                workspace.RecordGeometryChange(
-                    _grip.Entity,
-                    _before,
-                    "Grip Edit");
-            }
-            catch (Exception exception) when (IsRecoverable(exception))
-            {
-                failure = exception;
-                try
-                {
-                    _grip.Entity.RestoreGeometrySnapshot(actualBefore);
-                }
-                catch (Exception restoreException) when (IsRecoverable(restoreException))
-                {
-                    failure = new AggregateException(
-                        "Grip commit and rollback both failed.",
-                        exception,
-                        restoreException);
-                }
-            }
+            CommitReplacementPreview(() => CadTransaction.ApplyEntities(workspace, [_grip.Entity],
+                "Grip Edit", entity => entity.RestoreGeometrySnapshot(_preview), geometryOnly: true));
         }
-
-        if (failure is not null)
+        catch (Exception failure) when (IsRecoverable(failure))
         {
-            if (!wasModified &&
-                workspace.History.CurrentStateId == historyState)
-                workspace.MarkSaved();
-
+            ShowReplacementPreview([_grip.Entity], [_preview]);
             ShowInvalidGripPrompt();
             return true;
         }
@@ -259,54 +228,6 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
         }
     }
 
-    private void ShowDragMarker(OcctPoint3d point)
-    {
-        if (!point.IsFinite ||
-            Context.Workspace.Engine is not { IsInitialized: true } engine)
-            return;
-
-        ClearDragMarker();
-
-        var size = Math.Min(35, Context.Workspace.Grips.HotMarkerSize + 2);
-        _dragMarkerPixels ??= CreateCircularMarkerPixels(
-            size,
-            Color.FromArgb(255, 245, 178, 35));
-
-        var createdMarker = engine.AddPointPixmap(
-            point,
-            size,
-            size,
-            _dragMarkerPixels);
-
-        _dragMarker = createdMarker;
-        engine.SetObjectSelectable(createdMarker, false);
-        engine.SetDisplayPriority(createdMarker, 10);
-    }
-
-    private void UpdateDragMarker(OcctPoint3d point)
-    {
-        if (!point.IsFinite)
-            return;
-
-        var engine = Context.Workspace.Engine;
-        if (engine is not { IsInitialized: true })
-            return;
-
-        if (_dragMarker is not { } marker ||
-            !engine.ContainsObject(marker.Id))
-        {
-            ShowDragMarker(point);
-            return;
-        }
-
-        engine.UpdatePoints([
-            new OcctPointStateUpdate(
-                marker,
-                point,
-                true)
-        ]);
-    }
-
     private void UpdateDragMarkerFromPreview()
     {
         if (_preview is null)
@@ -318,55 +239,9 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
             if (grips[index].Index != _grip.Index)
                 continue;
 
-            UpdateDragMarker(grips[index].Position);
+            Context.Workspace.Grips.UpdateDragMarker(grips[index].Position);
             return;
         }
-    }
-
-    private void ClearDragMarker()
-    {
-        var marker = _dragMarker;
-        _dragMarker = null;
-        if (marker is not { } existingMarker ||
-            Context.Workspace.Engine is not { IsInitialized: true } engine ||
-            !engine.ContainsObject(existingMarker.Id))
-            return;
-
-        try
-        {
-            engine.Delete(existingMarker);
-        }
-        catch (Exception exception) when (IsRecoverable(exception))
-        {
-        }
-    }
-
-    private static byte[] CreateCircularMarkerPixels(
-        int size,
-        Color color)
-    {
-        var pixels = new byte[size * size * 4];
-        var center = size / 2;
-        var radius = Math.Max(2, center - 1);
-
-        for (var y = 0; y < size; y++)
-        {
-            for (var x = 0; x < size; x++)
-            {
-                var dx = x - center;
-                var dy = y - center;
-                if (dx * dx + dy * dy > radius * radius)
-                    continue;
-
-                var offset = (y * size + x) * 4;
-                pixels[offset] = color.B;
-                pixels[offset + 1] = color.G;
-                pixels[offset + 2] = color.R;
-                pixels[offset + 3] = color.A;
-            }
-        }
-
-        return pixels;
     }
 
     private void SetGripPrompt(

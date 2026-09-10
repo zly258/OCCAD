@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -39,13 +39,19 @@ public sealed class CadPreselectionManager
         _selection.FilterChanged += SelectionFilterChanged;
     }
 
+    // OCCT detection and click selection use the same physical-pixel aperture.
+    public int PixelTolerance => _selection.PixelTolerance;
+
     public CadPreselection? Current { get; private set; }
 
     public event EventHandler<CadPreselectionChangedEventArgs>? Changed;
 
     public void Update(CadEntity? entity, OcctSelectionHitDetail? hit)
     {
-        if (entity is null || !_selection.CanSelect(entity))
+        if (entity is null || (_selection.Scope == CadSelectionScope.Entity
+                ? !_selection.CanSelect(entity)
+                : hit is not { SubshapeIndex: >= 0 } detail ||
+                  !_selection.CanSelectSubshape(entity, detail.SubshapeType)))
         {
             Clear();
             return;
@@ -55,8 +61,8 @@ public sealed class CadPreselectionManager
             ? new CadPreselection(
                 entity,
                 value.Point,
-                value.SubshapeType,
-                value.SubshapeIndex)
+                _selection.Scope == CadSelectionScope.Subobject ? value.SubshapeType : OcctShapeType.Shape,
+                _selection.Scope == CadSelectionScope.Subobject ? value.SubshapeIndex : -1)
             : new CadPreselection(
                 entity,
                 OcctPoint3d.Origin,
@@ -86,13 +92,18 @@ public sealed class CadPreselectionManager
             return;
         }
 
-        if (Current is { } value && !_selection.CanSelect(value.Entity))
+        if (Current is { } value && !CanKeep(value))
             Clear();
     }
 
+    private bool CanKeep(CadPreselection value) =>
+        value.IsSubshape
+            ? _selection.CanSelectSubshape(value.Entity, value.SubshapeType)
+            : _selection.CanSelect(value.Entity);
+
     private void SelectionFilterChanged(object? sender, EventArgs args)
     {
-        if (Current is { } current && !_selection.CanSelect(current.Entity))
+        if (Current is { } current && !CanKeep(current))
             Clear();
     }
 }

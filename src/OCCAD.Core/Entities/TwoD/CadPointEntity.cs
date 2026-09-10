@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Text.Json.Nodes;
 using OcctNet;
 
@@ -23,7 +23,7 @@ public sealed class CadPointEntity : CadEntity
     internal override OcctShape BuildShape(OcctEngine engine) => engine.MakeVertex(_position);
 
     public override IReadOnlyList<CadSnapPoint> GetSnapPoints() =>
-        [new(this, _position, CadSnapType.Vertex, 0)];
+        [new(this, _position, CadSnapType.Node, 0)];
 
     public override IReadOnlyList<CadGripPoint> GetGripPoints() =>
         [new(this, 0, _position)];

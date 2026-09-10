@@ -53,7 +53,8 @@ public abstract class CadEntity
     [CadProperty(CadValueSemantic.Text, Order = 0)]
     public string EntityType => _entityType;
 
-    [Browsable(false)]
+    [Category("General"), DisplayName("ID"), ReadOnly(true)]
+    [CadProperty(CadValueSemantic.Text, Order = 5)]
     public Guid Id { get; private set; } = Guid.NewGuid();
 
     [Category("General")]
@@ -68,12 +69,12 @@ public abstract class CadEntity
         }
     }
 
-    [Category("General"), ReadOnly(true)]
+    [Category("General"), DisplayName("Layer")]
     [CadProperty(CadValueSemantic.Layer, Order = 20)]
     public string Layer
     {
         get => _layer;
-        internal set
+        set
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(value);
             SetMetadata(ref _layer, value.Trim());

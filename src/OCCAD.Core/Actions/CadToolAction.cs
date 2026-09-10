@@ -1,4 +1,4 @@
-﻿namespace OCCAD;
+namespace OCCAD;
 
 public sealed class CadToolAction : CadAction
 {
@@ -28,6 +28,7 @@ public sealed class CadToolAction : CadAction
                 StringComparer.OrdinalIgnoreCase);
     }
 
+    public string ToolId => _toolId;
     public override string Id => _id;
     public override string DisplayName => _displayName;
     public override string Description => $"Start {DisplayName} tool";

@@ -183,20 +183,18 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
 
         try
         {
-            Context.Workspace.MirrorEntities(
+            CommitTransform(() => Context.Workspace.MirrorEntities(
                 Entities,
                 _firstPoint.Value,
                 planeNormal,
-                _keepSource);
+                _keepSource));
+            return true;
         }
         catch (NotSupportedException)
         {
             ClearTransformPreview();
             return false;
         }
-
-        Context.Workspace.Tools.CompleteCurrent();
-        return true;
     }
 
     private void RefreshExactOrPointerPreview()

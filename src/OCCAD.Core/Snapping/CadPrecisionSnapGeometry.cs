@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -75,7 +75,8 @@ internal static class CadPrecisionSnapGeometry
         if (!queryPoint.IsFinite) throw new ArgumentOutOfRangeException(nameof(queryPoint));
 
         const CadSnapType precisionModes = CadSnapType.Nearest | CadSnapType.Intersection |
-            CadSnapType.Perpendicular | CadSnapType.Tangent;
+            CadSnapType.Perpendicular | CadSnapType.Tangent | CadSnapType.ApparentIntersection |
+            CadSnapType.Extension;
         if ((modes & precisionModes) == 0) return Array.Empty<CadSnapPoint>();
 
         var curves = BuildCurves(
@@ -145,6 +146,49 @@ internal static class CadPrecisionSnapGeometry
                             workPlane.LocalToWorld(intersection),
                             CadSnapType.Intersection,
                             first.Index));
+                    }
+                }
+            }
+        }
+
+        if ((modes & CadSnapType.ApparentIntersection) != 0)
+        {
+            for (var firstIndex = 0; firstIndex < curves.Count; firstIndex++)
+            {
+                var first = curves[firstIndex];
+                for (var secondIndex = firstIndex + 1; secondIndex < curves.Count; secondIndex++)
+                {
+                    var second = curves[secondIndex];
+
+                    foreach (var intersection in ApparentIntersections(first, second))
+                    {
+                        AddUnique(result, new CadSnapPoint(
+                            first.Entity,
+                            workPlane.LocalToWorld(intersection),
+                            CadSnapType.ApparentIntersection,
+                            first.Index));
+                    }
+                }
+            }
+        }
+
+        if ((modes & CadSnapType.Extension) != 0)
+        {
+            foreach (var curve in curves)
+            {
+                if (curve.Kind == CadSnapCurveKind.Segment)
+                {
+                    var projected = ProjectToInfiniteLine(query, curve.Start, curve.End, out var t);
+                    if (t < -GeometryTolerance || t > 1.0 + GeometryTolerance)
+                    {
+                        if (DistanceSquared(query, projected) <= 10000.0)
+                        {
+                            AddUnique(result, new CadSnapPoint(
+                                curve.Entity,
+                                workPlane.LocalToWorld(projected),
+                                CadSnapType.Extension,
+                                curve.Index));
+                        }
                     }
                 }
             }
@@ -591,6 +635,29 @@ internal static class CadPrecisionSnapGeometry
             return SegmentCircle(second, first);
 
         return CircleCircle(first, second);
+    }
+
+    private static IEnumerable<CadPlanePoint> ApparentIntersections(CadSnapCurve first, CadSnapCurve second)
+    {
+        if (first.Kind == CadSnapCurveKind.Segment && second.Kind == CadSnapCurveKind.Segment)
+        {
+            var p = first.Start;
+            var r = new CadPlanePoint(first.End.X - first.Start.X, first.End.Y - first.Start.Y);
+            var q = second.Start;
+            var s = new CadPlanePoint(second.End.X - second.Start.X, second.End.Y - second.Start.Y);
+            var cross = Cross(r, s);
+            if (Math.Abs(cross) <= GeometryTolerance) yield break;
+
+            var qp = new CadPlanePoint(q.X - p.X, q.Y - p.Y);
+            var t = Cross(qp, s) / cross;
+            var u = Cross(qp, r) / cross;
+            var onFirst = t >= -GeometryTolerance && t <= 1.0 + GeometryTolerance;
+            var onSecond = u >= -GeometryTolerance && u <= 1.0 + GeometryTolerance;
+            if ((!onFirst || !onSecond) && Math.Abs(t) <= 50.0 && Math.Abs(u) <= 50.0)
+            {
+                yield return new CadPlanePoint(p.X + r.X * t, p.Y + r.Y * t);
+            }
+        }
     }
 
     private static IEnumerable<CadPlanePoint> SegmentSegment(CadSnapCurve first, CadSnapCurve second)

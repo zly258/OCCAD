@@ -96,7 +96,11 @@ public abstract class CadDrawingTool : CadTool
 
     protected void CommitPreview(CadEntity? entity)
     {
-        if (entity is null) return;
+        if (entity is null)
+            return;
+
+        // Never keep transient and document presentations alive in the same
+        // final frame.
         Context.Preview.Clear();
         Context.AddEntity(entity.Duplicate());
         Context.Workspace.Tools.CompleteCurrent();

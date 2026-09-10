@@ -73,8 +73,10 @@ public sealed class LineTool : CadDrawingTool, ICadPointInputTool
         if (_start.Value.DistanceTo(point) <= 1e-9)
             return false;
         UpdatePreview(_start.Value, point);
-        if (_preview is not null) Context.AddEntity(_preview.Duplicate());
-        Context.Workspace.Tools.CompleteCurrent();
+        if (_preview is null)
+            return false;
+
+        CommitPreview(_preview);
         return true;
     }
 

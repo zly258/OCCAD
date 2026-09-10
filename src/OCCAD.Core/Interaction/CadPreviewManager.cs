@@ -51,14 +51,21 @@ public sealed class CadPreviewManager
 
     public void Clear()
     {
+        var redraw = false;
         if (_engine is { IsInitialized: true } engine && _shapes.Count > 0)
         {
-            using var batch = engine.BeginDisplayBatch();
-            DeleteObjects(engine, _shapes);
+            using (engine.BeginDisplayBatch())
+            {
+                DeleteObjects(engine, _shapes);
+            }
+            redraw = true;
         }
 
         _shapes.Clear();
         _entities.Clear();
+
+        if (redraw && _engine is { IsInitialized: true } redrawEngine)
+            redrawEngine.Redraw();
     }
 
     private void Rebuild(IReadOnlyList<CadEntity> entities)

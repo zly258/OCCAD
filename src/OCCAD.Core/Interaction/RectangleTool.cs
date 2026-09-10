@@ -132,9 +132,7 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
             return false;
 
         _preview = new CadRectangleEntity(center, _xAxis, _yAxis, width, height);
-        ShowPreview(_preview);
-        Context.AddEntity(_preview.Duplicate());
-        Context.Workspace.Tools.CompleteCurrent();
+        CommitPreview(_preview);
         return true;
     }
 

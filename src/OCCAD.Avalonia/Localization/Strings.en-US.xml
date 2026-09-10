@@ -802,14 +802,12 @@
     <sys:String x:Key="Cad.Text.ErrorMessage">OCCAD encountered an error. Details were written to the application log.</sys:String>
     <sys:String x:Key="Cad.Text.ErrorLog">Log:</sys:String>
     <sys:String x:Key="Cad.Text.Continue">Continue</sys:String>
-    <sys:String x:Key="Cad.Text.Exit">Exit</sys:String>
 
     <sys:String x:Key="Cad.Text.LineWidth">Line width</sys:String>
     <sys:String x:Key="Cad.Text.LineStyle">Line style</sys:String>
     <sys:String x:Key="Cad.Text.Current">Current</sys:String>
     <sys:String x:Key="Cad.Text.Ok">OK</sys:String>
     <sys:String x:Key="Cad.Text.CustomColor">Custom color</sys:String>
-    <sys:String x:Key="Cad.Text.MoreColors">More colors</sys:String>
     <sys:String x:Key="Cad.Text.ColorTable">Color table</sys:String>
     <sys:String x:Key="Cad.Prompt.revolve.AxisStart">Revolve: specify axis start point [Backspace profile, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.revolve.AxisEnd">Revolve: specify axis end point [Backspace axis start, Esc cancel]</sys:String>

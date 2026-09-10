@@ -152,7 +152,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
                         "Cad.Text.SelectionInitial",
                         "Selection: 0"),
                     Foreground = CadTheme.Muted,
-                    Margin = new Thickness(10)
+                    Margin = new Thickness(6)
                 });
                 return;
             }
@@ -175,7 +175,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 Text = title,
                 FontWeight = FontWeight.SemiBold,
                 Foreground = CadTheme.Text,
-                Margin = new Thickness(8, 7, 8, 6)
+                Margin = new Thickness(6, 4, 6, 3)
             });
 
             if (_subobject is { } subobject)
@@ -189,9 +189,11 @@ internal sealed class CadPropertyInspectorController : IDisposable
             {
                 _host.Children.Add(new Border
                 {
-                    Background = CadTheme.PanelAlt,
-                    Padding = new Thickness(7, 3),
-                    Margin = new Thickness(0, 1),
+                    Background = CadTheme.Toolbar,
+                    BorderBrush = CadTheme.Border,
+                    BorderThickness = new Thickness(0, 1, 0, 0),
+                    Padding = new Thickness(5, 2),
+                    Margin = new Thickness(0),
                     Child = new TextBlock
                     {
                         Text = group.Key,
@@ -435,9 +437,11 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         _host.Children.Add(new Border
         {
-            Background = CadTheme.PanelAlt,
-            Padding = new Thickness(8, 4),
-            Margin = new Thickness(0, 1),
+            Background = CadTheme.Toolbar,
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(5, 2),
+            Margin = new Thickness(0),
             Child = new TextBlock
             {
                 Text = title,
@@ -459,12 +463,12 @@ internal sealed class CadPropertyInspectorController : IDisposable
     {
         var row = new Grid
         {
-            ColumnSpacing = 8,
-            Margin = new Thickness(8, 1)
+            ColumnSpacing = 5,
+            Margin = new Thickness(5, 0)
         };
         row.ColumnDefinitions.Add(
             new ColumnDefinition(
-                new GridLength(108)));
+                new GridLength(94)));
         row.ColumnDefinitions.Add(
             new ColumnDefinition(
                 new GridLength(
@@ -544,10 +548,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
     {
         var row = new Grid
         {
-            ColumnSpacing = 8,
-            Margin = new Thickness(7, 1)
+            ColumnSpacing = 5,
+            Margin = new Thickness(5, 0)
         };
-        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(108)));
+        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(94)));
         row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
 
         var label = new TextBlock
@@ -558,7 +562,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
             Foreground = CadTheme.Text,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            FontSize = 11.5
+            FontSize = 11.0
         };
         if (!string.IsNullOrWhiteSpace(slot.Descriptor.Description))
         {
@@ -680,10 +684,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
             : DrawingColor.LightGray;
         var button = new Button
         {
-            MinHeight = 24,
+            MinHeight = 22,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Left,
-            Padding = new Thickness(6, 2),
+            Padding = new Thickness(5, 1),
             Background = new SolidColorBrush(ToMediaColor(drawing)),
             Foreground = ColorTextBrush(drawing),
             Content = $"#{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"

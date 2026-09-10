@@ -802,14 +802,12 @@
     <sys:String x:Key="Cad.Text.ErrorMessage">OCCAD 发生错误。详细信息已写入应用日志。</sys:String>
     <sys:String x:Key="Cad.Text.ErrorLog">日志：</sys:String>
     <sys:String x:Key="Cad.Text.Continue">继续</sys:String>
-    <sys:String x:Key="Cad.Text.Exit">退出</sys:String>
 
     <sys:String x:Key="Cad.Text.LineWidth">线宽</sys:String>
     <sys:String x:Key="Cad.Text.LineStyle">线型</sys:String>
     <sys:String x:Key="Cad.Text.Current">当前</sys:String>
     <sys:String x:Key="Cad.Text.Ok">确定</sys:String>
     <sys:String x:Key="Cad.Text.CustomColor">自定义颜色</sys:String>
-    <sys:String x:Key="Cad.Text.MoreColors">更多颜色</sys:String>
     <sys:String x:Key="Cad.Text.ColorTable">颜色表</sys:String>
     <sys:String x:Key="Cad.Prompt.revolve.AxisStart">旋转建模：指定旋转轴起点 [Backspace 返回轮廓，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.revolve.AxisEnd">旋转建模：指定旋转轴终点 [Backspace 返回轴起点，Esc 取消]</sys:String>

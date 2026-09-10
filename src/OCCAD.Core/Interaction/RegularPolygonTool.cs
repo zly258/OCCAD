@@ -204,9 +204,7 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
             axis,
             radius,
             _sides);
-        ShowPreview(polygon);
-        Context.AddEntity(polygon.Duplicate());
-        Context.Workspace.Tools.CompleteCurrent();
+        CommitPreview(polygon);
         return true;
     }
 

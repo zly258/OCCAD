@@ -36,15 +36,15 @@ internal sealed class CadToolPanel : Border
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
 
-        Width = 312;
-        MaxHeight = 570;
+        Width = 282;
+        MaxHeight = 520;
         HorizontalAlignment = HorizontalAlignment.Left;
         VerticalAlignment = VerticalAlignment.Top;
-        Margin = new Thickness(10);
+        Margin = new Thickness(6);
         Background = CadTheme.Surface;
-        BorderBrush = CadTheme.BorderStrong;
+        BorderBrush = CadTheme.Border;
         BorderThickness = new Thickness(1);
-        CornerRadius = new CornerRadius(3);
+        CornerRadius = new CornerRadius(0);
         IsVisible = false;
 
         _title = new TextBlock
@@ -52,14 +52,14 @@ internal sealed class CadToolPanel : Border
             FontWeight = FontWeight.SemiBold,
             Foreground = CadTheme.Text,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(10, 0)
+            Margin = new Thickness(7, 0)
         };
 
         _close = new Button
         {
             Content = "×",
-            Width = 28,
-            Height = 28,
+            Width = 24,
+            Height = 24,
             Padding = new Thickness(0),
             Background = Brushes.Transparent,
             Foreground = CadTheme.Muted,
@@ -71,8 +71,8 @@ internal sealed class CadToolPanel : Border
 
         var header = new DockPanel
         {
-            Height = 31,
-            Background = CadTheme.Header
+            Height = 26,
+            Background = CadTheme.Toolbar
         };
         DockPanel.SetDock(_close, Dock.Right);
         header.Children.Add(_close);
@@ -80,8 +80,8 @@ internal sealed class CadToolPanel : Border
 
         _content = new StackPanel
         {
-            Spacing = 3,
-            Margin = new Thickness(9)
+            Spacing = 2,
+            Margin = new Thickness(6)
         };
 
         _finish = CompactButton();
@@ -93,7 +93,7 @@ internal sealed class CadToolPanel : Border
         _planeState = new TextBlock
         {
             Foreground = CadTheme.Muted,
-            FontSize = 10.5,
+            FontSize = 10.0,
             VerticalAlignment = VerticalAlignment.Center
         };
         _planeLock = new CheckBox
@@ -264,8 +264,8 @@ internal sealed class CadToolPanel : Border
 
             var buttons = new Grid
             {
-                Margin = new Thickness(0, 6, 0, 0),
-                ColumnSpacing = 6
+                Margin = new Thickness(0, 4, 0, 0),
+                ColumnSpacing = 4
             };
             buttons.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
             buttons.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
@@ -299,18 +299,23 @@ internal sealed class CadToolPanel : Border
 
         var row = new Grid
         {
-            Margin = new Thickness(0, 0, 0, 6),
-            ColumnSpacing = 8,
-            Background = CadTheme.PanelAlt
+            Margin = new Thickness(0, 0, 0, 3),
+            ColumnSpacing = 5,
+            Background = CadTheme.Surface
         };
         row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
         row.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-        _planeState.Margin = new Thickness(6, 3);
+        _planeState.Margin = new Thickness(5, 2);
         row.Children.Add(_planeState);
         Grid.SetColumn(_planeLock, 1);
-        _planeLock.Margin = new Thickness(0, 2, 5, 2);
+        _planeLock.Margin = new Thickness(0, 1, 4, 1);
         row.Children.Add(_planeLock);
-        _content.Children.Add(row);
+        _content.Children.Add(new Border
+        {
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = row
+        });
         RefreshWorkPlaneState();
     }
 
@@ -387,7 +392,7 @@ internal sealed class CadToolPanel : Border
         _editors[id] = editor;
         _locks[id] = toggle;
 
-        var panel = new Grid { ColumnSpacing = 6 };
+        var panel = new Grid { ColumnSpacing = 4 };
         panel.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
         panel.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
@@ -419,7 +424,7 @@ internal sealed class CadToolPanel : Border
             _editors[parameter.Id] = editor;
             _locks[parameter.Id] = toggle;
 
-            var panel = new Grid { ColumnSpacing = 6 };
+            var panel = new Grid { ColumnSpacing = 4 };
             panel.ColumnDefinitions.Add(
                 new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
             panel.ColumnDefinitions.Add(
@@ -573,11 +578,11 @@ internal sealed class CadToolPanel : Border
     {
         var row = new Grid
         {
-            ColumnSpacing = 7,
-            Margin = new Thickness(0, 1)
+            ColumnSpacing = 5,
+            Margin = new Thickness(0)
         };
         row.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(112)));
+            new ColumnDefinition(new GridLength(96)));
         row.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
 

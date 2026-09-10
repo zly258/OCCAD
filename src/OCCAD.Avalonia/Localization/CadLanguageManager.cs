@@ -169,7 +169,7 @@ internal static class CadLanguageManager
             ?? throw new InvalidOperationException($"Localization resource '{resourceName}' cannot be opened.");
         var document = XDocument.Load(stream);
         XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
-        var values = document
+        var entries = document
             .Descendants()
             .Select(element => new
             {
@@ -177,10 +177,26 @@ internal static class CadLanguageManager
                 Value = element.Value
             })
             .Where(value => !string.IsNullOrWhiteSpace(value.Key))
-            .ToDictionary(
+            .ToArray();
+
+        var duplicates = entries
+            .GroupBy(
                 value => value.Key!,
-                value => value.Value,
-                StringComparer.OrdinalIgnoreCase);
+                StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (duplicates.Length > 0)
+        {
+            throw new InvalidDataException(
+                $"Localization resource '{resourceName}' contains duplicate keys: {string.Join(", ", duplicates)}");
+        }
+
+        var values = entries.ToDictionary(
+            value => value.Key!,
+            value => value.Value,
+            StringComparer.OrdinalIgnoreCase);
         Cache[language] = values;
         return values;
     }

@@ -82,7 +82,7 @@ public class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
     {
         if(!IsActive || _source is null || !point.IsFinite) return false;
         var entity=Create(point); if(entity is null) return false;
-        Context.AddEntity(entity); Context.Workspace.Tools.CompleteCurrent(); return true;
+        CommitPreview(entity); return true;
     }
 
     protected override bool OnSetParameter(string id,string value)

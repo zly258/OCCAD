@@ -78,8 +78,10 @@ public sealed class SphereTool : CadDrawingTool, ICadPointInputTool
         if (radius <= 1e-9)
             return false;
 
-        Context.AddEntity(new CadSphereEntity(_center.Value, radius));
-        Context.Workspace.Tools.CompleteCurrent();
+        CommitPreview(
+            new CadSphereEntity(
+                _center.Value,
+                radius));
         return true;
     }
 

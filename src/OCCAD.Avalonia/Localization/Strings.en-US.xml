@@ -488,6 +488,8 @@
     <sys:String x:Key="Cad.Category.Source">Source</sys:String>
     <sys:String x:Key="Cad.Category.State">State</sys:String>
     <sys:String x:Key="Cad.History.LayerColor">Layer Color</sys:String>
+    <sys:String x:Key="Cad.History.LayerLineStyle">Layer Line Style</sys:String>
+    <sys:String x:Key="Cad.History.LayerLineWidth">Layer Line Width</sys:String>
     <sys:String x:Key="Cad.History.LayerEdit">Layer Edit</sys:String>
     <sys:String x:Key="Cad.History.PropertyEdit">Property Edit</sys:String>
     <sys:String x:Key="Cad.History.PropertyEditNamed">Property {0}</sys:String>

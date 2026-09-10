@@ -108,11 +108,11 @@ public sealed class ShapeOffsetTool : CadSelectionTransformToolBase
                 Entities[0],
                 _offset);
 
-        Context.Preview.Clear();
-        Context.Workspace.ReplaceEntities(
-            Entities,
-            [feature],
-            "Shape Offset");
+        CommitReplacementPreview(
+            () => Context.Workspace.ReplaceEntities(
+                Entities,
+                [feature],
+                "Shape Offset"));
         Context.Workspace.Tools.CompleteCurrent();
         return true;
     }
@@ -120,12 +120,19 @@ public sealed class ShapeOffsetTool : CadSelectionTransformToolBase
     private void RefreshPreview()
     {
         if (Entities.Count == 1)
-            Context.Preview.Show(
-                new CadShapeOffsetEntity(
-                    Entities[0],
-                    _offset));
+        {
+            ShowReplacementPreview(
+                Entities,
+                [
+                    new CadShapeOffsetEntity(
+                        Entities[0],
+                        _offset)
+                ]);
+        }
         else
-            Context.Preview.Clear();
+        {
+            ClearReplacementPreview();
+        }
     }
 
     private static bool TryNonZero(string text, out double value)

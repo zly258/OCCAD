@@ -144,7 +144,6 @@ public sealed class OffsetTool : CadSelectionTransformToolBase, ICadPointInputTo
             return false;
         }
 
-        Context.Preview.Clear();
         Context.Workspace.AddGeneratedEntities(offsets, "Offset");
         Context.Workspace.Tools.CompleteCurrent();
         return true;

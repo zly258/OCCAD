@@ -137,10 +137,10 @@ public sealed class BoxTool : CadDrawingTool, ICadPointInputTool
                     return true;
 
                 Update(point);
-                if (_preview is not null)
-                    Context.AddEntity(_preview.Duplicate());
-                Context.Workspace.Tools.CompleteCurrent();
-                break;
+                if (_preview is null)
+                    return false;
+                CommitPreview(_preview);
+                return true;
         }
 
         return true;

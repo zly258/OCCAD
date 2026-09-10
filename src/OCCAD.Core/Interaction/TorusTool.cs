@@ -132,9 +132,9 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
             return false;
 
         Update(tubePoint);
-        if (_preview is not null)
-            Context.AddEntity(_preview.Duplicate());
-        Context.Workspace.Tools.CompleteCurrent();
+        if (_preview is null)
+            return false;
+        CommitPreview(_preview);
         return true;
     }
 

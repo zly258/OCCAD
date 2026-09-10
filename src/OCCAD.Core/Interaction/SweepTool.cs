@@ -72,7 +72,6 @@ public sealed class SweepTool : CadSelectionTransformToolBase
             return true;
         }
 
-        Context.Preview.Clear();
         Context.Workspace.AddGeneratedEntities(
             [entity],
             "Sweep");

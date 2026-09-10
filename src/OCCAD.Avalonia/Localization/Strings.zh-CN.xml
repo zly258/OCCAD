@@ -215,6 +215,8 @@
     <sys:String x:Key="Cad.Category.Source">来源</sys:String>
     <sys:String x:Key="Cad.Category.State">状态</sys:String>
     <sys:String x:Key="Cad.History.LayerColor">图层颜色</sys:String>
+    <sys:String x:Key="Cad.History.LayerLineStyle">图层线型</sys:String>
+    <sys:String x:Key="Cad.History.LayerLineWidth">图层线宽</sys:String>
     <sys:String x:Key="Cad.History.LayerEdit">图层属性</sys:String>
     <sys:String x:Key="Cad.History.PropertyEdit">属性修改</sys:String>
     <sys:String x:Key="Cad.History.PropertyEditNamed">修改属性 {0}</sys:String>

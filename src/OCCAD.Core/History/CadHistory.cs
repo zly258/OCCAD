@@ -208,16 +208,46 @@ internal sealed class CadReplaceEntitiesHistoryEntry : ICadHistoryEntry
 
     public string Name { get; }
 
-    public void Undo()
-    {
-        _document.RemoveRange(_after.Reverse());
-        _document.AddRange(_before);
-    }
+    public void Undo() =>
+        Replace(
+            _after,
+            _before);
 
-    public void Redo()
+    public void Redo() =>
+        Replace(
+            _before,
+            _after);
+
+    private void Replace(
+        IReadOnlyList<CadEntity> remove,
+        IReadOnlyList<CadEntity> add)
     {
-        _document.RemoveRange(_before.Reverse());
-        _document.AddRange(_after);
+        using var changes =
+            _document.BeginChangeSet();
+
+        _document.RemoveRange(
+            remove.Reverse());
+
+        try
+        {
+            _document.AddRange(add);
+        }
+        catch (Exception failure)
+        {
+            try
+            {
+                _document.AddRange(remove);
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Entity replacement and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
+            throw;
+        }
     }
 }
 
@@ -276,13 +306,58 @@ internal sealed class CadGeometryHistoryEntry : ICadHistoryEntry
 
     public string Name { get; }
 
-    public void Undo() => Restore(_before);
-    public void Redo() => Restore(_after);
+    public void Undo() =>
+        Restore(
+            _before,
+            _after);
 
-    private void Restore(IReadOnlyList<CadEntity> snapshots)
+    public void Redo() =>
+        Restore(
+            _after,
+            _before);
+
+    private void Restore(
+        IReadOnlyList<CadEntity> snapshots,
+        IReadOnlyList<CadEntity> rollback)
     {
-        for (var index = 0; index < _targets.Length; index++)
-            _targets[index].RestoreGeometrySnapshot(snapshots[index]);
+        var applied = 0;
+        try
+        {
+            for (; applied < _targets.Length; applied++)
+            {
+                _targets[applied]
+                    .RestoreGeometrySnapshot(
+                        snapshots[applied]);
+            }
+        }
+        catch (Exception failure)
+        {
+            var failures =
+                new List<Exception> { failure };
+
+            for (var index = applied - 1; index >= 0; index--)
+            {
+                try
+                {
+                    _targets[index]
+                        .RestoreGeometrySnapshot(
+                            rollback[index]);
+                }
+                catch (Exception restoreFailure)
+                {
+                    failures.Add(restoreFailure);
+                }
+            }
+
+            if (failures.Count > 1)
+            {
+                throw new AggregateException(
+                    "Geometry history restore and rollback both failed.",
+                    failures);
+            }
+
+            throw;
+        }
     }
 }
 
@@ -316,13 +391,58 @@ internal sealed class CadEntityStateHistoryEntry : ICadHistoryEntry
 
     public string Name { get; }
 
-    public void Undo() => Restore(_before);
-    public void Redo() => Restore(_after);
+    public void Undo() =>
+        Restore(
+            _before,
+            _after);
 
-    private void Restore(IReadOnlyList<CadEntity> snapshots)
+    public void Redo() =>
+        Restore(
+            _after,
+            _before);
+
+    private void Restore(
+        IReadOnlyList<CadEntity> snapshots,
+        IReadOnlyList<CadEntity> rollback)
     {
-        for (var index = 0; index < _targets.Length; index++)
-            _targets[index].RestoreState(snapshots[index]);
+        var applied = 0;
+        try
+        {
+            for (; applied < _targets.Length; applied++)
+            {
+                _targets[applied]
+                    .RestoreState(
+                        snapshots[applied]);
+            }
+        }
+        catch (Exception failure)
+        {
+            var failures =
+                new List<Exception> { failure };
+
+            for (var index = applied - 1; index >= 0; index--)
+            {
+                try
+                {
+                    _targets[index]
+                        .RestoreState(
+                            rollback[index]);
+                }
+                catch (Exception restoreFailure)
+                {
+                    failures.Add(restoreFailure);
+                }
+            }
+
+            if (failures.Count > 1)
+            {
+                throw new AggregateException(
+                    "Entity-state history restore and rollback both failed.",
+                    failures);
+            }
+
+            throw;
+        }
     }
 }
 

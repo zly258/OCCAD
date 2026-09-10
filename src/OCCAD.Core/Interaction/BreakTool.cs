@@ -160,7 +160,6 @@ public sealed class BreakTool : CadSelectionTransformToolBase, ICadPointInputToo
             return false;
         }
 
-        ClearReplacementPreview();
         CommitReplacementPreview(
             () => Context.Workspace.ReplaceEntities(
                 [Entities[0]],

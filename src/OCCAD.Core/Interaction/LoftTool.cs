@@ -166,7 +166,6 @@ public sealed class LoftTool : CadTool
         if (!TryCreate(out var entity))
             return false;
 
-        Context.Preview.Clear();
         Context.Workspace.AddGeneratedEntities(
             [entity],
             "Loft");

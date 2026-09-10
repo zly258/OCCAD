@@ -88,8 +88,7 @@ public sealed class TextTool : CadDrawingTool, ICadPointInputTool
     private bool AcceptPoint(OcctPoint3d point)
     {
         if (!point.IsFinite) return false;
-        Context.AddEntity(Create(point));
-        Context.Workspace.Tools.CompleteCurrent();
+        CommitPreview(Create(point));
         return true;
     }
 

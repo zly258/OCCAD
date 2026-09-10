@@ -861,10 +861,31 @@ public sealed class CadWorkspace : IDisposable
                     after,
                     name));
         }
-        catch
+        catch (Exception failure)
         {
+            var failures =
+                new List<Exception> { failure };
             for (var index = 0; index < targets.Length; index++)
-                targets[index].RestoreGeometrySnapshot(before[index]);
+            {
+                try
+                {
+                    targets[index]
+                        .RestoreGeometrySnapshot(
+                            before[index]);
+                }
+                catch (Exception restoreFailure)
+                {
+                    failures.Add(restoreFailure);
+                }
+            }
+
+            if (failures.Count > 1)
+            {
+                throw new AggregateException(
+                    "Geometry change and rollback both failed.",
+                    failures);
+            }
+
             throw;
         }
     }
@@ -895,9 +916,20 @@ public sealed class CadWorkspace : IDisposable
             Selection.RefreshValidity();
             Subobjects.RefreshValidity();
         }
-        catch
+        catch (Exception failure)
         {
-            layer.RestoreState(before);
+            try
+            {
+                layer.RestoreState(before);
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Layer change and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
             throw;
         }
     }
@@ -939,12 +971,32 @@ public sealed class CadWorkspace : IDisposable
                     after,
                     name));
             Selection.RefreshValidity();
-        Subobjects.RefreshValidity();
+            Subobjects.RefreshValidity();
         }
-        catch
+        catch (Exception failure)
         {
+            var failures =
+                new List<Exception> { failure };
             for (var index = 0; index < targets.Length; index++)
-                targets[index].RestoreState(before[index]);
+            {
+                try
+                {
+                    targets[index]
+                        .RestoreState(before[index]);
+                }
+                catch (Exception restoreFailure)
+                {
+                    failures.Add(restoreFailure);
+                }
+            }
+
+            if (failures.Count > 1)
+            {
+                throw new AggregateException(
+                    "Entity state change and rollback both failed.",
+                    failures);
+            }
+
             throw;
         }
     }

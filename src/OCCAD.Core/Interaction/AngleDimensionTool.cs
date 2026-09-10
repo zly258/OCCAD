@@ -53,7 +53,7 @@ public sealed class AngleDimensionTool : CadDrawingTool, ICadPointInputTool
     {
         if(!IsActive||_lines.Count!=2||!point.IsFinite)return false;
         var delta=point-_vertex;delta-=_normal*delta.Dot(_normal);if(delta.Length<=1e-9)return false;
-        Context.AddEntity(new CadAngleDimensionEntity(_vertex,_firstDirection,_secondDirection,delta.Length,_textHeight,_arrowSize));Context.Workspace.Tools.CompleteCurrent();return true;
+        CommitPreview(new CadAngleDimensionEntity(_vertex,_firstDirection,_secondDirection,delta.Length,_textHeight,_arrowSize));return true;
     }
     protected override bool OnSetParameter(string id,string value)
     {

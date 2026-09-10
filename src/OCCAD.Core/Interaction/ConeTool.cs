@@ -124,8 +124,7 @@ public sealed class ConeTool : CadDrawingTool, ICadPointInputTool
                     var entity = CreateCone(point);
                     if (entity is null)
                         return false;
-                    Context.AddEntity(entity);
-                    Context.Workspace.Tools.CompleteCurrent();
+                    CommitPreview(entity);
                     return true;
                 }
 

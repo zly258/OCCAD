@@ -372,7 +372,6 @@ public sealed class RevolveTool :
         if (!TryCreate(out var entity))
             return false;
 
-        Context.Preview.Clear();
         Context.Workspace.AddGeneratedEntities(
             [entity],
             "Revolve");

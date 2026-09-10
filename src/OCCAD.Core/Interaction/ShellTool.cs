@@ -111,21 +111,28 @@ public sealed class ShellTool : CadTool
             return false;
 
         var source = _source!;
-        Context.Preview.Clear();
-        Context.Workspace.ReplaceEntities(
-            [source],
-            [feature],
-            "Shell");
+        CommitReplacementPreview(
+            () => Context.Workspace.ReplaceEntities(
+                [source],
+                [feature],
+                "Shell"));
         Context.Workspace.Tools.CompleteCurrent();
         return true;
     }
 
     private void RefreshPreview()
     {
-        if (TryCreate(out var feature))
-            Context.Preview.Show(feature);
+        if (TryCreate(out var feature) &&
+            _source is { } source)
+        {
+            ShowReplacementPreview(
+                [source],
+                [feature]);
+        }
         else
-            Context.Preview.Clear();
+        {
+            ClearReplacementPreview();
+        }
     }
 
     private bool TryCreate(out CadShellEntity feature)

@@ -100,10 +100,10 @@ public abstract class CadDrawingTool : CadTool
             return;
 
         // Keep the transient preview until the document/history commit
-        // succeeds. If presentation creation or history recording fails, the
-        // Tool remains active with its last valid preview.
+        // succeeds. CompleteCurrent() owns deactivation and transient cleanup,
+        // so a cleanup failure cannot leave this already-committed Tool active
+        // and accidentally allow the same entity to be committed again.
         Context.AddEntity(entity.Duplicate());
-        Context.Preview.Clear();
         Context.Workspace.Tools.CompleteCurrent();
     }
 }

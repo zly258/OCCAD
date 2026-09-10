@@ -245,7 +245,6 @@ public sealed class ExtrudeTool :
         if (!TryCreate(out var entity))
             return false;
 
-        Context.Preview.Clear();
         Context.Workspace.AddGeneratedEntities(
             [entity],
             "Extrude");

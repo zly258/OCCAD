@@ -9,18 +9,23 @@ namespace OCCAD.Avalonia;
 /// </summary>
 internal static class CadTheme
 {
-    public const double FontSize = 11.0;
-    public const double SmallFontSize = 10.0;
-    public const double CaptionFontSize = 10.0;
+    public const double FontSize = 12.0;
+    public const double SmallFontSize = 11.0;
+    public const double CaptionFontSize = 11.0;
     public const double ControlHeight = 28.0;
     public const double PanelHeaderHeight = 28.0;
     public const double StatusHeight = 26.0;
     public const double SplitterThickness = 4.0;
     public const double ModelPanelWidth = 220.0;
     public const double PropertyPanelWidth = 380.0;
-    public const double PropertyLabelWidth = 120.0;
-    public const double PropertyTitleHeight = 28.0;
-    public const double PropertyRowHeight = 26.0;
+    public const double PropertyLabelWidth = 126.0;
+    public const double PropertyFontSize = 12.5;
+    public const double PropertyHeaderFontSize = 12.0;
+    public const double PropertyTitleFontSize = 13.0;
+    public const double PropertyCategoryFontSize = 12.5;
+    public const double PropertyTitleHeight = 32.0;
+    public const double PropertyRowHeight = 30.0;
+    public const double PropertyControlHeight = 30.0;
     public const double LayerHeaderHeight = 28.0;
     public const double LayerRowHeight = 26.0;
     public const double LayerActionButtonMinWidth = 44.0;

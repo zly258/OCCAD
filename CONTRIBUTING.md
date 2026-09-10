@@ -1,24 +1,27 @@
 # Contributing to OCCAD
 
-OCCAD is maintained as a CAD product core, not as an OCCT API demo. Contributions should preserve ownership, transaction/history semantics, Tool lifecycle, native-resource cleanup, and the separation between Core and Avalonia.
+OCCAD is maintained as a CAD product core, not as an OCCT API demo. Contributions must preserve ownership, transaction/history semantics, Tool lifecycle, native-resource cleanup, and the Core/Avalonia boundary.
 
 ## Start here
 
-Read:
+Read these documents before changing code:
 
 - `docs/README.md`
 - `docs/en-US/04-ARCHITECTURE.md` or `docs/zh-CN/04-ARCHITECTURE.md`
+- `docs/en-US/07-CODE-ORGANIZATION.md` or `docs/zh-CN/07-CODE-ORGANIZATION.md`
 - `docs/en-US/08-DEVELOPMENT-GUIDE.md` or `docs/zh-CN/08-DEVELOPMENT-GUIDE.md`
 - `docs/en-US/10-TRANSACTION-RESOURCE-CONTRACT.md` or `docs/zh-CN/10-TRANSACTION-RESOURCE-CONTRACT.md`
-- `docs/en-US/11-TESTING-VALIDATION.md` or `docs/zh-CN/11-TESTING-VALIDATION.md`
+- `docs/en-US/11-BUILD-VALIDATION.md` or `docs/zh-CN/11-BUILD-VALIDATION.md`
 
 ## Change policy
 
-Prefer small changes with one clear responsibility. Do not combine unrelated architecture, UI styling, entity expansion, and bug fixes into one change.
+Prefer small changes with one clear responsibility. Do not combine unrelated architecture changes, UI styling, entity expansion, and bug fixes.
 
 For Core work, identify the authoritative state owner and failure/rollback semantics before implementation.
 
-For UI work, keep Avalonia as an adapter over Core. Do not create a second command system, transaction path, property model, layer model, or formal selection model.
+For UI work, keep Avalonia as an adapter over Core. Do not create a second command system, transaction path, property model, layer model, selection model, or viewer-owned business state.
+
+During release stabilization, do not broaden the product surface. Accept only build fixes, reproducible blockers, interaction/native cleanup fixes, localization corrections, documentation corrections, and build/run/publish fixes.
 
 ## Build
 
@@ -28,52 +31,76 @@ Primary Windows validation:
 .\build.ps1
 ```
 
-Normal builds must not clone or rebuild OcctCSharpBridge.
+Linux validation:
 
-## Tests
+```bash
+./build.sh
+```
 
-Add regression coverage for changed invariants. Prefer non-native tests when native presentation is not required. Use native tests for ViewerObject mapping, object counts, Snap/Grip/Preview markers, native selection, rectangle queries, and presentation consistency.
+Normal builds consume the installed OcctCSharpBridge SDK. They do not clone, rebuild, or synchronize Bridge source automatically.
 
-If native tests cannot run in the current environment, say so explicitly. Do not report unexecuted tests as passed.
+## Validation
+
+The repository currently does not maintain a separate Test project. Validate changed invariants through the build scripts and the manual/native regression matrix in `11-BUILD-VALIDATION.md` and `16-RELEASE-GUIDE.md`.
+
+If a build or native regression cannot run in the current environment, state that explicitly. Never report an unexecuted validation as passed.
 
 ## Core review checklist
 
-- [ ] Single owner is clear.
-- [ ] Authoritative state point is clear.
-- [ ] No-op does not create History/Modified state.
-- [ ] Rollback is defined for failure paths.
-- [ ] Undo/Redo are symmetric.
-- [ ] Tool cancel/deactivate returns neutral.
-- [ ] Preview/transient state does not enter Document/History.
-- [ ] Native handles cannot be forgotten after failed cleanup.
-- [ ] Event type is classified as veto, strict propagation, or notification.
-- [ ] Public notification observers are isolated when state is already authoritative.
-- [ ] New public extension points have documentation and tests.
+- [ ] One authoritative owner is clear.
+- [ ] Commit point and rollback path are clear.
+- [ ] No-op does not create History or Modified state.
+- [ ] Undo/Redo are symmetric and atomic.
+- [ ] Tool cancel/deactivate returns the interaction system to neutral.
+- [ ] Preview/Snap/Tracking/Grip transient state never enters Document/History.
+- [ ] Native handles are retained until cleanup is confirmed.
+- [ ] Events are classified as veto, strict propagation, or post-state notification.
+- [ ] Recoverable notification failures do not invalidate authoritative state.
+- [ ] Fatal failures are not swallowed as recoverable errors.
+- [ ] New public extension points have documentation and validation.
 
 ## UI review checklist
 
 - [ ] No duplicated Core business logic.
-- [ ] No direct viewer state used as business truth.
-- [ ] DPI/scaling remains usable at common Windows scaling factors.
-- [ ] Prompt information is not redundantly duplicated across Command Line, Floating Tool Panel, and Status Bar.
-- [ ] Localization resources are updated where required.
+- [ ] Viewer/presentation state is never used as business truth.
+- [ ] The Classic Shell remains compact and usable at 125%/150% DPI.
+- [ ] Operation Prompt and fixed Tool Parameter Strip have distinct responsibilities and do not duplicate full command UI.
+- [ ] PropertyGrid editors update Core through the formal transaction path.
+- [ ] Entity Color/LineStyle/LineWidth support explicit override and ByLayer restoration.
+- [ ] Localization resources are complete for Chinese and English.
 
 ## Architecture decisions
 
-Use `docs/adr/0000-template.md` when a change alters dependency direction, ownership, Tool lifecycle, transaction/history semantics, persistence compatibility, plugin/global-service policy, or threading/native scheduling.
+Use `docs/adr/0000-template.md` when a change alters dependency direction, state ownership, Tool lifecycle, transaction/history semantics, persistence compatibility, plugin/global-service policy, threading, or native scheduling.
 
 ## Repository hygiene
 
-Avoid:
+Do not commit:
 
-- generated build artifacts;
-- local SDK paths committed into source;
-- temporary investigation notes in long-lived docs;
-- reflection-based dispatch;
-- compatibility layers that preserve incorrect APIs;
-- artificial type suffixes such as `Advanced`, `Extended`, `V1`, or `V2`;
-- GitHub Actions unless project policy explicitly changes through an accepted architecture decision.
+- generated build/publish artifacts;
+- local logs or crash dumps;
+- temporary screenshots;
+- local SDK/OCCT absolute paths;
+- one-off migration or investigation scripts;
+- generated icon pipelines that are not part of the product build;
+- temporary validation output.
+
+Avoid reflection-based dispatch, compatibility layers that preserve incorrect APIs, and artificial naming such as `Advanced`, `Extended`, `Legacy`, `Compat`, `V1`, or `V2` unless the concept itself is real and documented.
+
+GitHub Actions are not part of the current repository policy.
 
 ## Documentation
 
-When behavior or architecture changes, update the matching document in `docs/en-US` and `docs/zh-CN` in the same change. Long-lived architectural trade-offs also require an ADR.
+When behavior or architecture changes, update the matching document in both `docs/en-US` and `docs/zh-CN` in the same change.
+
+Documentation rules:
+
+- describe current stable behavior, not commit history;
+- use stable Action/Tool/Entity IDs exactly as implemented;
+- distinguish **Initial Release**, **Infrastructure**, **Internal**, and **Out of Scope**;
+- use `ByLayer` for inherited entity appearance and `Override` for entity-specific appearance;
+- use `Preview`, `Snap`, `Tracking`, `Grip`, `Selection`, `WorkPlane`, `Tool`, `Action`, `Transaction`, and `History` consistently as product terms;
+- do not claim a feature merely because a helper, Entity, or transaction API exists;
+- do not duplicate long normative contracts when a canonical document already owns them; link to that document instead.
+
+Long-lived architectural trade-offs require an ADR.

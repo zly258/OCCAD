@@ -8,6 +8,7 @@ Set-StrictMode -Version Latest
 
 $root = $PSScriptRoot
 $solution = Join-Path $root 'OCCAD.sln'
+$appDirectory = Join-Path $root "src\OCCAD.Avalonia\bin\x64\$Configuration\net10.0"
 $bridgeSdk = if (-not [string]::IsNullOrWhiteSpace($env:OCCTCSHARPBRIDGE_SDK)) {
     [System.IO.Path]::GetFullPath($env:OCCTCSHARPBRIDGE_SDK)
 } else {
@@ -99,4 +100,41 @@ if ($LASTEXITCODE -ne 0) {
     throw "OCCAD build failed. OCCAD source $occadSourceCommit; Bridge SDK source $bridgeSourceCommit. Exit code: $LASTEXITCODE."
 }
 
+foreach ($name in @(
+    'OCCAD.exe',
+    'OCCAD.dll',
+    'OcctNet.dll',
+    'OcctNet.Avalonia.dll',
+    'bridge-contract.json',
+    'bridge-manifest.json'
+)) {
+    $path = Join-Path $appDirectory $name
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Build output is missing required file '$name': $path"
+    }
+}
+
+if ($usesPortableRuntime) {
+    foreach ($path in @(
+        (Join-Path $appDirectory 'runtime\OcctNative.dll'),
+        (Join-Path $appDirectory 'bridge-portable-manifest.json')
+    )) {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "Portable build output is incomplete: $path"
+        }
+    }
+
+    $outputResources = Join-Path $appDirectory 'occt\resources'
+    if (-not (Test-Path -LiteralPath $outputResources -PathType Container)) {
+        throw "Portable build output is missing OCCT resources: $outputResources"
+    }
+}
+else {
+    $outputNative = Join-Path $appDirectory 'OcctNative.dll'
+    if (-not (Test-Path -LiteralPath $outputNative -PathType Leaf)) {
+        throw "Flat build output is missing OcctNative.dll: $outputNative"
+    }
+}
+
+Write-Host "[build] Application:    $appDirectory"
 Write-Host '[build] Completed.' -ForegroundColor Green

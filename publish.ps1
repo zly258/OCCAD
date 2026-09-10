@@ -1,6 +1,7 @@
 param(
     [string]$OutputDirectory = '',
-    [string]$OcctRoot = $env:OCCT_ROOT
+    [string]$OcctRoot = $env:OCCT_ROOT,
+    [switch]$NoArchive
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,6 +19,9 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $root 'artifacts\publish\OCCAD'
 }
 $OutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
+$outputParent = Split-Path -Parent $OutputDirectory
+$packageName = Split-Path -Leaf $OutputDirectory
+$archivePath = Join-Path $outputParent "$packageName-win-x64.zip"
 
 foreach ($name in @('OcctNet.dll','OcctNet.Avalonia.dll','bridge-contract.json','bridge-manifest.json')) {
     if (-not (Test-Path -LiteralPath (Join-Path $bridgeRoot $name) -PathType Leaf)) {
@@ -114,8 +118,8 @@ if (-not (Test-Path -LiteralPath $launcherDestination -PathType Leaf)) {
     throw "Publish output is missing run.ps1: $launcherDestination"
 }
 
-# Ship the release/legal documentation with the executable package so a copied
-# or archived delivery remains self-describing without requiring the source tree.
+# Ship release/legal documentation with the executable package so a copied or
+# archived delivery remains self-describing without requiring the source tree.
 foreach ($name in @(
     'README.md',
     'README.zh-CN.md',
@@ -142,11 +146,22 @@ if (-not (Test-Path -LiteralPath (Join-Path $docsDestination 'README.md') -PathT
     throw "Publish output is missing offline documentation: $docsDestination"
 }
 
+if (-not $NoArchive) {
+    Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
+    Compress-Archive -LiteralPath $OutputDirectory -DestinationPath $archivePath -CompressionLevel Optimal
+    if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+        throw "Windows release archive was not created: $archivePath"
+    }
+}
+
 Write-Host "[publish] Bridge SDK: $bridgeRoot"
 Write-Host "[publish] Runtime:    $runtimeDescription"
 Write-Host "[publish] Output:     $OutputDirectory"
 Write-Host "[publish] Run:        $launcherDestination"
 Write-Host "[publish] Docs:       $docsDestination"
+if (-not $NoArchive) {
+    Write-Host "[publish] Archive:    $archivePath"
+}
 if (-not $usesPortableRuntime -and [string]::IsNullOrWhiteSpace($OcctRoot)) {
     Write-Host '[publish] Flat runtime requires external OCCT at launch. From the package, run .\run.ps1 -OcctRoot <path> or set OCCT_ROOT/CASROOT.' -ForegroundColor Yellow
 }

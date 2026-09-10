@@ -86,7 +86,9 @@ publish_args=(
 )
 dotnet "${publish_args[@]}"
 
-[[ -f "${STAGING_DIR}/OCCAD.dll" ]] || fail "Publish output is missing OCCAD.dll."
+for name in OCCAD.dll OcctNet.dll OcctNet.Avalonia.dll bridge-contract.json bridge-manifest.json; do
+    [[ -f "${STAGING_DIR}/${name}" ]] || fail "Publish output is missing required file '${name}'."
+done
 [[ -f "${STAGING_DIR}/runtime/libOcctNative.so" ]] || fail "Publish output is missing runtime/libOcctNative.so."
 [[ -d "${STAGING_DIR}/occt/resources" ]] || fail "Publish output is missing OCCT resources."
 [[ -f "${STAGING_DIR}/bridge-portable-manifest.json" ]] || fail "Publish output is missing bridge-portable-manifest.json."
@@ -115,6 +117,16 @@ EOF
 chmod +x "${STAGING_DIR}/run.sh"
 [[ -f "${STAGING_DIR}/OCCAD" ]] && chmod +x "${STAGING_DIR}/OCCAD"
 
+# Keep release/legal documentation inside the package so an extracted delivery
+# remains self-describing without requiring access to the source repository.
+for name in README.md README.zh-CN.md CHANGELOG.md LICENSE LICENSE_LGPL_21.txt OcctCSharpBridge_LGPL_EXCEPTION.txt THIRD_PARTY_NOTICES.md; do
+    [[ -f "${ROOT_DIR}/${name}" ]] || fail "Release documentation is missing from the repository: ${ROOT_DIR}/${name}"
+    cp -f "${ROOT_DIR}/${name}" "${STAGING_DIR}/${name}"
+done
+[[ -d "${ROOT_DIR}/docs" ]] || fail "Release documentation directory is missing: ${ROOT_DIR}/docs"
+cp -a "${ROOT_DIR}/docs" "${STAGING_DIR}/docs"
+[[ -f "${STAGING_DIR}/docs/README.md" ]] || fail "Publish output is missing offline documentation."
+
 mv "${STAGING_DIR}" "${PACKAGE_DIR}"
 
 if [[ "${CREATE_ARCHIVE}" == true ]]; then
@@ -127,3 +139,4 @@ log "Bridge SDK: ${BRIDGE_SDK}"
 log "Portable:   ${PORTABLE_ROOT}"
 log "Package:    ${PACKAGE_DIR}"
 log "Run:        ${PACKAGE_DIR}/run.sh"
+log "Docs:       ${PACKAGE_DIR}/docs"

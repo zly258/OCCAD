@@ -11,29 +11,38 @@ internal static class CadPropertyEditorFactory
     public static CadPropertyEditorKind Resolve(CadPropertyDescriptor descriptor, bool entityContext)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        _ = entityContext;
 
-        // TextBox is the common industrial PropertyGrid value editor. Numeric
-        // descriptors still use Core numeric conversion/validation, but use the
-        // same left-aligned editing surface as string/point/vector values.
-        return descriptor.Editor == CadPropertyEditorKind.Numeric
+        var editor = descriptor.Editor;
+
+        // Entity appearance properties (Color / LineStyle / LineWidth) use a
+        // compound ByLayer editor in the entity PropertyGrid. The value editor
+        // nested inside that compound control resolves the underlying value
+        // kind rather than recursively resolving to ByLayer again.
+        if (!entityContext && editor == CadPropertyEditorKind.ByLayer)
+        {
+            editor = descriptor.Value.Semantic switch
+            {
+                CadValueSemantic.Boolean => CadPropertyEditorKind.Boolean,
+                CadValueSemantic.Enum or CadValueSemantic.Choice => CadPropertyEditorKind.Choice,
+                CadValueSemantic.Color => CadPropertyEditorKind.Color,
+                CadValueSemantic.Point or CadValueSemantic.Vector => CadPropertyEditorKind.Text,
+                _ => CadValueTextConverter.IsNumericType(descriptor.PropertyType)
+                    ? CadPropertyEditorKind.Numeric
+                    : descriptor.PropertyType == typeof(string) ||
+                      descriptor.Converter.CanConvertFrom(typeof(string))
+                        ? CadPropertyEditorKind.Text
+                        : CadPropertyEditorKind.ReadOnly
+            };
+        }
+
+        // Numeric values intentionally share the normal left-aligned TextBox
+        // surface; parsing and validation remain in Core.
+        return editor == CadPropertyEditorKind.Numeric
             ? CadPropertyEditorKind.Text
-            : descriptor.Editor;
+            : editor;
     }
 
     public static string? ByLayerProperty(CadPropertyDescriptor descriptor) => descriptor.ByLayerProperty;
-
-    public static bool CanEditAsText(
-        CadPropertyDescriptor descriptor)
-    {
-        ArgumentNullException.ThrowIfNull(descriptor);
-
-        return descriptor.Value.Semantic is
-                   CadValueSemantic.Point or CadValueSemantic.Vector ||
-               descriptor.PropertyType == typeof(string) ||
-               CadValueTextConverter.IsNumericType(descriptor.PropertyType) ||
-               descriptor.Converter.CanConvertFrom(typeof(string));
-    }
 
     public static string FormatValue(
         CadPropertyDescriptor descriptor,

@@ -26,7 +26,7 @@ internal sealed class CadGripMarkerPresenter
         CreateMarkerSet(
             19,
             Color.FromArgb(255, 235, 175, 35),
-            circular: true);
+            circular: false);
     private OcctPoint? _dragMarker;
     private byte[]? _dragMarkerPixels;
 
@@ -57,7 +57,7 @@ internal sealed class CadGripMarkerPresenter
                 CreateMarkerSet(
                     HotMarkerSize,
                     Color.FromArgb(255, 235, 175, 35),
-                    circular: true);
+                    circular: false);
         }
     }
 
@@ -251,6 +251,7 @@ internal sealed class CadGripMarkerPresenter
         catch (Exception exception)
             when (IsRecoverablePresentationFailure(exception))
         {
+            // Keep the handle so lifecycle cleanup can retry.
         }
     }
 

@@ -6,11 +6,10 @@ internal static class CadCoreRegistration
     {
         var entities = new CadEntityRegistry();
 
-        // Persistence compatibility and the interactive command surface are
-        // deliberately separate concerns. Keep all existing entity codecs
-        // registered so documents created by earlier OCCAD builds remain
-        // readable, while CreateToolRegistry/RegisterActions expose only the
-        // stabilized core CAD feature set.
+        // Registration is the executable CAD capability boundary. Keep only
+        // entity contracts that are currently used by the aligned tool/action
+        // surface or by the native document/exchange path; compatibility must
+        // never create a second hidden command surface.
         entities.Register("angledimension", "Angle Dimension", static () => new CadAngleDimensionEntity(OcctNet.OcctPoint3d.Origin, OcctNet.OcctVector3d.UnitX, OcctNet.OcctVector3d.UnitY, 1), CadAngleDimensionEntity.WriteGeometry, CadAngleDimensionEntity.ReadGeometry);
         entities.Register("circulardimension", "Circular Dimension", static () => new CadCircularDimensionEntity(CadCircularDimensionKind.Radius, OcctNet.OcctPoint3d.Origin, OcctNet.OcctVector3d.UnitZ, OcctNet.OcctVector3d.UnitX, 1), CadCircularDimensionEntity.WriteGeometry, CadCircularDimensionEntity.ReadGeometry);
         entities.Register("lengthdimension", "Length Dimension", static () => new CadLengthDimensionEntity(OcctNet.OcctPoint3d.Origin, new OcctNet.OcctPoint3d(1, 0, 0), OcctNet.OcctVector3d.UnitZ, 1), CadLengthDimensionEntity.WriteGeometry, CadLengthDimensionEntity.ReadGeometry);
@@ -109,7 +108,6 @@ internal static class CadCoreRegistration
         ArgumentNullException.ThrowIfNull(actions);
         ArgumentNullException.ThrowIfNull(workspace);
 
-        actions.Register(new CadNewDocumentAction(workspace));
         actions.Register(new CadClearModelAction(workspace));
         actions.Register(new CadUndoAction(workspace));
         actions.Register(new CadRedoAction(workspace));

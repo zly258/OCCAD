@@ -41,14 +41,34 @@ public sealed class CadApplicationCore : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+            return;
+
         _disposed = true;
         _settingsBinding.Dispose();
-        Workspace.Dispose();
+
+        try
+        {
+            Workspace.Dispose();
+        }
+        catch (Exception exception)
+            when (IsRecoverableShutdownFailure(exception))
+        {
+            // A desktop process must be able to exit even if the native viewer
+            // is already partially destroyed. Operational cleanup remains
+            // strict while the application is running; shutdown is best-effort.
+            System.Diagnostics.Debug.WriteLine(
+                $"OCCAD workspace shutdown cleanup failed: {exception}");
+        }
     }
 
     private void ThrowIfDisposed()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
+
+    private static bool IsRecoverableShutdownFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 }

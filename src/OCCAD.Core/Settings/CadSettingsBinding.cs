@@ -20,6 +20,7 @@ public sealed class CadSettingsBinding : IDisposable
         _store = store ?? throw new ArgumentNullException(nameof(store));
 
         _store.Changed += StoreChanged;
+        _workspace.Selection.SettingsChanged += SelectionSettingsChanged;
         _workspace.Drafting.Changed += DraftingChanged;
         _workspace.Snap.SettingsChanged += SnapSettingsChanged;
         _workspace.Grips.SettingsChanged += GripSettingsChanged;
@@ -33,43 +34,58 @@ public sealed class CadSettingsBinding : IDisposable
 
         Synchronize(() =>
         {
-            workspace.Selection.PixelTolerance = store.Get(
-                CadSettingKeys.SelectionTolerance,
-                workspace.Selection.PixelTolerance);
+            // A settings file is user data, not executable configuration.
+            // Invalid persisted values are ignored individually and then
+            // normalized back to the effective Core state below.
+            TryApplyPersisted(() =>
+                workspace.Selection.PixelTolerance = store.Get(
+                    CadSettingKeys.SelectionTolerance,
+                    workspace.Selection.PixelTolerance));
 
-            workspace.Grips.MarkerSize = store.Get(
-                CadSettingKeys.GripSize,
-                workspace.Grips.MarkerSize);
-            workspace.Grips.PixelTolerance = store.Get(
-                CadSettingKeys.GripTolerance,
-                workspace.Grips.PixelTolerance);
+            TryApplyPersisted(() =>
+                workspace.Grips.MarkerSize = store.Get(
+                    CadSettingKeys.GripSize,
+                    workspace.Grips.MarkerSize));
+            TryApplyPersisted(() =>
+                workspace.Grips.PixelTolerance = store.Get(
+                    CadSettingKeys.GripTolerance,
+                    workspace.Grips.PixelTolerance));
 
-            workspace.Snap.Enabled = store.Get(
-                CadSettingKeys.SnapEnabled,
-                workspace.Snap.Enabled);
-            workspace.Snap.Modes = store.Get(
-                CadSettingKeys.SnapModes,
-                workspace.Snap.Modes);
-            workspace.Snap.MarkerSize = store.Get(
-                CadSettingKeys.SnapSize,
-                workspace.Snap.MarkerSize);
-            workspace.Snap.PixelTolerance = store.Get(
-                CadSettingKeys.SnapTolerance,
-                workspace.Snap.PixelTolerance);
+            TryApplyPersisted(() =>
+                workspace.Snap.Enabled = store.Get(
+                    CadSettingKeys.SnapEnabled,
+                    workspace.Snap.Enabled));
+            TryApplyPersisted(() =>
+                workspace.Snap.Modes = store.Get(
+                    CadSettingKeys.SnapModes,
+                    workspace.Snap.Modes));
+            TryApplyPersisted(() =>
+                workspace.Snap.MarkerSize = store.Get(
+                    CadSettingKeys.SnapSize,
+                    workspace.Snap.MarkerSize));
+            TryApplyPersisted(() =>
+                workspace.Snap.PixelTolerance = store.Get(
+                    CadSettingKeys.SnapTolerance,
+                    workspace.Snap.PixelTolerance));
 
-            workspace.Drafting.OrthogonalTrackingEnabled = store.Get(
-                CadSettingKeys.OrthogonalTrackingEnabled,
-                workspace.Drafting.OrthogonalTrackingEnabled);
-            workspace.Drafting.PolarTrackingEnabled = store.Get(
-                CadSettingKeys.PolarTrackingEnabled,
-                workspace.Drafting.PolarTrackingEnabled);
-            workspace.Drafting.PolarIncrementDegrees = store.Get(
-                CadSettingKeys.PolarIncrementDegrees,
-                workspace.Drafting.PolarIncrementDegrees);
-            workspace.Drafting.TrackingToleranceDegrees = store.Get(
-                CadSettingKeys.TrackingToleranceDegrees,
-                workspace.Drafting.TrackingToleranceDegrees);
+            TryApplyPersisted(() =>
+                workspace.Drafting.OrthogonalTrackingEnabled = store.Get(
+                    CadSettingKeys.OrthogonalTrackingEnabled,
+                    workspace.Drafting.OrthogonalTrackingEnabled));
+            TryApplyPersisted(() =>
+                workspace.Drafting.PolarTrackingEnabled = store.Get(
+                    CadSettingKeys.PolarTrackingEnabled,
+                    workspace.Drafting.PolarTrackingEnabled));
+            TryApplyPersisted(() =>
+                workspace.Drafting.PolarIncrementDegrees = store.Get(
+                    CadSettingKeys.PolarIncrementDegrees,
+                    workspace.Drafting.PolarIncrementDegrees));
+            TryApplyPersisted(() =>
+                workspace.Drafting.TrackingToleranceDegrees = store.Get(
+                    CadSettingKeys.TrackingToleranceDegrees,
+                    workspace.Drafting.TrackingToleranceDegrees));
 
+            PersistSelectionUnsafe(workspace, store);
             PersistGripUnsafe(workspace, store);
             PersistSnapUnsafe(workspace, store);
             PersistDraftingUnsafe(workspace, store);
@@ -85,6 +101,7 @@ public sealed class CadSettingsBinding : IDisposable
             store.Changed -= StoreChanged;
         if (workspace is not null)
         {
+            workspace.Selection.SettingsChanged -= SelectionSettingsChanged;
             workspace.Drafting.Changed -= DraftingChanged;
             workspace.Snap.SettingsChanged -= SnapSettingsChanged;
             workspace.Grips.SettingsChanged -= GripSettingsChanged;
@@ -103,6 +120,7 @@ public sealed class CadSettingsBinding : IDisposable
 
         Synchronize(() =>
         {
+            var normalizeSelection = false;
             var normalizeGrip = false;
             var normalizeSnap = false;
             var normalizeDrafting = false;
@@ -113,6 +131,7 @@ public sealed class CadSettingsBinding : IDisposable
                     workspace.Selection.PixelTolerance = store.Get(
                         args.Key,
                         workspace.Selection.PixelTolerance);
+                    normalizeSelection = true;
                     break;
 
                 case CadSettingKeys.GripSize:
@@ -179,6 +198,8 @@ public sealed class CadSettingsBinding : IDisposable
                     break;
             }
 
+            if (normalizeSelection)
+                PersistSelectionUnsafe(workspace, store);
             if (normalizeGrip)
                 PersistGripUnsafe(workspace, store);
             if (normalizeSnap)
@@ -186,6 +207,16 @@ public sealed class CadSettingsBinding : IDisposable
             if (normalizeDrafting)
                 PersistDraftingUnsafe(workspace, store);
         });
+    }
+
+    private void SelectionSettingsChanged(object? sender, EventArgs args)
+    {
+        if (_synchronizing)
+            return;
+
+        var workspace = RequiredWorkspace();
+        var store = RequiredStore();
+        Synchronize(() => PersistSelectionUnsafe(workspace, store));
     }
 
     private void DraftingChanged(object? sender, EventArgs args)
@@ -216,6 +247,15 @@ public sealed class CadSettingsBinding : IDisposable
         var workspace = RequiredWorkspace();
         var store = RequiredStore();
         Synchronize(() => PersistGripUnsafe(workspace, store));
+    }
+
+    private static void PersistSelectionUnsafe(
+        CadWorkspace workspace,
+        CadSettingsStore store)
+    {
+        store.Set(
+            CadSettingKeys.SelectionTolerance,
+            workspace.Selection.PixelTolerance);
     }
 
     private static void PersistGripUnsafe(
@@ -264,6 +304,20 @@ public sealed class CadSettingsBinding : IDisposable
         store.Set(
             CadSettingKeys.SnapTolerance,
             workspace.Snap.PixelTolerance);
+    }
+
+    private static void TryApplyPersisted(Action apply)
+    {
+        try
+        {
+            apply();
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException or InvalidOperationException)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Ignoring invalid OCCAD persisted setting: {exception.Message}");
+        }
     }
 
     private void Synchronize(Action action)

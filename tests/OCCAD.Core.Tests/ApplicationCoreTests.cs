@@ -20,7 +20,7 @@ public sealed class ApplicationCoreTests
     {
         using var source = new MemoryStream();
         var settings = new CadSettingsStore();
-        settings.Set(CadSettingKeys.SelectionTolerance, 13.0);
+        settings.Set(CadSettingKeys.SelectionTolerance, 13);
         settings.Set(CadSettingKeys.PolarIncrementDegrees, 30.0);
         settings.Save(source);
         source.Position = 0;
@@ -28,23 +28,59 @@ public sealed class ApplicationCoreTests
         using var app = new CadApplicationCore();
         app.LoadSettings(source);
 
-        Assert.AreEqual(13.0, app.Workspace.Selection.PixelTolerance);
+        Assert.AreEqual(13, app.Workspace.Selection.PixelTolerance);
         Assert.AreEqual(30.0, app.Workspace.Drafting.PolarIncrementDegrees);
     }
 
     [TestMethod]
-    public void RuntimeDraftingAndSnapChangesPersistBackToStore()
+    public void RuntimeInteractionPreferencesPersistBackToStore()
     {
         using var app = new CadApplicationCore();
 
+        app.Workspace.Selection.PixelTolerance = 12;
+        app.Workspace.Grips.MarkerSize = 19;
+        app.Workspace.Grips.PixelTolerance = 14;
         app.Workspace.Snap.Enabled = false;
         app.Workspace.Snap.MarkerSize = 23;
         app.Workspace.Drafting.OrthogonalTrackingEnabled = true;
 
+        Assert.AreEqual(12, app.Settings.Get(CadSettingKeys.SelectionTolerance, 0));
+        Assert.AreEqual(19, app.Settings.Get(CadSettingKeys.GripSize, 0));
+        Assert.AreEqual(14.0, app.Settings.Get(CadSettingKeys.GripTolerance, 0.0));
         Assert.IsFalse(app.Settings.Get(CadSettingKeys.SnapEnabled, true));
         Assert.AreEqual(23, app.Settings.Get(CadSettingKeys.SnapSize, 0));
         Assert.IsTrue(app.Settings.Get(CadSettingKeys.OrthogonalTrackingEnabled, false));
         Assert.IsFalse(app.Settings.Get(CadSettingKeys.PolarTrackingEnabled, true));
+    }
+
+    [TestMethod]
+    public void InvalidPersistedPreferencesAreIgnoredAndNormalized()
+    {
+        using var source = new MemoryStream();
+        var persisted = new CadSettingsStore();
+        persisted.Set(CadSettingKeys.SelectionTolerance, 999);
+        persisted.Set(CadSettingKeys.GripSize, 999);
+        persisted.Set(CadSettingKeys.SnapSize, -5);
+        persisted.Set(CadSettingKeys.PolarIncrementDegrees, 999.0);
+        persisted.Save(source);
+        source.Position = 0;
+
+        using var app = new CadApplicationCore();
+        var expectedSelection = app.Workspace.Selection.PixelTolerance;
+        var expectedGrip = app.Workspace.Grips.MarkerSize;
+        var expectedSnap = app.Workspace.Snap.MarkerSize;
+        var expectedPolar = app.Workspace.Drafting.PolarIncrementDegrees;
+
+        app.LoadSettings(source);
+
+        Assert.AreEqual(expectedSelection, app.Workspace.Selection.PixelTolerance);
+        Assert.AreEqual(expectedGrip, app.Workspace.Grips.MarkerSize);
+        Assert.AreEqual(expectedSnap, app.Workspace.Snap.MarkerSize);
+        Assert.AreEqual(expectedPolar, app.Workspace.Drafting.PolarIncrementDegrees);
+        Assert.AreEqual(expectedSelection, app.Settings.Get(CadSettingKeys.SelectionTolerance, -1));
+        Assert.AreEqual(expectedGrip, app.Settings.Get(CadSettingKeys.GripSize, -1));
+        Assert.AreEqual(expectedSnap, app.Settings.Get(CadSettingKeys.SnapSize, -1));
+        Assert.AreEqual(expectedPolar, app.Settings.Get(CadSettingKeys.PolarIncrementDegrees, -1.0));
     }
 
     [TestMethod]
@@ -63,14 +99,11 @@ public sealed class ApplicationCoreTests
     }
 
     [TestMethod]
-    public void LegacyNewActionCannotBypassDocumentSession()
+    public void DocumentLifecycleIsNotAWorkspaceAction()
     {
         using var app = new CadApplicationCore();
-        var action = app.Workspace.Actions.Find("file.new");
 
-        Assert.IsNotNull(action);
-        Assert.IsFalse(action.CanExecute());
-        Assert.IsFalse(app.Workspace.Actions.Execute("file.new"));
+        Assert.IsNull(app.Workspace.Actions.Find("file.new"));
     }
 
     [TestMethod]

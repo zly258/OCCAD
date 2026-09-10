@@ -22,8 +22,8 @@ internal sealed class CadColorDialog : Window
         Title = CadLanguageManager.Text(
             "Cad.Text.ColorTable",
             "Color table");
-        Width = 360;
-        MinWidth = 340;
+        Width = 340;
+        MinWidth = 320;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -54,17 +54,17 @@ internal sealed class CadColorDialog : Window
         _customHost = new Border
         {
             IsVisible = false,
-            Background = CadTheme.Panel,
+            Background = CadTheme.Surface,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(1),
-            Padding = new Thickness(8),
+            Padding = new Thickness(6),
             Child = _picker
         };
 
         _preview = new Border
         {
-            Width = 44,
-            Height = 24,
+            Width = 38,
+            Height = 22,
             BorderBrush = CadTheme.BorderStrong,
             BorderThickness = new Thickness(1),
             Background = new SolidColorBrush(
@@ -83,7 +83,7 @@ internal sealed class CadColorDialog : Window
 
         var top = new Grid
         {
-            ColumnSpacing = 8
+            ColumnSpacing = 4
         };
         top.ColumnDefinitions.Add(
             new ColumnDefinition(
@@ -111,15 +111,15 @@ internal sealed class CadColorDialog : Window
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Spacing = 6
+            Spacing = 4
         };
         buttons.Children.Add(ok);
         buttons.Children.Add(cancel);
 
         var content = new StackPanel
         {
-            Margin = new Thickness(12),
-            Spacing = 10
+            Margin = new Thickness(10),
+            Spacing = 7
         };
         content.Children.Add(_table);
         content.Children.Add(top);
@@ -146,7 +146,7 @@ internal sealed class CadColorDialog : Window
         var button = new Button
         {
             Content = text,
-            MinWidth = 84,
+            MinWidth = 72,
             HorizontalContentAlignment =
                 HorizontalAlignment.Center
         };

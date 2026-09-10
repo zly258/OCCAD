@@ -77,8 +77,7 @@ public sealed class SplineTool : CadDrawingTool, ICadPointInputTool
         if (!CanFinishCore)
             return false;
 
-        Context.AddEntity(new CadSplineEntity(_fitPoints));
-        Context.Workspace.Tools.CompleteCurrent();
+        CommitPreview(new CadSplineEntity(_fitPoints));
         return true;
     }
 

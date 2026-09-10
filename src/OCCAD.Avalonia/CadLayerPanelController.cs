@@ -84,7 +84,7 @@ internal sealed class CadLayerPanelController : IDisposable
             var toolbar = new Grid
             {
                 ColumnSpacing = 3,
-                Margin = new Thickness(4, 4, 4, 3)
+                Margin = new Thickness(3, 3, 3, 2)
             };
             toolbar.ColumnDefinitions.Add(
                 new ColumnDefinition(
@@ -143,7 +143,7 @@ internal sealed class CadLayerPanelController : IDisposable
                         "Layer: {0}"),
                     _workspace.Layers.Current.Name),
                 Foreground = CadTheme.Muted,
-                Margin = new Thickness(6, 3, 6, 4),
+                Margin = new Thickness(5, 2, 5, 3),
                 VerticalAlignment = VerticalAlignment.Center
             });
         }
@@ -237,7 +237,7 @@ internal sealed class CadLayerPanelController : IDisposable
         var label = new TextBlock
         {
             Text = text,
-            FontSize = 10.0,
+            FontSize = CadTheme.SmallFontSize,
             FontWeight = FontWeight.SemiBold,
             Foreground = CadTheme.Muted,
             Margin = new Thickness(3, 2),
@@ -371,8 +371,8 @@ internal sealed class CadLayerPanelController : IDisposable
 
         var color = new Button
         {
-            Width = 28,
-            MinHeight = 22,
+            Width = 26,
+            MinHeight = CadTheme.ControlHeight,
             Padding = new Thickness(0),
             Background = new SolidColorBrush(
                 ToMediaColor(layer.Color)),

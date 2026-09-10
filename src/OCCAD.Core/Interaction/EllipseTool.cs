@@ -188,9 +188,7 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
             _majorAxis,
             _majorRadius,
             minor);
-        ShowPreview(entity);
-        Context.AddEntity(entity.Duplicate());
-        Context.Workspace.Tools.CompleteCurrent();
+        CommitPreview(entity);
         return true;
     }
 

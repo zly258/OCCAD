@@ -8,21 +8,35 @@ namespace OCCAD.Avalonia;
 
 internal static class CadTheme
 {
-    public static readonly IBrush WindowBrush = Brush("#E6E9EC");
-    public static readonly IBrush Surface = Brush("#FFFFFF");
-    public static readonly IBrush Panel = Brush("#FAFBFC");
-    public static readonly IBrush PanelAlt = Brush("#F1F3F5");
-    public static readonly IBrush Toolbar = Brush("#F3F4F5");
-    public static readonly IBrush Header = Brush("#F3F4F5");
-    public static readonly IBrush HeaderHover = Brush("#E8ECEF");
-    public static readonly IBrush Accent = Brush("#2F6F9F");
-    public static readonly IBrush AccentSoft = Brush("#E1EDF6");
-    public static readonly IBrush Border = Brush("#C9CED3");
-    public static readonly IBrush BorderStrong = Brush("#B8BEC4");
-    public static readonly IBrush Splitter = Brush("#D2D9DF");
-    public static readonly IBrush Text = Brush("#1D252B");
-    public static readonly IBrush Muted = Brush("#68747D");
-    public static readonly IBrush Viewport = Brush("#111417");
+    public const double FontSize = 11.0;
+    public const double SmallFontSize = 10.0;
+    public const double CaptionFontSize = 10.5;
+    public const double ControlHeight = 22.0;
+    public const double MenuHeight = 24.0;
+    public const double PanelHeaderHeight = 23.0;
+    public const double StatusHeight = 21.0;
+    public const double SplitterThickness = 3.0;
+    public const double ModelPanelWidth = 188.0;
+    public const double PropertyPanelWidth = 296.0;
+    public const double ToolPanelWidth = 276.0;
+    public const double PropertyLabelWidth = 92.0;
+    public const double ToolLabelWidth = 92.0;
+
+    public static readonly IBrush WindowBrush = Brush("#DDE1E5");
+    public static readonly IBrush Surface = Brush("#FAFAFA");
+    public static readonly IBrush Panel = Brush("#F5F6F7");
+    public static readonly IBrush PanelAlt = Brush("#ECEFF1");
+    public static readonly IBrush Toolbar = Brush("#E9ECEF");
+    public static readonly IBrush Header = Brush("#E4E7EA");
+    public static readonly IBrush HeaderHover = Brush("#DCE2E7");
+    public static readonly IBrush Accent = Brush("#2B78B5");
+    public static readonly IBrush AccentSoft = Brush("#DCEAF5");
+    public static readonly IBrush Border = Brush("#BFC5CA");
+    public static readonly IBrush BorderStrong = Brush("#AEB5BB");
+    public static readonly IBrush Splitter = Brush("#C8CDD2");
+    public static readonly IBrush Text = Brush("#20262B");
+    public static readonly IBrush Muted = Brush("#626C74");
+    public static readonly IBrush Viewport = Brush("#1B1D1F");
 
     public static void Apply(Application app)
     {
@@ -55,7 +69,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(TextBlock.FontSizeProperty, 11.0d),
+                new Setter(TextBlock.FontSizeProperty, FontSize),
                 new Setter(TextBlock.ForegroundProperty, Text)
             }
         });
@@ -64,7 +78,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(Button.MinHeightProperty, 22d),
+                new Setter(Button.MinHeightProperty, ControlHeight),
                 new Setter(Button.PaddingProperty, new Thickness(6, 0)),
                 new Setter(Button.MarginProperty, new Thickness(1)),
                 new Setter(Button.BackgroundProperty, Brushes.Transparent),
@@ -89,7 +103,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(ToggleButton.MinHeightProperty, 22d),
+                new Setter(ToggleButton.MinHeightProperty, ControlHeight),
                 new Setter(ToggleButton.PaddingProperty, new Thickness(6, 0)),
                 new Setter(ToggleButton.MarginProperty, new Thickness(1)),
                 new Setter(ToggleButton.BackgroundProperty, Brushes.Transparent),
@@ -103,7 +117,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(TextBox.MinHeightProperty, 22d),
+                new Setter(TextBox.MinHeightProperty, ControlHeight),
                 new Setter(TextBox.PaddingProperty, new Thickness(5, 0)),
                 new Setter(TextBox.BackgroundProperty, Surface),
                 new Setter(TextBox.BorderBrushProperty, Border),
@@ -116,7 +130,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(ComboBox.MinHeightProperty, 22d),
+                new Setter(ComboBox.MinHeightProperty, ControlHeight),
                 new Setter(ComboBox.BackgroundProperty, Surface),
                 new Setter(ComboBox.BorderBrushProperty, Border),
                 new Setter(ComboBox.BorderThicknessProperty, new Thickness(1)),
@@ -128,7 +142,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(MenuItem.MinHeightProperty, 23d),
+                new Setter(MenuItem.MinHeightProperty, MenuHeight),
                 new Setter(MenuItem.PaddingProperty, new Thickness(7, 2)),
                 new Setter(MenuItem.ForegroundProperty, Text)
             }
@@ -164,7 +178,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(TabItem.MinHeightProperty, 24d),
+                new Setter(TabItem.MinHeightProperty, MenuHeight),
                 new Setter(TabItem.PaddingProperty, new Thickness(8, 2)),
                 new Setter(TabItem.FontWeightProperty, FontWeight.SemiBold)
             }
@@ -174,7 +188,7 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(Menu.MinHeightProperty, 24d),
+                new Setter(Menu.MinHeightProperty, MenuHeight),
                 new Setter(Menu.BackgroundProperty, Toolbar),
                 new Setter(Menu.ForegroundProperty, Text)
             }

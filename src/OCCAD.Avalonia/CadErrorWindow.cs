@@ -19,10 +19,10 @@ internal sealed class CadErrorWindow : Window
         Title = CadLanguageManager.Text(
             "Cad.Text.ErrorTitle",
             "OCCAD Error");
-        Width = 680;
-        Height = 440;
-        MinWidth = 480;
-        MinHeight = 300;
+        Width = 620;
+        Height = 390;
+        MinWidth = 460;
+        MinHeight = 280;
         WindowStartupLocation =
             WindowStartupLocation.CenterOwner;
         Background = CadTheme.Surface;
@@ -68,7 +68,7 @@ internal sealed class CadErrorWindow : Window
             Content = CadLanguageManager.Text(
                 "Cad.Text.Continue",
                 "Continue"),
-            MinWidth = 88
+            MinWidth = 76
         };
         close.Classes.Add("cad-compact");
         close.Classes.Add("cad-primary");
@@ -91,28 +91,28 @@ internal sealed class CadErrorWindow : Window
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Spacing = 8
+            Spacing = 4
         };
         buttons.Children.Add(close);
         buttons.Children.Add(exit);
 
         var root = new Grid
         {
-            Margin = new Thickness(18),
+            Margin = new Thickness(12),
             RowDefinitions = new RowDefinitions(
                 "Auto,Auto,*,Auto,Auto")
         };
         root.Children.Add(message);
 
         Grid.SetRow(source, 1);
-        source.Margin = new Thickness(0, 8, 0, 8);
+        source.Margin = new Thickness(0, 6, 0, 6);
         root.Children.Add(source);
 
         Grid.SetRow(details, 2);
         root.Children.Add(details);
 
         Grid.SetRow(path, 3);
-        path.Margin = new Thickness(0, 10, 0, 10);
+        path.Margin = new Thickness(0, 7, 0, 7);
         root.Children.Add(path);
 
         Grid.SetRow(buttons, 4);

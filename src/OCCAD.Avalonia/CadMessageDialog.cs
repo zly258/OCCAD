@@ -32,11 +32,11 @@ internal sealed class CadMessageDialog : Window
         CadMessageDialogKind kind)
     {
         Title = title;
-        Width = 440;
-        MinWidth = 380;
-        MaxWidth = 620;
-        MinHeight = 176;
-        MaxHeight = 520;
+        Width = 400;
+        MinWidth = 340;
+        MaxWidth = 560;
+        MinHeight = 150;
+        MaxHeight = 440;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         WindowStartupLocation =
@@ -48,7 +48,7 @@ internal sealed class CadMessageDialog : Window
             Text = title,
             FontWeight =
                 global::Avalonia.Media.FontWeight.SemiBold,
-            FontSize = 13,
+            FontSize = 11.5,
             Foreground = CadTheme.Text,
             TextWrapping =
                 global::Avalonia.Media.TextWrapping.Wrap
@@ -60,13 +60,13 @@ internal sealed class CadMessageDialog : Window
             TextWrapping =
                 global::Avalonia.Media.TextWrapping.Wrap,
             Foreground = CadTheme.Text,
-            LineHeight = 18
+            LineHeight = 16
         };
 
         var messageHost = new ScrollViewer
         {
             Content = text,
-            MaxHeight = 300,
+            MaxHeight = 240,
             HorizontalScrollBarVisibility =
                 global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             VerticalScrollBarVisibility =
@@ -90,8 +90,8 @@ internal sealed class CadMessageDialog : Window
 
         var body = new Grid
         {
-            ColumnSpacing = 12,
-            Margin = new Thickness(16, 14, 16, 12)
+            ColumnSpacing = 8,
+            Margin = new Thickness(12, 10, 12, 9)
         };
         body.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(3)));
@@ -114,10 +114,10 @@ internal sealed class CadMessageDialog : Window
         var buttons = BuildButtons(yesNoCancel);
         var footer = new Border
         {
-            Background = CadTheme.Panel,
+            Background = CadTheme.Toolbar,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(12, 8),
+            Padding = new Thickness(10, 6),
             Child = buttons
         };
 
@@ -165,7 +165,7 @@ internal sealed class CadMessageDialog : Window
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Spacing = 6
+            Spacing = 4
         };
 
         if (yesNoCancel)
@@ -223,7 +223,7 @@ internal sealed class CadMessageDialog : Window
         var button = new Button
         {
             Content = text,
-            MinWidth = 82,
+            MinWidth = 72,
             HorizontalContentAlignment =
                 HorizontalAlignment.Center
         };

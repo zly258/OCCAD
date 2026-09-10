@@ -72,8 +72,7 @@ public sealed class PolygonTool : CadDrawingTool, ICadPointInputTool
         if (!CanFinishCore)
             return false;
 
-        Context.AddEntity(new CadPolygonEntity(_points));
-        Context.Workspace.Tools.CompleteCurrent();
+        CommitPreview(new CadPolygonEntity(_points));
         return true;
     }
 

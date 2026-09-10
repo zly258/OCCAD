@@ -70,6 +70,9 @@ internal sealed class CadViewportInteractionController : IDisposable
             throw new InvalidOperationException(
                 "The OCCT engine is not initialized.");
 
+        engine.SetAutomaticHighlight(
+            _workspace.Tools.ActiveTool is null);
+
         RebuildSubobjectMarkers(
             _workspace.Subobjects.Selected);
     }
@@ -410,6 +413,17 @@ internal sealed class CadViewportInteractionController : IDisposable
     {
         ClearTransientInput();
         _workspace.ClearPointerObservation();
+
+        if (_workspace.Engine is { IsInitialized: true } engine)
+        {
+            // OCCT automatic detection highlight is intentionally disabled
+            // while a Tool owns the pointer. Otherwise the final committed
+            // entity can be highlighted immediately at the same cursor
+            // position and look like a stale, oversized preview.
+            engine.SetAutomaticHighlight(input.Tool is null);
+            engine.Redraw();
+        }
+
         CoordinateCleared?.Invoke(
             this,
             EventArgs.Empty);
@@ -684,13 +698,17 @@ internal sealed class CadViewportInteractionController : IDisposable
         var rectangleVisible = _selectionRectangleVisible;
 
         _selectionGesture = false;
-        _selectionRectangleVisible = false;
 
         if (engine is not { IsInitialized: true })
+        {
+            _selectionRectangleVisible = false;
             return;
+        }
 
         if (rectangleVisible)
         {
+            // Hide the transient rectangle before clearing the visibility
+            // state. HideSelectionRectangle() intentionally checks this flag.
             HideSelectionRectangle(engine);
             var allowOverlap = endX < startX;
             var objects = engine.QueryRectangle(
@@ -749,13 +767,16 @@ internal sealed class CadViewportInteractionController : IDisposable
         try
         {
             engine.HideSelectionRectangle();
+            engine.Redraw();
         }
         catch (Exception exception)
             when (IsRecoverableSelectionFailure(exception))
         {
         }
-
-        _selectionRectangleVisible = false;
+        finally
+        {
+            _selectionRectangleVisible = false;
+        }
     }
 
     private static CadSelectionOperation SelectionOperation(

@@ -36,8 +36,8 @@ internal sealed class CadToolPanel : Border
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
 
-        Width = 282;
-        MaxHeight = 520;
+        Width = CadTheme.ToolPanelWidth;
+        MaxHeight = 500;
         HorizontalAlignment = HorizontalAlignment.Left;
         VerticalAlignment = VerticalAlignment.Top;
         Margin = new Thickness(6);
@@ -58,8 +58,8 @@ internal sealed class CadToolPanel : Border
         _close = new Button
         {
             Content = "×",
-            Width = 24,
-            Height = 24,
+            Width = CadTheme.PanelHeaderHeight,
+            Height = CadTheme.PanelHeaderHeight,
             Padding = new Thickness(0),
             Background = Brushes.Transparent,
             Foreground = CadTheme.Muted,
@@ -71,7 +71,7 @@ internal sealed class CadToolPanel : Border
 
         var header = new DockPanel
         {
-            Height = 26,
+            Height = 24,
             Background = CadTheme.Toolbar
         };
         DockPanel.SetDock(_close, Dock.Right);
@@ -93,7 +93,7 @@ internal sealed class CadToolPanel : Border
         _planeState = new TextBlock
         {
             Foreground = CadTheme.Muted,
-            FontSize = 10.0,
+            FontSize = CadTheme.SmallFontSize,
             VerticalAlignment = VerticalAlignment.Center
         };
         _planeLock = new CheckBox
@@ -582,7 +582,7 @@ internal sealed class CadToolPanel : Border
             Margin = new Thickness(0)
         };
         row.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(96)));
+            new ColumnDefinition(new GridLength(CadTheme.ToolLabelWidth)));
         row.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
 

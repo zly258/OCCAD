@@ -20,8 +20,8 @@ internal sealed class LayerNameDialog : Window
             creating
                 ? "New Layer"
                 : "Rename Layer");
-        Width = 360;
-        Height = 150;
+        Width = 330;
+        Height = 132;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = CadTheme.Surface;
@@ -45,7 +45,7 @@ internal sealed class LayerNameDialog : Window
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Spacing = 6
+            Spacing = 4
         };
         var ok = Button(
             CadLanguageManager.Text("Cad.Text.Accept", "OK"));
@@ -59,8 +59,8 @@ internal sealed class LayerNameDialog : Window
 
         var content = new StackPanel
         {
-            Margin = new Thickness(14),
-            Spacing = 8
+            Margin = new Thickness(10),
+            Spacing = 6
         };
         content.Children.Add(new TextBlock
         {
@@ -92,7 +92,7 @@ internal sealed class LayerNameDialog : Window
         var button = new Button
         {
             Content = text,
-            MinWidth = 76,
+            MinWidth = 70,
             HorizontalContentAlignment = HorizontalAlignment.Center
         };
         button.Classes.Add("cad-compact");

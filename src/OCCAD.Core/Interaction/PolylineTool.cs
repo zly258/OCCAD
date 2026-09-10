@@ -61,8 +61,7 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
             return true;
         }
 
-        Context.AddEntity(new CadPolylineEntity(_points, closed: true));
-        Context.Workspace.Tools.CompleteCurrent();
+        CommitPreview(new CadPolylineEntity(_points, closed: true));
         success = true;
         message = "Close";
         return true;
@@ -83,8 +82,7 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
     protected override bool OnFinish()
     {
         if (!CanFinishCore) return false;
-        Context.AddEntity(new CadPolylineEntity(_points));
-        Context.Workspace.Tools.CompleteCurrent();
+        CommitPreview(new CadPolylineEntity(_points));
         return true;
     }
 

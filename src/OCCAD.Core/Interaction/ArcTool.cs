@@ -177,8 +177,8 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
             return false;
         }
 
-        Context.AddEntity(arc);
-        Context.Workspace.Tools.CompleteCurrent();
+        _preview = arc;
+        CommitPreview(_preview);
         return true;
     }
 

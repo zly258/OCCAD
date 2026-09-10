@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-This document uses current `CadCoreRegistration`, the Classic Avalonia Shell, and actual persistence registration as the source of truth.
+This document uses current `CadCoreRegistration`, the Classic Avalonia Shell, actual command registration, and persistence registration as the source of truth.
 
 Status is split into:
 
@@ -12,7 +12,9 @@ Status is split into:
 - **Persistence**: formal read/write support;
 - **Status**: initial release, infrastructure, internal support, or outside the release surface.
 
-A historical/experimental class or unregistered Action in source does not imply product support.
+A historical/experimental class, geometry helper, transaction API, or unregistered Action in source does not imply product support.
+
+For exact Action IDs and aliases, see [15-COMMAND-REFERENCE.md](15-COMMAND-REFERENCE.md). For release acceptance, see [16-RELEASE-GUIDE.md](16-RELEASE-GUIDE.md).
 
 ## 2. 2D Entity / Tool
 
@@ -224,8 +226,20 @@ Unless explicitly brought back into scope, the current Classic Shell does not ex
 
 Validate every product feature through:
 
-`Entry → Parameters → Prompt → Preview → Exact Input → Commit → Property → Grip/Snap → Save/Open`
+`Entry → Parameters → Prompt → Preview → Exact Input → Commit → Property → Grip/Snap → Undo/Redo → Save/Open`
 
 Also verify that Commit/Cancel restores neutral state and leaves no Preview/native transient residue.
 
 The repository currently has no independent Test project; actual builds plus manual/native regression are the current acceptance path.
+
+## 15. Release classification
+
+Use these labels consistently in README, documentation, and Release Notes:
+
+- **Initial** — formally exposed and part of the initial release claim, pending/subject to the normal release gates.
+- **Initial infrastructure** — required platform behavior used by initial features; not normally a standalone command.
+- **Infrastructure only** — Core API/geometry/transaction support exists but the user-facing interaction loop is incomplete.
+- **Internal** — persistence/geometry/helper capability used by other features and not a public user entry.
+- **Outside release surface** — intentionally not claimed in the current release.
+
+A feature may move to **Initial** only when registration, UI entry, prompt/parameters, preview, exact input where applicable, commit, cleanup, Undo/Redo, and persistence expectations are all coherent and the release regression is defined.

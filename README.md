@@ -1,16 +1,16 @@
 # OCCAD
 
-OCCAD is an Avalonia desktop CAD application and extensible CAD kernel built on **OcctCSharpBridge / Open CASCADE Technology (OCCT)**.
+OCCAD is an Avalonia desktop CAD application and extensible CAD core built on **OcctCSharpBridge / Open CASCADE Technology (OCCT)**.
 
-[中文说明](README.zh-CN.md)
+[中文说明](README.zh-CN.md) · [Documentation](docs/README.md) · [User Guide](docs/en-US/13-USER-GUIDE.md) · [Feature Matrix](docs/en-US/14-FEATURE-MATRIX.md) · [Command Reference](docs/en-US/15-COMMAND-REFERENCE.md) · [Release Guide](docs/en-US/16-RELEASE-GUIDE.md)
 
-## Project scope
+## Product scope
 
-The current milestone is an initial CAD baseline with an explicit lifecycle for:
+The initial OCCAD baseline focuses on a complete CAD interaction loop rather than broad feature count:
 
 `Create → Preview → Exact Input → Commit → Property → Grip → Undo/Redo`
 
-Core layers include Document / Entity / Layer, Tool / Action / Transaction / History, Selection / Preselection / Subobject Selection, WorkPlane / Snap / Tracking / Precision Input, Grip / Preview / transient ownership, 2D drafting, 3D primitives, modeling features, Model Tree / Layers / Properties, localization, and persistence.
+Core capabilities include Document / Entity / Layer, Tool / Action / Command / Transaction / History, Selection / Preselection / Subobject Selection, WorkPlane / Snap / Tracking / Precision Input, Grip / Preview / transient ownership, 2D drafting, 3D primitives, modeling features, Model Tree / Layers / Properties, localization, and OCCAD document persistence.
 
 ## Technical baseline
 
@@ -22,16 +22,17 @@ Core layers include Document / Entity / Layer, Tool / Action / Transaction / His
 
 ## UI baseline
 
-OCCAD has one classic CAD shell:
+OCCAD uses one compact classic CAD shell:
 
 ```text
 Menu: File | Draw | Model | Modify | View | Window | Language
 
 Toolbar Row 1
-Undo Redo | Current Layer | Top Front Right Iso Fill | Wireframe Shaded
+Undo Redo | Current Layer | Top Front Right Iso Fit | Wireframe Shaded
 
 Toolbar Row 2
-Line Polyline Rectangle Circle Arc Polygon | Move Delete | Box Cylinder Sphere Extrude Revolve
+Line Polyline Rectangle Circle Arc Regular Polygon | Move Delete |
+Box Cylinder Sphere Extrude Revolve
 
 Model Tree | CAD Viewport | Layers / Properties
 
@@ -39,69 +40,32 @@ Fixed Tool Parameter Strip
 Operation Prompt | XY YZ XZ | SNAP ORTHO POLAR
 ```
 
-Rules:
+Design rules:
 
 - no Ribbon;
-- the toolbar contains only frequent commands and may use up to two compact rows;
-- file operations, language switching, and the full command set remain in Menu;
-- Button / TextBox / ComboBox / CheckBox / Menu use native Avalonia Fluent styling;
-- `CadTheme` contains layout metrics and CAD-specific viewport/overlay visuals only;
-- the custom CAD ColorTable is retained;
-- the Tool parameter strip is fixed immediately above the status strip so the viewport does not jump when tools change;
-- dark viewport, lower-left triedron, ViewCube disabled by default;
-- no permanent bottom command bar, Ready text, version text, or permanent coordinate noise.
-
-## Tool parameters
-
-Parameterized tools expose their `ParameterPanel` through the fixed bottom parameter strip.
-
-Regular Polygon example:
-
-```text
-Regular Polygon: Sides [6]  Mode [Inscribed]
-```
-
-- `Sides`: 3..360;
-- `Mode`: Inscribed / Circumscribed;
-- before center placement, the side count may also be typed directly and confirmed with Enter;
-- editor changes are written back to the active Tool;
-- observable preview dimensions may refresh the displayed values;
-- a focused editor is not overwritten by live refresh.
-
-The same mechanism is shared by Box, Cylinder, Cone, Frustum, Sphere, Ellipsoid, Torus, Helix, Ellipse, Extrude, and other parameterized tools.
-
-## PropertyGrid
-
-PropertyGrid is driven by Core descriptors:
-
-- Property / Value are left aligned;
-- numeric editors are left aligned;
-- Point / Vector / Normal use vertical engineering input:
-
-```text
-X  [ ... ]
-Y  [ ... ]
-Z  [ ... ]
-```
-
-- Layer uses a ComboBox;
-- Color / LineStyle / LineWidth support ByLayer;
-- Color editing keeps OCCAD's custom CAD ColorTable;
-- planar `Normal` is editable for Circle / Arc / Ellipse / Rectangle / Regular Polygon.
-
-## Interaction baseline
-
-- `Esc`: cancel the active Tool and clear Entity / Subobject / Preselection state;
-- `Backspace`: step back the active Tool stage;
-- `Enter/Space`: submit the current valid stage or finish;
-- XY / YZ / XZ switch the drafting work plane; a fixed temporary ToolPlane is first stepped back to a safe stage;
-- `Ctrl+Z`: Undo;
-- `Ctrl+Y` / `Ctrl+Shift+Z`: Redo;
-- Preview/Snap/Tracking/Grip are transient and must clear after Commit/Cancel.
+- no more than two compact toolbar rows;
+- full command surface remains in Menu;
+- native Avalonia Fluent controls for normal UI;
+- CAD-specific ColorTable retained;
+- fixed Tool parameter strip to prevent viewport jumping;
+- dark viewport and lower-left triedron;
+- ViewCube disabled by default;
+- no permanent Command Line, Ready text, version noise, or permanent coordinate noise.
 
 ## Initial feature surface
 
-2D: Point, Line, Polyline, Free Polygon, Regular Polygon, Rectangle, Circle, Arc, Ellipse, Spline.
+### 2D drafting
+
+- Point
+- Line
+- Polyline
+- Free Polygon
+- Regular Polygon
+- Rectangle
+- Circle
+- Arc
+- Ellipse
+- Spline
 
 Circle methods: Center+Radius, Center+Diameter, Two Points, Three Points, Point+Center.
 
@@ -109,13 +73,104 @@ Arc methods: Three Points, Center→Start→End, Start→Center→End, Start→E
 
 Ellipse methods: Center+Axes, Axis Endpoints+Minor Axis.
 
-3D/curves: Box, Cylinder, Cone, Frustum, Sphere, Ellipsoid, Torus, Helix.
+### 3D and curves
 
-Features: Extrude, Revolve, Sweep, Loft.
+- Box
+- Cylinder
+- Cone
+- Frustum
+- Sphere
+- Ellipsoid
+- Torus
+- Helix
 
-Modify: Move and Delete are exposed in the current shell. Copy / Rotate / Scale / Mirror remain transaction-level Core capabilities until dedicated interactive Tools are completed and validated.
+### Modeling features
 
-Views: Top / Bottom / Front / Back / Left / Right, Iso NE/NW/SE/SW, Fill (`view.fit`), Wireframe, Shaded.
+- Extrude
+- Revolve
+- Sweep
+- Loft
+
+### Modify
+
+- Move
+- Delete
+
+Copy / Rotate / Scale / Mirror currently remain transaction-level Core capabilities until dedicated interactive Tools are completed and validated. Array / Offset / Trim / Extend / Fillet / Chamfer / Annotation are not part of the initial product surface.
+
+### Interaction
+
+- Entity / Subobject Selection
+- Preselection
+- Window / Crossing selection
+- SNAP candidate discovery and cycling
+- Grip / Hot Grip / Grip Edit
+- XY / YZ / XZ WorkPlane
+- ORTHO / POLAR
+- exact point/length/angle/factor input
+- transient Preview / Tracking ownership
+- atomic Undo / Redo
+
+## Quick start
+
+### Windows
+
+```powershell
+git clone https://github.com/zly258/OCCAD.git
+cd OCCAD
+.\build.ps1
+.\run.ps1
+```
+
+With a flat Bridge SDK and external OCCT runtime:
+
+```powershell
+.\run.ps1 -OcctRoot D:\tools\occt-vc144-64
+```
+
+### Linux
+
+```bash
+git clone https://github.com/zly258/OCCAD.git
+cd OCCAD
+./build.sh
+./run.sh
+```
+
+The Bridge SDK path can be overridden with `OCCTCSHARPBRIDGE_SDK`.
+
+## Common shortcuts
+
+| Shortcut | Function |
+|---|---|
+| Esc | Cancel active Tool |
+| Backspace | Step back Tool stage |
+| Enter / Space | Accept / finish current stage |
+| Ctrl+Z | Undo |
+| Ctrl+Y / Ctrl+Shift+Z | Redo |
+| F3 | SNAP |
+| F8 | ORTHO |
+| F10 | POLAR |
+| Tab / Shift+Tab | Cycle Snap candidates |
+| T / S / F | XY / YZ / XZ WorkPlane |
+| Shift+middle button | Rotate view |
+| Middle-button double click | Fit All |
+
+See the [User Guide](docs/en-US/13-USER-GUIDE.md) for detailed workflows and exact-input syntax.
+
+## Properties and Layers
+
+Properties are driven by Core descriptors rather than UI-specific model state.
+
+- numeric editors are left aligned;
+- Layer uses a ComboBox;
+- Color / LineStyle / LineWidth support ByLayer;
+- Color uses OCCAD's CAD ColorTable;
+- Point / Vector / Normal use X/Y/Z engineering input;
+- planar `Normal` is editable for Circle / Arc / Ellipse / Rectangle / Regular Polygon;
+- property edits participate in transaction/history/presentation synchronization.
+
+Layers support current layer, visibility, locking, color, line style, line width, rename, and removal of non-default layers. Layer `0` remains protected.
 
 ## Architecture
 
@@ -129,11 +184,13 @@ OcctNet / OcctCSharpBridge
 OCCT
 ```
 
-Core does not depend on Avalonia. The UI adapts input and presents state; it does not duplicate Document, Selection, History, Layer, Geometry, or Tool business state.
+`CadWorkspace` is the composition root for one CAD session. Core is authoritative for Document, Selection, Tool lifecycle, WorkPlane, Snap, Grip, transaction/history, and transient ownership. Avalonia adapts input and presents Core state; it does not maintain a parallel CAD model.
 
-## Build
+See [Architecture](docs/en-US/04-ARCHITECTURE.md) and [Development Guide](docs/en-US/08-DEVELOPMENT-GUIDE.md).
 
-Windows:
+## Build and validation
+
+Windows authoritative build:
 
 ```powershell
 .\build.ps1
@@ -145,17 +202,62 @@ Linux:
 ./build.sh
 ```
 
-Linux validation uses the current portable Bridge SDK layout (`portable/runtime` + `portable/occt`). Windows accepts the installed SDK layout supported by `build.ps1`.
-
-The repository currently does not maintain a separate Test project. Validation order is:
-
-`Core build → Avalonia build → real interactive regression → native/transient cleanup checks`
+The repository currently does not maintain a separate Test project or use GitHub Actions as the product acceptance path. Release validation is based on local build plus real manual/native regression.
 
 Source existence or Action registration alone does not prove product completion.
 
+## Publish packages
+
+Windows:
+
+```powershell
+.\publish.ps1
+```
+
+Default output:
+
+```text
+artifacts\publish\OCCAD
+```
+
+The package includes a `run.ps1` launcher. With the portable Bridge layout, native runtime and OCCT resources are packaged with the application.
+
+Linux:
+
+```bash
+./publish.sh
+```
+
+Default outputs:
+
+```text
+artifacts/publish/OCCAD-linux-x64/
+artifacts/publish/OCCAD-linux-x64.tar.gz
+```
+
+The Linux package includes `run.sh`, portable runtime, and OCCT resources.
+
+Before creating a public release, follow the complete [Release and Delivery Guide](docs/en-US/16-RELEASE-GUIDE.md).
+
 ## Documentation
 
-Start at [docs/README.md](docs/README.md). Key contracts include UI, interaction, architecture, entity/tool, transaction/resource, build validation, user guide, and feature matrix documents.
+The documentation set is maintained in Chinese and English with synchronized topic numbering.
+
+Recommended entry points:
+
+- [Detailed User Guide](docs/en-US/13-USER-GUIDE.md)
+- [Initial Release Feature Matrix](docs/en-US/14-FEATURE-MATRIX.md)
+- [Command and Feature Reference](docs/en-US/15-COMMAND-REFERENCE.md)
+- [Architecture Design](docs/en-US/04-ARCHITECTURE.md)
+- [Developer Handbook](docs/en-US/08-DEVELOPMENT-GUIDE.md)
+- [Build and Validation](docs/en-US/11-BUILD-VALIDATION.md)
+- [Release and Delivery Guide](docs/en-US/16-RELEASE-GUIDE.md)
+
+Start from [docs/README.md](docs/README.md) for the complete index.
+
+## Release readiness
+
+The repository is now structured and documented for an initial release. Formal Release Ready status still requires the real Windows build, application startup, core interaction regression, Save/Open regression, localization/DPI checks, and clean-directory package launch defined in the Release Guide.
 
 ## License
 

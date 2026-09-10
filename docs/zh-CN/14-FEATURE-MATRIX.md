@@ -2,7 +2,7 @@
 
 ## 1. 说明
 
-本文以当前 `CadCoreRegistration`、Classic Avalonia Shell 和持久化注册为准。
+本文以当前 `CadCoreRegistration`、Classic Avalonia Shell、Command 注册和持久化注册为准。
 
 状态判断必须区分：
 
@@ -10,9 +10,11 @@
 - **UI**：是否在当前 Classic Shell 暴露；
 - **参数**：Tool 参数是否有可见输入入口；
 - **持久化**：是否有正式读写路径；
-- **状态**：初版、基础设施、内部支持或非初版。
+- **状态**：初版、初版基础设施、仅基础设施、内部支持或非初版。
 
-源码中存在历史类、实验类或未注册 Action，不等于产品支持。
+源码中存在历史类、实验类、geometry helper、transaction API 或未注册 Action，不等于产品支持。
+
+精确 Action ID / Alias 见 [15-COMMAND-REFERENCE.md](15-COMMAND-REFERENCE.md)，发布验收见 [16-RELEASE-GUIDE.md](16-RELEASE-GUIDE.md)。
 
 ## 2. 2D Entity / Tool
 
@@ -224,8 +226,20 @@ STEP / IGES / BREP / STL / OBJ / glTF 等方向必须按实际 Import/Export 实
 
 每个产品功能按以下链路验收：
 
-`入口 → 参数 → Prompt → Preview → Exact Input → Commit → Property → Grip/Snap → Save/Open`
+`入口 → 参数 → Prompt → Preview → Exact Input → Commit → Property → Grip/Snap → Undo/Redo → Save/Open`
 
 并检查 Cancel/Commit 后是否恢复 neutral、是否存在 Preview/Native transient 残留。
 
 当前仓库不维护独立 Test 项目；实际 build 和手工/native 回归是当前验收依据。
+
+## 15. 发布分类定义
+
+README、功能文档和 Release Notes 统一使用以下分类：
+
+- **初版**：正式暴露，属于初版发布声明范围，但仍需通过正常 Release Gate；
+- **初版基础设施**：支撑初版功能的正式平台能力，通常不是单独命令；
+- **仅基础设施**：Core API/geometry/transaction 已存在，但用户交互闭环未完成；
+- **内部支持**：被其他功能使用的 persistence/geometry/helper 能力，不提供用户入口；
+- **非初版**：当前明确不作为发布声明。
+
+一个功能只有在注册、UI 入口、Prompt/参数、Preview、精确输入（适用时）、Commit、Cleanup、Undo/Redo 和持久化预期都一致，并定义了发布回归后，才可以从“仅基础设施”提升为“初版”。

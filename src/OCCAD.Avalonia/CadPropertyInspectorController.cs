@@ -245,23 +245,9 @@ internal sealed class CadPropertyInspectorController : IDisposable
             .ToArray();
     }
 
-    private static IEnumerable<CadPropertyDescriptor> BrowsableProperties(object target)
-    {
-        var hideOrientation = target is
-            CadCircleEntity or
-            CadArcEntity or
-            CadEllipseEntity or
-            CadRectangleEntity;
-
-        return CadPropertyCatalog
-            .Describe(target)
-            .Where(descriptor =>
-                !hideOrientation ||
-                !string.Equals(
-                    descriptor.Category,
-                    "Orientation",
-                    StringComparison.OrdinalIgnoreCase));
-    }
+    private static IEnumerable<CadPropertyDescriptor> BrowsableProperties(
+        object target) =>
+        CadPropertyCatalog.Describe(target);
 
     private void AddSubobjectDetails(
         CadSubobjectSelection selection)
@@ -699,6 +685,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
             HorizontalContentAlignment = HorizontalAlignment.Left,
             Padding = new Thickness(6, 2),
             Background = new SolidColorBrush(ToMediaColor(drawing)),
+            Foreground = ColorTextBrush(drawing),
             Content = $"#{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
         };
         button.Classes.Add("cad-compact");
@@ -956,7 +943,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
             CadLanguageManager.Text(
                 "Cad.Text.PropertyUpdateFailed",
                 "Property Update Failed"),
-            string.Join(Environment.NewLine, messages));
+            string.Join(Environment.NewLine, messages),
+            kind: CadMessageDialogKind.Error);
     }
 
     private string LocalizeSubobjectTitle(
@@ -1005,6 +993,17 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
     private static MediaColor ToMediaColor(DrawingColor value) =>
         MediaColor.FromArgb(value.A, value.R, value.G, value.B);
+
+    private static IBrush ColorTextBrush(DrawingColor value)
+    {
+        var luminance =
+            0.2126 * value.R +
+            0.7152 * value.G +
+            0.0722 * value.B;
+        return luminance < 140.0
+            ? Brushes.White
+            : CadTheme.Text;
+    }
 
     private void EnsureNotDisposed() =>
         ObjectDisposedException.ThrowIf(_disposed, this);

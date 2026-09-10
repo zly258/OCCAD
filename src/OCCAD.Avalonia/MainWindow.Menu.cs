@@ -91,7 +91,11 @@ public sealed partial class MainWindow
             Action(
                 "draw.arc.startendpoint",
                 "Cad.Parameter.arc.Method.StartEndPoint",
-                "Start + End + Point"));
+                "Start + End + Point"),
+            Action(
+                "draw.arc.startendtangent",
+                "Cad.Parameter.arc.Method.StartEndTangent",
+                "Start + End + Start Tangent"));
 
         var ellipse = Menu(
             UiText("Cad.Text.Ellipse", "Ellipse"),

@@ -155,6 +155,7 @@ internal static class CadCoreRegistration
         actions.Register(new CadToolAction(workspace, "draw.arc.startcenterend", "Arc - Start Center End", "arc", initialParameters: new Dictionary<string, string> { ["Method"] = "StartCenterEnd" }));
         actions.Register(new CadToolAction(workspace, "draw.arc.startendcenter", "Arc - Start End Center", "arc", initialParameters: new Dictionary<string, string> { ["Method"] = "StartEndCenter" }));
         actions.Register(new CadToolAction(workspace, "draw.arc.startendpoint", "Arc - Start End Point", "arc", initialParameters: new Dictionary<string, string> { ["Method"] = "StartEndPoint" }));
+        actions.Register(new CadToolAction(workspace, "draw.arc.startendtangent", "Arc - Start End Tangent", "arc", initialParameters: new Dictionary<string, string> { ["Method"] = "StartEndTangent" }));
 
         actions.Register(new CadToolAction(workspace, "draw.ellipse", "Ellipse", "ellipse"));
         actions.Register(new CadToolAction(workspace, "draw.ellipse.centermajorminor", "Ellipse - Center Major Minor", "ellipse", initialParameters: new Dictionary<string, string> { ["Method"] = "CenterMajorMinor" }));

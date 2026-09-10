@@ -134,18 +134,7 @@ internal sealed class CadLayerPanelController : IDisposable
             foreach (var layer in layers)
                 _host.Children.Add(CreateLayerRow(layer));
 
-            var footer = new Grid
-            {
-                Margin = new Thickness(6, 5, 6, 6),
-                ColumnSpacing = 5
-            };
-            footer.ColumnDefinitions.Add(
-                new ColumnDefinition(
-                    new GridLength(1, GridUnitType.Star)));
-            footer.ColumnDefinitions.Add(
-                new ColumnDefinition(GridLength.Auto));
-
-            footer.Children.Add(new TextBlock
+            _host.Children.Add(new TextBlock
             {
                 Text = string.Format(
                     System.Globalization.CultureInfo.CurrentCulture,
@@ -154,18 +143,9 @@ internal sealed class CadLayerPanelController : IDisposable
                         "Layer: {0}"),
                     _workspace.Layers.Current.Name),
                 Foreground = CadTheme.Muted,
+                Margin = new Thickness(10, 5, 10, 7),
                 VerticalAlignment = VerticalAlignment.Center
             });
-
-            var properties = CompactButton(
-                CadLanguageManager.Text(
-                    "Cad.Text.Properties",
-                    "Properties"));
-            properties.Click += (_, _) =>
-                _inspectLayer(_workspace.Layers.Current);
-            Grid.SetColumn(properties, 1);
-            footer.Children.Add(properties);
-            _host.Children.Add(footer);
         }
         finally
         {
@@ -296,7 +276,10 @@ internal sealed class CadLayerPanelController : IDisposable
                 : FontWeight.Normal
         };
         name.Click += (_, _) =>
+        {
             _workspace.SetCurrentLayer(layer);
+            _inspectLayer(layer);
+        };
         grid.Children.Add(name);
 
         var width = new ComboBox

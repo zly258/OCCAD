@@ -66,9 +66,13 @@ public sealed class CadPreviewManager
         var engine = _engine ??
             throw new InvalidOperationException("No OCCT engine is attached.");
 
-        var nextShapes = new List<IOcctObject>(entities.Count);
         using var batch = engine.BeginDisplayBatch();
 
+        DeleteObjects(engine, _shapes);
+        _shapes.Clear();
+        _entities.Clear();
+
+        var nextShapes = new List<IOcctObject>(entities.Count);
         try
         {
             foreach (var entity in entities)
@@ -78,8 +82,7 @@ public sealed class CadPreviewManager
                 engine.SetLocalTransformation(
                     shape,
                     entity.Placement.Transform);
-                var appearance =
-                    ResolveAppearance(entity);
+                var appearance = ResolveAppearance(entity);
                 engine.SetObjectSelectable(shape, false);
                 engine.SetObjectColor(shape, appearance.Color);
                 engine.SetObjectTransparency(
@@ -90,41 +93,18 @@ public sealed class CadPreviewManager
                     engine.SetObjectLineWidth(
                         shape,
                         Math.Max(0.1, appearance.LineWidth));
-                    engine.SetObjectLineStyle(
-                        shape,
-                        appearance.LineStyle);
-                    engine.SetObjectDisplayMode(
-                        shape,
-                        entity.DisplayMode);
-                    engine.SetObjectMaterial(
-                        shape,
-                        entity.Material);
+                    engine.SetObjectLineStyle(shape, appearance.LineStyle);
+                    engine.SetObjectDisplayMode(shape, entity.DisplayMode);
+                    engine.SetObjectMaterial(shape, entity.Material);
                 }
             }
         }
         catch
         {
             TryDeleteObjects(engine, nextShapes);
-            TryDeleteObjects(engine, _shapes);
-            _shapes.Clear();
-            _entities.Clear();
             throw;
         }
 
-        try
-        {
-            DeleteObjects(engine, _shapes);
-        }
-        catch
-        {
-            TryDeleteObjects(engine, nextShapes);
-            TryDeleteObjects(engine, _shapes);
-            _shapes.Clear();
-            _entities.Clear();
-            throw;
-        }
-
-        _shapes.Clear();
         _shapes.AddRange(nextShapes);
     }
 
@@ -143,11 +123,9 @@ public sealed class CadPreviewManager
         OcctEngine engine,
         IEnumerable<IOcctObject> shapes)
     {
-        var existing = shapes
-            .Where(shape => engine.ContainsObject(shape.Id))
-            .ToArray();
-        if (existing.Length > 0)
-            engine.Delete(existing);
+        var values = shapes.ToArray();
+        if (values.Length > 0)
+            engine.Delete(values);
     }
 
     private static void TryDeleteObjects(

@@ -816,6 +816,16 @@
     <sys:String x:Key="Cad.Prompt.revolve.Angle">Revolve: move the pointer to set angle, click or press Enter to accept [Backspace axis, Esc cancel]</sys:String>
     <sys:String x:Key="Cad.Prompt.loft.Duplicate">Loft: section already selected; choose another section.</sys:String>
     <sys:String x:Key="Cad.Prompt.loft.Minimum">Loft: select at least two sections before finishing.</sys:String>
+
+    <sys:String x:Key="Cad.Property.AxisPointX">Axis point X</sys:String>
+    <sys:String x:Key="Cad.Property.AxisPointY">Axis point Y</sys:String>
+    <sys:String x:Key="Cad.Property.AxisPointZ">Axis point Z</sys:String>
+    <sys:String x:Key="Cad.Property.AxisDirectionX">Axis direction X</sys:String>
+    <sys:String x:Key="Cad.Property.AxisDirectionY">Axis direction Y</sys:String>
+    <sys:String x:Key="Cad.Property.AxisDirectionZ">Axis direction Z</sys:String>
+
+    <sys:String x:Key="Cad.Parameter.arc.Method.StartEndTangent">Start + End + Start Tangent</sys:String>
+    <sys:String x:Key="Cad.Prompt.Arc.Tangent">Arc: specify start tangent direction [Backspace undo, Esc cancel]</sys:String>
 </ResourceDictionary>
 
 

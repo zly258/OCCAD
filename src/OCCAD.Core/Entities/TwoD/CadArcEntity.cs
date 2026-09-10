@@ -43,12 +43,12 @@ public sealed class CadArcEntity : CadEntity
     [Browsable(false)] public OcctPoint3d Middle => PointAt(_startAngleDegrees + _sweepAngleDegrees * 0.5);
     [Browsable(false)] public OcctPoint3d End => PointAt(_startAngleDegrees + _sweepAngleDegrees);
 
-    [Browsable(false)] public double NormalX => _normal.X;
-    [Browsable(false)] public double NormalY => _normal.Y;
-    [Browsable(false)] public double NormalZ => _normal.Z;
-    [Browsable(false)] public double XAxisX => _xAxis.X;
-    [Browsable(false)] public double XAxisY => _xAxis.Y;
-    [Browsable(false)] public double XAxisZ => _xAxis.Z;
+    [Category("Orientation"), ReadOnly(true)] public double NormalX => _normal.X;
+    [Category("Orientation"), ReadOnly(true)] public double NormalY => _normal.Y;
+    [Category("Orientation"), ReadOnly(true)] public double NormalZ => _normal.Z;
+    [Category("Orientation"), ReadOnly(true)] public double XAxisX => _xAxis.X;
+    [Category("Orientation"), ReadOnly(true)] public double XAxisY => _xAxis.Y;
+    [Category("Orientation"), ReadOnly(true)] public double XAxisZ => _xAxis.Z;
 
     [Category("Geometry")] public double CenterX { get => _center.X; set => SetCenter(value, _center.Y, _center.Z); }
     [Category("Geometry")] public double CenterY { get => _center.Y; set => SetCenter(_center.X, value, _center.Z); }

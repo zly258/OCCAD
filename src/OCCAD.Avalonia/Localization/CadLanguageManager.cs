@@ -11,7 +11,7 @@ internal static class CadLanguageManager
     private static readonly Dictionary<string, IReadOnlyDictionary<string, string>> Cache =
         new(StringComparer.OrdinalIgnoreCase);
 
-    public static string CurrentLanguage { get; private set; } = "en-US";
+    public static string CurrentLanguage { get; private set; } = "zh-CN";
     public static event EventHandler? Changed;
 
     public static string Text(string key, string fallback)

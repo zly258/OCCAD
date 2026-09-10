@@ -816,6 +816,16 @@
     <sys:String x:Key="Cad.Prompt.revolve.Angle">旋转建模：移动鼠标设置角度，单击或按 Enter 确认 [Backspace 返回旋转轴，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.loft.Duplicate">放样：该截面已选择，请选择其他截面。</sys:String>
     <sys:String x:Key="Cad.Prompt.loft.Minimum">放样：至少选择两个截面后才能完成。</sys:String>
+
+    <sys:String x:Key="Cad.Property.AxisPointX">轴起点 X</sys:String>
+    <sys:String x:Key="Cad.Property.AxisPointY">轴起点 Y</sys:String>
+    <sys:String x:Key="Cad.Property.AxisPointZ">轴起点 Z</sys:String>
+    <sys:String x:Key="Cad.Property.AxisDirectionX">轴方向 X</sys:String>
+    <sys:String x:Key="Cad.Property.AxisDirectionY">轴方向 Y</sys:String>
+    <sys:String x:Key="Cad.Property.AxisDirectionZ">轴方向 Z</sys:String>
+
+    <sys:String x:Key="Cad.Parameter.arc.Method.StartEndTangent">起点 + 终点 + 起点切线</sys:String>
+    <sys:String x:Key="Cad.Prompt.Arc.Tangent">圆弧：指定起点切线方向 [Backspace 返回，Esc 取消]</sys:String>
 </ResourceDictionary>
 
 

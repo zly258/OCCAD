@@ -36,12 +36,12 @@ public sealed class CadRectangleEntity : CadEntity
     [Browsable(false)] public OcctPoint3d Center => _center;
     [Browsable(false)] public OcctVector3d XAxis => _xAxis;
     [Browsable(false)] public OcctVector3d YAxis => _yAxis;
-    [Browsable(false)] public double XAxisX => _xAxis.X;
-    [Browsable(false)] public double XAxisY => _xAxis.Y;
-    [Browsable(false)] public double XAxisZ => _xAxis.Z;
-    [Browsable(false)] public double YAxisX => _yAxis.X;
-    [Browsable(false)] public double YAxisY => _yAxis.Y;
-    [Browsable(false)] public double YAxisZ => _yAxis.Z;
+    [Category("Orientation"), ReadOnly(true)] public double XAxisX => _xAxis.X;
+    [Category("Orientation"), ReadOnly(true)] public double XAxisY => _xAxis.Y;
+    [Category("Orientation"), ReadOnly(true)] public double XAxisZ => _xAxis.Z;
+    [Category("Orientation"), ReadOnly(true)] public double YAxisX => _yAxis.X;
+    [Category("Orientation"), ReadOnly(true)] public double YAxisY => _yAxis.Y;
+    [Category("Orientation"), ReadOnly(true)] public double YAxisZ => _yAxis.Z;
 
     [Category("Geometry")] public double CenterX { get => _center.X; set => SetCenter(value, _center.Y, _center.Z); }
     [Category("Geometry")] public double CenterY { get => _center.Y; set => SetCenter(_center.X, value, _center.Z); }

@@ -34,7 +34,7 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
         if (input.Kind == OcctPointerInputKind.Moved &&
             _basePoint is { } basePoint)
         {
-            ShowTranslatedPreview(
+            UpdateTranslatedPreview(
                 Context.ResolvePoint(
                     input.X,
                     input.Y,
@@ -106,8 +106,7 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
         {
             _basePoint = point;
             Context.WorkPlane.SetOrigin(point);
-            Context.Preview.Show(
-                Entities.Select(static entity => entity.Duplicate()));
+            Context.Preview.Clear();
             SetStageLocalized(
                 1,
                 $"Cad.Prompt.{Id}.Target",
@@ -118,18 +117,50 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
 
         var displacement =
             CadTransformMath.Between(_basePoint.Value, point);
-        if (displacement.LengthSquared > 1e-18)
-            Commit(displacement);
+        if (displacement.LengthSquared <= 1e-18)
+        {
+            Context.Preview.Clear();
+            return false;
+        }
 
+        Commit(displacement);
         Context.Workspace.Tools.CompleteCurrent();
         return true;
     }
 
-    private void ShowTranslatedPreview(OcctPoint3d target)
+    protected virtual void ShowTranslatedPreview(
+        OcctVector3d displacement)
+    {
+        ShowEntityPreview(
+            entity =>
+                entity.TranslatePlacement(displacement));
+    }
+
+    protected void RefreshTranslatedPreview()
+    {
+        if (_basePoint is not { } basePoint ||
+            Context.Workspace.LastPointerPosition is not { } pointer)
+            return;
+
+        var target =
+            Context.ResolvePoint(
+                pointer.X,
+                pointer.Y,
+                basePoint).Point;
+        UpdateTranslatedPreview(target);
+    }
+
+    private void UpdateTranslatedPreview(
+        OcctPoint3d target)
     {
         var displacement =
             CadTransformMath.Between(BasePoint, target);
-        ShowEntityPreview(
-            entity => entity.TranslatePlacement(displacement));
+        if (displacement.LengthSquared <= 1e-18)
+        {
+            Context.Preview.Clear();
+            return;
+        }
+
+        ShowTranslatedPreview(displacement);
     }
 }

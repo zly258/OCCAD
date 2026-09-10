@@ -399,5 +399,10 @@ public sealed class CadToolContext(CadWorkspace workspace)
             ActiveTool?.SnapResolvePolicy ??
             CadSnapResolvePolicy.KeepExactPoint);
 
-    public void AddEntity(CadEntity entity) => Workspace.AddEntity(entity);
+    public void AddEntity(CadEntity entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        Preview.Clear();
+        Workspace.AddEntity(entity);
+    }
 }

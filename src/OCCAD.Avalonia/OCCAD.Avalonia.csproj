@@ -25,7 +25,9 @@
       <HintPath>$(OcctBridgeSdkRoot)\OcctNet.Avalonia.dll</HintPath>
       <Private>true</Private>
     </Reference>
-    <EmbeddedResource Include="Localization\Strings.*.xml" />
+    <EmbeddedResource Include="Localization\Strings.*.xml">
+      <WithCulture>false</WithCulture>
+    </EmbeddedResource>
     <AvaloniaResource Include="Assets\OCCAD.png" />
     <None Include="$(OcctBridgeSdkRoot)\runtime\*" Link="runtime\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(OcctBridgeSdkRoot)\runtime\OcctNative.dll')" />
     <None Include="$(OcctBridgeSdkRoot)\occt\**\*" Link="occt\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(OcctBridgeSdkRoot)\occt')" />

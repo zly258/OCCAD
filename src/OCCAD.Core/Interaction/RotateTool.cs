@@ -7,7 +7,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     private OcctPoint3d? _center;
     private OcctVector3d? _reference;
     private OcctVector3d _normal;
-    private OcctPoint3d _initialOrigin;
+    private CadPlaneFrame _initialPlane;
     public override string Id => "rotate";
     public override string DisplayName => "Rotate";
     public override OcctPoint3d? PrecisionReferencePoint => _center;
@@ -17,9 +17,9 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
 
     protected override void OnTransformStarted()
     {
-        _initialOrigin =
-            Context.WorkPlane.Origin;
-        _normal = Context.WorkPlane.Normal;
+        _initialPlane =
+            Context.WorkPlane.EffectivePlane;
+        _normal = _initialPlane.Normal;
         RestorePrompt();
     }
 
@@ -51,6 +51,13 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
         {
             if (!Direction(point, out var direction)) return false;
             _reference = direction;
+            var yAxis =
+                _normal.Cross(direction).Normalized();
+            SetWorkPlane(
+                _center.Value,
+                direction,
+                yAxis,
+                lockPlane: true);
             RestorePrompt();
             return true;
         }
@@ -84,13 +91,20 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
         if (_reference is not null)
         {
             _reference = null;
+            SetWorkPlane(
+                _center!.Value,
+                _initialPlane.XAxis,
+                _initialPlane.YAxis,
+                lockPlane: false);
         }
         else
         {
             _center = null;
-            Context.WorkPlane.SetToolPlaneFixed(false);
-            Context.WorkPlane.SetOrigin(
-                _initialOrigin);
+            SetWorkPlane(
+                _initialPlane.Origin,
+                _initialPlane.XAxis,
+                _initialPlane.YAxis,
+                lockPlane: false);
         }
         Context.Preview.Clear();
         RestorePrompt();
@@ -101,7 +115,7 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     {
         _center = null;
         _reference = null;
-        _initialOrigin = default;
+        _initialPlane = default;
     }
 
     private bool Direction(OcctPoint3d point, out OcctVector3d direction)

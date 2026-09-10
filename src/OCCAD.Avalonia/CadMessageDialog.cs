@@ -68,9 +68,9 @@ internal sealed class CadMessageDialog : Window
             Content = text,
             MaxHeight = 300,
             HorizontalScrollBarVisibility =
-                ScrollBarVisibility.Disabled,
+                global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             VerticalScrollBarVisibility =
-                ScrollBarVisibility.Auto
+                global::Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
         };
 
         var accent = new Border

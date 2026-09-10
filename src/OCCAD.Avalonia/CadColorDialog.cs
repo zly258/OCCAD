@@ -29,20 +29,20 @@ internal sealed class CadColorDialog : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = CadTheme.Surface;
 
-        _table = new CadColorTable(initial);
-        _table.ColorChanged += (_, _) =>
-        {
-            _selected = _table.SelectedColor;
-            _picker.Color = ToMediaColor(_selected);
-            RefreshPreview();
-        };
-
         _picker = new ColorPicker
         {
             Color = ToMediaColor(initial),
             IsAlphaEnabled = false,
             IsAlphaVisible = false,
             HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+
+        _table = new CadColorTable(initial);
+        _table.ColorChanged += (_, _) =>
+        {
+            _selected = _table.SelectedColor;
+            _picker.Color = ToMediaColor(_selected);
+            RefreshPreview();
         };
         _picker.ColorChanged += (_, args) =>
         {

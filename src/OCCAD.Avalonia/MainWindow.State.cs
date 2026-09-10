@@ -379,13 +379,10 @@ public sealed partial class MainWindow
 
             _viewport.InteractionFeatures = features;
 
-            _toolStatus.Text =
-                tool.Prompt is { } prompt
-                    ? CadLanguageManager.ToolPrompt(prompt)
-                    : UiFormat(
-                        "Cad.Text.ToolActive",
-                        "{0}: active",
-                        LocalizeToolName(tool));
+            _toolStatus.Text = UiFormat(
+                "Cad.Text.ToolActive",
+                "{0}: active",
+                LocalizeToolName(tool));
 
             if (_workspace.LastResolvedPoint is { } resolved)
                 UpdateDynamicInputHud(resolved);

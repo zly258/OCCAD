@@ -97,6 +97,7 @@ public abstract class CadDrawingTool : CadTool
     protected void CommitPreview(CadEntity? entity)
     {
         if (entity is null) return;
+        Context.Preview.Clear();
         Context.AddEntity(entity.Duplicate());
         Context.Workspace.Tools.CompleteCurrent();
     }

@@ -413,25 +413,41 @@ public sealed class CadWorkspace : IDisposable
     }
     public IReadOnlyList<CadEntity> CopyEntities(
         IEnumerable<CadEntity> entities,
-        OcctVector3d displacement)
+        OcctVector3d displacement,
+        int count = 1)
     {
         ArgumentNullException.ThrowIfNull(entities);
         if (!displacement.IsFinite)
             throw new ArgumentOutOfRangeException(nameof(displacement));
+        if (displacement.LengthSquared <= 1e-18)
+            return Array.Empty<CadEntity>();
+        if (count is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(count));
 
-        var copies = EditableEntities(entities)
-            .Select(static entity => entity.Duplicate())
-            .ToArray();
-        if (copies.Length == 0) return copies;
+        var sources = EditableEntities(entities).ToArray();
+        if (sources.Length == 0)
+            return Array.Empty<CadEntity>();
 
-        foreach (var copy in copies)
-            copy.TranslatePlacement(displacement);
+        var copies = new List<CadEntity>(
+            sources.Length * count);
+        for (var index = 1; index <= count; index++)
+        {
+            var step = displacement * index;
+            foreach (var source in sources)
+            {
+                var copy = source.Duplicate();
+                copy.TranslatePlacement(step);
+                copies.Add(copy);
+            }
+        }
 
         History.Execute(
             new CadAddEntitiesHistoryEntry(
                 Document,
                 copies,
-                copies.Length == 1 ? "Copy" : $"Copy {copies.Length}"));
+                copies.Count == 1
+                    ? "Copy"
+                    : $"Copy {copies.Count}"));
         return copies;
     }
 

@@ -23,9 +23,9 @@ public sealed class CadCircleEntity : CadEntity
     [Browsable(false)] public OcctPoint3d Center => _center;
     [Browsable(false)] public OcctVector3d Normal => _normal;
 
-    [Browsable(false)] public double NormalX => _normal.X;
-    [Browsable(false)] public double NormalY => _normal.Y;
-    [Browsable(false)] public double NormalZ => _normal.Z;
+    [Category("Orientation"), ReadOnly(true)] public double NormalX => _normal.X;
+    [Category("Orientation"), ReadOnly(true)] public double NormalY => _normal.Y;
+    [Category("Orientation"), ReadOnly(true)] public double NormalZ => _normal.Z;
 
     [Category("Geometry")] public double CenterX { get => _center.X; set => SetCenter(value, _center.Y, _center.Z); }
     [Category("Geometry")] public double CenterY { get => _center.Y; set => SetCenter(_center.X, value, _center.Z); }

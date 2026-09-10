@@ -9,6 +9,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
     private const string StartCenterEnd = "StartCenterEnd";
     private const string StartEndCenter = "StartEndCenter";
     private const string StartEndPoint = "StartEndPoint";
+    private const string StartEndTangent = "StartEndTangent";
 
     private readonly List<OcctPoint3d> _points = [];
     private string _method = ThreePoints;
@@ -74,7 +75,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
             if (Stage != 0) return false;
 
             var normalized = value.Trim();
-            if (normalized is not (ThreePoints or CenterStartEnd or StartCenterEnd or StartEndCenter or StartEndPoint))
+            if (normalized is not (ThreePoints or CenterStartEnd or StartCenterEnd or StartEndCenter or StartEndPoint or StartEndTangent))
                 return false;
 
             _method = normalized;
@@ -120,7 +121,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
                 "Method",
                 "Method",
                 _method,
-                [ThreePoints, CenterStartEnd, StartCenterEnd, StartEndCenter, StartEndPoint]));
+                [ThreePoints, CenterStartEnd, StartCenterEnd, StartEndCenter, StartEndPoint, StartEndTangent]));
         }
 
         if (_method is CenterStartEnd or StartCenterEnd or StartEndCenter)
@@ -189,6 +190,12 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         }
         if (TryCreateArc(_points[0], _points[1], cursor, out var arc))
             _preview = arc;
+        else if (_method == StartEndTangent)
+        {
+            _preview = null;
+            Context.Preview.Clear();
+            return;
+        }
         else if (_points[1].DistanceTo(cursor) > 1e-9)
             _preview = new CadPolylineEntity([_points[0], _points[1], cursor]);
         else
@@ -248,10 +255,114 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
                     arc = new CadArcEntity(first, third, second);
                     return true;
 
+                case StartEndTangent:
+                    return TryCreateStartEndTangentArc(
+                        first,
+                        second,
+                        third,
+                        out arc);
+
                 default:
                     arc = null!;
                     return false;
             }
+        }
+        catch (ArgumentException)
+        {
+            arc = null!;
+            return false;
+        }
+    }
+
+    private bool TryCreateStartEndTangentArc(
+        OcctPoint3d start,
+        OcctPoint3d end,
+        OcctPoint3d tangentPoint,
+        out CadArcEntity arc)
+    {
+        arc = null!;
+
+        var chord = ToLocal(start, end);
+        var tangent = ToLocal(start, tangentPoint);
+        var tangentLength =
+            Math.Sqrt(
+                tangent.X * tangent.X +
+                tangent.Y * tangent.Y);
+        var chordLengthSquared =
+            chord.X * chord.X +
+            chord.Y * chord.Y;
+
+        if (tangentLength <= 1e-9 ||
+            chordLengthSquared <= 1e-18)
+            return false;
+
+        var tx = tangent.X / tangentLength;
+        var ty = tangent.Y / tangentLength;
+        var nx = -ty;
+        var ny = tx;
+        var denominator =
+            chord.X * nx +
+            chord.Y * ny;
+        if (Math.Abs(denominator) <= 1e-9)
+            return false;
+
+        var signedRadius =
+            chordLengthSquared /
+            (2.0 * denominator);
+        if (!double.IsFinite(signedRadius) ||
+            Math.Abs(signedRadius) <= 1e-9)
+            return false;
+
+        var center =
+            start +
+            _xAxis * (nx * signedRadius) +
+            _yAxis * (ny * signedRadius);
+        var radius = Math.Abs(signedRadius);
+
+        var startLocal = ToLocal(center, start);
+        var endLocal = ToLocal(center, end);
+        var startAngle =
+            Math.Atan2(startLocal.Y, startLocal.X);
+        var endAngle =
+            Math.Atan2(endLocal.Y, endLocal.X);
+
+        var radial =
+            CadTransformMath.Between(center, start)
+                .Normalized();
+        var planeNormal =
+            _xAxis.Cross(_yAxis).Normalized();
+        var ccwTangent =
+            planeNormal.Cross(radial).Normalized();
+        var tangentWorld =
+            (_xAxis * tx + _yAxis * ty).Normalized();
+        var ccw =
+            CadTransformMath.Dot(
+                ccwTangent,
+                tangentWorld) >= 0.0;
+
+        var sweep = ccw
+            ? CadPrecisionSnapGeometry.NormalizePositive(
+                endAngle - startAngle)
+            : -CadPrecisionSnapGeometry.NormalizePositive(
+                startAngle - endAngle);
+        if (Math.Abs(sweep) <= 1e-9 ||
+            Math.Abs(Math.Abs(sweep) - Math.PI * 2.0) <= 1e-9)
+            return false;
+
+        var middleAngle =
+            startAngle + sweep * 0.5;
+        var middle =
+            center +
+            _xAxis * (Math.Cos(middleAngle) * radius) +
+            _yAxis * (Math.Sin(middleAngle) * radius);
+
+        try
+        {
+            arc = new CadArcEntity(
+                start,
+                middle,
+                end);
+            return true;
         }
         catch (ArgumentException)
         {
@@ -426,6 +537,9 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
             (StartEndPoint, 0) => ("Cad.Prompt.Arc.Start", "Arc: specify start point [Esc cancel]", CadPrecisionInputKind.None),
             (StartEndPoint, 1) => ("Cad.Prompt.Arc.End", "Arc: specify end point [Backspace undo, Esc cancel]", CadPrecisionInputKind.LengthAndAngle),
             (StartEndPoint, _) => ("Cad.Prompt.Arc.PointOnArc", "Arc: specify a point on the arc [Backspace undo, Esc cancel]", CadPrecisionInputKind.LengthAndAngle),
+            (StartEndTangent, 0) => ("Cad.Prompt.Arc.Start", "Arc: specify start point [Esc cancel]", CadPrecisionInputKind.None),
+            (StartEndTangent, 1) => ("Cad.Prompt.Arc.End", "Arc: specify end point [Backspace undo, Esc cancel]", CadPrecisionInputKind.LengthAndAngle),
+            (StartEndTangent, _) => ("Cad.Prompt.Arc.Tangent", "Arc: specify start tangent direction [Backspace undo, Esc cancel]", CadPrecisionInputKind.Angle),
             _ => ("Cad.Prompt.Arc.End", "Arc: specify end point [Backspace undo, Esc cancel]", CadPrecisionInputKind.Angle)
         };
         SetStageLocalized(_points.Count, key, fallback, precision);

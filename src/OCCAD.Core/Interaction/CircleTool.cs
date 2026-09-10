@@ -389,9 +389,9 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
 
     private void Commit(CadCircleEntity entity)
     {
-        _preview = entity;
-        ShowPreview(entity);
-        Context.AddEntity(entity.Duplicate());
+        _preview = null;
+        Context.Preview.Clear();
+        Context.AddEntity(entity);
         Context.Workspace.Tools.CompleteCurrent();
     }
 

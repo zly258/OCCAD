@@ -75,6 +75,24 @@ public sealed class CadRevolveEntity : CadFeatureEntity
     [Browsable(false)]
     public OcctVector3d AxisDirection => _axisDirection;
 
+    [Category("Geometry"), ReadOnly(true)]
+    public double AxisPointX => _axisPoint.X;
+
+    [Category("Geometry"), ReadOnly(true)]
+    public double AxisPointY => _axisPoint.Y;
+
+    [Category("Geometry"), ReadOnly(true)]
+    public double AxisPointZ => _axisPoint.Z;
+
+    [Category("Orientation"), ReadOnly(true)]
+    public double AxisDirectionX => _axisDirection.X;
+
+    [Category("Orientation"), ReadOnly(true)]
+    public double AxisDirectionY => _axisDirection.Y;
+
+    [Category("Orientation"), ReadOnly(true)]
+    public double AxisDirectionZ => _axisDirection.Z;
+
     [Category("Geometry")]
     public double AngleDegrees
     {

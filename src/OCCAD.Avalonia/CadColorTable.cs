@@ -141,7 +141,7 @@ internal sealed class CadColorTable : UserControl
 
     private void ColorButtonClicked(
         object? sender,
-        Avalonia.Interactivity.RoutedEventArgs e)
+        global::Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is not Button
             {

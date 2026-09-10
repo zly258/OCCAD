@@ -95,6 +95,7 @@ public sealed class InteractionTests
         using var w = new CadWorkspace();
         w.Selection.SetScope(CadSelectionScope.Subobject, CadSubshapeMask.Face);
         Assert.IsTrue(w.Tools.Activate(id));
+        Assert.IsTrue(w.Transients.CurrentToolOwner > 0);
         Assert.AreEqual(CadSelectionScope.Entity, w.Selection.Scope);
         w.Snap.TemporaryModes = CadSnapType.Endpoint;
         Assert.IsTrue(w.Tools.CancelCurrent());
@@ -134,8 +135,11 @@ public sealed class InteractionTests
         Assert.HasCount(1, w.Document.Entities);
     }
 
-    internal static void AssertNeutral(CadWorkspace w) =>
+    internal static void AssertNeutral(CadWorkspace w)
+    {
+        Assert.AreEqual(0L, w.Transients.CurrentToolOwner, "Transient tool owner was not released.");
         Assert.IsEmpty(w.Tools.NeutralStateViolations, string.Join(", ", w.Tools.NeutralStateViolations));
+    }
 
     public sealed class FailingCleanupTool : CadTool
     {

@@ -38,11 +38,19 @@ public sealed class CadTransaction : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_committed) return;
+
         var after = CadWorkspaceSnapshot.Capture(_workspace);
         _hasChanges = !_before.SameState(after, _workspace.Entities);
         _workspace.History.ResumeRecording();
-        _committed = true;
-        if (_hasChanges)
+
+        if (!_hasChanges)
+        {
+            _committed = true;
+            return;
+        }
+
+        var state = _workspace.History.CurrentStateId;
+        try
         {
             RecordApplied(
                 _workspace.History,
@@ -51,6 +59,16 @@ public sealed class CadTransaction : IDisposable
                     _name,
                     _before,
                     after));
+            _committed = true;
+        }
+        catch
+        {
+            // If history state advanced, the Undo entry is authoritative even if
+            // a fatal observer failed afterwards. Only a failure before history
+            // installation leaves this transaction uncommitted and eligible for
+            // snapshot rollback in Dispose().
+            _committed = _workspace.History.CurrentStateId != state;
+            throw;
         }
     }
 
@@ -80,23 +98,70 @@ public sealed class CadTransaction : IDisposable
     // Small commands retain their efficient, operation-specific history entries.
     internal static void Execute(CadWorkspace workspace, ICadHistoryEntry entry)
     {
-        using var batch = workspace.Engine?.BeginDisplayBatch();
-        using var changes = workspace.Document.BeginChangeSet();
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(entry);
+
+        // Lightweight operations are allowed inside an explicit CadTransaction.
+        // In that case the outer snapshot owns history and this entry only applies
+        // its model mutation.
+        if (workspace.History.RecordingSuspended)
+        {
+            entry.Redo();
+            return;
+        }
+
+        var wasModified = workspace.IsModified;
         var state = workspace.History.CurrentStateId;
-        try
+        var redoCompleted = false;
+        var historyInstalled = false;
+        var rollbackComplete = false;
+        Exception? failure = null;
+
+        using (workspace.Engine?.BeginDisplayBatch())
         {
-            workspace.History.Execute(entry);
+            using (workspace.Document.BeginChangeSet())
+            {
+                try
+                {
+                    entry.Redo();
+                    redoCompleted = true;
+                    try
+                    {
+                        RecordApplied(workspace.History, entry);
+                    }
+                    finally
+                    {
+                        historyInstalled =
+                            workspace.History.CurrentStateId != state;
+                    }
+                }
+                catch (Exception error)
+                {
+                    failure = error;
+                    if (redoCompleted && !historyInstalled)
+                    {
+                        try
+                        {
+                            entry.Undo();
+                            rollbackComplete = true;
+                        }
+                        catch (Exception rollbackFailure)
+                        {
+                            failure = new AggregateException(
+                                $"'{entry.Name}' applied but history installation and rollback both failed.",
+                                error,
+                                rollbackFailure);
+                        }
+                    }
+                }
+            }
         }
-        catch (Exception exception)
-            when (workspace.History.CurrentStateId != state &&
-                  IsRecoverableHistoryNotificationFailure(exception))
-        {
-            // The operation and its Undo record are already authoritative.
-            // UI/event observers must not turn a committed command into a
-            // reported failure and tempt the caller to apply it again.
-            System.Diagnostics.Debug.WriteLine(
-                $"History observer failed after '{entry.Name}' committed: {exception}");
-        }
+
+        if (failure is not null && rollbackComplete)
+            workspace.RestoreModifiedState(wasModified);
+
+        if (failure is not null)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     internal static void ApplyCreatedEntity(
@@ -156,13 +221,21 @@ public sealed class CadTransaction : IDisposable
                     // released and the tool has returned to the neutral interaction state.
                     complete();
 
-                    RecordApplied(
-                        workspace.History,
-                        new CadAddEntitiesHistoryEntry(
-                            workspace.Document,
-                            values,
-                            name.Trim()));
-                    historyInstalled = true;
+                    var state = workspace.History.CurrentStateId;
+                    try
+                    {
+                        RecordApplied(
+                            workspace.History,
+                            new CadAddEntitiesHistoryEntry(
+                                workspace.Document,
+                                values,
+                                name.Trim()));
+                    }
+                    finally
+                    {
+                        historyInstalled =
+                            workspace.History.CurrentStateId != state;
+                    }
                 }
                 catch (Exception error)
                 {
@@ -252,12 +325,19 @@ public sealed class CadTransaction : IDisposable
                     // operation as failed.
                     complete?.Invoke();
 
-                    RecordApplied(
-                        workspace.History,
-                        geometryOnly
-                            ? new CadGeometryHistoryEntry(targets, before, after, name)
-                            : new CadEntityStateHistoryEntry(targets, before, after, name));
-                    recorded = true;
+                    var state = workspace.History.CurrentStateId;
+                    try
+                    {
+                        RecordApplied(
+                            workspace.History,
+                            geometryOnly
+                                ? new CadGeometryHistoryEntry(targets, before, after, name)
+                                : new CadEntityStateHistoryEntry(targets, before, after, name));
+                    }
+                    finally
+                    {
+                        recorded = workspace.History.CurrentStateId != state;
+                    }
                 }
             }
             catch (Exception error)

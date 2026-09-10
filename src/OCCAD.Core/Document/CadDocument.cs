@@ -483,13 +483,14 @@ public sealed class CadDocument
         if (_changeSetDepth > 0)
             _pendingChanges.Add(change);
 
-        Changed?.Invoke(this, change);
+        PublishObservers(Changed, change, "Changed");
 
         if (_changeSetDepth == 0)
         {
-            ChangeSetCommitted?.Invoke(
-                this,
-                new CadDocumentChangeSetEventArgs([change]));
+            PublishObservers(
+                ChangeSetCommitted,
+                new CadDocumentChangeSetEventArgs([change]),
+                "ChangeSetCommitted");
         }
     }
 
@@ -508,10 +509,43 @@ public sealed class CadDocument
 
         var committed = _pendingChanges.ToArray();
         _pendingChanges.Clear();
-        ChangeSetCommitted?.Invoke(
-            this,
-            new CadDocumentChangeSetEventArgs(committed));
+        PublishObservers(
+            ChangeSetCommitted,
+            new CadDocumentChangeSetEventArgs(committed),
+            "ChangeSetCommitted");
     }
+
+    private void PublishObservers<TEventArgs>(
+        EventHandler<TEventArgs>? handlers,
+        TEventArgs args,
+        string eventName)
+        where TEventArgs : EventArgs
+    {
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler<TEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                // Document state and native presentation have already advanced.
+                // Observers are cache/UI/integration side effects and cannot
+                // invalidate the authoritative document operation or starve
+                // later observers of the same transition.
+                System.Diagnostics.Debug.WriteLine(
+                    $"CadDocument {eventName} observer failed after state changed: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private sealed class ChangeSetScope : IDisposable
     {
@@ -724,4 +758,3 @@ public sealed class CadDocument
         }
     }
 }
-

@@ -42,8 +42,7 @@ public sealed class CadLayerManager
         EnsureUniqueName(normalized, except: null);
 
         var layer = AddCore(normalized);
-        Changed?.Invoke(
-            this,
+        PublishChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.Added,
                 layer));
@@ -98,8 +97,7 @@ public sealed class CadLayerManager
         if (ReferenceEquals(_current, layer)) return;
 
         _current = layer;
-        Changed?.Invoke(
-            this,
+        PublishChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.CurrentChanged,
                 layer));
@@ -139,8 +137,7 @@ public sealed class CadLayerManager
 
         _layers.Clear();
         _current = AddCore("0");
-        Changed?.Invoke(
-            this,
+        PublishChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.Reset,
                 _current));
@@ -156,7 +153,7 @@ public sealed class CadLayerManager
         for (var i = 0; i < layers.Count; i++) layers[i].RestoreState(states[i]);
         _current = current;
         foreach (var layer in _layers) layer.Changed += LayerChanged;
-        Changed?.Invoke(this, new(CadLayerManagerChangeKind.Reset, current));
+        PublishChanged(new(CadLayerManagerChangeKind.Reset, current));
     }
 
     internal int IndexOf(CadLayer layer)
@@ -178,8 +175,7 @@ public sealed class CadLayerManager
 
         layer.Changed -= LayerChanged;
         _layers.RemoveAt(index);
-        Changed?.Invoke(
-            this,
+        PublishChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.Removed,
                 layer));
@@ -199,8 +195,7 @@ public sealed class CadLayerManager
 
         layer.Changed += LayerChanged;
         _layers.Insert(index, layer);
-        Changed?.Invoke(
-            this,
+        PublishChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.Added,
                 layer));
@@ -218,14 +213,38 @@ public sealed class CadLayerManager
     {
         if (sender is not CadLayer layer) return;
 
-        Changed?.Invoke(
-            this,
+        PublishChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.LayerChanged,
                 layer,
                 e.Kind,
                 e.PreviousName));
     }
+
+    private void PublishChanged(CadLayerManagerChangedEventArgs args)
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler<CadLayerManagerChangedEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"CadLayerManager Changed observer failed after state changed: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private void EnsureOwned(CadLayer layer)
     {

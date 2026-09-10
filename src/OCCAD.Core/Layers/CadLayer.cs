@@ -137,15 +137,13 @@ public sealed class CadLayer
         _locked = state.Locked;
 
         if (appearanceChanged)
-            Changed?.Invoke(
-                this,
+            PublishChanged(
                 new CadLayerChangedEventArgs(
                     CadLayerChangeKind.Appearance,
                     nameof(RestoreState)));
 
         if (stateChanged)
-            Changed?.Invoke(
-                this,
+            PublishChanged(
                 new CadLayerChangedEventArgs(
                     CadLayerChangeKind.State,
                     nameof(RestoreState)));
@@ -162,9 +160,12 @@ public sealed class CadLayer
             CadLayerChangeKind.Metadata,
             nameof(Name),
             previousName);
+
+        // Changing is intentionally strict and remains a pre-state hook. A
+        // subscriber can reject the operation before the layer is mutated.
         Changing?.Invoke(this, args);
         _name = normalized;
-        Changed?.Invoke(this, args);
+        PublishChanged(args);
     }
 
     private bool Set<T>(
@@ -175,11 +176,39 @@ public sealed class CadLayer
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         var args = new CadLayerChangedEventArgs(kind, propertyName);
+
+        // Keep pre-change validation/veto semantics strict. Once the backing
+        // field changes, Changed observers are notification-only.
         Changing?.Invoke(this, args);
         field = value;
-        Changed?.Invoke(this, args);
+        PublishChanged(args);
         return true;
     }
+
+    private void PublishChanged(CadLayerChangedEventArgs args)
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler<CadLayerChangedEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"CadLayer Changed observer failed after state changed: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     public override string ToString() => Name;
 }

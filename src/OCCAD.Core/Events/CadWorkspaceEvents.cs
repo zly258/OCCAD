@@ -28,8 +28,33 @@ public sealed class CadWorkspaceEvents : IDisposable
         workspace.Layers.Changed += LayerChanged;
         workspace.ModifiedChanged += ModifiedChanged;
     }
+
     public event EventHandler<CadDomainEventArgs>? Changed;
-    private void Publish(CadDomainEventKind kind, EventArgs args) => Changed?.Invoke(this, new(kind, args));
+
+    private void Publish(CadDomainEventKind kind, EventArgs args)
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        var payload = new CadDomainEventArgs(kind, args);
+        foreach (EventHandler<CadDomainEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, payload);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                // Domain events are an integration projection over already
+                // authoritative workspace state. One consumer must not starve
+                // the remaining consumers or invalidate the originating action.
+                System.Diagnostics.Debug.WriteLine(
+                    $"CadWorkspaceEvents observer failed for {kind}: {exception}");
+            }
+        }
+    }
+
     private void EntityChanged(object? sender, CadDocumentChangedEventArgs args) => Publish(args.Kind switch
     {
         CadDocumentChangeKind.Added => CadDomainEventKind.EntityAdded,
@@ -49,6 +74,12 @@ public sealed class CadWorkspaceEvents : IDisposable
     private void ToolUpdated(object? sender, CadToolChangedEventArgs args) => Publish(CadDomainEventKind.ToolStageChanged, args);
     private void LayerChanged(object? sender, CadLayerManagerChangedEventArgs args) => Publish(CadDomainEventKind.LayerChanged, args);
     private void ModifiedChanged(object? sender, EventArgs args) => Publish(CadDomainEventKind.DocumentModifiedChanged, args);
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
+
     public void Dispose()
     {
         _workspace.Document.Changed -= EntityChanged;

@@ -700,24 +700,50 @@ public sealed class CadWorkspace : IDisposable
 
     public void Dispose()
     {
-        Events.Dispose();
-        Transients.ClearAll();
+        List<Exception> failures = [];
+
+        // Disconnect internal observers first so cleanup cannot recursively
+        // rebuild grips, modified state, or workspace event projections while
+        // the object graph is being torn down.
+        Cleanup(Events.Dispose);
         Selection.Changed -= FormalSelectionChanged;
         Subobjects.Changed -= SubobjectSelectionChanged;
         Document.ChangeSetCommitted -= DocumentChangedForModification;
         Layers.Changed -= LayersChangedForModification;
         History.Changed -= HistoryChangedForModification;
-        Tools.CancelCurrent();
-        Snap.Clear();
-        Tracking.Clear();
-        Preview.Clear();
-        Grips.Clear();
-        Selection.Clear();
-        Subobjects.Clear();
-        Document.DetachEngine(deletePresentation: true);
+
+        Cleanup(() => Tools.CancelCurrent());
+        Cleanup(Transients.ClearAll);
+        Cleanup(Snap.Clear);
+        Cleanup(Tracking.Clear);
+        Cleanup(Preview.Clear);
+        Cleanup(Grips.Clear);
+        Cleanup(Selection.Clear);
+        Cleanup(Subobjects.Clear);
+        Cleanup(() => Document.DetachEngine(deletePresentation: true));
+
         Engine = null;
         LastResolvedPoint = null;
         LastPointerPosition = null;
+
+        if (failures.Count > 0)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"CadWorkspace disposed with {failures.Count} recoverable cleanup failure(s): " +
+                string.Join(Environment.NewLine, failures));
+        }
+
+        void Cleanup(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception exception) when (IsRecoverableDisposeFailure(exception))
+            {
+                failures.Add(exception);
+            }
+        }
     }
 
     internal void RefreshSelectionGrips()
@@ -806,7 +832,46 @@ public sealed class CadWorkspace : IDisposable
     {
         if (_isModified == value) return;
         _isModified = value;
-        ModifiedChanged?.Invoke(this, EventArgs.Empty);
+        PublishModifiedChanged();
+    }
+
+    private void PublishModifiedChanged()
+    {
+        var handlers = ModifiedChanged;
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, EventArgs.Empty);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                // Modified state is already authoritative. UI title/status-bar
+                // observers cannot invalidate a save/undo/document transition.
+                System.Diagnostics.Debug.WriteLine(
+                    $"ModifiedChanged observer failed after state changed: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
+
+    private static bool IsRecoverableDisposeFailure(Exception exception)
+    {
+        if (exception is AggregateException aggregate)
+            return aggregate.Flatten().InnerExceptions.All(IsRecoverableDisposeFailure);
+
+        if (exception is OutOfMemoryException or StackOverflowException or AccessViolationException)
+            return false;
+
+        return exception.InnerException is null ||
+               IsRecoverableDisposeFailure(exception.InnerException);
     }
 
     private IEnumerable<CadEntity> EditableEntities(

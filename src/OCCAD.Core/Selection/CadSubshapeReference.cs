@@ -60,6 +60,20 @@ public readonly record struct CadSubshapeReference
         ShapeType == other.ShapeType &&
         Index == other.Index;
 
+    public bool SameLogicalReference(
+        CadSubshapeReference other)
+    {
+        if (EntityId != other.EntityId ||
+            ShapeType != other.ShapeType)
+            return false;
+
+        if (Fallback is { } left &&
+            other.Fallback is { } right)
+            return left == right;
+
+        return Index == other.Index;
+    }
+
     public static CadSubshapeReference Create(
         CadEntity entity,
         OcctShapeType shapeType,

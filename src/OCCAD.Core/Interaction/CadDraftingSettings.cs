@@ -5,7 +5,9 @@ namespace OCCAD;
 public enum CadTrackingKind
 {
     Orthogonal,
-    Polar
+    Polar,
+    AxisLock,
+    AngleLock
 }
 
 public readonly record struct CadTrackingResult(
@@ -77,13 +79,33 @@ public sealed class CadDraftingSettings
     public bool OrthogonalTrackingEnabled
     {
         get => _orthogonalTrackingEnabled;
-        set => Set(ref _orthogonalTrackingEnabled, value);
+        set
+        {
+            if (_orthogonalTrackingEnabled == value &&
+                (!value || !_polarTrackingEnabled))
+                return;
+
+            _orthogonalTrackingEnabled = value;
+            if (value)
+                _polarTrackingEnabled = false;
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     public bool PolarTrackingEnabled
     {
         get => _polarTrackingEnabled;
-        set => Set(ref _polarTrackingEnabled, value);
+        set
+        {
+            if (_polarTrackingEnabled == value &&
+                (!value || !_orthogonalTrackingEnabled))
+                return;
+
+            _polarTrackingEnabled = value;
+            if (value)
+                _orthogonalTrackingEnabled = false;
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     public double PolarIncrementDegrees
@@ -209,6 +231,50 @@ public sealed class CadDraftingSettings
             bestAngle = candidateAngle;
             bestKind = kind;
         }
+    }
+
+    public CadTrackingResult? ConstraintGuide(
+        CadWorkPlane workPlane,
+        OcctPoint3d reference,
+        OcctPoint3d point)
+    {
+        ArgumentNullException.ThrowIfNull(workPlane);
+        if (!reference.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(reference));
+        if (!point.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(point));
+        if (!workPlane.IsActive)
+            return null;
+
+        var a = workPlane.WorldToLocal(reference);
+        var b = workPlane.WorldToLocal(point);
+        var dx = b.X - a.X;
+        var dy = b.Y - a.Y;
+        if (dx * dx + dy * dy <= 1e-24)
+            return null;
+
+        if (AngleLockEnabled)
+        {
+            return new CadTrackingResult(
+                reference,
+                point,
+                CadTrackingKind.AngleLock,
+                NormalizeAngleDegrees(
+                    LockedAngleDegrees));
+        }
+
+        if (!AxisLockEnabled)
+            return null;
+
+        var angle = Math.Abs(dx) >= Math.Abs(dy)
+            ? dx >= 0.0 ? 0.0 : 180.0
+            : dy >= 0.0 ? 90.0 : 270.0;
+
+        return new CadTrackingResult(
+            reference,
+            point,
+            CadTrackingKind.AxisLock,
+            angle);
     }
 
     public OcctPoint3d Constrain(

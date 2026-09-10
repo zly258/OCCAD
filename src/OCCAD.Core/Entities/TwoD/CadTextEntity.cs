@@ -50,7 +50,7 @@ public sealed class CadTextEntity : CadEntity
         }
     }
 
-    [Browsable(false)] public OcctPoint3d Position => _position;
+    [Browsable(false)] public OcctPoint3d InsertionPoint => _position;
     [Browsable(false)] public OcctVector3d Normal => _normal;
     [Browsable(false)] public OcctVector3d XAxis => _xAxis;
 
@@ -200,7 +200,7 @@ public sealed class CadTextEntity : CadEntity
         new()
         {
             ["text"] = entity.Text,
-            ["position"] = CadEntityJson.Point(entity.Position),
+            ["position"] = CadEntityJson.Point(entity.InsertionPoint),
             ["normal"] = CadEntityJson.Vector(entity.Normal),
             ["xAxis"] = CadEntityJson.Vector(entity.XAxis),
             ["height"] = entity.Height,

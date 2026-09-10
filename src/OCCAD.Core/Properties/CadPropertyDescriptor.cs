@@ -88,7 +88,7 @@ public static class CadPropertyCatalog
                 property.Name,
                 property.PropertyType);
 
-        var minimum =
+        double? minimum =
             attribute is not null &&
             double.IsFinite(attribute.Minimum)
                 ? attribute.Minimum
@@ -97,7 +97,7 @@ public static class CadPropertyCatalog
                     ? 0.0
                     : null;
 
-        var maximum =
+        double? maximum =
             attribute is not null &&
             double.IsFinite(attribute.Maximum)
                 ? attribute.Maximum

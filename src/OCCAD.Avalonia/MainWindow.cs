@@ -700,15 +700,11 @@ public sealed partial class MainWindow : Window
 
     private void FinishCurrentTool()
     {
-        var tool = _workspace.Tools.ActiveTool;
-        if (tool is null)
+        if (_workspace.Tools.ActiveTool is null)
             return;
 
         _viewportInteraction.FlushPointerMoves();
-        if (tool.CanFinish)
-            _workspace.Tools.FinishCurrent();
-        else if (tool.CanCommitCurrentStage)
-            _workspace.Tools.CommitCurrentStage();
+        _workspace.Tools.SubmitCurrent();
     }
 
     private void DisposeWorkspace()

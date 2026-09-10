@@ -457,7 +457,7 @@ public abstract class CadEntity
 
     private CadSnapPoint TransformSnapPoint(CadSnapPoint point)
     {
-        var workPlane = point.WorkPlane is { } plane
+        CadSnapWorkPlane? workPlane = point.WorkPlane is { } plane
             ? new CadSnapWorkPlane(
                 _placement.ToWorldPoint(plane.Origin),
                 _placement.ToWorldVector(plane.XAxis).Normalized(),
@@ -475,7 +475,7 @@ public abstract class CadEntity
 
     private CadGripPoint TransformGripPoint(CadGripPoint point)
     {
-        var workPlane = point.WorkPlane is { } plane
+        CadGripWorkPlane? workPlane = point.WorkPlane is { } plane
             ? new CadGripWorkPlane(
                 _placement.ToWorldPoint(plane.Origin),
                 _placement.ToWorldVector(plane.XAxis).Normalized(),

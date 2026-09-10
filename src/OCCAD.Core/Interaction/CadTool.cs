@@ -45,9 +45,8 @@ public readonly record struct CadToolInteractionPolicy(
 }
 
 public readonly record struct CadToolInteractionState(
-    int Stage,
+    CadToolStep Step,
     CadToolState State,
-    CadPrecisionInputKind PrecisionInputs,
     bool HasPreview,
     bool CanCommitCurrentStage,
     bool CanCancel,
@@ -112,9 +111,8 @@ public abstract class CadTool
     public bool CanStepBack => IsActive && CanStepBackCore;
     public CadToolInteractionState InteractionState =>
         new(
-            Stage,
+            CurrentStep,
             State,
-            PrecisionInputs,
             HasPreview,
             CanCommitCurrentStage,
             CanCancel,

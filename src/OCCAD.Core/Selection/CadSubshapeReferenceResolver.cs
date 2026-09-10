@@ -123,6 +123,51 @@ public static class CadSubshapeReferenceResolver
         return true;
     }
 
+    public static bool TryGetRepresentativePoint(
+        OcctEngine engine,
+        CadEntity entity,
+        CadSubshapeReference reference,
+        out OcctPoint3d point)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+        ArgumentNullException.ThrowIfNull(entity);
+
+        point = default;
+        if (reference.EntityId != entity.Id ||
+            entity.ViewerShape is not { } owner ||
+            !engine.ContainsObject(owner.Id))
+            return false;
+
+        try
+        {
+            point = reference.ShapeType switch
+            {
+                OcctShapeType.Vertex =>
+                    engine.GetVertexPoint(
+                        owner,
+                        reference.Index),
+                OcctShapeType.Edge =>
+                    engine.EvaluateEdge(
+                        owner,
+                        reference.Index,
+                        0.5).Point,
+                OcctShapeType.Face =>
+                    engine.GetFaceCenter(
+                        owner,
+                        reference.Index),
+                _ => default
+            };
+
+            return point.IsFinite;
+        }
+        catch (Exception exception)
+            when (IsRecoverable(exception))
+        {
+            point = default;
+            return false;
+        }
+    }
+
     public static CadSubshapeReference Resolve(
         OcctEngine engine,
         CadEntity entity,
@@ -174,8 +219,7 @@ public static class CadSubshapeReferenceResolver
     {
         fallback = default;
 
-        var owner = entity.ViewerShape;
-        if (owner is null ||
+        if (entity.ViewerShape is not { } owner ||
             !engine.ContainsObject(owner.Id) ||
             index < 0)
         {

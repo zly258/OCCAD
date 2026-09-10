@@ -34,6 +34,8 @@ public sealed class CadWorkspace : IDisposable
 
         var toolRegistry = CadCoreRegistration.CreateToolRegistry();
         Tools = new CadToolManager(this, toolRegistry);
+        Selection.Changed += FormalSelectionChanged;
+        Subobjects.Changed += SubobjectSelectionChanged;
         Actions = new CadActionManager();
         CadCoreRegistration.RegisterActions(Actions, this);
 
@@ -93,6 +95,7 @@ public sealed class CadWorkspace : IDisposable
         }
 
         Selection.AttachEngine(engine);
+        Subobjects.AttachEngine(engine);
         Snap.AttachEngine(engine);
         Tracking.AttachEngine(engine);
         Preview.AttachEngine(engine);
@@ -637,8 +640,13 @@ public sealed class CadWorkspace : IDisposable
                 Snap.Clear();
             }
             point = constrained;
-            if (tracking is { } activeTracking)
-                tracking = activeTracking with { Point = point };
+
+            tracking = tracking is { } activeTracking
+                ? activeTracking with { Point = point }
+                : Drafting.ConstraintGuide(
+                    WorkPlane,
+                    trackingOrigin,
+                    point);
         }
 
         if (constraintOrigin is not null)
@@ -653,6 +661,8 @@ public sealed class CadWorkspace : IDisposable
 
     public void Dispose()
     {
+        Selection.Changed -= FormalSelectionChanged;
+        Subobjects.Changed -= SubobjectSelectionChanged;
         Document.ChangeSetCommitted -= DocumentChangedForModification;
         Layers.Changed -= LayersChangedForModification;
         History.Changed -= HistoryChangedForModification;
@@ -667,6 +677,34 @@ public sealed class CadWorkspace : IDisposable
         Engine = null;
         LastResolvedPoint = null;
         LastPointerPosition = null;
+    }
+
+    internal void RefreshSelectionGrips()
+    {
+        if (Tools.OwnsInteraction ||
+            Subobjects.Selected.Count > 0)
+        {
+            Grips.Clear();
+            return;
+        }
+
+        Grips.Show(Selection.Selected);
+    }
+
+    private void FormalSelectionChanged(
+        object? sender,
+        CadSelectionChangedEventArgs args)
+    {
+        if (!Tools.OwnsInteraction)
+            RefreshSelectionGrips();
+    }
+
+    private void SubobjectSelectionChanged(
+        object? sender,
+        CadSubobjectSelectionChangedEventArgs args)
+    {
+        if (!Tools.OwnsInteraction)
+            RefreshSelectionGrips();
     }
 
     internal CadEntity CaptureGeometry(CadEntity entity)

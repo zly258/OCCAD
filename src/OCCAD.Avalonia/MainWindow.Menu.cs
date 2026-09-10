@@ -679,19 +679,11 @@ public sealed partial class MainWindow
         }
 
         if (e.Key == Key.Enter &&
-            _workspace.Tools.ActiveTool is { } tool)
+            _workspace.Tools.ActiveTool is not null)
         {
             _viewportInteraction.FlushPointerMoves();
 
-            if (tool.CanFinish)
-            {
-                _workspace.Tools.FinishCurrent();
-                e.Handled = true;
-                return;
-            }
-
-            if (tool.CanCommitCurrentStage &&
-                _workspace.Tools.CommitCurrentStage())
+            if (_workspace.Tools.SubmitCurrent())
             {
                 e.Handled = true;
                 return;

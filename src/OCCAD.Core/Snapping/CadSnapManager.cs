@@ -8,6 +8,7 @@ public sealed class CadSnapManager
     private const int MarkerSize = 13;
     private const int MarkerDisplayPriority = 10;
     private const double PriorityTieDistancePixels = 2.0;
+    private const double HysteresisPixels = 2.5;
     private const CadSnapType AllModes =
         CadSnapType.Endpoint |
         CadSnapType.Midpoint |
@@ -235,6 +236,39 @@ public sealed class CadSnapManager
                 _lastResolveX == x &&
                 _lastResolveY == y &&
                 _candidates.SequenceEqual(nextCandidates);
+
+            var hysteresisIndex = -1;
+            if (!preserveCycle &&
+                Current is { } previous &&
+                ranked.Count > 0)
+            {
+                for (var index = 0;
+                     index < ranked.Count;
+                     index++)
+                {
+                    if (!SameCandidate(
+                            ranked[index].Point,
+                            previous))
+                        continue;
+
+                    var bestDistance =
+                        Math.Sqrt(
+                            ranked[0].DistanceSquared);
+                    var currentDistance =
+                        Math.Sqrt(
+                            ranked[index].DistanceSquared);
+
+                    if (currentDistance <=
+                        bestDistance +
+                        HysteresisPixels)
+                    {
+                        hysteresisIndex = index;
+                    }
+
+                    break;
+                }
+            }
+
             _candidates = nextCandidates;
             _lastResolveX = x;
             _lastResolveY = y;
@@ -249,7 +283,12 @@ public sealed class CadSnapManager
             if (!preserveCycle ||
                 _currentCandidateIndex < 0 ||
                 _currentCandidateIndex >= _candidates.Count)
-                _currentCandidateIndex = 0;
+            {
+                _currentCandidateIndex =
+                    hysteresisIndex >= 0
+                        ? hysteresisIndex
+                        : 0;
+            }
 
             var current = _candidates[_currentCandidateIndex];
             SetCurrent(current);
@@ -949,6 +988,15 @@ public sealed class CadSnapManager
                 ReferenceEquals(point.Entity, args.Entity)))
             ResetCandidateState();
     }
+
+    private static bool SameCandidate(
+        CadSnapPoint left,
+        CadSnapPoint right) =>
+        ReferenceEquals(left.Entity, right.Entity) &&
+        left.Type == right.Type &&
+        left.Index == right.Index &&
+        left.Position.DistanceTo(
+            right.Position) <= 1e-8;
 
     internal static int PriorityGroup(CadSnapType type) => type switch
     {

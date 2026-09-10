@@ -15,7 +15,7 @@ public sealed class CadPointEntity : CadEntity
         DisplayMode = OcctDisplayMode.Wireframe;
     }
 
-    [Browsable(false)] public OcctPoint3d Position => _position;
+    [Browsable(false)] public OcctPoint3d Point => _position;
     [Category("Geometry")] public double X { get => _position.X; set => SetPosition(value, _position.Y, _position.Z); }
     [Category("Geometry")] public double Y { get => _position.Y; set => SetPosition(_position.X, value, _position.Z); }
     [Category("Geometry")] public double Z { get => _position.Z; set => SetPosition(_position.X, _position.Y, value); }
@@ -72,7 +72,7 @@ public sealed class CadPointEntity : CadEntity
     }
 
     internal static JsonObject WriteGeometry(CadPointEntity entity) =>
-        new() { ["position"] = CadEntityJson.Point(entity.Position) };
+        new() { ["position"] = CadEntityJson.Point(entity.Point) };
 
     internal static CadPointEntity ReadGeometry(JsonObject data) =>
         new(CadEntityJson.ReadPoint(data, "position"));

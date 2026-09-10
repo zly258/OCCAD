@@ -189,13 +189,14 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
                 ? 0
                 : path.Segments.Count - 1;
         var source = path.Segments[segmentIndex];
+        var sourceEntity = source.ToEntity();
         var endpoint =
             extendStart
                 ? path.Start
                 : path.End;
 
         CadEntity extended;
-        switch (source)
+        switch (sourceEntity)
         {
             case CadLineEntity line:
                 if (!CadLineEditGeometry.TryExtend(

@@ -208,7 +208,8 @@ internal sealed class CadToolPanel : Border
     private static string BuildSchema(CadTool tool)
     {
         var parameters = tool.ParameterPanel?.Parameters ?? [];
-        return $"{tool.Stage}:{tool.PrecisionInputs}:{tool.PrecisionLengthLabel}:{tool.PrecisionAngleLabel}:{tool.PrecisionFactorLabel}|" +
+        var step = tool.CurrentStep;
+        return $"{step.Index}:{step.InputKind}:{step.PrecisionInputs}:{tool.PrecisionLengthLabel}:{tool.PrecisionAngleLabel}:{tool.PrecisionFactorLabel}|" +
                string.Join(
                    "|",
                    parameters.Select(parameter =>
@@ -252,10 +253,15 @@ internal sealed class CadToolPanel : Border
             };
             buttons.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
             buttons.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
-            _finish.Content = tool.CanFinish
-                ? CadLanguageManager.Text("Cad.Text.Finish", "Finish")
-                : CadLanguageManager.Text("Cad.Text.Accept", "Accept");
-            _finish.IsEnabled = tool.CanFinish || tool.CanCommitCurrentStage;
+            var canAcceptStep =
+                tool.CanCommitCurrentStage &&
+                !tool.CurrentStep.RequiresPointer;
+            _finish.Content = canAcceptStep
+                ? CadLanguageManager.Text("Cad.Text.Accept", "Accept")
+                : CadLanguageManager.Text("Cad.Text.Finish", "Finish");
+            _finish.IsEnabled =
+                canAcceptStep ||
+                tool.CanFinish;
             _cancel.Content = CadLanguageManager.Text("Cad.Text.Cancel", "Cancel");
             _cancel.IsEnabled = tool.CanCancel;
             buttons.Children.Add(_finish);
@@ -311,14 +317,15 @@ internal sealed class CadToolPanel : Border
 
     private void AddPrecisionEditors(CadTool tool)
     {
-        var inputs = tool.PrecisionInputs;
+        var step = tool.CurrentStep;
+        var inputs = step.PrecisionInputs;
 
         if ((inputs & CadPrecisionInputKind.Length) != 0)
         {
             AddLockedNumericRow(
                 PrecisionLengthId,
                 CadLanguageManager.Text(
-                    $"Cad.Precision.{tool.Id}.{tool.Stage}.Length",
+                    $"Cad.Precision.{tool.Id}.{step.Index}.Length",
                     tool.PrecisionLengthLabel),
                 _workspace.Drafting.LengthLockEnabled
                     ? _workspace.Drafting.LockedLength
@@ -330,7 +337,7 @@ internal sealed class CadToolPanel : Border
             AddLockedNumericRow(
                 PrecisionAngleId,
                 CadLanguageManager.Text(
-                    $"Cad.Precision.{tool.Id}.{tool.Stage}.Angle",
+                    $"Cad.Precision.{tool.Id}.{step.Index}.Angle",
                     tool.PrecisionAngleLabel),
                 _workspace.Drafting.AngleLockEnabled
                     ? _workspace.Drafting.LockedAngleDegrees
@@ -342,7 +349,7 @@ internal sealed class CadToolPanel : Border
             AddLockedNumericRow(
                 PrecisionFactorId,
                 CadLanguageManager.Text(
-                    $"Cad.Precision.{tool.Id}.{tool.Stage}.Factor",
+                    $"Cad.Precision.{tool.Id}.{step.Index}.Factor",
                     tool.PrecisionFactorLabel),
                 _workspace.Precision.Factor);
         }
@@ -786,10 +793,7 @@ internal sealed class CadToolPanel : Border
     {
         if (_tool is null) return;
 
-        if (_tool.CanFinish)
-            _workspace.Tools.FinishCurrent();
-        else if (_tool.CanCommitCurrentStage)
-            _workspace.Tools.CommitCurrentStage();
+        _workspace.Tools.SubmitCurrent();
     }
 
     private static Button CompactButton()

@@ -18,6 +18,7 @@ public sealed class CadToolManager
 {
     private readonly CadToolRegistry _registry;
     private readonly CadToolContext _context;
+    private bool _transitioning;
 
     public CadToolManager(CadWorkspace workspace, CadToolRegistry registry)
     {
@@ -27,6 +28,10 @@ public sealed class CadToolManager
     }
 
     public CadTool? ActiveTool { get; private set; }
+
+    internal bool OwnsInteraction =>
+        _transitioning ||
+        ActiveTool is not null;
 
     public CadInteractionMode Mode =>
         ActiveTool is null ? CadInteractionMode.Normal : CadInteractionMode.Drawing;
@@ -137,6 +142,8 @@ public sealed class CadToolManager
             _context.Workspace.Tracking.Clear();
             _context.Workspace.Snap.Clear();
             _context.Workspace.Snap.Active = false;
+            _context.Workspace.Precision.ResetFactor();
+            _context.Workspace.Drafting.ResetTransientLocks();
             _context.Workspace.WorkPlane.EndToolPlane();
             return false;
         }
@@ -172,20 +179,26 @@ public sealed class CadToolManager
         return tool?.StepBack() == true;
     }
 
+    public bool SubmitCurrent()
+    {
+        var tool = ActiveTool;
+        if (tool is null)
+            return false;
+
+        if (TrySubmitCurrentStep(tool))
+            return true;
+
+        return tool.CanFinish &&
+               FinishCurrent();
+    }
+
     public bool HandleSecondaryAction()
     {
         var tool = ActiveTool;
         if (tool is null)
             return false;
 
-        if (tool.State == CadToolState.WaitForSelect)
-        {
-            if (CommitCurrentStage())
-                return true;
-            return CancelCurrent();
-        }
-
-        if (tool.CanFinish && FinishCurrent())
+        if (SubmitCurrent())
             return true;
 
         return CancelCurrent();
@@ -208,24 +221,28 @@ public sealed class CadToolManager
             return StepBackCurrent();
 
         if (input.Kind == OcctKeyInputKind.Pressed &&
-            input.Key == OcctKey.Enter)
-        {
-            if (ActiveTool is { State: CadToolState.WaitForSelect })
-                return CommitCurrentStage();
-
-            if (ActiveTool is
-                {
-                    State: CadToolState.Drawing,
-                    CanFinish: true
-                })
-                return FinishCurrent();
-        }
+            input.Key == OcctKey.Enter &&
+            ActiveTool is not null &&
+            SubmitCurrent())
+            return true;
 
         return ActiveTool?.HandleKey(input) == true;
     }
 
+    private bool TrySubmitCurrentStep(CadTool tool)
+    {
+        ArgumentNullException.ThrowIfNull(tool);
+
+        if (!tool.CanCommitCurrentStage ||
+            tool.CurrentStep.RequiresPointer)
+            return false;
+
+        return CommitCurrentStage();
+    }
+
     private void SetActive(CadTool tool)
     {
+        _transitioning = true;
         _context.Workspace.Grips.Clear();
         try
         {
@@ -243,6 +260,7 @@ public sealed class CadToolManager
                 cleanupFailure = exception;
             }
 
+            _transitioning = false;
             RestoreSelectionGrips();
 
             if (cleanupFailure is not null)
@@ -259,11 +277,13 @@ public sealed class CadToolManager
 
         ActiveTool = tool;
         tool.Updated += ActiveToolUpdated;
+        _transitioning = false;
         ToolChanged?.Invoke(this, new CadToolChangedEventArgs(tool));
     }
 
     private void DeactivateActiveTool(CadTool tool, bool canceled)
     {
+        _transitioning = true;
         tool.Updated -= ActiveToolUpdated;
         try
         {
@@ -274,6 +294,7 @@ public sealed class CadToolManager
             ActiveTool = null;
             try
             {
+                _transitioning = false;
                 RestoreSelectionGrips();
             }
             finally
@@ -294,5 +315,5 @@ public sealed class CadToolManager
     }
 
     private void RestoreSelectionGrips() =>
-        _context.Workspace.Grips.Show(_context.Workspace.Selection.Selected);
+        _context.Workspace.RefreshSelectionGrips();
 }

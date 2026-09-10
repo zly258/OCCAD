@@ -796,32 +796,37 @@ public sealed partial class MainWindow
                 .RenderScaling ?? 1.0;
         var x = pointer.X / scaling;
         var y = pointer.Y / scaling;
-        const double offset = 14;
-        const double estimatedWidth = 240;
-        const double estimatedHeight = 30;
+        var offset =
+            CadTheme.DynamicHudOffset;
+        var estimatedWidth =
+            CadTheme.DynamicHudMaxWidth;
+        var estimatedHeight =
+            CadTheme.DynamicHudEstimatedHeight;
+        var margin =
+            CadTheme.OverlayMargin;
 
         var maxLeft = Math.Max(
-            8,
+            margin,
             _viewport.Bounds.Width -
             estimatedWidth -
-            8);
+            margin);
         var maxTop = Math.Max(
-            8,
+            margin,
             _viewport.Bounds.Height -
             estimatedHeight -
-            8);
+            margin);
 
         Canvas.SetLeft(
             _dynamicHud,
             Math.Clamp(
                 x + offset,
-                8,
+                margin,
                 maxLeft));
         Canvas.SetTop(
             _dynamicHud,
             Math.Clamp(
                 y + offset,
-                8,
+                margin,
                 maxTop));
     }
 

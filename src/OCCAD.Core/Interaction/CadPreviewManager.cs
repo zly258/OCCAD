@@ -6,7 +6,13 @@ public sealed class CadPreviewManager
 {
     private readonly List<CadEntity> _entities = [];
     private readonly CadDocument? _document;
+    private static long _nextOwnerId;
+
     private readonly List<IOcctObject> _shapes = [];
+    private readonly Dictionary<long, string> _ownedTags = [];
+    private readonly string _tagPrefix =
+        $"OCCAD.Preview.{System.Threading.Interlocked.Increment(ref _nextOwnerId)}";
+    private long _nextTagId;
     private OcctEngine? _engine;
 
     public CadPreviewManager()
@@ -27,6 +33,7 @@ public sealed class CadPreviewManager
     {
         ArgumentNullException.ThrowIfNull(engine);
         Clear();
+        _ownedTags.Clear();
         _engine = engine;
     }
 
@@ -51,18 +58,18 @@ public sealed class CadPreviewManager
 
     public void Clear()
     {
-        if (_engine is { IsInitialized: true } engine && _shapes.Count > 0)
+        if (_engine is { IsInitialized: true } engine &&
+            (_shapes.Count > 0 || _ownedTags.Count > 0))
         {
-            // Delete requests a redraw and the outer display batch performs it
-            // once on dispose. Do not issue a second explicit Redraw().
             using (engine.BeginDisplayBatch())
             {
-                DeleteObjects(engine, _shapes);
+                DeleteOwnedObjects(engine);
             }
         }
 
         _shapes.Clear();
         _entities.Clear();
+        _ownedTags.Clear();
     }
 
     private void Rebuild(IReadOnlyList<CadEntity> entities)
@@ -72,7 +79,7 @@ public sealed class CadPreviewManager
 
         using var batch = engine.BeginDisplayBatch();
 
-        DeleteObjects(engine, _shapes);
+        DeleteOwnedObjects(engine);
         _shapes.Clear();
         _entities.Clear();
 
@@ -83,6 +90,14 @@ public sealed class CadPreviewManager
             {
                 var shape = entity.BuildPresentation(engine);
                 nextShapes.Add(shape);
+
+                var tag =
+                    $"{_tagPrefix}.{++_nextTagId}";
+                engine.SetApplicationTag(
+                    shape,
+                    tag);
+                _ownedTags[shape.Id] = tag;
+
                 engine.SetLocalTransformation(
                     shape,
                     entity.Placement.Transform);
@@ -106,6 +121,7 @@ public sealed class CadPreviewManager
         catch
         {
             TryDeleteObjects(engine, nextShapes);
+            PurgeMissingOwnership(engine);
             throw;
         }
 
@@ -122,6 +138,43 @@ public sealed class CadPreviewManager
                 entity.Visible,
                 entity.Selectable)
             : _document.ResolveAppearance(entity);
+
+    private void DeleteOwnedObjects(
+        OcctEngine engine)
+    {
+        if (_ownedTags.Count == 0)
+            return;
+
+        var tags = _ownedTags.Values
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var tag in tags)
+        {
+            var value =
+                engine.FindObjectByApplicationTag(tag);
+            if (value is not null)
+                engine.Delete(value);
+
+            if (engine.FindObjectByApplicationTag(tag) is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Preview object '{tag}' was not removed from the OCCT scene.");
+            }
+        }
+
+        _ownedTags.Clear();
+    }
+
+    private void PurgeMissingOwnership(
+        OcctEngine engine)
+    {
+        foreach (var pair in _ownedTags.ToArray())
+        {
+            if (engine.FindObjectByApplicationTag(pair.Value) is null)
+                _ownedTags.Remove(pair.Key);
+        }
+    }
 
     private static void DeleteObjects(
         OcctEngine engine,

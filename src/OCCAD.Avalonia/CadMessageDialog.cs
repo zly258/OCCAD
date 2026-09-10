@@ -32,11 +32,11 @@ internal sealed class CadMessageDialog : Window
         CadMessageDialogKind kind)
     {
         Title = title;
-        Width = 400;
-        MinWidth = 340;
-        MaxWidth = 560;
-        MinHeight = 150;
-        MaxHeight = 440;
+        Width = 440;
+        MinWidth = 380;
+        MaxWidth = 640;
+        MinHeight = 180;
+        MaxHeight = 520;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         WindowStartupLocation =
@@ -60,13 +60,13 @@ internal sealed class CadMessageDialog : Window
             TextWrapping =
                 global::Avalonia.Media.TextWrapping.Wrap,
             Foreground = CadTheme.Text,
-            LineHeight = 16
+            LineHeight = 18
         };
 
         var messageHost = new ScrollViewer
         {
             Content = text,
-            MaxHeight = 240,
+            MaxHeight = 300,
             HorizontalScrollBarVisibility =
                 global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             VerticalScrollBarVisibility =

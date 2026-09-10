@@ -19,6 +19,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
     private CadEntity[] _entities = [];
     private CadLayer? _layer;
     private CadSubobjectSelection? _subobject;
+    private readonly Dictionary<string, bool> _collapsedCategories =
+        new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
     private bool _refreshing;
 
@@ -152,7 +154,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
                         "Cad.Text.SelectionInitial",
                         "Selection: 0"),
                     Foreground = CadTheme.Muted,
-                    Margin = new Thickness(5)
+                    Margin = new Thickness(7)
                 });
                 return;
             }
@@ -170,13 +172,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                                 "Selection [{0}]"),
                             _entities.Length);
 
-            _host.Children.Add(new TextBlock
-            {
-                Text = title,
-                FontWeight = FontWeight.SemiBold,
-                Foreground = CadTheme.Text,
-                Margin = new Thickness(5, 3, 5, 2)
-            });
+            _host.Children.Add(
+                CreateInspectorTitle(title));
 
             if (_subobject is { } subobject)
                 AddSubobjectDetails(subobject);
@@ -186,24 +183,14 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
             foreach (var group in groups)
             {
-                var groupTitle = LocalizeCategory(group.Key);
-                _host.Children.Add(new Border
-                {
-                    Background = CadTheme.Toolbar,
-                    BorderBrush = CadTheme.Border,
-                    BorderThickness = new Thickness(0, 1, 0, 0),
-                    Padding = new Thickness(4, 1),
-                    Margin = new Thickness(0),
-                    Child = new TextBlock
-                    {
-                        Text = groupTitle,
-                        FontWeight = FontWeight.SemiBold,
-                        Foreground = CadTheme.Text
-                    }
-                });
-
-                foreach (var slot in group)
-                    _host.Children.Add(CreatePropertyRow(slot));
+                var categoryKey =
+                    string.IsNullOrWhiteSpace(group.Key)
+                        ? "General"
+                        : group.Key;
+                AddPropertyGroup(
+                    categoryKey,
+                    LocalizeCategory(categoryKey),
+                    group.Select(CreatePropertyRow));
             }
         }
         finally
@@ -432,45 +419,20 @@ internal sealed class CadPropertyInspectorController : IDisposable
         if (rows.Count == 0)
             return;
 
-        _host.Children.Add(new Border
-        {
-            Background = CadTheme.Toolbar,
-            BorderBrush = CadTheme.Border,
-            BorderThickness = new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(4, 1),
-            Margin = new Thickness(0),
-            Child = new TextBlock
-            {
-                Text = title,
-                FontWeight = FontWeight.SemiBold,
-                Foreground = CadTheme.Text
-            }
-        });
-
-        foreach (var row in rows)
-            _host.Children.Add(
-                CreateReadOnlyRow(
+        AddPropertyGroup(
+            "Subobject",
+            title,
+            rows.Select(
+                row => CreateReadOnlyRow(
                     row.Label,
-                    row.Value));
+                    row.Value)));
     }
 
     private static Control CreateReadOnlyRow(
         string label,
         string value)
     {
-        var row = new Grid
-        {
-            ColumnSpacing = 4,
-            Margin = new Thickness(4, 0)
-        };
-        row.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(CadTheme.PropertyLabelWidth)));
-        row.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(
-                    1,
-                    GridUnitType.Star)));
+        var row = CreatePropertyGrid();
 
         row.Children.Add(new TextBlock
         {
@@ -493,7 +455,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
         };
         Grid.SetColumn(text, 1);
         row.Children.Add(text);
-        return row;
+
+        return WrapPropertyRow(row);
     }
 
     private static string Text(
@@ -543,13 +506,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
     private Control CreatePropertyRow(PropertySlot slot)
     {
-        var row = new Grid
-        {
-            ColumnSpacing = 4,
-            Margin = new Thickness(4, 0)
-        };
-        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(CadTheme.PropertyLabelWidth)));
-        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+        var row = CreatePropertyGrid();
 
         var label = new TextBlock
         {
@@ -574,7 +531,153 @@ internal sealed class CadPropertyInspectorController : IDisposable
         var editor = CreateEditor(slot);
         Grid.SetColumn(editor, 1);
         row.Children.Add(editor);
+        return WrapPropertyRow(row);
+    }
+
+    private static Grid CreatePropertyGrid()
+    {
+        var row = new Grid
+        {
+            ColumnSpacing = 8
+        };
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition(
+                new GridLength(
+                    CadTheme.PropertyLabelWidth)));
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition(
+                new GridLength(
+                    1,
+                    GridUnitType.Star)));
         return row;
+    }
+
+    private static Border WrapPropertyRow(
+        Control content) =>
+        new()
+        {
+            MinHeight = CadTheme.PropertyRowHeight,
+            Background = CadTheme.Surface,
+            BorderBrush = CadTheme.Border,
+            BorderThickness =
+                new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(
+                CadTheme.PropertyRowIndent,
+                0,
+                7,
+                0),
+            Child = content
+        };
+
+    private static Border CreateInspectorTitle(
+        string title) =>
+        new()
+        {
+            MinHeight = CadTheme.PropertyTitleHeight,
+            Background = CadTheme.PanelAlt,
+            BorderBrush = CadTheme.Border,
+            BorderThickness =
+                new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(9, 0),
+            Child = new TextBlock
+            {
+                Text = title,
+                FontWeight = FontWeight.SemiBold,
+                Foreground = CadTheme.Text,
+                VerticalAlignment =
+                    VerticalAlignment.Center,
+                TextTrimming =
+                    TextTrimming.CharacterEllipsis
+            }
+        };
+
+    private void AddPropertyGroup(
+        string categoryKey,
+        string title,
+        IEnumerable<Control> rows)
+    {
+        var collapsed =
+            _collapsedCategories.TryGetValue(
+                categoryKey,
+                out var stored) &&
+            stored;
+
+        var body = new StackPanel
+        {
+            IsVisible = !collapsed
+        };
+        foreach (var row in rows)
+            body.Children.Add(row);
+
+        var chevron = new TextBlock
+        {
+            Text = collapsed ? "▸" : "▾",
+            Width = CadTheme.PropertyChevronWidth,
+            FontSize = CadTheme.SmallFontSize,
+            Foreground = CadTheme.Muted,
+            VerticalAlignment =
+                VerticalAlignment.Center,
+            TextAlignment = TextAlignment.Center
+        };
+
+        var titleText = new TextBlock
+        {
+            Text = title,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = CadTheme.Text,
+            VerticalAlignment =
+                VerticalAlignment.Center,
+            TextTrimming =
+                TextTrimming.CharacterEllipsis
+        };
+
+        var headerContent = new Grid
+        {
+            ColumnSpacing = 3,
+            Margin = new Thickness(5, 0, 7, 0)
+        };
+        headerContent.ColumnDefinitions.Add(
+            new ColumnDefinition(GridLength.Auto));
+        headerContent.ColumnDefinitions.Add(
+            new ColumnDefinition(
+                new GridLength(
+                    1,
+                    GridUnitType.Star)));
+        headerContent.Children.Add(chevron);
+        Grid.SetColumn(titleText, 1);
+        headerContent.Children.Add(titleText);
+
+        var header = new Button
+        {
+            Content = headerContent,
+            Height =
+                CadTheme.PropertyCategoryHeaderHeight,
+            Padding = new Thickness(0),
+            Margin = new Thickness(0),
+            HorizontalContentAlignment =
+                HorizontalAlignment.Stretch,
+            VerticalContentAlignment =
+                VerticalAlignment.Center,
+            Background = CadTheme.Toolbar,
+            Foreground = CadTheme.Text,
+            BorderBrush = CadTheme.BorderStrong,
+            BorderThickness =
+                new Thickness(0, 1, 0, 1)
+        };
+        header.Click += (_, _) =>
+        {
+            var nextCollapsed = body.IsVisible;
+            body.IsVisible = !nextCollapsed;
+            chevron.Text =
+                nextCollapsed ? "▸" : "▾";
+            _collapsedCategories[categoryKey] =
+                nextCollapsed;
+        };
+
+        var section = new StackPanel();
+        section.Children.Add(header);
+        section.Children.Add(body);
+        _host.Children.Add(section);
     }
 
     private Control CreateEditor(PropertySlot slot)
@@ -738,7 +841,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         var grid = new Grid
         {
-            ColumnSpacing = 4
+            ColumnSpacing = 6
         };
         grid.ColumnDefinitions.Add(
             new ColumnDefinition(GridLength.Auto));
@@ -849,7 +952,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
             MinHeight = CadTheme.ControlHeight,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Left,
-            Padding = new Thickness(4, 0),
+            Padding = new Thickness(6, 1),
             Background = isMixed
                 ? CadTheme.PanelAlt
                 : new SolidColorBrush(

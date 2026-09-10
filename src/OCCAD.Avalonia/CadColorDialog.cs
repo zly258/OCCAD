@@ -22,8 +22,8 @@ internal sealed class CadColorDialog : Window
         Title = CadLanguageManager.Text(
             "Cad.Text.ColorTable",
             "Color table");
-        Width = 340;
-        MinWidth = 320;
+        Width = 380;
+        MinWidth = 350;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -57,14 +57,14 @@ internal sealed class CadColorDialog : Window
             Background = CadTheme.Surface,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(1),
-            Padding = new Thickness(6),
+            Padding = new Thickness(8),
             Child = _picker
         };
 
         _preview = new Border
         {
-            Width = 38,
-            Height = 22,
+            Width = 42,
+            Height = 26,
             BorderBrush = CadTheme.BorderStrong,
             BorderThickness = new Thickness(1),
             Background = new SolidColorBrush(

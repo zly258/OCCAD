@@ -84,7 +84,7 @@ internal sealed class CadLayerPanelController : IDisposable
             var toolbar = new Grid
             {
                 ColumnSpacing = 3,
-                Margin = new Thickness(3, 3, 3, 2)
+                Margin = new Thickness(5, 5, 5, 3)
             };
             toolbar.ColumnDefinitions.Add(
                 new ColumnDefinition(
@@ -143,7 +143,7 @@ internal sealed class CadLayerPanelController : IDisposable
                         "Layer: {0}"),
                     _workspace.Layers.Current.Name),
                 Foreground = CadTheme.Muted,
-                Margin = new Thickness(5, 2, 5, 3),
+                Margin = new Thickness(7, 3, 7, 4),
                 VerticalAlignment = VerticalAlignment.Center
             });
         }
@@ -158,7 +158,7 @@ internal sealed class CadLayerPanelController : IDisposable
         var grid = new Grid
         {
             ColumnSpacing = 3,
-            Margin = new Thickness(3, 0),
+            Margin = new Thickness(5, 0),
             Background = CadTheme.Toolbar
         };
         ConfigureLayerColumns(grid);
@@ -240,7 +240,7 @@ internal sealed class CadLayerPanelController : IDisposable
             FontSize = CadTheme.SmallFontSize,
             FontWeight = FontWeight.SemiBold,
             Foreground = CadTheme.Muted,
-            Margin = new Thickness(3, 2),
+            Margin = new Thickness(5, 3),
             HorizontalAlignment = alignment,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
@@ -271,7 +271,7 @@ internal sealed class CadLayerPanelController : IDisposable
                 ? CadTheme.AccentSoft
                 : Brushes.Transparent,
             BorderThickness = new Thickness(0),
-            Padding = new Thickness(4, 1),
+            Padding = new Thickness(6, 2),
             Foreground = CadTheme.Text,
             FontWeight = current
                 ? FontWeight.SemiBold
@@ -375,7 +375,7 @@ internal sealed class CadLayerPanelController : IDisposable
 
         var color = new Button
         {
-            Width = 26,
+            Width = 30,
             MinHeight = CadTheme.ControlHeight,
             Padding = new Thickness(0),
             Background = new SolidColorBrush(
@@ -415,7 +415,7 @@ internal sealed class CadLayerPanelController : IDisposable
                 : CadTheme.Surface,
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 0, 0, 1),
-            Padding = new Thickness(3, 1),
+            Padding = new Thickness(5, 2),
             Margin = new Thickness(3, 0),
             Child = grid
         };

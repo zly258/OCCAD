@@ -20,8 +20,8 @@ internal sealed class LayerNameDialog : Window
             creating
                 ? "New Layer"
                 : "Rename Layer");
-        Width = 330;
-        Height = 132;
+        Width = 370;
+        Height = 154;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = CadTheme.Surface;

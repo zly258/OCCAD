@@ -8,37 +8,46 @@ namespace OCCAD.Avalonia;
 
 internal static class CadTheme
 {
-    public const double FontSize = 11.0;
-    public const double SmallFontSize = 10.0;
-    public const double CaptionFontSize = 10.5;
-    public const double ControlHeight = 22.0;
-    public const double MenuHeight = 24.0;
-    public const double PanelHeaderHeight = 23.0;
-    public const double StatusHeight = 21.0;
-    public const double SplitterThickness = 3.0;
-    public const double ModelPanelWidth = 188.0;
-    public const double PropertyPanelWidth = 296.0;
-    public const double ToolPanelWidth = 276.0;
-    public const double PropertyLabelWidth = 92.0;
-    public const double ToolLabelWidth = 92.0;
-    public const double DialogButtonWidth = 72.0;
-    public const double DialogPadding = 10.0;
+    public const double FontSize = 12.0;
+    public const double SmallFontSize = 11.0;
+    public const double CaptionFontSize = 11.0;
+    public const double ControlHeight = 26.0;
+    public const double MenuHeight = 28.0;
+    public const double PanelHeaderHeight = 28.0;
+    public const double StatusHeight = 24.0;
+    public const double SplitterThickness = 4.0;
+    public const double ModelPanelWidth = 210.0;
+    public const double PropertyPanelWidth = 330.0;
+    public const double ToolPanelWidth = 304.0;
+    public const double PropertyLabelWidth = 112.0;
+    public const double PropertyTitleHeight = 30.0;
+    public const double PropertyCategoryHeaderHeight = 27.0;
+    public const double PropertyRowHeight = 28.0;
+    public const double PropertyRowIndent = 14.0;
+    public const double PropertyChevronWidth = 16.0;
+    public const double ToolLabelWidth = 100.0;
+    public const double DialogButtonWidth = 80.0;
+    public const double DialogPadding = 12.0;
+    public const double DynamicHudMaxWidth = 300.0;
+    public const double DynamicHudEstimatedHeight = 34.0;
+    public const double DynamicHudOffset = 16.0;
+    public const double OverlayMargin = 8.0;
 
-    public static readonly IBrush WindowBrush = Brush("#DDE1E5");
-    public static readonly IBrush Surface = Brush("#FAFAFA");
-    public static readonly IBrush Panel = Brush("#F5F6F7");
-    public static readonly IBrush PanelAlt = Brush("#ECEFF1");
-    public static readonly IBrush Toolbar = Brush("#E9ECEF");
-    public static readonly IBrush Header = Brush("#E4E7EA");
-    public static readonly IBrush HeaderHover = Brush("#DCE2E7");
-    public static readonly IBrush Accent = Brush("#2B78B5");
-    public static readonly IBrush AccentSoft = Brush("#DCEAF5");
-    public static readonly IBrush Border = Brush("#BFC5CA");
-    public static readonly IBrush BorderStrong = Brush("#AEB5BB");
-    public static readonly IBrush Splitter = Brush("#C8CDD2");
-    public static readonly IBrush Text = Brush("#20262B");
-    public static readonly IBrush Muted = Brush("#626C74");
-    public static readonly IBrush Viewport = Brush("#1B1D1F");
+    public static readonly IBrush WindowBrush = Brush("#D6DADF");
+    public static readonly IBrush Surface = Brush("#F7F8F9");
+    public static readonly IBrush Panel = Brush("#F0F2F4");
+    public static readonly IBrush PanelAlt = Brush("#E8EBEE");
+    public static readonly IBrush Toolbar = Brush("#E3E6E9");
+    public static readonly IBrush Header = Brush("#DCE1E5");
+    public static readonly IBrush HeaderHover = Brush("#D3DAE0");
+    public static readonly IBrush Accent = Brush("#2F6FA5");
+    public static readonly IBrush AccentSoft = Brush("#D8E7F2");
+    public static readonly IBrush Border = Brush("#B5BDC4");
+    public static readonly IBrush BorderStrong = Brush("#9FA9B1");
+    public static readonly IBrush Splitter = Brush("#BEC5CB");
+    public static readonly IBrush Text = Brush("#1F252A");
+    public static readonly IBrush Muted = Brush("#5B6670");
+    public static readonly IBrush Viewport = Brush("#202326");
 
     public static void Apply(Application app)
     {
@@ -77,13 +86,39 @@ internal static class CadTheme
             }
         });
 
+        app.Styles.Add(new Style(x => x.OfType<Button>())
+        {
+            Setters =
+            {
+                new Setter(
+                    Button.VerticalContentAlignmentProperty,
+                    VerticalAlignment.Center),
+                new Setter(
+                    Button.HorizontalContentAlignmentProperty,
+                    HorizontalAlignment.Center)
+            }
+        });
+
+        app.Styles.Add(new Style(x => x.OfType<ToggleButton>())
+        {
+            Setters =
+            {
+                new Setter(
+                    ToggleButton.VerticalContentAlignmentProperty,
+                    VerticalAlignment.Center),
+                new Setter(
+                    ToggleButton.HorizontalContentAlignmentProperty,
+                    HorizontalAlignment.Center)
+            }
+        });
+
         app.Styles.Add(new Style(x => x.OfType<Button>().Class("cad-compact"))
         {
             Setters =
             {
                 new Setter(Button.MinHeightProperty, ControlHeight),
                 new Setter(Button.FontSizeProperty, FontSize),
-                new Setter(Button.PaddingProperty, new Thickness(6, 0)),
+                new Setter(Button.PaddingProperty, new Thickness(8, 1)),
                 new Setter(Button.MarginProperty, new Thickness(1)),
                 new Setter(Button.BackgroundProperty, Brushes.Transparent),
                 new Setter(Button.BorderBrushProperty, Brushes.Transparent),
@@ -124,7 +159,7 @@ internal static class CadTheme
             {
                 new Setter(TextBox.MinHeightProperty, ControlHeight),
                 new Setter(TextBox.FontSizeProperty, FontSize),
-                new Setter(TextBox.PaddingProperty, new Thickness(5, 0)),
+                new Setter(TextBox.PaddingProperty, new Thickness(7, 1)),
                 new Setter(TextBox.BackgroundProperty, Surface),
                 new Setter(TextBox.BorderBrushProperty, Border),
                 new Setter(TextBox.BorderThicknessProperty, new Thickness(1)),
@@ -151,7 +186,7 @@ internal static class CadTheme
             {
                 new Setter(MenuItem.MinHeightProperty, MenuHeight),
                 new Setter(MenuItem.FontSizeProperty, FontSize),
-                new Setter(MenuItem.PaddingProperty, new Thickness(7, 2)),
+                new Setter(MenuItem.PaddingProperty, new Thickness(9, 3)),
                 new Setter(MenuItem.ForegroundProperty, Text)
             }
         });
@@ -161,6 +196,7 @@ internal static class CadTheme
             Setters =
             {
                 new Setter(CheckBox.FontSizeProperty, FontSize),
+                new Setter(CheckBox.MinHeightProperty, ControlHeight),
                 new Setter(CheckBox.ForegroundProperty, Text)
             }
         });
@@ -169,8 +205,8 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(TreeViewItem.MinHeightProperty, 20d),
-                new Setter(TreeViewItem.PaddingProperty, new Thickness(3, 0))
+                new Setter(TreeViewItem.MinHeightProperty, 24d),
+                new Setter(TreeViewItem.PaddingProperty, new Thickness(5, 1))
             }
         });
 
@@ -196,7 +232,7 @@ internal static class CadTheme
             Setters =
             {
                 new Setter(TabItem.MinHeightProperty, MenuHeight),
-                new Setter(TabItem.PaddingProperty, new Thickness(8, 2)),
+                new Setter(TabItem.PaddingProperty, new Thickness(10, 3)),
                 new Setter(TabItem.FontWeightProperty, FontWeight.SemiBold)
             }
         });
@@ -227,7 +263,7 @@ internal static class CadTheme
             BorderBrush = Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
             CornerRadius = new CornerRadius(0),
-            Padding = padding ?? new Thickness(4),
+            Padding = padding ?? new Thickness(6),
             Child = child
         };
 
@@ -237,7 +273,7 @@ internal static class CadTheme
             Text = text,
             FontWeight = FontWeight.SemiBold,
             Foreground = Text,
-            Margin = new Thickness(0, 0, 0, 3)
+            Margin = new Thickness(0, 0, 0, 5)
         };
 
     private static SolidColorBrush Brush(string value) =>

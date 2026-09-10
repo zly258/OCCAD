@@ -97,10 +97,10 @@ public sealed partial class MainWindow : Window
             "MainWindow constructor entered.");
 
         Title = "OCCAD";
-        Width = 1180;
-        Height = 760;
-        MinWidth = 800;
-        MinHeight = 520;
+        Width = 1280;
+        Height = 820;
+        MinWidth = 900;
+        MinHeight = 600;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         WindowState = WindowState.Maximized;
         Background = CadTheme.WindowBrush;
@@ -210,7 +210,7 @@ public sealed partial class MainWindow : Window
         {
             Orientation = Orientation.Horizontal,
             Spacing = 1,
-            Margin = new Thickness(3, 0),
+            Margin = new Thickness(5, 1),
             VerticalAlignment = VerticalAlignment.Center
         };
 
@@ -221,7 +221,7 @@ public sealed partial class MainWindow : Window
             FontWeight = FontWeight.SemiBold,
             FontSize = CadTheme.SmallFontSize,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(2, 0, 1, 0)
+            Margin = new Thickness(6, 0, 3, 0)
         });
 
         ConfigurePlaneButton(_planeXy, "XY", CadWorkPlanePreset.XY);
@@ -232,7 +232,7 @@ public sealed partial class MainWindow : Window
         panel.Children.Add(_planeXz);
         panel.Children.Add(ToolbarSeparator());
 
-        _layerCombo.Width = 124;
+        _layerCombo.Width = 150;
         _layerCombo.Classes.Add("cad-input");
         _layerCombo.SelectionChanged += (_, _) =>
         {
@@ -349,11 +349,11 @@ public sealed partial class MainWindow : Window
         _modelSearch.PlaceholderText = CadLanguageManager.Text(
             "Cad.Text.FilterModel",
             "Filter model tree");
-        _modelSearch.Margin = new Thickness(4, 4, 4, 3);
+        _modelSearch.Margin = new Thickness(6, 6, 6, 4);
         _modelSearch.Classes.Add("cad-input");
         _modelSearch.TextChanged += (_, _) => RefreshTree();
 
-        _modelTree.Margin = new Thickness(3, 0, 3, 3);
+        _modelTree.Margin = new Thickness(5, 0, 5, 5);
         _modelTree.Classes.Add("cad-tree");
         _modelTree.SelectionChanged += ModelTreeSelectionChanged;
 
@@ -479,13 +479,13 @@ public sealed partial class MainWindow : Window
         _dynamicValue.Foreground = CadTheme.Text;
         _dynamicValue.FontSize = CadTheme.CaptionFontSize;
         _dynamicHud.IsVisible = false;
-        _dynamicHud.MinWidth = 92;
-        _dynamicHud.MaxWidth = 240;
-        _dynamicHud.Padding = new Thickness(5, 2);
+        _dynamicHud.MinWidth = 112;
+        _dynamicHud.MaxWidth = CadTheme.DynamicHudMaxWidth;
+        _dynamicHud.Padding = new Thickness(7, 4);
         _dynamicHud.Background = CadTheme.Surface;
         _dynamicHud.BorderBrush = CadTheme.BorderStrong;
         _dynamicHud.BorderThickness = new Thickness(1);
-        _dynamicHud.CornerRadius = new CornerRadius(1);
+        _dynamicHud.CornerRadius = new CornerRadius(0);
         _dynamicHud.Child = _dynamicValue;
         overlay.Children.Add(_dynamicHud);
 
@@ -495,13 +495,13 @@ public sealed partial class MainWindow : Window
 
     private Control BuildStatusBar()
     {
-        ConfigureStatusText(_toolStatus, 126);
-        ConfigureStatusText(_selectionStatus, 72);
-        ConfigureStatusText(_historyStatus, 94);
-        ConfigureStatusText(_snapStatus, 82);
-        ConfigureStatusText(_precisionStatus, 96);
-        ConfigureStatusText(_workPlaneStatus, 76);
-        ConfigureStatusText(_coordinateStatus, 178);
+        ConfigureStatusText(_toolStatus, 156);
+        ConfigureStatusText(_selectionStatus, 92);
+        ConfigureStatusText(_historyStatus, 122);
+        ConfigureStatusText(_snapStatus, 104);
+        ConfigureStatusText(_precisionStatus, 124);
+        ConfigureStatusText(_workPlaneStatus, 118);
+        ConfigureStatusText(_coordinateStatus, 214);
         _toolStatus.Foreground = CadTheme.Text;
         _coordinateStatus.Foreground = CadTheme.Text;
         _coordinateStatus.TextAlignment = TextAlignment.Right;
@@ -509,7 +509,7 @@ public sealed partial class MainWindow : Window
         var panel = new DockPanel
         {
             LastChildFill = true,
-            Margin = new Thickness(4, 1)
+            Margin = new Thickness(6, 2)
         };
 
         DockPanel.SetDock(_coordinateStatus, Dock.Right);
@@ -688,10 +688,10 @@ public sealed partial class MainWindow : Window
     {
         _modelPanel.IsVisible = visible;
         _modelColumn.Width = visible
-            ? new GridLength(194)
+            ? new GridLength(CadTheme.ModelPanelWidth)
             : new GridLength(0);
         _modelSplitterColumn.Width = visible
-            ? new GridLength(3)
+            ? new GridLength(CadTheme.SplitterThickness)
             : new GridLength(0);
         RefreshPanelMenuState();
     }
@@ -716,10 +716,10 @@ public sealed partial class MainWindow : Window
 
         _rightPanel.IsVisible = anyVisible;
         _rightColumn.Width = anyVisible
-            ? new GridLength(312)
+            ? new GridLength(CadTheme.PropertyPanelWidth)
             : new GridLength(0);
         _rightSplitterColumn.Width = anyVisible
-            ? new GridLength(3)
+            ? new GridLength(CadTheme.SplitterThickness)
             : new GridLength(0);
 
         _layerPanelRow.Height = layersVisible
@@ -729,7 +729,7 @@ public sealed partial class MainWindow : Window
             : new GridLength(0);
         _rightPanelSplitterRow.Height =
             layersVisible && propertiesVisible
-                ? new GridLength(3)
+                ? new GridLength(CadTheme.SplitterThickness)
                 : new GridLength(0);
         _propertyPanelRow.Height = propertiesVisible
             ? new GridLength(
@@ -751,7 +751,7 @@ public sealed partial class MainWindow : Window
             FontWeight = FontWeight.SemiBold,
             Foreground = CadTheme.Text,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(7, 0)
+            Margin = new Thickness(9, 0)
         };
         var button = new Button
         {
@@ -786,9 +786,9 @@ public sealed partial class MainWindow : Window
         new Border
         {
             Width = 1,
-            Height = 16,
+            Height = 20,
             Background = CadTheme.Border,
-            Margin = new Thickness(2, 1)
+            Margin = new Thickness(3, 2)
         };
 
     private static void ConfigureToggle(ToggleButton button)
@@ -804,7 +804,7 @@ public sealed partial class MainWindow : Window
     {
         ConfigureToggle(button);
         button.Content = text;
-        button.MinWidth = 31;
+        button.MinWidth = 38;
         button.Tag = preset;
         button.Click += (_, _) =>
         {
@@ -827,7 +827,7 @@ public sealed partial class MainWindow : Window
         double minWidth)
     {
         text.MinWidth = minWidth;
-        text.Margin = new Thickness(4, 0);
+        text.Margin = new Thickness(6, 0);
         text.FontSize = CadTheme.CaptionFontSize;
         text.VerticalAlignment = VerticalAlignment.Center;
         text.TextTrimming = TextTrimming.CharacterEllipsis;

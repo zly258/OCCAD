@@ -25,6 +25,7 @@ internal sealed class CadViewportInteractionController : IDisposable
     private bool _middleNavigating;
     private bool _selectionGesture;
     private bool _selectionRectangleVisible;
+    private bool _restoreAutomaticHighlightOnMove;
     private int _selectionStartX;
     private int _selectionStartY;
     private int _selectionCurrentX;
@@ -102,6 +103,7 @@ internal sealed class CadViewportInteractionController : IDisposable
     {
         if (_workspace.Engine is null) return;
 
+        RestoreAutomaticHighlightOnPointerMove(input);
         UpdateNavigationCursorState(input);
         RefreshCursor();
 
@@ -416,12 +418,23 @@ internal sealed class CadViewportInteractionController : IDisposable
 
         if (_workspace.Engine is { IsInitialized: true } engine)
         {
-            // OCCT automatic detection highlight is intentionally disabled
-            // while a Tool owns the pointer. Otherwise the final committed
-            // entity can be highlighted immediately at the same cursor
-            // position and look like a stale, oversized preview.
-            engine.SetAutomaticHighlight(input.Tool is null);
-            engine.Redraw();
+            // Do not immediately restore automatic hover when a drawing Tool
+            // completes. The pointer is still sitting on the just-committed
+            // geometry, so OCCT can instantly draw a dynamic highlight that
+            // looks exactly like a stale final preview. Clear only dynamic
+            // (non-selection) highlight now and restore hover on the next real
+            // pointer move.
+            using var batch =
+                engine.BeginDisplayBatch();
+
+            ClearDynamicHighlights(engine);
+            engine.SetAutomaticHighlight(false);
+            _restoreAutomaticHighlightOnMove =
+                input.Tool is null;
+        }
+        else
+        {
+            _restoreAutomaticHighlightOnMove = false;
         }
 
         CoordinateCleared?.Invoke(
@@ -443,11 +456,40 @@ internal sealed class CadViewportInteractionController : IDisposable
         RefreshCursor();
     }
 
+    private void RestoreAutomaticHighlightOnPointerMove(
+        OcctPointerInputEventArgs input)
+    {
+        if (!_restoreAutomaticHighlightOnMove ||
+            input.Kind != OcctPointerInputKind.Moved ||
+            input.Buttons != OcctPointerButtons.None ||
+            _workspace.Tools.ActiveTool is not null ||
+            _workspace.Engine is not
+            { IsInitialized: true } engine)
+            return;
+
+        engine.SetAutomaticHighlight(true);
+        _restoreAutomaticHighlightOnMove = false;
+    }
+
+    private static void ClearDynamicHighlights(
+        OcctEngine engine)
+    {
+        foreach (var value in engine.GetObjects())
+        {
+            if (!engine.IsObjectHighlighted(value) ||
+                engine.IsObjectSelected(value))
+                continue;
+
+            engine.Unhighlight(value);
+        }
+    }
+
     private void ViewportEngineRecreated(
         object? sender,
         OcctEngineLifecycleEventArgs input)
     {
         _pointerMoves.Clear();
+        _restoreAutomaticHighlightOnMove = false;
         _selectionGesture = false;
         _selectionRectangleVisible = false;
 

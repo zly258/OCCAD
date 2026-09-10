@@ -19,10 +19,10 @@ internal sealed class CadErrorWindow : Window
         Title = CadLanguageManager.Text(
             "Cad.Text.ErrorTitle",
             "OCCAD Error");
-        Width = 620;
-        Height = 390;
-        MinWidth = 460;
-        MinHeight = 280;
+        Width = 680;
+        Height = 430;
+        MinWidth = 520;
+        MinHeight = 320;
         WindowStartupLocation =
             WindowStartupLocation.CenterOwner;
         Background = CadTheme.Surface;
@@ -105,14 +105,14 @@ internal sealed class CadErrorWindow : Window
         root.Children.Add(message);
 
         Grid.SetRow(source, 1);
-        source.Margin = new Thickness(0, 6, 0, 6);
+        source.Margin = new Thickness(0, 8, 0, 8);
         root.Children.Add(source);
 
         Grid.SetRow(details, 2);
         root.Children.Add(details);
 
         Grid.SetRow(path, 3);
-        path.Margin = new Thickness(0, 7, 0, 7);
+        path.Margin = new Thickness(0, 9, 0, 9);
         root.Children.Add(path);
 
         Grid.SetRow(buttons, 4);

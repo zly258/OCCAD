@@ -37,10 +37,10 @@ internal sealed class CadToolPanel : Border
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
 
         Width = CadTheme.ToolPanelWidth;
-        MaxHeight = 500;
+        MaxHeight = 620;
         HorizontalAlignment = HorizontalAlignment.Left;
         VerticalAlignment = VerticalAlignment.Top;
-        Margin = new Thickness(6);
+        Margin = new Thickness(8);
         Background = CadTheme.Surface;
         BorderBrush = CadTheme.Border;
         BorderThickness = new Thickness(1);
@@ -52,7 +52,7 @@ internal sealed class CadToolPanel : Border
             FontWeight = FontWeight.SemiBold,
             Foreground = CadTheme.Text,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(7, 0)
+            Margin = new Thickness(9, 0)
         };
 
         _close = new Button
@@ -81,7 +81,7 @@ internal sealed class CadToolPanel : Border
         _content = new StackPanel
         {
             Spacing = 2,
-            Margin = new Thickness(6)
+            Margin = new Thickness(8)
         };
 
         _finish = CompactButton();
@@ -264,7 +264,7 @@ internal sealed class CadToolPanel : Border
 
             var buttons = new Grid
             {
-                Margin = new Thickness(0, 4, 0, 0),
+                Margin = new Thickness(0, 6, 0, 0),
                 ColumnSpacing = 4
             };
             buttons.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
@@ -299,16 +299,16 @@ internal sealed class CadToolPanel : Border
 
         var row = new Grid
         {
-            Margin = new Thickness(0, 0, 0, 3),
+            Margin = new Thickness(0, 0, 0, 5),
             ColumnSpacing = 5,
             Background = CadTheme.Surface
         };
         row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
         row.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-        _planeState.Margin = new Thickness(5, 2);
+        _planeState.Margin = new Thickness(6, 3);
         row.Children.Add(_planeState);
         Grid.SetColumn(_planeLock, 1);
-        _planeLock.Margin = new Thickness(0, 1, 4, 1);
+        _planeLock.Margin = new Thickness(0, 2, 6, 2);
         row.Children.Add(_planeLock);
         _content.Children.Add(new Border
         {

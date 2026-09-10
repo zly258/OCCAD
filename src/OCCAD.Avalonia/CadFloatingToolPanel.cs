@@ -23,6 +23,7 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
     private readonly CadWorkspace _workspace;
     private readonly Border _header;
     private readonly TextBlock _title;
+    private readonly TextBlock _feedback;
     private readonly StackPanel _content;
     private readonly Button _back;
     private readonly Button _accept;
@@ -31,6 +32,7 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
     private bool _hiddenByUser;
     private bool _refreshing;
     private bool _dragging;
+    private int _toolUpdateVersion;
     private Point _dragPointerStart;
     private Point _dragPanelStart;
     private bool _disposed;
@@ -57,6 +59,15 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
             Margin = new Thickness(7, 0),
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
+        };
+
+        _feedback = new TextBlock
+        {
+            IsVisible = false,
+            Foreground = CadTheme.Muted,
+            FontSize = CadTheme.CaptionFontSize,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(6, 2, 6, 5)
         };
 
         var close = new Button
@@ -171,8 +182,11 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         _header.PointerReleased -= HeaderPointerReleased;
     }
 
-    private void ToolChanged(object? sender, CadToolChangedEventArgs e) =>
+    private void ToolChanged(object? sender, CadToolChangedEventArgs e)
+    {
+        _toolUpdateVersion++;
         SetTool(e.Tool);
+    }
 
     private void LanguageChanged(object? sender, EventArgs e) =>
         SetTool(_workspace.Tools.ActiveTool, forceRebuild: true);
@@ -189,6 +203,7 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         {
             _hiddenByUser = false;
             _content.Children.Clear();
+            ClearFeedback();
             SetPanelVisible(false);
             return;
         }
@@ -222,8 +237,11 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
                 $"Cad.ToolPanel.{tool.Id}.Title",
                 CadLanguageManager.Text(tool.LocalizationKey, tool.DisplayName));
             _content.Children.Clear();
+            ClearFeedback();
 
             AddStageHeader(tool);
+            Detach(_feedback);
+            _content.Children.Add(_feedback);
             if (tool.CurrentStep.InputKind == CadToolInputKind.Point)
                 AddExactPointEditor(tool);
             AddPrecisionEditors(tool);
@@ -308,14 +326,27 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
                 editor.Text,
                 reference,
                 _workspace.WorkPlane,
-                out var input) ||
-            !_workspace.Tools.CommitPoint(input.Point))
+                out var input))
         {
+            ShowFeedback(
+                "Cad.Text.InvalidCoordinate",
+                "Invalid coordinate input.");
             editor.SelectAll();
             return;
         }
 
-        SetTool(_workspace.Tools.ActiveTool, forceRebuild: true);
+        var version = _toolUpdateVersion;
+        if (!_workspace.Tools.CommitPoint(input.Point))
+        {
+            ShowFeedback(
+                "Cad.Text.PointRejected",
+                "The current tool cannot accept that point.");
+            editor.SelectAll();
+            return;
+        }
+
+        ClearFeedback();
+        EnsureMutationRebuilt(version);
     }
 
     private void AddPrecisionEditors(CadTool tool)
@@ -419,10 +450,20 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
             !ReferenceEquals(_workspace.Tools.ActiveTool, tool))
             return;
 
+        var version = _toolUpdateVersion;
         if (string.IsNullOrWhiteSpace(text))
         {
             if (!_workspace.Precision.ClearLock(tool, kind))
+            {
                 SetTool(tool, forceRebuild: true);
+                ShowFeedback(
+                    "Cad.Text.PrecisionRejected",
+                    "The current precision input cannot be cleared.");
+                return;
+            }
+
+            ClearFeedback();
+            EnsureMutationRebuilt(version);
             return;
         }
 
@@ -430,6 +471,9 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
             (kind != CadPrecisionInputKind.Angle && number <= 0))
         {
             SetTool(tool, forceRebuild: true);
+            ShowFeedback(
+                "Cad.Text.InvalidPrecisionValue",
+                "Enter a valid precision value.");
             return;
         }
 
@@ -445,7 +489,16 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         };
 
         if (!_workspace.Precision.Apply(tool, input))
+        {
             SetTool(tool, forceRebuild: true);
+            ShowFeedback(
+                "Cad.Text.PrecisionRejected",
+                "The current tool rejected that precision value.");
+            return;
+        }
+
+        ClearFeedback();
+        EnsureMutationRebuilt(version);
     }
 
     private void AddParameterEditors(CadTool tool)
@@ -483,7 +536,7 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
                 editor.IsCheckedChanged += (_, _) =>
                 {
                     if (!_refreshing)
-                        ApplyParameter(
+                        _ = ApplyParameter(
                             tool,
                             parameter.Id,
                             editor.IsChecked == true ? "true" : "false");
@@ -513,7 +566,7 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
                 editor.SelectionChanged += (_, _) =>
                 {
                     if (!_refreshing && editor.SelectedItem is ChoiceItem selected)
-                        ApplyParameter(tool, parameter.Id, selected.Value);
+                        _ = ApplyParameter(tool, parameter.Id, selected.Value);
                 };
                 return editor;
             }
@@ -554,35 +607,77 @@ internal sealed class CadFloatingToolPanel : Border, IDisposable
         string id,
         string value)
     {
+        var lastSubmittedText = value;
         var editor = new TextBox
         {
             Text = value,
             Tag = id
         };
         editor.Classes.Add("cad-input");
+
+        void Commit()
+        {
+            var text = editor.Text ?? string.Empty;
+            if (string.Equals(text, lastSubmittedText, StringComparison.Ordinal))
+                return;
+
+            lastSubmittedText = text;
+            if (!ApplyParameter(tool, id, text))
+                editor.SelectAll();
+        }
+
         editor.KeyDown += (_, e) =>
         {
             if (e.Key != Key.Enter)
                 return;
-            ApplyParameter(tool, id, editor.Text ?? string.Empty);
+            Commit();
             e.Handled = true;
         };
-        editor.LostFocus += (_, _) =>
-            ApplyParameter(tool, id, editor.Text ?? string.Empty);
+        editor.LostFocus += (_, _) => Commit();
         return editor;
     }
 
-    private void ApplyParameter(
+    private bool ApplyParameter(
         CadTool tool,
         string id,
         string value)
     {
         if (_refreshing ||
             !ReferenceEquals(_workspace.Tools.ActiveTool, tool))
+            return false;
+
+        var version = _toolUpdateVersion;
+        if (!tool.TrySetParameter(id, value))
+        {
+            ShowFeedback(
+                "Cad.Text.InvalidParameterValue",
+                "The parameter value is not valid for the current tool.");
+            return false;
+        }
+
+        ClearFeedback();
+        EnsureMutationRebuilt(version);
+        return true;
+    }
+
+    private void EnsureMutationRebuilt(int previousVersion)
+    {
+        if (_toolUpdateVersion != previousVersion)
             return;
 
-        tool.TrySetParameter(id, value);
-        SetTool(tool, forceRebuild: true);
+        SetTool(_workspace.Tools.ActiveTool, forceRebuild: true);
+    }
+
+    private void ShowFeedback(string resourceKey, string fallback)
+    {
+        _feedback.Text = CadLanguageManager.Text(resourceKey, fallback);
+        _feedback.IsVisible = true;
+    }
+
+    private void ClearFeedback()
+    {
+        _feedback.Text = string.Empty;
+        _feedback.IsVisible = false;
     }
 
     private void AddCommandButtons(CadTool tool)

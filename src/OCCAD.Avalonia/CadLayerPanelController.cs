@@ -142,23 +142,48 @@ internal sealed class CadLayerPanelController : IDisposable
         var grid = new Grid
         {
             MinHeight = CadTheme.LayerHeaderHeight,
-            ColumnSpacing = 2,
-            Margin = new Thickness(4, 0),
+            ColumnSpacing = 1,
+            Margin = new Thickness(3, 0),
             Background = CadTheme.Header
         };
         ConfigureLayerColumns(grid);
 
-        AddHeader(grid, 0, CadLanguageManager.Text("Cad.Text.Current", "Current"));
+        AddHeader(
+            grid,
+            0,
+            CadLanguageManager.Text("Cad.Text.Current", "Current"),
+            "●");
         AddHeader(
             grid,
             1,
             CadLanguageManager.Text("Cad.Text.Name", "Name"),
+            CadLanguageManager.Text("Cad.Text.Name", "Name"),
             HorizontalAlignment.Left);
-        AddHeader(grid, 2, CadLanguageManager.Text("Cad.Text.Visible", "Visible"));
-        AddHeader(grid, 3, CadLanguageManager.Text("Cad.Text.Color", "Color"));
-        AddHeader(grid, 4, CadLanguageManager.Text("Cad.Text.LineStyle", "Line style"));
-        AddHeader(grid, 5, CadLanguageManager.Text("Cad.Text.LineWidth", "Line width"));
-        AddHeader(grid, 6, CadLanguageManager.Text("Cad.Text.Locked", "Locked"));
+        AddHeader(
+            grid,
+            2,
+            CadLanguageManager.Text("Cad.Text.Visible", "Visible"),
+            ShortHeader("显", "V"));
+        AddHeader(
+            grid,
+            3,
+            CadLanguageManager.Text("Cad.Text.Color", "Color"),
+            ShortHeader("色", "C"));
+        AddHeader(
+            grid,
+            4,
+            CadLanguageManager.Text("Cad.Text.LineStyle", "Line style"),
+            ShortHeader("线型", "Style"));
+        AddHeader(
+            grid,
+            5,
+            CadLanguageManager.Text("Cad.Text.LineWidth", "Line width"),
+            ShortHeader("线宽", "Width"));
+        AddHeader(
+            grid,
+            6,
+            CadLanguageManager.Text("Cad.Text.Locked", "Locked"),
+            ShortHeader("锁", "L"));
 
         return new Border
         {
@@ -171,25 +196,26 @@ internal sealed class CadLayerPanelController : IDisposable
 
     private static void ConfigureLayerColumns(Grid grid)
     {
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(42)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(26)));
         grid.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(34)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(34)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(62)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(54)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(34)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(28)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(32)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(56)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(48)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(28)));
     }
 
     private static void AddHeader(
         Grid grid,
         int column,
-        string text,
+        string fullText,
+        string displayText,
         HorizontalAlignment alignment = HorizontalAlignment.Center)
     {
         var label = new TextBlock
         {
-            Text = text,
+            Text = displayText,
             FontSize = CadTheme.SmallFontSize,
             FontWeight = FontWeight.SemiBold,
             Foreground = CadTheme.Muted,
@@ -198,6 +224,7 @@ internal sealed class CadLayerPanelController : IDisposable
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
+        ToolTip.SetTip(label, fullText);
         Grid.SetColumn(label, column);
         grid.Children.Add(label);
     }
@@ -214,24 +241,33 @@ internal sealed class CadLayerPanelController : IDisposable
         var grid = new Grid
         {
             MinHeight = CadTheme.LayerRowHeight,
-            ColumnSpacing = 2,
+            ColumnSpacing = 1,
             VerticalAlignment = VerticalAlignment.Center
         };
         ConfigureLayerColumns(grid);
 
-        var currentLayer = new CheckBox
+        var currentLayer = new Button
         {
-            IsChecked = current,
+            Content = current ? "●" : "○",
             IsEnabled = !current,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
+            Width = 24,
+            Height = Math.Max(18, CadTheme.ControlHeight - 4),
+            Padding = new Thickness(0),
+            Margin = new Thickness(0),
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Foreground = current ? CadTheme.Accent : CadTheme.Muted
         };
         ToolTip.SetTip(
             currentLayer,
-            CadLanguageManager.Text("Cad.Text.SetCurrentLayer", "Set current layer"));
-        currentLayer.IsCheckedChanged += (_, _) =>
+            current
+                ? CadLanguageManager.Text("Cad.Text.CurrentLayer", "Current layer")
+                : CadLanguageManager.Text("Cad.Text.SetCurrentLayer", "Set current layer"));
+        currentLayer.Click += (_, _) =>
         {
-            if (_refreshing || currentLayer.IsChecked != true || current)
+            if (_refreshing || current)
                 return;
 
             _workspace.SetCurrentLayer(layer);
@@ -245,7 +281,7 @@ internal sealed class CadLayerPanelController : IDisposable
             HorizontalContentAlignment = HorizontalAlignment.Left,
             Background = Brushes.Transparent,
             BorderThickness = new Thickness(0),
-            Padding = new Thickness(5, 0),
+            Padding = new Thickness(4, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
             Foreground = CadTheme.Text,
             FontWeight = current ? FontWeight.SemiBold : FontWeight.Normal
@@ -272,7 +308,7 @@ internal sealed class CadLayerPanelController : IDisposable
 
         var color = new Button
         {
-            Width = 26,
+            Width = 24,
             Height = Math.Max(18, CadTheme.ControlHeight - 4),
             Padding = new Thickness(0),
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -306,7 +342,8 @@ internal sealed class CadLayerPanelController : IDisposable
         var style = new ComboBox
         {
             ItemsSource = styles,
-            SelectedItem = styles.FirstOrDefault(item => item.Value == layer.LineStyle)
+            SelectedItem = styles.FirstOrDefault(item => item.Value == layer.LineStyle),
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
         style.Classes.Add("cad-input");
         style.SelectionChanged += (_, _) =>
@@ -325,7 +362,8 @@ internal sealed class CadLayerPanelController : IDisposable
         {
             ItemsSource = LineWidths,
             SelectedItem = LineWidths.FirstOrDefault(
-                value => Math.Abs(value - layer.LineWidth) < 1e-12)
+                value => Math.Abs(value - layer.LineWidth) < 1e-12),
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
         width.Classes.Add("cad-input");
         width.SelectionChanged += (_, _) =>
@@ -361,7 +399,7 @@ internal sealed class CadLayerPanelController : IDisposable
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 0, 0, 1),
             MinHeight = CadTheme.LayerRowHeight,
-            Padding = new Thickness(4, 0),
+            Padding = new Thickness(3, 0),
             Margin = new Thickness(0),
             Child = grid
         };
@@ -467,6 +505,14 @@ internal sealed class CadLayerPanelController : IDisposable
         button.Classes.Add("cad-compact");
         return button;
     }
+
+    private static string ShortHeader(string chinese, string english) =>
+        string.Equals(
+            CadLanguageManager.CurrentLanguage,
+            "zh-CN",
+            StringComparison.OrdinalIgnoreCase)
+            ? chinese
+            : english;
 
     private static MediaColor ToMediaColor(DrawingColor value) =>
         MediaColor.FromArgb(value.A, value.R, value.G, value.B);

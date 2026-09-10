@@ -68,7 +68,6 @@ public sealed partial class MainWindow : Window
     private readonly CadCommandLineController _commandLine;
 
     private bool _refreshingUi;
-    private bool _refreshingTree;
     private bool _closingConfirmed;
     private bool _disposed;
     private global::Avalonia.Platform.Storage.IStorageFile? _documentFile;
@@ -314,6 +313,8 @@ public sealed partial class MainWindow : Window
 
         _propertyPanelBorder.Child = BuildPropertyPanel();
         _propertyPanelBorder.Background = CadTheme.Surface;
+        _propertyPanelBorder.BorderBrush = CadTheme.BorderStrong;
+        _propertyPanelBorder.BorderThickness = new Thickness(0);
 
         var splitter = new GridSplitter
         {
@@ -375,8 +376,9 @@ public sealed partial class MainWindow : Window
         var scroll = new ScrollViewer
         {
             Content = _propertyHost,
-            HorizontalScrollBarVisibility =
-                ScrollBarVisibility.Disabled
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Background = CadTheme.Surface,
+            Padding = new Thickness(0)
         };
 
         var grid = new Grid();
@@ -758,15 +760,6 @@ public sealed partial class MainWindow : Window
             Child = panel
         };
     }
-
-    private static Control ToolbarSeparator() =>
-        new Border
-        {
-            Width = 1,
-            Height = 20,
-            Background = CadTheme.Border,
-            Margin = new Thickness(3, 2)
-        };
 
     private static void ConfigureToggle(ToggleButton button)
     {

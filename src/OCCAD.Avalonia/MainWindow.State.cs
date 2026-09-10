@@ -18,11 +18,6 @@ public sealed partial class MainWindow
             _modelTree,
             message => _commandLine.ShowFeedback(message));
 
-    private bool ChineseUi => string.Equals(
-        CadLanguageManager.CurrentLanguage,
-        "zh-CN",
-        StringComparison.OrdinalIgnoreCase);
-
     private void RefreshAll()
     {
         ModelPanel.Refresh();
@@ -49,7 +44,6 @@ public sealed partial class MainWindow
         _commandLine.RefreshLanguage();
         ModelPanel.RefreshLanguage();
         RefreshRefinementLanguage();
-        RefreshCompactToolbarLanguage();
 
         UpdateToolUi(_workspace.Tools.ActiveTool);
         UpdateSelectionStatus();
@@ -128,8 +122,6 @@ public sealed partial class MainWindow
 
     private void ModelTreeSelectionChanged(object? sender, SelectionChangedEventArgs e) =>
         ModelPanel.HandleSelectionChanged();
-
-    private void SelectTreeEntity(CadEntity? entity) => ModelPanel.SelectEntity(entity);
 
     private void LayerManagerChanged(CadLayerManagerChangedEventArgs args)
     {

@@ -19,8 +19,6 @@ public sealed partial class MainWindow
         _floatingToolPanelApplied = true;
 
         _floatingToolPanel = new CadFloatingToolPanel(_workspace);
-        _floatingToolPanel.UserVisibilityRequested +=
-            FloatingToolPanelVisibilityRequested;
         _floatingToolPanel.PanelVisibilityChanged +=
             FloatingToolPanelVisibilityChanged;
         Closed += FloatingToolPanelClosed;
@@ -47,9 +45,6 @@ public sealed partial class MainWindow
         RefreshPanelMenuState();
     }
 
-    private void FloatingToolPanelVisibilityRequested(bool visible) =>
-        RefreshPanelMenuState();
-
     private void FloatingToolPanelVisibilityChanged(object? sender, EventArgs e) =>
         RefreshPanelMenuState();
 
@@ -57,8 +52,6 @@ public sealed partial class MainWindow
     {
         if (_floatingToolPanel is not null)
         {
-            _floatingToolPanel.UserVisibilityRequested -=
-                FloatingToolPanelVisibilityRequested;
             _floatingToolPanel.PanelVisibilityChanged -=
                 FloatingToolPanelVisibilityChanged;
             _floatingToolPanel.Dispose();

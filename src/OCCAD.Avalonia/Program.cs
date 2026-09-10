@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using OcctNet;
@@ -30,6 +31,10 @@ internal sealed class App : Application
         Styles.Add(new FluentTheme
         {
             DensityStyle = DensityStyle.Compact
+        });
+        Styles.Add(new StyleInclude(new Uri("avares://OCCAD/"))
+        {
+            Source = new Uri("avares://OCCAD/Styles/CadRibbonTheme.axaml")
         });
     }
 

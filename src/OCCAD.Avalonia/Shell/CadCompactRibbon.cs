@@ -11,14 +11,16 @@ internal sealed record CadShellCommand(
     string? Description = null);
 
 /// <summary>
-/// Minimal command surface. CAD commands resolve to registered Core Action IDs;
-/// only platform document lifecycle commands are injected from the shell.
+/// Thin action-driven Ribbon adapter. Layout follows ModelScript's compact
+/// three-row industrial Ribbon; every CAD command still resolves through Core's
+/// authoritative <see cref="CadActionManager"/>.
 /// </summary>
 internal sealed class CadCompactRibbon : Border
 {
     private readonly CadWorkspace _workspace;
     private readonly Action<string> _feedback;
     private readonly IReadOnlyList<CadShellCommand> _shellCommands;
+    private readonly List<(Button Button, string ActionId)> _actionButtons = [];
 
     public CadCompactRibbon(
         CadWorkspace workspace,
@@ -29,163 +31,189 @@ internal sealed class CadCompactRibbon : Border
         _feedback = feedback ?? throw new ArgumentNullException(nameof(feedback));
         _shellCommands = shellCommands ?? Array.Empty<CadShellCommand>();
 
-        Background = CadUi.Surface;
-        BorderBrush = CadUi.Border;
-        BorderThickness = new Thickness(0, 0, 0, 1);
         MinHeight = CadUi.RibbonHeight;
         MaxHeight = CadUi.RibbonHeight;
-        Child = BuildTabs();
+        Child = BuildRibbon();
+
+        _workspace.Events.Changed += (_, _) => RefreshCanExecute();
+        _workspace.Actions.ActionFinished += (_, _) => RefreshCanExecute();
+        RefreshCanExecute();
     }
 
-    private Control BuildTabs()
+    private Control BuildRibbon()
     {
         var tabs = new TabControl
         {
+            Classes = { "cad-ribbon-tabs" },
+            FontFamily = CadUi.UiFontFamily,
             FontSize = CadUi.UiFontSize,
             ItemsSource = new[]
             {
-                StartTab(),
+                BuildHomeTab(),
+                CadRibbonBar.CreateTab(
+                    "绘图",
+                    ActionGroup("基础",
+                        Item("点", "draw.point"),
+                        Item("直线", "draw.line"),
+                        Item("多段线", "draw.polyline"),
+                        Item("矩形", "draw.rectangle")),
+                    ActionGroup("圆与曲线",
+                        Item("圆", "draw.circle"),
+                        Item("圆弧", "draw.arc"),
+                        Item("椭圆", "draw.ellipse"),
+                        Item("样条", "draw.spline")),
+                    ActionGroup("构造",
+                        Item("中心线", "draw.centerline"),
+                        Item("中心标记", "draw.centermark"),
+                        Item("多边形", "draw.polygon"),
+                        Item("正多边形", "draw.regularpolygon"))),
 
-                Tab("绘图",
-                    Action("点", "draw.point"),
-                    Action("直线", "draw.line"),
-                    Action("中心线", "draw.centerline"),
-                    Action("多段线", "draw.polyline"),
-                    Action("圆", "draw.circle"),
-                    Action("圆弧", "draw.arc"),
-                    Action("矩形", "draw.rectangle"),
-                    Action("多边形", "draw.polygon"),
-                    Action("正多边形", "draw.regularpolygon"),
-                    Action("椭圆", "draw.ellipse"),
-                    Action("样条", "draw.spline")),
+                CadRibbonBar.CreateTab(
+                    "修改",
+                    ActionGroup("变换",
+                        Item("移动", "modify.move"),
+                        Item("复制", "modify.copy"),
+                        Item("旋转", "modify.rotate"),
+                        Item("缩放", "modify.scale"),
+                        Item("镜像", "modify.mirror"),
+                        Item("阵列", "modify.array")),
+                    ActionGroup("编辑",
+                        Item("偏移", "modify.offset"),
+                        Item("修剪", "modify.trim"),
+                        Item("延伸", "modify.extend"),
+                        Item("圆角", "modify.fillet"),
+                        Item("倒角", "modify.chamfer"))),
 
-                Tab("建模",
-                    Action("长方体", "solid.box"),
-                    Action("圆柱", "solid.cylinder"),
-                    Action("圆锥", "solid.cone"),
-                    Action("球", "solid.sphere"),
-                    Action("椭球", "solid.ellipsoid"),
-                    Action("圆环", "solid.torus"),
-                    Action("拉伸", "feature.extrude"),
-                    Action("旋转", "feature.revolve"),
-                    Action("扫掠", "feature.sweep"),
-                    Action("放样", "feature.loft")),
+                CadRibbonBar.CreateTab(
+                    "建模",
+                    ActionGroup("基本实体",
+                        Item("长方体", "solid.box"),
+                        Item("圆柱", "solid.cylinder"),
+                        Item("圆锥", "solid.cone"),
+                        Item("球", "solid.sphere"),
+                        Item("椭球", "solid.ellipsoid"),
+                        Item("圆环", "solid.torus")),
+                    ActionGroup("特征",
+                        Item("拉伸", "feature.extrude"),
+                        Item("旋转", "feature.revolve"),
+                        Item("扫掠", "feature.sweep"),
+                        Item("放样", "feature.loft"))),
 
-                Tab("修改",
-                    Action("移动", "modify.move"),
-                    Action("复制", "modify.copy"),
-                    Action("旋转", "modify.rotate"),
-                    Action("缩放", "modify.scale"),
-                    Action("镜像", "modify.mirror"),
-                    Action("阵列", "modify.array"),
-                    Action("偏移", "modify.offset"),
-                    Action("修剪", "modify.trim"),
-                    Action("延伸", "modify.extend"),
-                    Action("圆角", "modify.fillet"),
-                    Action("倒角", "modify.chamfer")),
+                CadRibbonBar.CreateTab(
+                    "标注",
+                    ActionGroup("文字",
+                        Item("文字", "annotate.text")),
+                    ActionGroup("尺寸",
+                        Item("长度", "annotate.length"),
+                        Item("角度", "annotate.angle"),
+                        Item("半径", "annotate.radius"),
+                        Item("直径", "annotate.diameter"))),
 
-                Tab("标注",
-                    Action("文字", "annotate.text"),
-                    Action("长度", "annotate.length"),
-                    Action("角度", "annotate.angle"),
-                    Action("半径", "annotate.radius"),
-                    Action("直径", "annotate.diameter")),
-
-                Tab("视图",
-                    Action("适合", "view.fit"),
-                    Action("等轴测", "view.isometric"),
-                    Action("顶", "view.top"),
-                    Action("前", "view.front"),
-                    Action("右", "view.right"),
-                    Action("线框", "display.wireframe"),
-                    Action("着色", "display.shaded"),
-                    Action("隐藏", "view.hide"),
-                    Action("隔离", "view.isolate"),
-                    Action("全部", "view.showall"))
+                CadRibbonBar.CreateTab(
+                    "视图",
+                    ActionGroup("视角",
+                        Item("适合", "view.fit"),
+                        Item("等轴测", "view.isometric"),
+                        Item("顶", "view.top"),
+                        Item("底", "view.bottom"),
+                        Item("前", "view.front"),
+                        Item("后", "view.back"),
+                        Item("左", "view.left"),
+                        Item("右", "view.right")),
+                    ActionGroup("显示",
+                        Item("线框", "display.wireframe"),
+                        Item("着色", "display.shaded"),
+                        Item("隐藏", "view.hide"),
+                        Item("隔离", "view.isolate"),
+                        Item("全部显示", "view.showall")))
             }
         };
 
-        return tabs;
+        var quick = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 1
+        };
+        AddActionButton(quick, Item("撤销", "edit.undo"));
+        AddActionButton(quick, Item("重做", "edit.redo"));
+        AddActionButton(quick, Item("适合", "view.fit"));
+        if (quick.Children.Count > 0)
+            tabs.Margin = new Thickness(0, 0, 150, 0);
+
+        return CadRibbonBar.CreateShell(
+            tabs,
+            quick.Children.Count > 0 ? quick : null);
     }
 
-    private TabItem StartTab()
+    private TabItem BuildHomeTab()
     {
-        var buttons = CreateButtonPanel();
-
+        var fileButtons = new List<Control>();
         foreach (var command in _shellCommands)
         {
-            var button = CreateButton(command.Text);
-            if (!string.IsNullOrWhiteSpace(command.Description))
-                ToolTip.SetTip(button, command.Description);
-            button.Click += async (_, _) => await ExecuteShellAsync(command);
-            buttons.Children.Add(button);
+            var button = CadRibbonBar.CreateButton(
+                command.Text,
+                () => _ = ExecuteShellAsync(command),
+                command.Description);
+            fileButtons.Add(button);
         }
 
-        AddActionButton(buttons, Action("撤销", "edit.undo"));
-        AddActionButton(buttons, Action("重做", "edit.redo"));
-        AddActionButton(buttons, Action("删除", "edit.delete"));
-        AddActionButton(buttons, Action("全选", "select.all"));
-        AddActionButton(buttons, Action("反选", "select.invert"));
-        AddActionButton(buttons, Action("测距", "measure.distance"));
-
-        return CreateTab("开始", buttons);
+        return CadRibbonBar.CreateTab(
+            "开始",
+            CadRibbonBar.CreateGroup("文件", fileButtons),
+            ActionGroup("编辑",
+                Item("撤销", "edit.undo"),
+                Item("重做", "edit.redo"),
+                Item("删除", "edit.delete")),
+            ActionGroup("选择",
+                Item("全选", "select.all"),
+                Item("反选", "select.invert")),
+            ActionGroup("工具",
+                Item("测距", "measure.distance")));
     }
 
-    private TabItem Tab(string title, params RibbonAction[] actions)
+    private Border ActionGroup(
+        string title,
+        params RibbonAction[] actions)
     {
-        var buttons = CreateButtonPanel();
+        var controls = new List<Control>();
         foreach (var item in actions)
-            AddActionButton(buttons, item);
-        return CreateTab(title, buttons);
+        {
+            var button = CreateActionButton(item);
+            if (button is not null)
+                controls.Add(button);
+        }
+        return CadRibbonBar.CreateGroup(title, controls);
     }
 
-    private void AddActionButton(Panel buttons, RibbonAction item)
+    private Button? CreateActionButton(RibbonAction item)
     {
         var action = _workspace.Actions.Find(item.Id);
         if (action is null)
-            return;
+            return null;
 
-        var button = CreateButton(item.Text);
         var shortcut = string.IsNullOrWhiteSpace(action.Shortcut)
             ? string.Empty
             : $"  {action.Shortcut}";
-        ToolTip.SetTip(button, $"{action.Description}{shortcut}");
-        button.Click += (_, _) => Execute(item.Id, item.Text);
-        buttons.Children.Add(button);
-    }
-
-    private static StackPanel CreateButtonPanel() =>
-        new()
-        {
-            Orientation = Orientation.Horizontal,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(4, 3)
-        };
-
-    private static Button CreateButton(string text)
-    {
-        var button = new Button
-        {
-            Content = text,
-            VerticalContentAlignment = VerticalAlignment.Center,
-            HorizontalContentAlignment = HorizontalAlignment.Center,
-            Foreground = CadUi.Text
-        };
-        CadUi.ConfigureCompactButton(button);
+        var button = CadRibbonBar.CreateButton(
+            item.Text,
+            () => Execute(item.Id, item.Text),
+            $"{action.Description}{shortcut}");
+        _actionButtons.Add((button, item.Id));
         return button;
     }
 
-    private static TabItem CreateTab(string title, Control content) =>
-        new()
-        {
-            Header = title,
-            Content = new ScrollViewer
-            {
-                HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-                VerticalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
-                Content = content
-            }
-        };
+    private void AddActionButton(Panel host, RibbonAction item)
+    {
+        var button = CreateActionButton(item);
+        if (button is not null)
+            host.Children.Add(button);
+    }
+
+    private void RefreshCanExecute()
+    {
+        foreach (var (button, actionId) in _actionButtons)
+            button.IsEnabled = _workspace.Actions.CanExecute(actionId);
+    }
 
     private async Task ExecuteShellAsync(CadShellCommand command)
     {
@@ -197,17 +225,20 @@ internal sealed class CadCompactRibbon : Border
         {
             _feedback(exception.Message);
         }
+        finally
+        {
+            RefreshCanExecute();
+        }
     }
 
     private void Execute(string id, string text)
     {
-        if (_workspace.Actions.Execute(id))
-            return;
-
-        _feedback($"当前不能执行：{text}");
+        if (!_workspace.Actions.Execute(id))
+            _feedback($"当前不能执行：{text}");
+        RefreshCanExecute();
     }
 
-    private static RibbonAction Action(string text, string id) =>
+    private static RibbonAction Item(string text, string id) =>
         new(text, id);
 
     private sealed record RibbonAction(string Text, string Id);

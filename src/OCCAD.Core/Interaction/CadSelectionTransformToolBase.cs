@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using OcctNet;
 
 namespace OCCAD;
@@ -54,16 +55,39 @@ public abstract class CadSelectionTransformToolBase : CadTool
 
     protected override void OnCanceled()
     {
-        ClearTransformPreview();
-        ResetTransformState();
+        Exception? failure = null;
+        Cleanup(ClearTransformPreview);
+        Cleanup(ResetTransformState);
+        if (failure is not null)
+            ExceptionDispatchInfo.Capture(failure).Throw();
+
+        void Cleanup(Action action)
+        {
+            try { action(); }
+            catch (Exception exception) { failure ??= exception; }
+        }
     }
 
     protected override void OnDeactivated()
     {
-        ClearReplacementPreview();
-        Context.Selection.Changed -= SelectionChanged;
-        _entities = [];
-        ResetTransformState();
+        Exception? failure = null;
+
+        // Deactivation is a lifecycle boundary: every cleanup action must run
+        // even when native preview deletion fails. In particular the selection
+        // event subscription must never outlive an inactive transform tool.
+        Cleanup(ClearReplacementPreview);
+        Cleanup(() => Context.Selection.Changed -= SelectionChanged);
+        Cleanup(() => _entities = []);
+        Cleanup(ResetTransformState);
+
+        if (failure is not null)
+            ExceptionDispatchInfo.Capture(failure).Throw();
+
+        void Cleanup(Action action)
+        {
+            try { action(); }
+            catch (Exception exception) { failure ??= exception; }
+        }
     }
 
     protected abstract void OnTransformStarted();

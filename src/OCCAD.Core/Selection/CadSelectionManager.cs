@@ -71,7 +71,8 @@ public sealed class CadSelectionManager
         {
             if (value is < 0 or > 100) throw new ArgumentOutOfRangeException(nameof(value));
             _pixelTolerance = value;
-            if (_engine is { IsInitialized: true } engine) engine.SetSelectionTolerance(value);
+            if (_engine is { IsInitialized: true } engine)
+                TryViewerSideEffect(() => engine.SetSelectionTolerance(value), "selection tolerance");
         }
     }
 
@@ -97,7 +98,7 @@ public sealed class CadSelectionManager
             if (_filterKind == value) return;
             _filterKind = value;
             RefreshValidity();
-            FilterChanged?.Invoke(this, EventArgs.Empty);
+            PublishSimple(FilterChanged, "FilterChanged");
         }
     }
 
@@ -124,8 +125,8 @@ public sealed class CadSelectionManager
         _scope = scope;
         _subshapeMask = mask;
         RefreshValidity();
-        SynchronizeSelectionModes();
-        FilterChanged?.Invoke(this, EventArgs.Empty);
+        TryViewerSideEffect(SynchronizeSelectionModes, "selection modes");
+        PublishSimple(FilterChanged, "FilterChanged");
     }
 
     public bool CanSelectSubshape(CadEntity entity, OcctShapeType type) =>
@@ -176,7 +177,7 @@ public sealed class CadSelectionManager
         if (ReferenceEquals(Filter, filter)) return;
         Filter = filter;
         RefreshValidity();
-        FilterChanged?.Invoke(this, EventArgs.Empty);
+        PublishSimple(FilterChanged, "FilterChanged");
     }
 
     public void ClearFilter() => SetFilter(null);
@@ -188,9 +189,9 @@ public sealed class CadSelectionManager
             throw new InvalidOperationException("The OCCT engine is not initialized.");
 
         _engine = engine;
-        engine.SetSelectionTolerance(PixelTolerance);
-        SynchronizeSelectionModes();
-        SyncEngineSelection();
+        TryViewerSideEffect(() => engine.SetSelectionTolerance(PixelTolerance), "selection tolerance");
+        TryViewerSideEffect(SynchronizeSelectionModes, "selection modes");
+        TryViewerSideEffect(SyncEngineSelection, "selection synchronization");
     }
 
     public void UpdateFromViewer(
@@ -297,14 +298,14 @@ public sealed class CadSelectionManager
         }
         else if (_engine is { IsInitialized: true } engine)
         {
-            engine.ClearSelection();
+            TryViewerSideEffect(engine.ClearSelection, "selection clear");
         }
 
         // This event represents the user's/API caller's explicit clear intent,
         // not merely a transition to an empty entity set. Subobject selection is
         // allowed to exist without entity selection, but an explicit Clear means
         // clear the complete formal selection state.
-        Cleared?.Invoke(this, EventArgs.Empty);
+        PublishSimple(Cleared, "Cleared");
     }
 
     public void RefreshValidity()
@@ -404,11 +405,11 @@ public sealed class CadSelectionManager
         if (args.Entity is { } entity &&
             (args.Kind == CadDocumentChangeKind.Added ||
              args.Kind == CadDocumentChangeKind.Changed && args.EntityChangeKind == CadEntityChangeKind.Geometry))
-            SynchronizeSubshapeModes(entity);
+            TryViewerSideEffect(() => SynchronizeSubshapeModes(entity), "subshape selection modes");
         if (args.Kind == CadDocumentChangeKind.Reset)
         {
             SetSelection([], null, syncEngine: false);
-            Cleared?.Invoke(this, EventArgs.Empty);
+            PublishSimple(Cleared, "Cleared");
             return;
         }
 
@@ -441,7 +442,8 @@ public sealed class CadSelectionManager
             _selected.SequenceEqual(entities) &&
             ReferenceEquals(_primary, normalizedPrimary))
         {
-            if (syncEngine) SyncEngineSelection();
+            if (syncEngine)
+                TryViewerSideEffect(SyncEngineSelection, "selection synchronization");
             return;
         }
 
@@ -450,13 +452,9 @@ public sealed class CadSelectionManager
         _primary = normalizedPrimary;
 
         if (syncEngine)
-            SyncEngineSelection();
+            TryViewerSideEffect(SyncEngineSelection, "selection synchronization");
 
-        Changed?.Invoke(
-            this,
-            new CadSelectionChangedEventArgs(
-                _selected.ToArray(),
-                _primary));
+        PublishChanged();
     }
 
     private void SyncEngineSelection()
@@ -478,4 +476,64 @@ public sealed class CadSelectionManager
         else
             engine.SetSelection(objects);
     }
+
+    private void PublishChanged()
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        var args = new CadSelectionChangedEventArgs(
+            _selected.ToArray(),
+            _primary);
+        foreach (EventHandler<CadSelectionChangedEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception exception) when (IsRecoverableSideEffectFailure(exception))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"Selection Changed observer failed after formal state changed: {exception}");
+            }
+        }
+    }
+
+    private void PublishSimple(EventHandler? handlers, string eventName)
+    {
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, EventArgs.Empty);
+            }
+            catch (Exception exception) when (IsRecoverableSideEffectFailure(exception))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"Selection {eventName} observer failed after formal state changed: {exception}");
+            }
+        }
+    }
+
+    private static void TryViewerSideEffect(Action action, string operation)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception exception) when (IsRecoverableSideEffectFailure(exception))
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Selection viewer {operation} failed; formal selection remains authoritative: {exception}");
+        }
+    }
+
+    private static bool IsRecoverableSideEffectFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 }

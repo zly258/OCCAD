@@ -134,11 +134,11 @@ public sealed class CadToolManager
         catch (Exception exception) when (IsRecoverablePointerFailure(exception))
         {
             // Invalid or temporarily unsolvable pointer geometry must not tear
-            // down the active CAD command. Drop only transient feedback so the
-            // next valid pointer sample can continue the same tool.
-            _context.Preview.Clear();
-            _context.Snap.Clear();
-            _context.Tracking.Clear();
+            // down the active CAD command. Transient cleanup is best-effort as
+            // well: one native feedback channel failing to clear must not stop
+            // the other channels from being reset or convert a recoverable input
+            // sample into a false command failure.
+            ClearPointerFeedbackAfterRecoverableFailure(exception);
             return true;
         }
     }
@@ -161,7 +161,7 @@ public sealed class CadToolManager
     {
         if (ActiveTool?.CurrentStep.InputKind != CadToolInputKind.Point) return false;
         _context.Workspace.Precision.BeginOffset();
-        ToolUpdated?.Invoke(this, new(ActiveTool));
+        PublishToolUpdated(ActiveTool);
         return true;
     }
 
@@ -170,7 +170,7 @@ public sealed class CadToolManager
         if (_context.Workspace.Precision.PointMode == CadPointInputMode.Offset)
         {
             _context.Workspace.Precision.ResetPointInput();
-            ToolUpdated?.Invoke(this, new(ActiveTool));
+            PublishToolUpdated(ActiveTool);
             return true;
         }
         var tool = ActiveTool;
@@ -189,7 +189,7 @@ public sealed class CadToolManager
             if (!resolved.Point.IsFinite || tool.CurrentStep.InputKind != CadToolInputKind.Point) return false;
             if (precision.CaptureOffsetOrigin(resolved.Point))
             {
-                ToolUpdated?.Invoke(this, new(tool));
+                PublishToolUpdated(tool);
                 return true;
             }
             var accepted = tool.CommitCurrentStage(resolved);
@@ -198,7 +198,7 @@ public sealed class CadToolManager
                 var wasOffset = precision.PointMode == CadPointInputMode.Offset;
                 precision.ResetPointInput();
                 if (wasOffset && ReferenceEquals(ActiveTool, tool))
-                    ToolUpdated?.Invoke(this, new(tool));
+                    PublishToolUpdated(tool);
             }
             return accepted;
         }
@@ -212,7 +212,7 @@ public sealed class CadToolManager
                 var wasOffset = precision.PointMode == CadPointInputMode.Offset;
                 precision.ResetPointInput();
                 if (wasOffset && ReferenceEquals(ActiveTool, tool))
-                    ToolUpdated?.Invoke(this, new(tool));
+                    PublishToolUpdated(tool);
             }
             return accepted;
         }
@@ -286,44 +286,34 @@ public sealed class CadToolManager
         }
         catch (Exception activationFailure)
         {
-            Exception? cleanupFailure = null;
-            try
-            {
-                tool.Deactivate(canceled: true);
-            }
-            catch (Exception exception)
-            {
-                cleanupFailure = exception;
-            }
-
-            try
-            {
-                ResetNeutralInteractionState(tool.Id);
-            }
-            catch (Exception exception)
-            {
-                cleanupFailure ??= exception;
-            }
+            var cleanupFailures = new List<Exception>();
+            Cleanup(() => tool.Deactivate(canceled: true));
+            Cleanup(() => ResetNeutralInteractionState(tool.Id));
 
             _transitioning = false;
-            RestoreSelectionGrips();
+            Cleanup(RestoreSelectionGrips);
 
-            if (cleanupFailure is not null)
+            if (cleanupFailures.Count > 0)
             {
                 throw new AggregateException(
                     "Tool activation and cleanup both failed.",
-                    activationFailure,
-                    cleanupFailure);
+                    new[] { activationFailure }.Concat(cleanupFailures));
             }
 
             ExceptionDispatchInfo.Capture(activationFailure).Throw();
             return;
+
+            void Cleanup(Action action)
+            {
+                try { action(); }
+                catch (Exception exception) { cleanupFailures.Add(exception); }
+            }
         }
 
         ActiveTool = tool;
         tool.Updated += ActiveToolUpdated;
         _transitioning = false;
-        ToolChanged?.Invoke(this, new CadToolChangedEventArgs(tool));
+        PublishToolChanged(tool);
     }
 
     private void DeactivateActiveTool(CadTool tool, bool canceled)
@@ -331,34 +321,29 @@ public sealed class CadToolManager
         _transitioning = true;
         tool.Updated -= ActiveToolUpdated;
 
-        Exception? failure = null;
-        try
-        {
-            tool.Deactivate(canceled);
-        }
-        catch (Exception exception)
-        {
-            failure = exception;
-        }
-        finally
-        {
-            ActiveTool = null;
-            try
-            {
-                ResetNeutralInteractionState(tool.Id);
-            }
-            catch (Exception exception)
-            {
-                failure ??= exception;
-            }
+        var failures = new List<Exception>();
+        Cleanup(() => tool.Deactivate(canceled));
 
-            _transitioning = false;
-            RestoreSelectionGrips();
-            ToolChanged?.Invoke(this, new CadToolChangedEventArgs(null));
-        }
+        ActiveTool = null;
+        Cleanup(() => ResetNeutralInteractionState(tool.Id));
+        _transitioning = false;
+        Cleanup(RestoreSelectionGrips);
 
-        if (failure is not null)
-            ExceptionDispatchInfo.Capture(failure).Throw();
+        // Tool state is already authoritative and neutral here. UI observers are
+        // notifications only and cannot veto or reverse a completed transition.
+        PublishToolChanged(null);
+
+        if (failures.Count == 1)
+            ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1)
+            throw new AggregateException("Tool deactivation cleanup failed.", failures);
+        return;
+
+        void Cleanup(Action action)
+        {
+            try { action(); }
+            catch (Exception exception) { failures.Add(exception); }
+        }
     }
 
     private void ResetNeutralInteractionState(string? toolId = null)
@@ -413,16 +398,83 @@ public sealed class CadToolManager
         }
     }
 
+    private void ClearPointerFeedbackAfterRecoverableFailure(Exception pointerFailure)
+    {
+        var failures = new List<Exception>();
+        Cleanup(_context.Preview.Clear);
+        Cleanup(_context.Snap.Clear);
+        Cleanup(_context.Tracking.Clear);
+
+        if (failures.Count == 0)
+            return;
+
+        System.Diagnostics.Debug.WriteLine(
+            $"Recoverable pointer failure '{pointerFailure.Message}' also had {failures.Count} transient cleanup failure(s): " +
+            string.Join(" | ", failures.Select(static failure => failure.Message)));
+
+        return;
+
+        void Cleanup(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception exception) when (IsRecoverableCleanupFailure(exception))
+            {
+                failures.Add(exception);
+            }
+        }
+    }
+
     private void ActiveToolUpdated(object? sender, EventArgs e)
     {
         if (sender is not CadTool tool || !ReferenceEquals(tool, ActiveTool))
             return;
 
-        ToolUpdated?.Invoke(this, new CadToolChangedEventArgs(tool));
+        PublishToolUpdated(tool);
     }
 
     private void RestoreSelectionGrips() =>
         _context.Workspace.RefreshSelectionGrips();
+
+    private void PublishToolChanged(CadTool? tool) =>
+        PublishObservers(ToolChanged, new CadToolChangedEventArgs(tool), "ToolChanged");
+
+    private void PublishToolUpdated(CadTool? tool) =>
+        PublishObservers(ToolUpdated, new CadToolChangedEventArgs(tool), "ToolUpdated");
+
+    private void PublishObservers(
+        EventHandler<CadToolChangedEventArgs>? handlers,
+        CadToolChangedEventArgs args,
+        string eventName)
+    {
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler<CadToolChangedEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"{eventName} observer failed after tool state changed: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
+
+    private static bool IsRecoverableCleanupFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private static bool IsRecoverablePointerFailure(Exception exception) =>
         exception is ArgumentException or InvalidOperationException or ArithmeticException;

@@ -298,8 +298,10 @@ public sealed class CadTransaction : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(mutation);
 
+        var historyOwnedByOuterTransaction =
+            workspace.History.RecordingSuspended;
         if (complete is not null &&
-            workspace.History.RecordingSuspended)
+            historyOwnedByOuterTransaction)
         {
             throw new InvalidOperationException(
                 "A tool entity commit cannot be nested inside another transaction.");
@@ -325,18 +327,28 @@ public sealed class CadTransaction : IDisposable
                     // operation as failed.
                     complete?.Invoke();
 
-                    var state = workspace.History.CurrentStateId;
-                    try
+                    if (historyOwnedByOuterTransaction)
                     {
-                        RecordApplied(
-                            workspace.History,
-                            geometryOnly
-                                ? new CadGeometryHistoryEntry(targets, before, after, name)
-                                : new CadEntityStateHistoryEntry(targets, before, after, name));
+                        // The outer CadTransaction snapshot owns the single Undo
+                        // entry. Report that a mutation happened, but do not install
+                        // a nested history record.
+                        recorded = true;
                     }
-                    finally
+                    else
                     {
-                        recorded = workspace.History.CurrentStateId != state;
+                        var state = workspace.History.CurrentStateId;
+                        try
+                        {
+                            RecordApplied(
+                                workspace.History,
+                                geometryOnly
+                                    ? new CadGeometryHistoryEntry(targets, before, after, name)
+                                    : new CadEntityStateHistoryEntry(targets, before, after, name));
+                        }
+                        finally
+                        {
+                            recorded = workspace.History.CurrentStateId != state;
+                        }
                     }
                 }
             }

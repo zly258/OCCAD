@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Platform;
 
 namespace OCCAD.Avalonia;
 
@@ -101,6 +102,23 @@ public sealed partial class MainWindow
 
         if (_workspace.Actions.ExecuteShortcut(shortcut))
             e.Handled = true;
+    }
+
+    private void ApplyWindowLogo()
+    {
+        try
+        {
+            using var stream = AssetLoader.Open(
+                new Uri("avares://OCCAD/Assets/OCCAD.png"));
+            Icon = new WindowIcon(stream);
+        }
+        catch (Exception exception)
+            when (exception is not OutOfMemoryException and
+                  not StackOverflowException and
+                  not AccessViolationException)
+        {
+            CadDiagnostics.Report(exception, "Window logo");
+        }
     }
 
     private static string? ShortcutText(

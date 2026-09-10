@@ -34,7 +34,6 @@ internal sealed class CadCommandLineController : IDisposable
         _host = host ?? throw new ArgumentNullException(nameof(host));
 
         BuildUi();
-        _workspace.Actions.ActionFailed += ActionFailed;
         _workspace.Tools.ToolChanged += ToolChanged;
         _workspace.Tools.ToolUpdated += ToolChanged;
         RefreshToolPrompt();
@@ -69,7 +68,6 @@ internal sealed class CadCommandLineController : IDisposable
 
     public void Dispose()
     {
-        _workspace.Actions.ActionFailed -= ActionFailed;
         _workspace.Tools.ToolChanged -= ToolChanged;
         _workspace.Tools.ToolUpdated -= ToolChanged;
         _input.KeyDown -= InputKeyDown;
@@ -342,17 +340,5 @@ internal sealed class CadCommandLineController : IDisposable
                     "Canceled"),
                 _ => string.Empty
             });
-    }
-
-    private void ActionFailed(object? sender, CadActionFailedEventArgs e)
-    {
-        ShowFeedback(
-            string.Format(
-                CadLanguageManager.Text(
-                    "Cad.Text.CommandFailed",
-                    "{0} failed"),
-                CadLanguageManager.Text(
-                    $"Cad.Action.{e.Action.Id}",
-                    e.Action.DisplayName)));
     }
 }

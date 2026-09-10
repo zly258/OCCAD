@@ -132,7 +132,7 @@ public sealed partial class MainWindow
                         new("draw.circle.threepoints", "Cad.Parameter.circle.Method.ThreePoints", "Three Points"),
                         new("draw.circle.pointcenter", "Cad.Parameter.circle.Method.PointCenter", "Point + Center")),
                     RibbonActionMenu(
-                        "Cad.Text.Arc",
+                        "Cad.Text.ArcFamily",
                         "Arc",
                         new("draw.arc.threepoints", "Cad.Parameter.arc.Method.ThreePoints", "Three Points"),
                         new("draw.arc.centerstartend", "Cad.Parameter.arc.Method.CenterStartEnd", "Center + Start + End"),

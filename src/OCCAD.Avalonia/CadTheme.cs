@@ -286,25 +286,5 @@ internal static class CadTheme
         });
     }
 
-    public static Border Card(Control child, Thickness? padding = null) =>
-        new()
-        {
-            Background = Surface,
-            BorderBrush = Border,
-            BorderThickness = new Thickness(0, 1, 0, 0),
-            CornerRadius = new CornerRadius(0),
-            Padding = padding ?? new Thickness(4),
-            Child = child
-        };
-
-    public static TextBlock SectionTitle(string text) =>
-        new()
-        {
-            Text = text,
-            FontWeight = FontWeight.SemiBold,
-            Foreground = Text,
-            Margin = new Thickness(0, 0, 0, 3)
-        };
-
     private static SolidColorBrush Brush(string value) => new(Color.Parse(value));
 }

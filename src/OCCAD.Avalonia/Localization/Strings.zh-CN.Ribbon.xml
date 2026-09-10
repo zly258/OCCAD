@@ -4,6 +4,7 @@
     <sys:String x:Key="Cad.Text.Manage">管理</sys:String>
     <sys:String x:Key="Cad.Text.Construction">构造</sys:String>
     <sys:String x:Key="Cad.Text.Curves">曲线</sys:String>
+    <sys:String x:Key="Cad.Text.ArcFamily">圆弧</sys:String>
     <sys:String x:Key="Cad.Text.Layer">图层</sys:String>
     <sys:String x:Key="Cad.Text.CurrentLayer">当前图层</sys:String>
     <sys:String x:Key="Cad.Text.Modeling">建模</sys:String>

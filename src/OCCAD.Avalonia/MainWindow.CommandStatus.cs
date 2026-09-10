@@ -9,6 +9,16 @@ public sealed partial class MainWindow
 {
     private TextBlock? _draftingStatusLabel;
 
+    private static void ConfigureStatusPlaneButton(
+        global::Avalonia.Controls.Primitives.ToggleButton button)
+    {
+        button.MinWidth = 30;
+        button.Height = 19;
+        button.Padding = new Thickness(5, 0);
+        button.Margin = new Thickness(0);
+        button.FontSize = CadTheme.CaptionFontSize;
+    }
+
     private static void ConfigureStatusDraftingToggle(
         global::Avalonia.Controls.Primitives.ToggleButton button)
     {

@@ -49,13 +49,12 @@ public sealed class CadApplication : Application
             CadDiagnostics.Trace("Constructing MainWindow.");
 
             var window = new MainWindow();
-            // Complete shell composition before the window is presented.
-            // Migration presenters are applied after the legacy shell so the
-            // underlying Action/Tool contracts remain stable while the visible
-            // Avalonia UI is replaced incrementally.
+            // Keep the visible shell intentionally traditional: menu + compact
+            // one-line toolbar + viewport/docks + persistent command/status
+            // surfaces. Refinement presenters replace only the interaction
+            // panels that need richer CAD behavior.
             window.ApplyUiRefinement();
             window.ApplyCompactUiEnhancements();
-            window.ApplyRibbonShell();
             window.ApplyFloatingToolPanel();
             window.ApplyPropertyGridRefinement();
             window.ApplyCommandStatusRefinement();

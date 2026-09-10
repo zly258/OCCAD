@@ -1,7 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
-    <!-- Ribbon shell -->
+    <!-- Shell groups retained by menu/tool presenters -->
     <sys:String x:Key="Cad.Text.Basic">基本绘图</sys:String>
     <sys:String x:Key="Cad.Text.Transform">变换</sys:String>
     <sys:String x:Key="Cad.Text.StandardViews">标准视图</sys:String>
@@ -11,6 +11,10 @@
     <sys:String x:Key="Cad.Text.Features">特征</sys:String>
     <sys:String x:Key="Cad.Text.ToolParameters">工具参数</sys:String>
     <sys:String x:Key="Cad.Text.SelectionMode">选择模式</sys:String>
+
+    <!-- Layer table -->
+    <sys:String x:Key="Cad.Text.Current">当前</sys:String>
+    <sys:String x:Key="Cad.Text.SetCurrentLayer">设为当前图层</sys:String>
 
     <!-- Property grid -->
     <sys:String x:Key="Cad.Text.Property">属性</sys:String>

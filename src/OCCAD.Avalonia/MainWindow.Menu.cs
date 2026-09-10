@@ -126,15 +126,8 @@ public sealed partial class MainWindow
             SetPropertyPanelVisible);
         _toolPanelMenu = CheckItem(
             UiText("Cad.Text.ToolParameters", "Tool Parameters"),
-            _toolPanel.IsPanelVisible,
-            value =>
-            {
-                if (value)
-                    _toolPanel.ShowPanel();
-                else
-                    _toolPanel.HidePanel();
-                RefreshPanelMenuState();
-            });
+            IsToolParameterPanelVisible,
+            SetToolParameterPanelVisible);
 
         var panels = Menu(
             UiText("Cad.Text.Panels", "Panels"),
@@ -401,8 +394,8 @@ public sealed partial class MainWindow
             _propertyPanelMenu.IsChecked = _propertyPanelBorder.IsVisible;
         if (_toolPanelMenu is not null)
         {
-            _toolPanelMenu.IsEnabled = _toolPanel.CanDisplayCurrentTool;
-            _toolPanelMenu.IsChecked = _toolPanel.IsPanelVisible;
+            _toolPanelMenu.IsEnabled = CanShowToolParameterPanel;
+            _toolPanelMenu.IsChecked = IsToolParameterPanelVisible;
         }
     }
 

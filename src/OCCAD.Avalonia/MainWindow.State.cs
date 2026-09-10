@@ -215,7 +215,6 @@ public sealed partial class MainWindow
         _workspace.Tracking.Clear();
         _toolPanel.SetTool(_workspace.Tools.ActiveTool);
         RefreshInteractionUi();
-        _viewportInteraction.RefreshCurrentDrawingPointer();
     }
 
     private void RefreshInteractionUi()
@@ -223,13 +222,13 @@ public sealed partial class MainWindow
         _refreshingUi = true;
         try
         {
-            _snapToggle.Content = ChineseUi ? "捕捉" : "SN";
+            _snapToggle.Content = "SNAP";
             _snapToggle.IsChecked = _workspace.Snap.Enabled;
 
-            _orthoToggle.Content = ChineseUi ? "正交" : "OR";
+            _orthoToggle.Content = "ORTHO";
             _orthoToggle.IsChecked = _workspace.Drafting.OrthogonalTrackingEnabled;
 
-            _polarToggle.Content = ChineseUi ? "极轴" : "PL";
+            _polarToggle.Content = "POLAR";
             _polarToggle.IsChecked = _workspace.Drafting.PolarTrackingEnabled;
 
             var explicitDirectionLock =
@@ -470,17 +469,15 @@ public sealed partial class MainWindow
 
         if (resolved.Snap is { } snap)
         {
-            values.Add(
-                $"{(ChineseUi ? "捕捉" : "SN")} " +
-                LocalizeSnapType(snap.Type));
+            values.Add($"SNAP {LocalizeSnapType(snap.Type)}");
         }
         else if (resolved.Tracking is { } tracking)
         {
             var trackingName = tracking.Kind switch
             {
-                CadTrackingKind.Orthogonal => ChineseUi ? "正交" : "OR",
-                CadTrackingKind.Polar => ChineseUi ? "极轴" : "PL",
-                _ => tracking.Kind.ToString()
+                CadTrackingKind.Orthogonal => "ORTHO",
+                CadTrackingKind.Polar => "POLAR",
+                _ => tracking.Kind.ToString().ToUpperInvariant()
             };
             values.Add($"{trackingName} {tracking.AngleDegrees:F1}°");
         }

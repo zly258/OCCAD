@@ -89,12 +89,9 @@ internal sealed class CadLayerPanelController : IDisposable
             toolbar.ColumnDefinitions.Add(
                 new ColumnDefinition(
                     new GridLength(1, GridUnitType.Star)));
-            toolbar.ColumnDefinitions.Add(
-                new ColumnDefinition(GridLength.Auto));
-            toolbar.ColumnDefinitions.Add(
-                new ColumnDefinition(GridLength.Auto));
-            toolbar.ColumnDefinitions.Add(
-                new ColumnDefinition(GridLength.Auto));
+            toolbar.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            toolbar.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            toolbar.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
 
             toolbar.Children.Add(_search);
 
@@ -151,43 +148,17 @@ internal sealed class CadLayerPanelController : IDisposable
         };
         ConfigureLayerColumns(grid);
 
-        AddHeader(
-            grid,
-            0,
-            CadLanguageManager.Text(
-                "Cad.Text.Name",
-                "Name"),
-            HorizontalAlignment.Left);
+        AddHeader(grid, 0, CadLanguageManager.Text("Cad.Text.Current", "Current"));
         AddHeader(
             grid,
             1,
-            CadLanguageManager.Text(
-                "Cad.Text.Visible",
-                "Visible"));
-        AddHeader(
-            grid,
-            2,
-            CadLanguageManager.Text(
-                "Cad.Text.Color",
-                "Color"));
-        AddHeader(
-            grid,
-            3,
-            CadLanguageManager.Text(
-                "Cad.Text.LineStyle",
-                "Line style"));
-        AddHeader(
-            grid,
-            4,
-            CadLanguageManager.Text(
-                "Cad.Text.LineWidth",
-                "Line width"));
-        AddHeader(
-            grid,
-            5,
-            CadLanguageManager.Text(
-                "Cad.Text.Locked",
-                "Locked"));
+            CadLanguageManager.Text("Cad.Text.Name", "Name"),
+            HorizontalAlignment.Left);
+        AddHeader(grid, 2, CadLanguageManager.Text("Cad.Text.Visible", "Visible"));
+        AddHeader(grid, 3, CadLanguageManager.Text("Cad.Text.Color", "Color"));
+        AddHeader(grid, 4, CadLanguageManager.Text("Cad.Text.LineStyle", "Line style"));
+        AddHeader(grid, 5, CadLanguageManager.Text("Cad.Text.LineWidth", "Line width"));
+        AddHeader(grid, 6, CadLanguageManager.Text("Cad.Text.Locked", "Locked"));
 
         return new Border
         {
@@ -200,27 +171,21 @@ internal sealed class CadLayerPanelController : IDisposable
 
     private static void ConfigureLayerColumns(Grid grid)
     {
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(42)));
         grid.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(1, GridUnitType.Star)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(34)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(34)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(62)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(54)));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(new GridLength(34)));
+            new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(34)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(34)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(62)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(54)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(34)));
     }
 
     private static void AddHeader(
         Grid grid,
         int column,
         string text,
-        HorizontalAlignment alignment =
-            HorizontalAlignment.Center)
+        HorizontalAlignment alignment = HorizontalAlignment.Center)
     {
         var label = new TextBlock
         {
@@ -237,13 +202,9 @@ internal sealed class CadLayerPanelController : IDisposable
         grid.Children.Add(label);
     }
 
-    private Control CreateLayerRow(
-        CadLayer layer,
-        int rowIndex)
+    private Control CreateLayerRow(CadLayer layer, int rowIndex)
     {
-        var current = ReferenceEquals(
-            layer,
-            _workspace.Layers.Current);
+        var current = ReferenceEquals(layer, _workspace.Layers.Current);
         var rowBackground = current
             ? CadTheme.AccentSoft
             : rowIndex % 2 == 0
@@ -258,6 +219,26 @@ internal sealed class CadLayerPanelController : IDisposable
         };
         ConfigureLayerColumns(grid);
 
+        var currentLayer = new CheckBox
+        {
+            IsChecked = current,
+            IsEnabled = !current,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        ToolTip.SetTip(
+            currentLayer,
+            CadLanguageManager.Text("Cad.Text.SetCurrentLayer", "Set current layer"));
+        currentLayer.IsCheckedChanged += (_, _) =>
+        {
+            if (_refreshing || currentLayer.IsChecked != true || current)
+                return;
+
+            _workspace.SetCurrentLayer(layer);
+            _inspectLayer(layer);
+        };
+        grid.Children.Add(currentLayer);
+
         var name = new Button
         {
             Content = layer.Name,
@@ -267,16 +248,82 @@ internal sealed class CadLayerPanelController : IDisposable
             Padding = new Thickness(5, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
             Foreground = CadTheme.Text,
-            FontWeight = current
-                ? FontWeight.SemiBold
-                : FontWeight.Normal
+            FontWeight = current ? FontWeight.SemiBold : FontWeight.Normal
         };
         name.Click += (_, _) =>
         {
             _workspace.SetCurrentLayer(layer);
             _inspectLayer(layer);
         };
+        Grid.SetColumn(name, 1);
         grid.Children.Add(name);
+
+        var visible = new CheckBox
+        {
+            IsChecked = layer.Visible,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        ToolTip.SetTip(visible, CadLanguageManager.Text("Cad.Text.Visible", "Visible"));
+        visible.IsCheckedChanged += (_, _) =>
+        {
+            if (_refreshing) return;
+            TryLayerChange(
+                () => _workspace.SetLayerVisible(layer, visible.IsChecked == true));
+        };
+        Grid.SetColumn(visible, 2);
+        grid.Children.Add(visible);
+
+        var color = new Button
+        {
+            Width = 26,
+            Height = Math.Max(18, CadTheme.ControlHeight - 4),
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = new SolidColorBrush(ToMediaColor(layer.Color)),
+            BorderBrush = CadTheme.BorderStrong,
+            BorderThickness = new Thickness(1)
+        };
+        ToolTip.SetTip(color, CadLanguageManager.Text("Cad.Text.Color", "Color"));
+        color.Click += async (_, _) =>
+        {
+            if (_refreshing)
+                return;
+
+            var selected = await CadColorDialog.ShowAsync(_owner, layer.Color);
+            if (selected is not { } next || next.ToArgb() == layer.Color.ToArgb())
+                return;
+
+            TryLayerChange(() => _workspace.SetLayerColor(layer, next));
+        };
+        Grid.SetColumn(color, 3);
+        grid.Children.Add(color);
+
+        var styles = Enum.GetValues<OcctLineStyle>()
+            .Select(value => new StyleChoice(
+                value,
+                CadLanguageManager.Text(
+                    $"Cad.Value.OcctLineStyle.{value}",
+                    value.ToString())))
+            .ToArray();
+        var style = new ComboBox
+        {
+            ItemsSource = styles,
+            SelectedItem = styles.FirstOrDefault(item => item.Value == layer.LineStyle)
+        };
+        style.Classes.Add("cad-input");
+        style.SelectionChanged += (_, _) =>
+        {
+            if (_refreshing ||
+                style.SelectedItem is not StyleChoice item ||
+                item.Value == layer.LineStyle)
+                return;
+
+            TryLayerChange(() => _workspace.SetLayerLineStyle(layer, item.Value));
+        };
+        Grid.SetColumn(style, 4);
+        grid.Children.Add(style);
 
         var width = new ComboBox
         {
@@ -292,62 +339,10 @@ internal sealed class CadLayerPanelController : IDisposable
                 Math.Abs(value - layer.LineWidth) < 1e-12)
                 return;
 
-            TryLayerChange(
-                () => _workspace.SetLayerLineWidth(
-                    layer,
-                    value));
+            TryLayerChange(() => _workspace.SetLayerLineWidth(layer, value));
         };
-        Grid.SetColumn(width, 4);
+        Grid.SetColumn(width, 5);
         grid.Children.Add(width);
-
-        var styles = Enum.GetValues<OcctLineStyle>()
-            .Select(value => new StyleChoice(
-                value,
-                CadLanguageManager.Text(
-                    $"Cad.Value.OcctLineStyle.{value}",
-                    value.ToString())))
-            .ToArray();
-        var style = new ComboBox
-        {
-            ItemsSource = styles,
-            SelectedItem = styles.FirstOrDefault(
-                item => item.Value == layer.LineStyle)
-        };
-        style.Classes.Add("cad-input");
-        style.SelectionChanged += (_, _) =>
-        {
-            if (_refreshing ||
-                style.SelectedItem is not StyleChoice item ||
-                item.Value == layer.LineStyle)
-                return;
-
-            TryLayerChange(
-                () => _workspace.SetLayerLineStyle(
-                    layer,
-                    item.Value));
-        };
-        Grid.SetColumn(style, 3);
-        grid.Children.Add(style);
-
-        var visible = new CheckBox
-        {
-            IsChecked = layer.Visible,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        ToolTip.SetTip(
-            visible,
-            CadLanguageManager.Text("Cad.Text.Visible", "Visible"));
-        visible.IsCheckedChanged += (_, _) =>
-        {
-            if (_refreshing) return;
-            TryLayerChange(
-                () => _workspace.SetLayerVisible(
-                    layer,
-                    visible.IsChecked == true));
-        };
-        Grid.SetColumn(visible, 1);
-        grid.Children.Add(visible);
 
         var locked = new CheckBox
         {
@@ -355,56 +350,14 @@ internal sealed class CadLayerPanelController : IDisposable
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        ToolTip.SetTip(
-            locked,
-            CadLanguageManager.Text("Cad.Text.Locked", "Locked"));
+        ToolTip.SetTip(locked, CadLanguageManager.Text("Cad.Text.Locked", "Locked"));
         locked.IsCheckedChanged += (_, _) =>
         {
             if (_refreshing) return;
-            TryLayerChange(
-                () => _workspace.SetLayerLocked(
-                    layer,
-                    locked.IsChecked == true));
+            TryLayerChange(() => _workspace.SetLayerLocked(layer, locked.IsChecked == true));
         };
-        Grid.SetColumn(locked, 5);
+        Grid.SetColumn(locked, 6);
         grid.Children.Add(locked);
-
-        var color = new Button
-        {
-            Width = 26,
-            Height = Math.Max(18, CadTheme.ControlHeight - 4),
-            Padding = new Thickness(0),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(
-                ToMediaColor(layer.Color)),
-            BorderBrush = CadTheme.BorderStrong,
-            BorderThickness = new Thickness(1)
-        };
-        ToolTip.SetTip(
-            color,
-            CadLanguageManager.Text(
-                "Cad.Text.Color",
-                "Color"));
-        color.Click += async (_, _) =>
-        {
-            if (_refreshing)
-                return;
-
-            var selected = await CadColorDialog.ShowAsync(
-                _owner,
-                layer.Color);
-            if (selected is not { } next ||
-                next.ToArgb() == layer.Color.ToArgb())
-                return;
-
-            TryLayerChange(
-                () => _workspace.SetLayerColor(
-                    layer,
-                    next));
-        };
-        Grid.SetColumn(color, 2);
-        grid.Children.Add(color);
 
         return new Border
         {
@@ -420,11 +373,8 @@ internal sealed class CadLayerPanelController : IDisposable
 
     private async Task AddLayerAsync()
     {
-        var suggested =
-            _workspace.Layers.GenerateUniqueName("Layer");
-        var dialog = new LayerNameDialog(
-            suggested,
-            creating: true);
+        var suggested = _workspace.Layers.GenerateUniqueName("Layer");
+        var dialog = new LayerNameDialog(suggested, creating: true);
         var name = await dialog.ShowDialog<string?>(_owner);
         if (string.IsNullOrWhiteSpace(name))
             return;
@@ -446,18 +396,14 @@ internal sealed class CadLayerPanelController : IDisposable
         if (layer.IsDefault)
             return;
 
-        var dialog = new LayerNameDialog(
-            layer.Name,
-            creating: false);
+        var dialog = new LayerNameDialog(layer.Name, creating: false);
         var name = await dialog.ShowDialog<string?>(_owner);
         if (string.IsNullOrWhiteSpace(name))
             return;
 
         try
         {
-            _workspace.RenameLayer(
-                layer,
-                name.Trim());
+            _workspace.RenameLayer(layer, name.Trim());
         }
         catch (Exception exception)
         {
@@ -505,9 +451,7 @@ internal sealed class CadLayerPanelController : IDisposable
 
         _ = CadMessageDialog.ShowAsync(
             _owner,
-            CadLanguageManager.Text(
-                "Cad.Text.ErrorTitle",
-                "OCCAD Error"),
+            CadLanguageManager.Text("Cad.Text.ErrorTitle", "OCCAD Error"),
             exception.GetBaseException().Message,
             kind: CadMessageDialogKind.Error);
     }
@@ -529,15 +473,9 @@ internal sealed class CadLayerPanelController : IDisposable
     }
 
     private static MediaColor ToMediaColor(DrawingColor value) =>
-        MediaColor.FromArgb(
-            value.A,
-            value.R,
-            value.G,
-            value.B);
+        MediaColor.FromArgb(value.A, value.R, value.G, value.B);
 
-    private sealed record StyleChoice(
-        OcctLineStyle Value,
-        string Label)
+    private sealed record StyleChoice(OcctLineStyle Value, string Label)
     {
         public override string ToString() => Label;
     }

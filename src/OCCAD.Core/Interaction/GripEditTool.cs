@@ -115,6 +115,30 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
                 ConstraintOrigin).Point);
     }
 
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (_preview is not null &&
+            Context.Workspace.LastPointerPosition is { } pointer)
+        {
+            RefreshPreviewFromLastPointer(pointer);
+        }
+        return true;
+    }
+
+    protected internal override void RefreshPreviewFromLastPointer(
+        CadPointerPosition pointer)
+    {
+        if (_preview is null)
+            return;
+
+        var point = Context.ResolvePoint(
+            pointer.X,
+            pointer.Y,
+            ConstraintOrigin).Point;
+        if (TryMovePreview(point))
+            UpdateDragMarkerFromPreview();
+    }
+
     private bool TryCommitPoint(OcctPoint3d point)
     {
         if (_preview is null ||

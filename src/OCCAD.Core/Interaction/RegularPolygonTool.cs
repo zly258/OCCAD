@@ -24,6 +24,14 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
     public override string PrecisionLengthLabel => "Radius";
     protected override bool CanStepBackCore => _center is not null;
 
+    public override bool CanCommitCurrentStage =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        _center is not null &&
+        TryResolveExactRadiusPoint(out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     public override CadToolPanelDescriptor ParameterPanel =>
         new(
             "Regular Polygon",
@@ -83,6 +91,12 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
 
     protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
     {
+        if (_center is not null && TryResolveExactRadiusPoint(out var exactPoint))
+        {
+            _currentPoint = exactPoint;
+            return AcceptPoint(exactPoint);
+        }
+
         var point = Context.ResolvePoint(
             pointer.X,
             pointer.Y,
@@ -136,6 +150,18 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
         }
 
         return false;
+    }
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (_center is { } center && TryResolveExactRadiusPoint(out var exactPoint))
+        {
+            _currentPoint = exactPoint;
+            UpdatePreview(center, exactPoint);
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
     }
 
     protected override bool OnStepBack()
@@ -214,9 +240,28 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
 
     private void RefreshParameterDrivenPreview()
     {
-        if (_center is { } center &&
+        if (_center is { } center && TryResolveExactRadiusPoint(out var exactPoint))
+        {
+            _currentPoint = exactPoint;
+            UpdatePreview(center, exactPoint);
+            return;
+        }
+
+        if (_center is { } currentCenter &&
             _currentPoint is { } point)
-            UpdatePreview(center, point);
+        {
+            UpdatePreview(currentCenter, point);
+        }
+    }
+
+    private bool TryResolveExactRadiusPoint(out OcctPoint3d point)
+    {
+        point = default;
+        return _center is { } center &&
+               CadExactInputGeometry.TryResolveLengthAnglePoint(
+                   Context.Workspace,
+                   center,
+                   out point);
     }
 
     private void RefreshStagePrompt()

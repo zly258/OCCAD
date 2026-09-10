@@ -42,6 +42,13 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
 
     protected override bool CanStepBackCore => _points.Count > 0;
 
+    public override bool CanCommitCurrentStage =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        TryResolveExactInputPoint(out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnActivated()
     {
         _points.Clear();
@@ -79,14 +86,30 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
             Context.ResolvePoint(input.X, input.Y, PrecisionReferencePoint).Point));
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (TryResolveExactInputPoint(out var exactPoint))
+            return AcceptPoint(ProjectToDrawingPlane(exactPoint));
+
+        return CommitResolvedPoint(
             pointer,
             PrecisionReferencePoint,
             point => AcceptPoint(ProjectToDrawingPlane(point)));
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive && State == CadToolState.Drawing && AcceptPoint(ProjectToDrawingPlane(point));
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (TryResolveExactInputPoint(out var exactPoint))
+        {
+            UpdatePreview(ProjectToDrawingPlane(exactPoint));
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
+    }
 
     protected override bool OnSetParameter(string id, string value)
     {
@@ -112,7 +135,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
             bool.TryParse(value, out var clockwise))
         {
             _clockwise = clockwise;
-            RefreshPreviewFromLastPointer();
+            RefreshPreviewFromInput();
             NotifyUpdated();
             return true;
         }
@@ -236,6 +259,48 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         }
 
         ShowPreview(_preview);
+    }
+
+    private void RefreshPreviewFromInput()
+    {
+        if (_points.Count == 0)
+            return;
+
+        if (TryResolveExactInputPoint(out var exactPoint))
+        {
+            UpdatePreview(ProjectToDrawingPlane(exactPoint));
+            return;
+        }
+
+        RefreshPreviewFromLastPointer();
+    }
+
+    private bool TryResolveExactInputPoint(out OcctPoint3d point)
+    {
+        point = default;
+        if (_points.Count == 0)
+            return false;
+
+        var reference = PrecisionReferencePoint ?? Context.WorkPlane.Origin;
+        var precision = PrecisionInputs;
+        if ((precision & CadPrecisionInputKind.Length) != 0 &&
+            (precision & CadPrecisionInputKind.Angle) != 0)
+        {
+            return CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                reference,
+                out point);
+        }
+
+        if (precision == CadPrecisionInputKind.Angle)
+        {
+            return CadExactInputGeometry.TryResolveLockedAnglePoint(
+                Context.Workspace,
+                reference,
+                out point);
+        }
+
+        return false;
     }
 
     private void RefreshPreviewFromLastPointer()

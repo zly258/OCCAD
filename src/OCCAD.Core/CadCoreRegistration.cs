@@ -99,6 +99,7 @@ internal static class CadCoreRegistration
         ArgumentNullException.ThrowIfNull(workspace);
 
         actions.Register(new CadNewDocumentAction(workspace));
+        actions.Register(new CadClearModelAction(workspace));
         actions.Register(new CadUndoAction(workspace));
         actions.Register(new CadRedoAction(workspace));
         actions.Register(new CadDeleteAction(workspace));

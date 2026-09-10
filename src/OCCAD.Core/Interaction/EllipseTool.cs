@@ -56,6 +56,13 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
 
     protected override bool CanStepBackCore => _points.Count > 0;
 
+    public override bool CanCommitCurrentStage =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        TryResolveExactStagePoint(out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnActivated()
     {
         Reset();
@@ -95,11 +102,16 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
                     ReferencePoint()).Point));
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+            return AcceptPoint(exactPoint);
+
+        return CommitResolvedPoint(
             pointer,
             ReferencePoint(),
             point => AcceptPoint(ProjectToDrawingPlane(point)));
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive &&
@@ -161,6 +173,17 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
         return true;
     }
 
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+        {
+            UpdatePreview(exactPoint);
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
+    }
+
     protected override bool OnStepBack()
     {
         if (_points.Count == 0)
@@ -171,6 +194,7 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
         Context.Preview.Clear();
         RestoreConstructionState();
         RestorePrompt();
+        RefreshParameterStateAndPreview();
         return true;
     }
 
@@ -195,6 +219,7 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
         if (_points.Count < 3)
         {
             RestorePrompt();
+            RefreshParameterStateAndPreview();
             return true;
         }
 
@@ -355,6 +380,12 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
             RestoreMinorWorkPlane();
         }
 
+        if (TryResolveExactStagePoint(out var exactPoint))
+        {
+            UpdatePreview(exactPoint);
+            return;
+        }
+
         if (_points.Count == 0 ||
             Context.Workspace.LastPointerPosition is not { } pointer)
             return;
@@ -365,6 +396,36 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
                     pointer.X,
                     pointer.Y,
                     ReferencePoint()).Point));
+    }
+
+    private bool TryResolveExactStagePoint(out OcctPoint3d point)
+    {
+        point = default;
+        if (_points.Count == 1 &&
+            _majorRadiusParameter is { } major &&
+            major > 1e-9 &&
+            _angleDegrees is { } angle &&
+            double.IsFinite(angle))
+        {
+            var axis = AxisFromAngle(angle);
+            var length = _method == AxisEndpointsMinor
+                ? major * 2.0
+                : major;
+            point = _points[0] + axis * length;
+            return point.IsFinite;
+        }
+
+        if (_points.Count >= 2 &&
+            RestoreConstructionState() &&
+            _minorRadiusParameter is { } minor &&
+            IsValidMinor(minor))
+        {
+            var minorAxis = _normal.Cross(_majorAxis).Normalized();
+            point = _center + minorAxis * minor;
+            return point.IsFinite;
+        }
+
+        return false;
     }
 
     private double MinorRadius(OcctPoint3d point)

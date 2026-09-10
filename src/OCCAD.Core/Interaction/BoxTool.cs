@@ -18,8 +18,18 @@ public sealed class BoxTool : CadDrawingTool, ICadPointInputTool
 
     public override string Id => "box";
     public override string DisplayName => "Box";
+    public override string PrecisionLengthLabel => Stage == 2
+        ? "Height"
+        : "Base Diagonal";
 
     protected override bool CanStepBackCore => Stage > 0;
+
+    public override bool CanCommitCurrentStage =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        TryResolveExactStagePoint(out _)
+            ? true
+            : base.CanCommitCurrentStage;
 
     protected override void OnActivated()
     {
@@ -48,11 +58,27 @@ public sealed class BoxTool : CadDrawingTool, ICadPointInputTool
             Context.ResolvePoint(input.X, input.Y, ReferencePoint()).Point);
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(pointer, ReferencePoint(), AcceptPoint);
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+            return AcceptPoint(exactPoint);
+
+        return CommitResolvedPoint(pointer, ReferencePoint(), AcceptPoint);
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive && State == CadToolState.Drawing && AcceptPoint(point);
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (TryResolveExactStagePoint(out var exactPoint))
+        {
+            Update(exactPoint);
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
+    }
 
     protected override bool OnStepBack()
     {
@@ -129,13 +155,6 @@ public sealed class BoxTool : CadDrawingTool, ICadPointInputTool
                 }
 
             case 2:
-                if (Math.Abs(
-                        CadPlaneGeometry.SignedDistance(
-                            _second,
-                            point,
-                            _zAxis)) <= 1e-9)
-                    return true;
-
                 Update(point);
                 if (_preview is null)
                     return false;
@@ -152,6 +171,29 @@ public sealed class BoxTool : CadDrawingTool, ICadPointInputTool
         2 => _second,
         _ => null
     };
+
+    private bool TryResolveExactStagePoint(out OcctPoint3d point)
+    {
+        point = default;
+        if (Stage == 1)
+        {
+            return CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                _start,
+                out point);
+        }
+
+        if (Stage == 2 &&
+            Context.Workspace.Drafting.LengthLockEnabled &&
+            Context.Workspace.Drafting.LockedLength > 1e-9)
+        {
+            point = _second +
+                    _zAxis * Context.Workspace.Drafting.LockedLength;
+            return point.IsFinite;
+        }
+
+        return false;
+    }
 
     private void Update(OcctPoint3d point)
     {
@@ -181,6 +223,13 @@ public sealed class BoxTool : CadDrawingTool, ICadPointInputTool
         if (Stage != 2) return;
 
         var height = CadPlaneGeometry.SignedDistance(_second, point, _zAxis);
+        if (Math.Abs(height) <= 1e-9)
+        {
+            _preview = null;
+            Context.Preview.Clear();
+            return;
+        }
+
         var size = Math.Max(Math.Abs(height), MinSize);
         var heightOrigin = height < 0.0
             ? CadTransformMath.Add(_baseOrigin, _zAxis, height)

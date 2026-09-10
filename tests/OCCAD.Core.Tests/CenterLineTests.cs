@@ -46,7 +46,7 @@ public sealed class CenterLineTests
     }
 
     [TestMethod]
-    public void RefreshFromSourcesUpdatesAssociativeGeometry()
+    public void DocumentAutomaticallyRefreshesAssociativeGeometry()
     {
         using var workspace = new CadWorkspace();
         var first = new CadLineEntity(
@@ -63,9 +63,11 @@ public sealed class CenterLineTests
         second.StartY = 40;
         second.EndY = 40;
 
-        Assert.IsTrue(center.RefreshFromSources(workspace.Document));
         Assert.AreEqual(new OcctPoint3d(0, 20, 0), center.Start);
         Assert.AreEqual(new OcctPoint3d(100, 20, 0), center.End);
+        CollectionAssert.Contains(
+            workspace.Document.GetDependentEntities(second.Id).ToArray(),
+            center);
     }
 
     [TestMethod]

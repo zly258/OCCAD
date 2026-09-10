@@ -15,5 +15,41 @@
     <ProjectReference Include="..\OCCAD.Core\OCCAD.Core.csproj" />
     <PackageReference Include="Avalonia" Version="12.1.0" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.0" />
+    <Reference Include="OcctNet">
+      <HintPath>$(OcctBridgeDistRoot)\OcctNet.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="OcctNet.Avalonia">
+      <HintPath>$(OcctBridgeDistRoot)\OcctNet.Avalonia.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <None Include="$(OcctBridgeDistRoot)\bridge-contract.json" Link="bridge-contract.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(OcctBridgeDistRoot)\bridge-manifest.json" Link="bridge-manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <ItemGroup Condition="'$(OcctBridgePortableRoot)' != ''">
+    <None Include="$(OcctBridgePortableRoot)\runtime\*" Link="runtime\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(OcctBridgePortableRoot)\occt\**\*" Link="occt\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(OcctBridgePortableRoot)\package-manifest.json" Link="bridge-portable-manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(OcctBridgePortableRoot)' == '' and Exists('$(OcctBridgeDistRoot)\OcctNative.dll')">
+    <None Include="$(OcctBridgeDistRoot)\OcctNative.dll" Link="OcctNative.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="ValidateCadAvaloniaBridgeSdk" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(OcctBridgeDistRoot)\OcctNet.dll')" Text="OcctNet.dll is missing. Install the shared OcctCSharpBridge SDK or set OCCTCSHARPBRIDGE_SDK." />
+    <Error Condition="!Exists('$(OcctBridgeDistRoot)\OcctNet.Avalonia.dll')" Text="OcctNet.Avalonia.dll is missing. Install the shared OcctCSharpBridge SDK or set OCCTCSHARPBRIDGE_SDK." />
+    <Error Condition="!Exists('$(OcctBridgeDistRoot)\bridge-contract.json') or !Exists('$(OcctBridgeDistRoot)\bridge-manifest.json')" Text="OcctCSharpBridge SDK metadata is incomplete." />
+    <Error Condition="$([MSBuild]::IsOSPlatform('Linux')) and !Exists('$(OcctBridgePortableRoot)\runtime\libOcctNative.so')" Text="Linux requires the complete installed OcctCSharpBridge SDK with portable/runtime/libOcctNative.so." />
+    <Error Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(OcctBridgePortableRoot)' != '' and !Exists('$(OcctBridgePortableRoot)\runtime\OcctNative.dll')" Text="Portable Windows OcctCSharpBridge SDK is missing runtime/OcctNative.dll." />
+    <Error Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(OcctBridgePortableRoot)' == '' and !Exists('$(OcctBridgeDistRoot)\OcctNative.dll')" Text="Installed Windows OcctCSharpBridge SDK is missing OcctNative.dll." />
+  </Target>
+
+  <Target Name="PrepareCadBridgeRuntime" BeforeTargets="CopyFilesToOutputDirectory">
+    <RemoveDir Directories="$(TargetDir)runtime;$(TargetDir)occt" Condition="'$(OcctBridgePortableRoot)' == ''" />
+    <Delete Files="$(TargetDir)bridge-portable-manifest.json" Condition="'$(OcctBridgePortableRoot)' == ''" />
+    <Delete Files="$(TargetDir)OcctNative.dll;$(TargetDir)libOcctNative.so" Condition="'$(OcctBridgePortableRoot)' != ''" />
+  </Target>
 </Project>

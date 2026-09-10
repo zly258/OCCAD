@@ -54,7 +54,9 @@ public sealed class CadHistory
 
     internal void SuspendRecording()
     {
-        if (RecordingSuspended) throw new InvalidOperationException("Nested batch transactions are not supported.");
+        if (RecordingSuspended)
+            throw new InvalidOperationException(
+                "Nested batch transactions are not supported.");
         RecordingSuspended = true;
     }
 
@@ -62,7 +64,9 @@ public sealed class CadHistory
 
     private void EnsureNoTransaction()
     {
-        if (RecordingSuspended) throw new InvalidOperationException("Finish the transaction before changing history.");
+        if (RecordingSuspended)
+            throw new InvalidOperationException(
+                "Finish the transaction before changing history.");
     }
 
     public void Execute(ICadHistoryEntry entry)
@@ -241,11 +245,9 @@ internal sealed class CadReplaceEntitiesHistoryEntry : ICadHistoryEntry
         IReadOnlyList<CadEntity> remove,
         IReadOnlyList<CadEntity> add)
     {
-        using var changes =
-            _document.BeginChangeSet();
+        using var changes = _document.BeginChangeSet();
 
-        _document.RemoveRange(
-            remove.Reverse());
+        _document.RemoveRange(remove.Reverse());
 
         try
         {
@@ -281,7 +283,9 @@ internal sealed class CadRemoveEntitiesHistoryEntry : ICadHistoryEntry
     {
         _document = document ?? throw new ArgumentNullException(nameof(document));
         ArgumentNullException.ThrowIfNull(entities);
-        _entities = entities.Distinct().ToArray();
+        _entities = ExpandWithDependents(
+            _document,
+            entities).ToArray();
         if (_entities.Length == 0)
             throw new ArgumentException(
                 "At least one entity is required.",
@@ -293,8 +297,43 @@ internal sealed class CadRemoveEntitiesHistoryEntry : ICadHistoryEntry
             ? "Delete"
             : $"Delete {_entities.Length}";
 
+    // Sources are stored before their dependents. Undo restores sources first so
+    // dependent AddRange regeneration can resolve every host. Redo reverses the
+    // order, removing dependents before their source identities disappear.
     public void Undo() => _document.AddRange(_entities);
     public void Redo() => _document.RemoveRange(_entities.Reverse());
+
+    private static IEnumerable<CadEntity> ExpandWithDependents(
+        CadDocument document,
+        IEnumerable<CadEntity> requested)
+    {
+        var ordered = new List<CadEntity>();
+        var seen = new HashSet<Guid>();
+        var queue = new Queue<CadEntity>();
+
+        foreach (var entity in requested.Distinct())
+        {
+            if (!document.Entities.Contains(entity) ||
+                !seen.Add(entity.Id))
+                continue;
+            ordered.Add(entity);
+            queue.Enqueue(entity);
+        }
+
+        while (queue.Count > 0)
+        {
+            var source = queue.Dequeue();
+            foreach (var dependent in document.GetDependentEntities(source.Id))
+            {
+                if (!seen.Add(dependent.Id))
+                    continue;
+                ordered.Add(dependent);
+                queue.Enqueue(dependent);
+            }
+        }
+
+        return ordered;
+    }
 }
 
 internal sealed class CadGeometryHistoryEntry : ICadHistoryEntry
@@ -351,8 +390,7 @@ internal sealed class CadGeometryHistoryEntry : ICadHistoryEntry
         }
         catch (Exception failure)
         {
-            var failures =
-                new List<Exception> { failure };
+            var failures = new List<Exception> { failure };
 
             for (var index = applied - 1; index >= 0; index--)
             {
@@ -436,8 +474,7 @@ internal sealed class CadEntityStateHistoryEntry : ICadHistoryEntry
         }
         catch (Exception failure)
         {
-            var failures =
-                new List<Exception> { failure };
+            var failures = new List<Exception> { failure };
 
             for (var index = applied - 1; index >= 0; index--)
             {

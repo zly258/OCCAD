@@ -126,6 +126,24 @@ public sealed class CadLineEntity : CadEntity
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
+    internal CadLineEntity CreateLine(
+        OcctPoint3d start,
+        OcctPoint3d end) =>
+        CopyPropertiesTo(
+            new CadLineEntity(start, end));
+
+    internal CadArcEntity CreateArc(
+        OcctPoint3d start,
+        OcctPoint3d middle,
+        OcctPoint3d end) =>
+        CopyPropertiesTo(
+            new CadArcEntity(start, middle, end));
+
+    internal CadPolylineEntity CreatePolyline(
+        IEnumerable<OcctPoint3d> points) =>
+        CopyPropertiesTo(
+            new CadPolylineEntity(points, closed: false));
+
     public override CadEntity Duplicate() => CopyPropertiesTo(new CadLineEntity(_start, _end));
 
     public override void RestoreGeometry(CadEntity snapshot)

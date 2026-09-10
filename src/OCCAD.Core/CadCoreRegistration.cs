@@ -32,6 +32,15 @@ internal static class CadCoreRegistration
 
         entities.Register("torus", "Torus", static () => new CadTorusEntity(OcctNet.OcctPoint3d.Origin, 2, 0.5), CadTorusEntity.WriteGeometry, CadTorusEntity.ReadGeometry);
 
+        entities.RegisterPersistent("region", "Region", CadRegionEntity.WriteGeometry, CadRegionEntity.ReadGeometry);
+        entities.RegisterPersistent("extrude", "Extrude", CadExtrudeEntity.WriteGeometry, CadExtrudeEntity.ReadGeometry);
+        entities.RegisterPersistent("revolve", "Revolve", CadRevolveEntity.WriteGeometry, CadRevolveEntity.ReadGeometry);
+        entities.RegisterPersistent("boolean", "Boolean", CadBooleanEntity.WriteGeometry, CadBooleanEntity.ReadGeometry);
+        entities.RegisterPersistent("sweep", "Sweep", CadSweepEntity.WriteGeometry, CadSweepEntity.ReadGeometry);
+        entities.RegisterPersistent("loft", "Loft", CadLoftEntity.WriteGeometry, CadLoftEntity.ReadGeometry);
+        entities.RegisterPersistent("edgefillet", "Edge Fillet", CadEdgeFilletEntity.WriteGeometry, CadEdgeFilletEntity.ReadGeometry);
+        entities.RegisterPersistent("edgechamfer", "Edge Chamfer", CadEdgeChamferEntity.WriteGeometry, CadEdgeChamferEntity.ReadGeometry);
+
         return entities;
     }
 
@@ -69,6 +78,16 @@ internal static class CadCoreRegistration
         tools.Register<OffsetTool>("offset");
         tools.Register<TrimTool>("trim");
         tools.Register<ExtendTool>("extend");
+        tools.Register<BreakTool>("break");
+        tools.Register<FilletTool>("fillet");
+        tools.Register<ChamferTool>("chamfer");
+        tools.Register<ExtrudeTool>("extrude");
+        tools.Register<RevolveTool>("revolve");
+        tools.Register<BooleanTool>("boolean");
+        tools.Register<SweepTool>("sweep");
+        tools.Register<LoftTool>("loft");
+        tools.Register<EdgeFilletTool>("edgefillet");
+        tools.Register<EdgeChamferTool>("edgechamfer");
         tools.Register<RotateTool>("rotate");
         tools.Register<ScaleTool>("scale");
         tools.Register<MoveTool>("move");
@@ -150,6 +169,20 @@ internal static class CadCoreRegistration
         actions.Register(new CadToolAction(workspace, "modify.offset", "Offset", "offset"));
         actions.Register(new CadToolAction(workspace, "modify.trim", "Trim", "trim"));
         actions.Register(new CadToolAction(workspace, "modify.extend", "Extend", "extend"));
+        actions.Register(new CadJoinAction(workspace));
+        actions.Register(new CadToolAction(workspace, "modify.break", "Break", "break"));
+        actions.Register(new CadToolAction(workspace, "modify.fillet", "Fillet", "fillet"));
+        actions.Register(new CadToolAction(workspace, "modify.chamfer", "Chamfer", "chamfer"));
+        actions.Register(new CadRegionAction(workspace));
+        actions.Register(new CadToolAction(workspace, "solid.extrude", "Extrude", "extrude"));
+        actions.Register(new CadToolAction(workspace, "solid.revolve", "Revolve", "revolve"));
+        actions.Register(new CadToolAction(workspace, "solid.boolean.union", "Boolean Union", "boolean", initialParameters: new Dictionary<string, string> { ["Operation"] = "Union" }));
+        actions.Register(new CadToolAction(workspace, "solid.boolean.cut", "Boolean Cut", "boolean", initialParameters: new Dictionary<string, string> { ["Operation"] = "Cut" }));
+        actions.Register(new CadToolAction(workspace, "solid.boolean.common", "Boolean Common", "boolean", initialParameters: new Dictionary<string, string> { ["Operation"] = "Common" }));
+        actions.Register(new CadToolAction(workspace, "solid.sweep", "Sweep", "sweep"));
+        actions.Register(new CadToolAction(workspace, "solid.loft", "Loft", "loft"));
+        actions.Register(new CadEdgeFeatureAction(workspace, "solid.edgefillet", "Edge Fillet", "edgefillet"));
+        actions.Register(new CadEdgeFeatureAction(workspace, "solid.edgechamfer", "Edge Chamfer", "edgechamfer"));
         actions.Register(new CadToolAction(workspace, "modify.rotate", "Rotate", "rotate"));
         actions.Register(new CadToolAction(workspace, "modify.scale", "Scale", "scale"));
         actions.Register(new CadToolAction(workspace, "modify.move", "Move", "move"));

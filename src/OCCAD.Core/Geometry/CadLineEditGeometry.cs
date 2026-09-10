@@ -5,11 +5,10 @@ namespace OCCAD;
 internal static class CadLineEditGeometry
 {
     private const double Tolerance = 1e-9;
-    private const double PlaneTolerance = 1e-6;
 
     internal static bool TryTrim(
         CadLineEntity target,
-        IReadOnlyList<CadLineEntity> boundaries,
+        IReadOnlyList<CadEntity> boundaries,
         OcctPoint3d hitPoint,
         CadWorkPlane plane,
         out CadEntity[] replacements)
@@ -19,7 +18,8 @@ internal static class CadLineEditGeometry
         ArgumentNullException.ThrowIfNull(plane);
 
         replacements = [];
-        if (!IsOnPlane(target, plane))
+        if (!CadPlanarCurveIntersections.IsOnPlane(target.Start, plane) ||
+            !CadPlanarCurveIntersections.IsOnPlane(target.End, plane))
             return false;
 
         var start = plane.WorldToLocal(target.Start);
@@ -40,21 +40,19 @@ internal static class CadLineEditGeometry
         var intersections = new List<double>();
         foreach (var boundary in boundaries)
         {
-            if (ReferenceEquals(boundary, target) ||
-                !IsOnPlane(boundary, plane))
+            if (ReferenceEquals(boundary, target))
                 continue;
 
-            if (TryIntersect(
-                    target,
-                    boundary,
-                    plane,
-                    requireTargetSegment: true,
-                    requireBoundarySegment: true,
-                    out var targetT) &&
-                targetT > Tolerance &&
-                targetT < 1.0 - Tolerance)
+            foreach (var value in CadPlanarCurveIntersections.WithLine(
+                         target.Start,
+                         target.End,
+                         boundary,
+                         plane,
+                         targetSegment: true))
             {
-                intersections.Add(targetT);
+                if (value.TargetParameter > Tolerance &&
+                    value.TargetParameter < 1.0 - Tolerance)
+                    intersections.Add(value.TargetParameter);
             }
         }
 
@@ -97,7 +95,7 @@ internal static class CadLineEditGeometry
 
     internal static bool TryExtend(
         CadLineEntity target,
-        IReadOnlyList<CadLineEntity> boundaries,
+        IReadOnlyList<CadEntity> boundaries,
         OcctPoint3d hitPoint,
         CadWorkPlane plane,
         out CadLineEntity replacement)
@@ -107,7 +105,8 @@ internal static class CadLineEditGeometry
         ArgumentNullException.ThrowIfNull(plane);
 
         replacement = null!;
-        if (!IsOnPlane(target, plane))
+        if (!CadPlanarCurveIntersections.IsOnPlane(target.Start, plane) ||
+            !CadPlanarCurveIntersections.IsOnPlane(target.End, plane))
             return false;
 
         var start = plane.WorldToLocal(target.Start);
@@ -124,32 +123,31 @@ internal static class CadLineEditGeometry
         double? bestT = null;
         foreach (var boundary in boundaries)
         {
-            if (ReferenceEquals(boundary, target) ||
-                !IsOnPlane(boundary, plane))
+            if (ReferenceEquals(boundary, target))
                 continue;
 
-            if (!TryIntersect(
-                    target,
-                    boundary,
-                    plane,
-                    requireTargetSegment: false,
-                    requireBoundarySegment: true,
-                    out var targetT))
-                continue;
-
-            if (extendStart)
+            foreach (var value in CadPlanarCurveIntersections.WithLine(
+                         target.Start,
+                         target.End,
+                         boundary,
+                         plane,
+                         targetSegment: false))
             {
-                if (targetT >= -Tolerance)
-                    continue;
-                if (bestT is null || targetT > bestT.Value)
-                    bestT = targetT;
-            }
-            else
-            {
-                if (targetT <= 1.0 + Tolerance)
-                    continue;
-                if (bestT is null || targetT < bestT.Value)
-                    bestT = targetT;
+                var targetT = value.TargetParameter;
+                if (extendStart)
+                {
+                    if (targetT >= -Tolerance)
+                        continue;
+                    if (bestT is null || targetT > bestT.Value)
+                        bestT = targetT;
+                }
+                else
+                {
+                    if (targetT <= 1.0 + Tolerance)
+                        continue;
+                    if (bestT is null || targetT < bestT.Value)
+                        bestT = targetT;
+                }
             }
         }
 
@@ -181,66 +179,4 @@ internal static class CadLineEditGeometry
         line.Start +
         CadTransformMath.Between(line.Start, line.End) * t;
 
-    private static bool IsOnPlane(
-        CadLineEntity line,
-        CadWorkPlane plane)
-    {
-        var startDistance = CadTransformMath.Dot(
-            CadTransformMath.Between(plane.Origin, line.Start),
-            plane.Normal);
-        var endDistance = CadTransformMath.Dot(
-            CadTransformMath.Between(plane.Origin, line.End),
-            plane.Normal);
-        return Math.Abs(startDistance) <= PlaneTolerance &&
-               Math.Abs(endDistance) <= PlaneTolerance;
-    }
-
-    private static bool TryIntersect(
-        CadLineEntity first,
-        CadLineEntity second,
-        CadWorkPlane plane,
-        bool requireTargetSegment,
-        bool requireBoundarySegment,
-        out double firstT)
-    {
-        var a = plane.WorldToLocal(first.Start);
-        var b = plane.WorldToLocal(first.End);
-        var c = plane.WorldToLocal(second.Start);
-        var d = plane.WorldToLocal(second.End);
-
-        var rx = b.X - a.X;
-        var ry = b.Y - a.Y;
-        var sx = d.X - c.X;
-        var sy = d.Y - c.Y;
-        var denominator = Cross(rx, ry, sx, sy);
-        if (Math.Abs(denominator) <= Tolerance)
-        {
-            firstT = 0.0;
-            return false;
-        }
-
-        var qpx = c.X - a.X;
-        var qpy = c.Y - a.Y;
-        var t = Cross(qpx, qpy, sx, sy) / denominator;
-        var u = Cross(qpx, qpy, rx, ry) / denominator;
-
-        if ((requireTargetSegment &&
-             (t < -Tolerance || t > 1.0 + Tolerance)) ||
-            (requireBoundarySegment &&
-             (u < -Tolerance || u > 1.0 + Tolerance)))
-        {
-            firstT = 0.0;
-            return false;
-        }
-
-        firstT = t;
-        return double.IsFinite(t);
-    }
-
-    private static double Cross(
-        double ax,
-        double ay,
-        double bx,
-        double by) =>
-        ax * by - ay * bx;
 }

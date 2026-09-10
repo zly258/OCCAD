@@ -12,13 +12,25 @@ public sealed class TrimTool : CadSelectionTransformToolBase
     {
         SetSelectionFilter(
             new CadSelectionFilter(
-                "trim.lines",
-                static entity => entity is CadLineEntity));
+                "trim.boundaries",
+                static entity =>
+                    entity is CadLineEntity or
+                    CadPolylineEntity or
+                    CadCircleEntity or
+                    CadArcEntity));
         base.OnActivated();
     }
 
     protected override void OnTransformStarted()
     {
+        SetSelectionFilter(
+            new CadSelectionFilter(
+                "trim.targets",
+                static entity =>
+                    entity is CadLineEntity or
+                    CadArcEntity or
+                    CadCircleEntity or
+                    CadPolylineEntity));
         SetStageLocalized(
             0,
             "Cad.Prompt.trim.Target",
@@ -79,7 +91,7 @@ public sealed class TrimTool : CadSelectionTransformToolBase
     }
 
     private bool TryBuild(
-        out CadLineEntity target,
+        out CadEntity target,
         out CadEntity[] replacements)
     {
         target = null!;
@@ -87,21 +99,48 @@ public sealed class TrimTool : CadSelectionTransformToolBase
 
         if (Context.Workspace.Preselection.Current is not
             {
-                Entity: CadLineEntity hovered,
+                Entity: var hovered,
                 Point: var hit
             } ||
             Entities.Contains(hovered))
             return false;
 
-        var boundaries = Entities
-            .OfType<CadLineEntity>()
-            .ToArray();
-        if (!CadLineEditGeometry.TryTrim(
-                hovered,
-                boundaries,
-                hit,
-                Context.WorkPlane,
-                out replacements))
+        var boundaries = Entities.ToArray();
+
+        var success = hovered switch
+        {
+            CadLineEntity line =>
+                CadLineEditGeometry.TryTrim(
+                    line,
+                    boundaries,
+                    hit,
+                    Context.WorkPlane,
+                    out replacements),
+            CadArcEntity arc =>
+                CadArcEditGeometry.TryTrim(
+                    arc,
+                    boundaries,
+                    hit,
+                    Context.WorkPlane,
+                    out replacements),
+            CadPolylineEntity polyline =>
+                CadPolylineEditGeometry.TryTrim(
+                    polyline,
+                    boundaries,
+                    hit,
+                    Context.WorkPlane,
+                    out replacements),
+            CadCircleEntity circle =>
+                CadCircleEditGeometry.TryTrim(
+                    circle,
+                    boundaries,
+                    hit,
+                    Context.WorkPlane,
+                    out replacements),
+            _ => false
+        };
+
+        if (!success)
             return false;
 
         target = hovered;

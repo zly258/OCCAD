@@ -109,7 +109,18 @@ public sealed class CadPolylineEntity : CadEntity
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
-    public override CadEntity Duplicate() => CopyPropertiesTo(new CadPolylineEntity(_points, Closed));
+    internal CadPolylineEntity CopyWithPoints(
+        IEnumerable<OcctPoint3d> points) =>
+        CopyWithPoints(points, Closed);
+
+    internal CadPolylineEntity CopyWithPoints(
+        IEnumerable<OcctPoint3d> points,
+        bool closed) =>
+        CopyPropertiesTo(
+            new CadPolylineEntity(points, closed));
+
+    public override CadEntity Duplicate() =>
+        CopyWithPoints(_points);
 
     public override void RestoreGeometry(CadEntity snapshot)
     {

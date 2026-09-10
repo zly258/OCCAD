@@ -103,7 +103,11 @@ public partial class MainWindow : System.Windows.Window
         _workspace.Selection.Changed += (_, args) =>
             Dispatcher.InvokeAsync(() => ApplySelection(args));
         _workspace.Subobjects.Changed += (_, _) =>
-            Dispatcher.InvokeAsync(UpdateSelectionStatus);
+            Dispatcher.InvokeAsync(() =>
+            {
+                UpdateSelectionStatus();
+                RefreshActionUi();
+            });
         _workspace.Preselection.Changed += (_, _) =>
             Dispatcher.InvokeAsync(UpdateSelectionStatus);
         _workspace.Document.ChangeSetCommitted += (_, args) =>

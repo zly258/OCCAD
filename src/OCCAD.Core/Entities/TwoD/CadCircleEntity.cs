@@ -112,6 +112,25 @@ public sealed class CadCircleEntity : CadEntity
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
+    internal OcctPoint3d PointAtAngle(
+        double angleRadians)
+    {
+        var (xAxis, yAxis) = PlaneAxes(_normal);
+        return _center +
+               xAxis * (Math.Cos(angleRadians) * _radius) +
+               yAxis * (Math.Sin(angleRadians) * _radius);
+    }
+
+    internal CadArcEntity CreateArc(
+        OcctPoint3d start,
+        OcctPoint3d middle,
+        OcctPoint3d end)
+    {
+        var arc = new CadArcEntity(start, middle, end);
+        CopyPropertiesTo(arc);
+        return arc;
+    }
+
     public override CadEntity Duplicate() => CopyPropertiesTo(new CadCircleEntity(_center, _normal, _radius));
 
     public override void RestoreGeometry(CadEntity snapshot)

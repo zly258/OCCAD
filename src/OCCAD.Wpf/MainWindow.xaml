@@ -78,6 +78,21 @@
                     <Separator/>
                     <MenuItem Header="{DynamicResource Cad.Text.Helix}" Tag="solid.helix" Click="ActionClick"/>
                 </MenuItem>
+                <MenuItem Header="{DynamicResource Cad.Text.Modeling}">
+                    <MenuItem Header="{DynamicResource Cad.Text.Region}" Tag="model.region" Click="ActionClick"/>
+                    <MenuItem Header="{DynamicResource Cad.Text.Extrude}" Tag="solid.extrude" Click="ActionClick"/>
+                    <MenuItem Header="{DynamicResource Cad.Text.Revolve}" Tag="solid.revolve" Click="ActionClick"/>
+                    <Separator/>
+                    <MenuItem Header="{DynamicResource Cad.Text.BooleanUnion}" Tag="solid.boolean.union" Click="ActionClick"/>
+                    <MenuItem Header="{DynamicResource Cad.Text.BooleanCut}" Tag="solid.boolean.cut" Click="ActionClick"/>
+                    <MenuItem Header="{DynamicResource Cad.Text.BooleanCommon}" Tag="solid.boolean.common" Click="ActionClick"/>
+                    <Separator/>
+                    <MenuItem Header="{DynamicResource Cad.Text.Sweep}" Tag="solid.sweep" Click="ActionClick"/>
+                    <MenuItem Header="{DynamicResource Cad.Text.Loft}" Tag="solid.loft" Click="ActionClick"/>
+                    <Separator/>
+                    <MenuItem Header="{DynamicResource Cad.Text.EdgeFillet}" Tag="solid.edgefillet" Click="ActionClick"/>
+                    <MenuItem Header="{DynamicResource Cad.Text.EdgeChamfer}" Tag="solid.edgechamfer" Click="ActionClick"/>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="{DynamicResource Cad.Text.Modify}">
                 <MenuItem Header="{DynamicResource Cad.Text.Move}" Tag="modify.move" Click="ActionClick"/>
@@ -89,6 +104,10 @@
                 <MenuItem Header="{DynamicResource Cad.Text.Trim}" Tag="modify.trim" Click="ActionClick"/>
                 <MenuItem Header="{DynamicResource Cad.Text.Extend}" Tag="modify.extend" Click="ActionClick"/>
                 <MenuItem Header="{DynamicResource Cad.Text.Offset}" Tag="modify.offset" Click="ActionClick"/>
+                <MenuItem Header="{DynamicResource Cad.Text.Join}" Tag="modify.join" Click="ActionClick"/>
+                <MenuItem Header="{DynamicResource Cad.Text.Break}" Tag="modify.break" Click="ActionClick"/>
+                <MenuItem Header="{DynamicResource Cad.Text.Fillet}" Tag="modify.fillet" Click="ActionClick"/>
+                <MenuItem Header="{DynamicResource Cad.Text.Chamfer}" Tag="modify.chamfer" Click="ActionClick"/>
                 <Separator/>
                 <MenuItem Header="{DynamicResource Cad.Text.Array}">
                     <MenuItem Header="{DynamicResource Cad.Text.RectangularArray}" Tag="modify.rectarray" Click="ActionClick"/>

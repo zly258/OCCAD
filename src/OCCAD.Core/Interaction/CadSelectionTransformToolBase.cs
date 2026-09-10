@@ -9,14 +9,14 @@ public abstract class CadSelectionTransformToolBase : CadTool
     protected IReadOnlyList<CadEntity> Entities => _entities;
 
     public override bool CanCommitCurrentStage => State == CadToolState.WaitForSelect
-        ? IsActive && CurrentSelection().Length > 0
+        ? IsActive && IsSelectionValid(CurrentSelection())
         : base.CanCommitCurrentStage;
 
     internal override bool CommitCurrentStage()
     {
         if (State != CadToolState.WaitForSelect) return base.CommitCurrentStage();
         var selected = CurrentSelection();
-        if (!IsActive || selected.Length == 0) return false;
+        if (!IsActive || !IsSelectionValid(selected)) return false;
         BeginTransform(selected);
         return true;
     }
@@ -28,7 +28,7 @@ public abstract class CadSelectionTransformToolBase : CadTool
         Context.Selection.Changed += SelectionChanged;
 
         var selected = CurrentSelection();
-        if (selected.Length == 0)
+        if (!IsSelectionValid(selected))
             BeginSelection();
         else
             BeginTransform(selected);
@@ -66,6 +66,9 @@ public abstract class CadSelectionTransformToolBase : CadTool
     }
 
     protected abstract void OnTransformStarted();
+
+    protected virtual bool IsSelectionValid(CadEntity[] entities) =>
+        entities.Length > 0;
 
     protected virtual void ResetTransformState()
     {

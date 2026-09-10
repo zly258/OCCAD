@@ -364,11 +364,8 @@ public sealed class OffsetTool : CadSelectionTransformToolBase, ICadPointInputTo
             }
         }
 
-        var copy = (CadPolylineEntity)polyline.Duplicate();
-        for (var index = 0; index < result.Length; index++)
-            copy.MoveGrip(index, plane.LocalToWorld(result[index]));
-
-        offset = copy;
+        offset = polyline.CopyWithPoints(
+            result.Select(plane.LocalToWorld));
         return true;
     }
 

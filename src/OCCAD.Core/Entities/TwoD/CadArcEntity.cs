@@ -228,6 +228,112 @@ public sealed class CadArcEntity : CadEntity
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
+    internal CadArcEntity CopyWithParameterRange(
+        double startParameter,
+        double endParameter)
+    {
+        if (!double.IsFinite(startParameter) ||
+            !double.IsFinite(endParameter) ||
+            startParameter < 0.0 ||
+            endParameter > 1.0 ||
+            endParameter - startParameter <= 1e-9)
+            throw new ArgumentOutOfRangeException(
+                nameof(endParameter));
+
+        return CopyPropertiesTo(
+            new CadArcEntity(
+                _center,
+                _normal,
+                _xAxis,
+                _radius,
+                _startAngleDegrees +
+                _sweepAngleDegrees * startParameter,
+                _sweepAngleDegrees *
+                (endParameter - startParameter)));
+    }
+
+    internal CadArcEntity CopyWithAngles(
+        double startAngleDegrees,
+        double sweepAngleDegrees)
+    {
+        if (!double.IsFinite(startAngleDegrees) ||
+            !double.IsFinite(sweepAngleDegrees) ||
+            Math.Abs(sweepAngleDegrees) <= 1e-9 ||
+            Math.Abs(sweepAngleDegrees) >= 360.0 - 1e-9)
+            throw new ArgumentOutOfRangeException(
+                nameof(sweepAngleDegrees));
+
+        return CopyPropertiesTo(
+            new CadArcEntity(
+                _center,
+                _normal,
+                _xAxis,
+                _radius,
+                NormalizeDegrees(startAngleDegrees),
+                sweepAngleDegrees));
+    }
+
+    internal bool TryParameterAt(
+        OcctPoint3d point,
+        out double parameter)
+    {
+        if (!TryAngleOf(point, out var angle))
+        {
+            parameter = 0.0;
+            return false;
+        }
+
+        var span = Math.Abs(_sweepAngleDegrees);
+        var delta = _sweepAngleDegrees >= 0.0
+            ? NormalizeDegrees(angle - _startAngleDegrees)
+            : NormalizeDegrees(_startAngleDegrees - angle);
+        if (delta > span + 1e-7)
+        {
+            parameter = 0.0;
+            return false;
+        }
+
+        parameter = span <= 1e-12
+            ? 0.0
+            : Math.Clamp(delta / span, 0.0, 1.0);
+        return true;
+    }
+
+    internal bool TryClosestParameter(
+        OcctPoint3d point,
+        out double parameter)
+    {
+        if (!TryAngleOf(point, out var angle))
+        {
+            parameter = 0.0;
+            return false;
+        }
+
+        var span = Math.Abs(_sweepAngleDegrees);
+        var delta = _sweepAngleDegrees >= 0.0
+            ? NormalizeDegrees(angle - _startAngleDegrees)
+            : NormalizeDegrees(_startAngleDegrees - angle);
+        parameter = span <= 1e-12
+            ? 0.0
+            : Math.Clamp(delta / span, 0.0, 1.0);
+        return true;
+    }
+
+    internal OcctPoint3d PointAtParameter(double parameter) =>
+        PointAt(
+            _startAngleDegrees +
+            _sweepAngleDegrees * parameter);
+
+    internal CadArcEntity CreateArc(
+        OcctPoint3d start,
+        OcctPoint3d middle,
+        OcctPoint3d end) =>
+        CopyPropertiesTo(
+            new CadArcEntity(
+                start,
+                middle,
+                end));
+
     public override CadEntity Duplicate() =>
         CopyPropertiesTo(new CadArcEntity(
             _center,

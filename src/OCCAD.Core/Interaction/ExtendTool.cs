@@ -12,13 +12,24 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
     {
         SetSelectionFilter(
             new CadSelectionFilter(
-                "extend.lines",
-                static entity => entity is CadLineEntity));
+                "extend.boundaries",
+                static entity =>
+                    entity is CadLineEntity or
+                    CadPolylineEntity or
+                    CadCircleEntity or
+                    CadArcEntity));
         base.OnActivated();
     }
 
     protected override void OnTransformStarted()
     {
+        SetSelectionFilter(
+            new CadSelectionFilter(
+                "extend.targets",
+                static entity =>
+                    entity is CadLineEntity or
+                    CadArcEntity or
+                    CadPolylineEntity));
         SetStageLocalized(
             0,
             "Cad.Prompt.extend.Target",
@@ -79,30 +90,60 @@ public sealed class ExtendTool : CadSelectionTransformToolBase
     }
 
     private bool TryBuild(
-        out CadLineEntity target,
-        out CadLineEntity replacement)
+        out CadEntity target,
+        out CadEntity replacement)
     {
         target = null!;
         replacement = null!;
 
         if (Context.Workspace.Preselection.Current is not
             {
-                Entity: CadLineEntity hovered,
+                Entity: var hovered,
                 Point: var hit
             } ||
             Entities.Contains(hovered))
             return false;
 
-        var boundaries = Entities
-            .OfType<CadLineEntity>()
-            .ToArray();
-        if (!CadLineEditGeometry.TryExtend(
-                hovered,
-                boundaries,
-                hit,
-                Context.WorkPlane,
-                out replacement))
-            return false;
+        var boundaries = Entities.ToArray();
+
+        switch (hovered)
+        {
+            case CadLineEntity line:
+                if (!CadLineEditGeometry.TryExtend(
+                        line,
+                        boundaries,
+                        hit,
+                        Context.WorkPlane,
+                        out var lineReplacement))
+                    return false;
+                replacement = lineReplacement;
+                break;
+
+            case CadArcEntity arc:
+                if (!CadArcEditGeometry.TryExtend(
+                        arc,
+                        boundaries,
+                        hit,
+                        Context.WorkPlane,
+                        out var arcReplacement))
+                    return false;
+                replacement = arcReplacement;
+                break;
+
+            case CadPolylineEntity polyline:
+                if (!CadPolylineEditGeometry.TryExtend(
+                        polyline,
+                        boundaries,
+                        hit,
+                        Context.WorkPlane,
+                        out var polylineReplacement))
+                    return false;
+                replacement = polylineReplacement;
+                break;
+
+            default:
+                return false;
+        }
 
         target = hovered;
         return true;

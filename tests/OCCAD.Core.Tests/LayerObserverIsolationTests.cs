@@ -45,6 +45,34 @@ public sealed class LayerObserverIsolationTests
     }
 
     [TestMethod]
+    public void DocumentReceivesStrictLayerStateBeforePublicManagerObservers()
+    {
+        var manager = new CadLayerManager();
+        var document = new CadDocument(manager);
+        var layer = manager.Add("A");
+        var documentLayerChanges = 0;
+        var laterManagerObserverCalls = 0;
+
+        document.Changed += (_, args) =>
+        {
+            if (args.Kind == CadDocumentChangeKind.LayerChanged)
+                documentLayerChanges++;
+        };
+        manager.Changed += (_, _) =>
+            throw new InvalidOperationException("layer panel observer failure");
+        manager.Changed += (_, _) =>
+            laterManagerObserverCalls++;
+
+        layer.Color = Color.Red;
+
+        Assert.AreEqual(Color.Red, layer.Color);
+        Assert.AreEqual(1, documentLayerChanges,
+            "CadDocument must observe the strict internal layer state channel.");
+        Assert.AreEqual(1, laterManagerObserverCalls,
+            "A failed public manager observer must not starve later observers.");
+    }
+
+    [TestMethod]
     public void ChangingObserverRemainsStrictBeforeMutation()
     {
         var manager = new CadLayerManager();

@@ -183,6 +183,12 @@ public abstract class CadEntity
     public event EventHandler<CadEntityChangingEventArgs>? Changing;
     public event EventHandler<CadEntityChangedEventArgs>? Changed;
 
+    // Transactional/internal state propagation is intentionally separate from
+    // public Changed notifications. CadDocument subscribes here so native
+    // presentation failure can still reject and roll back a mutation, while
+    // UI/integration observers on Changed cannot participate in the transaction.
+    internal event EventHandler<CadEntityChangedEventArgs>? StateChanged;
+
     internal void RestoreIdentity(Guid id)
     {
         if (id == Guid.Empty)
@@ -412,9 +418,15 @@ public abstract class CadEntity
             RestoreGeometry(snapshot);
 
             if (metadataChanged)
-                Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Metadata, nameof(RestoreState)));
+                PublishStateAndChanged(
+                    new CadEntityChangedEventArgs(
+                        CadEntityChangeKind.Metadata,
+                        nameof(RestoreState)));
             if (appearanceChanged)
-                Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Appearance, nameof(RestoreState)));
+                PublishStateAndChanged(
+                    new CadEntityChangedEventArgs(
+                        CadEntityChangeKind.Appearance,
+                        nameof(RestoreState)));
         }
         catch (Exception failure)
         {
@@ -424,9 +436,15 @@ public abstract class CadEntity
                 RestoreGeometry(previous);
 
                 if (metadataChanged)
-                    Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Metadata, nameof(RestoreState)));
+                    PublishStateAndChanged(
+                        new CadEntityChangedEventArgs(
+                            CadEntityChangeKind.Metadata,
+                            nameof(RestoreState)));
                 if (appearanceChanged)
-                    Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Appearance, nameof(RestoreState)));
+                    PublishStateAndChanged(
+                        new CadEntityChangedEventArgs(
+                            CadEntityChangeKind.Appearance,
+                            nameof(RestoreState)));
             }
             catch (Exception restoreFailure)
             {
@@ -522,9 +540,21 @@ public abstract class CadEntity
         {
             RaiseGeometryChanged(propertyName);
         }
-        catch
+        catch (Exception failure)
         {
             _placement = previous;
+            try
+            {
+                RaiseGeometryChanged(propertyName);
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Entity placement apply and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
             throw;
         }
     }
@@ -544,7 +574,10 @@ public abstract class CadEntity
         Changing?.Invoke(this, new CadEntityChangingEventArgs(CadEntityChangeKind.Geometry, propertyName));
 
     protected void RaiseGeometryChanged([CallerMemberName] string? propertyName = null) =>
-        Changed?.Invoke(this, new CadEntityChangedEventArgs(CadEntityChangeKind.Geometry, propertyName));
+        PublishStateAndChanged(
+            new CadEntityChangedEventArgs(
+                CadEntityChangeKind.Geometry,
+                propertyName));
 
     protected bool SetGeometry<T>(
         ref T field,
@@ -568,9 +601,21 @@ public abstract class CadEntity
             RaiseGeometryChanged(propertyName);
             return true;
         }
-        catch
+        catch (Exception failure)
         {
             field = previous;
+            try
+            {
+                RaiseGeometryChanged(propertyName);
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Entity geometry apply and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
             throw;
         }
     }
@@ -603,13 +648,12 @@ public abstract class CadEntity
 
         var previous = field;
         field = value;
+        var args = new CadEntityChangedEventArgs(
+            CadEntityChangeKind.Metadata,
+            propertyName);
         try
         {
-            Changed?.Invoke(
-                this,
-                new CadEntityChangedEventArgs(
-                    CadEntityChangeKind.Metadata,
-                    propertyName));
+            PublishStateAndChanged(args);
             return true;
         }
         catch (Exception failure)
@@ -617,11 +661,7 @@ public abstract class CadEntity
             field = previous;
             try
             {
-                Changed?.Invoke(
-                    this,
-                    new CadEntityChangedEventArgs(
-                        CadEntityChangeKind.Metadata,
-                        propertyName));
+                PublishStateAndChanged(args);
             }
             catch (Exception restoreFailure)
             {
@@ -651,13 +691,12 @@ public abstract class CadEntity
 
         var previous = field;
         field = value;
+        var args = new CadEntityChangedEventArgs(
+            CadEntityChangeKind.Appearance,
+            propertyName);
         try
         {
-            Changed?.Invoke(
-                this,
-                new CadEntityChangedEventArgs(
-                    CadEntityChangeKind.Appearance,
-                    propertyName));
+            PublishStateAndChanged(args);
             return true;
         }
         catch (Exception failure)
@@ -665,11 +704,7 @@ public abstract class CadEntity
             field = previous;
             try
             {
-                Changed?.Invoke(
-                    this,
-                    new CadEntityChangedEventArgs(
-                        CadEntityChangeKind.Appearance,
-                        propertyName));
+                PublishStateAndChanged(args);
             }
             catch (Exception restoreFailure)
             {
@@ -682,6 +717,42 @@ public abstract class CadEntity
             throw;
         }
     }
+
+    private void PublishStateAndChanged(CadEntityChangedEventArgs args)
+    {
+        // Internal state propagation is strict: CadDocument must be able to
+        // reject a mutation if native presentation synchronization fails.
+        StateChanged?.Invoke(this, args);
+        PublishChanged(args);
+    }
+
+    private void PublishChanged(CadEntityChangedEventArgs args)
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler<CadEntityChangedEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                // Public Changed is a post-state notification only. UI/property
+                // grid/integration observers cannot roll back an entity after
+                // CadDocument has synchronized its authoritative presentation.
+                System.Diagnostics.Debug.WriteLine(
+                    $"CadEntity Changed observer failed after state changed: {exception}");
+            }
+        }
+    }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 
     private void ApplyBaseState(CadEntity snapshot)
     {

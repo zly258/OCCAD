@@ -41,7 +41,8 @@ public sealed class CadTrackingManager
             ShowGuide(tracking);
         }
 
-        if (currentChanged) Changed?.Invoke(this, EventArgs.Empty);
+        if (currentChanged)
+            PublishChanged();
     }
 
     public void Clear()
@@ -59,7 +60,31 @@ public sealed class CadTrackingManager
             _guide = null;
         }
 
-        if (hadState) Changed?.Invoke(this, EventArgs.Empty);
+        if (hadState)
+            PublishChanged();
+    }
+
+    private void PublishChanged()
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, EventArgs.Empty);
+            }
+            catch (Exception exception) when (IsRecoverableObserverFailure(exception))
+            {
+                // Tracking has already been resolved and its native guide is
+                // already authoritative. UI/status observers cannot invalidate
+                // pointer resolution or starve later observers.
+                System.Diagnostics.Debug.WriteLine(
+                    $"CadTrackingManager Changed observer failed after state changed: {exception}");
+            }
+        }
     }
 
     private void ShowGuide(CadTrackingResult? tracking)
@@ -125,4 +150,9 @@ public sealed class CadTrackingManager
             engine.Delete(value);
         overlay = null;
     }
+
+    private static bool IsRecoverableObserverFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException;
 }

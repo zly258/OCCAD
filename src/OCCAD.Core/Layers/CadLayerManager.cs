@@ -36,13 +36,18 @@ public sealed class CadLayerManager
 
     public event EventHandler<CadLayerManagerChangedEventArgs>? Changed;
 
+    // Internal propagation is strict so CadDocument can synchronize entity
+    // appearance before a layer mutation becomes authoritative to callers.
+    // Public Changed remains a post-state observer notification.
+    internal event EventHandler<CadLayerManagerChangedEventArgs>? StateChanged;
+
     public CadLayer Add(string name)
     {
         var normalized = NormalizeName(name);
         EnsureUniqueName(normalized, except: null);
 
         var layer = AddCore(normalized);
-        PublishChanged(
+        PublishStateAndChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.Added,
                 layer));
@@ -97,7 +102,7 @@ public sealed class CadLayerManager
         if (ReferenceEquals(_current, layer)) return;
 
         _current = layer;
-        PublishChanged(
+        PublishStateAndChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.CurrentChanged,
                 layer));
@@ -133,11 +138,11 @@ public sealed class CadLayerManager
     public void Reset()
     {
         foreach (var layer in _layers)
-            layer.Changed -= LayerChanged;
+            layer.StateChanged -= LayerChanged;
 
         _layers.Clear();
         _current = AddCore("0");
-        PublishChanged(
+        PublishStateAndChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.Reset,
                 _current));
@@ -146,14 +151,14 @@ public sealed class CadLayerManager
     internal void RestoreSnapshot(IReadOnlyList<CadLayer> layers,
         IReadOnlyList<CadLayerState> states, CadLayer current)
     {
-        foreach (var layer in _layers) layer.Changed -= LayerChanged;
+        foreach (var layer in _layers) layer.StateChanged -= LayerChanged;
         _layers.Clear();
         _layers.AddRange(layers);
         for (var i = 0; i < layers.Count; i++) layers[i].RenameCore(states[i].Name);
         for (var i = 0; i < layers.Count; i++) layers[i].RestoreState(states[i]);
         _current = current;
-        foreach (var layer in _layers) layer.Changed += LayerChanged;
-        PublishChanged(new(CadLayerManagerChangeKind.Reset, current));
+        foreach (var layer in _layers) layer.StateChanged += LayerChanged;
+        PublishStateAndChanged(new(CadLayerManagerChangeKind.Reset, current));
     }
 
     internal int IndexOf(CadLayer layer)
@@ -173,9 +178,9 @@ public sealed class CadLayerManager
         if (ReferenceEquals(_current, layer))
             SetCurrent(GetRequired("0"));
 
-        layer.Changed -= LayerChanged;
+        layer.StateChanged -= LayerChanged;
         _layers.RemoveAt(index);
-        PublishChanged(
+        PublishStateAndChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.Removed,
                 layer));
@@ -193,9 +198,9 @@ public sealed class CadLayerManager
         if (index < 0 || index > _layers.Count)
             throw new ArgumentOutOfRangeException(nameof(index));
 
-        layer.Changed += LayerChanged;
+        layer.StateChanged += LayerChanged;
         _layers.Insert(index, layer);
-        PublishChanged(
+        PublishStateAndChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.Added,
                 layer));
@@ -204,7 +209,7 @@ public sealed class CadLayerManager
     private CadLayer AddCore(string name)
     {
         var layer = new CadLayer(this, name);
-        layer.Changed += LayerChanged;
+        layer.StateChanged += LayerChanged;
         _layers.Add(layer);
         return layer;
     }
@@ -213,12 +218,18 @@ public sealed class CadLayerManager
     {
         if (sender is not CadLayer layer) return;
 
-        PublishChanged(
+        PublishStateAndChanged(
             new CadLayerManagerChangedEventArgs(
                 CadLayerManagerChangeKind.LayerChanged,
                 layer,
                 e.Kind,
                 e.PreviousName));
+    }
+
+    private void PublishStateAndChanged(CadLayerManagerChangedEventArgs args)
+    {
+        StateChanged?.Invoke(this, args);
+        PublishChanged(args);
     }
 
     private void PublishChanged(CadLayerManagerChangedEventArgs args)

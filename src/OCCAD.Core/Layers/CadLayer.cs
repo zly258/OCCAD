@@ -109,6 +109,11 @@ public sealed class CadLayer
     public event EventHandler<CadLayerChangedEventArgs>? Changing;
     public event EventHandler<CadLayerChangedEventArgs>? Changed;
 
+    // Internal state propagation remains strict so the layer manager/document
+    // can reject and roll back a layer mutation when native synchronization
+    // fails. Public Changed is post-state notification only.
+    internal event EventHandler<CadLayerChangedEventArgs>? StateChanged;
+
     public CadLayerState CaptureState() =>
         new(Name, Color, LineWidth, LineStyle, Visible, Locked);
 
@@ -119,9 +124,9 @@ public sealed class CadLayer
             !Enum.IsDefined(state.LineStyle))
             throw new ArgumentOutOfRangeException(nameof(state));
 
-        if (!string.Equals(_name, state.Name, StringComparison.Ordinal))
-            _owner.Rename(this, state.Name);
-
+        var previous = CaptureState();
+        var nameChanged =
+            !string.Equals(_name, state.Name, StringComparison.Ordinal);
         var appearanceChanged =
             _color != state.Color ||
             !_lineWidth.Equals(state.LineWidth) ||
@@ -130,23 +135,64 @@ public sealed class CadLayer
             _visible != state.Visible ||
             _locked != state.Locked;
 
-        _color = state.Color;
-        _lineWidth = state.LineWidth;
-        _lineStyle = state.LineStyle;
-        _visible = state.Visible;
-        _locked = state.Locked;
+        try
+        {
+            if (nameChanged)
+                _owner.Rename(this, state.Name);
 
-        if (appearanceChanged)
-            PublishChanged(
-                new CadLayerChangedEventArgs(
-                    CadLayerChangeKind.Appearance,
-                    nameof(RestoreState)));
+            _color = state.Color;
+            _lineWidth = state.LineWidth;
+            _lineStyle = state.LineStyle;
+            _visible = state.Visible;
+            _locked = state.Locked;
 
-        if (stateChanged)
-            PublishChanged(
-                new CadLayerChangedEventArgs(
-                    CadLayerChangeKind.State,
-                    nameof(RestoreState)));
+            if (appearanceChanged)
+                PublishStateAndChanged(
+                    new CadLayerChangedEventArgs(
+                        CadLayerChangeKind.Appearance,
+                        nameof(RestoreState)));
+
+            if (stateChanged)
+                PublishStateAndChanged(
+                    new CadLayerChangedEventArgs(
+                        CadLayerChangeKind.State,
+                        nameof(RestoreState)));
+        }
+        catch (Exception failure)
+        {
+            try
+            {
+                if (!string.Equals(_name, previous.Name, StringComparison.Ordinal))
+                    _owner.Rename(this, previous.Name);
+
+                _color = previous.Color;
+                _lineWidth = previous.LineWidth;
+                _lineStyle = previous.LineStyle;
+                _visible = previous.Visible;
+                _locked = previous.Locked;
+
+                if (appearanceChanged)
+                    PublishStateAndChanged(
+                        new CadLayerChangedEventArgs(
+                            CadLayerChangeKind.Appearance,
+                            nameof(RestoreState)));
+
+                if (stateChanged)
+                    PublishStateAndChanged(
+                        new CadLayerChangedEventArgs(
+                            CadLayerChangeKind.State,
+                            nameof(RestoreState)));
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Layer state apply and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
+            throw;
+        }
     }
 
     internal void RenameCore(string name)
@@ -161,11 +207,34 @@ public sealed class CadLayer
             nameof(Name),
             previousName);
 
-        // Changing is intentionally strict and remains a pre-state hook. A
-        // subscriber can reject the operation before the layer is mutated.
+        // Changing is a strict pre-state veto hook.
         Changing?.Invoke(this, args);
         _name = normalized;
-        PublishChanged(args);
+        try
+        {
+            PublishStateAndChanged(args);
+        }
+        catch (Exception failure)
+        {
+            _name = previousName;
+            try
+            {
+                PublishStateAndChanged(
+                    new CadLayerChangedEventArgs(
+                        CadLayerChangeKind.Metadata,
+                        nameof(Name),
+                        normalized));
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Layer rename and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
+            throw;
+        }
     }
 
     private bool Set<T>(
@@ -177,12 +246,37 @@ public sealed class CadLayer
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         var args = new CadLayerChangedEventArgs(kind, propertyName);
 
-        // Keep pre-change validation/veto semantics strict. Once the backing
-        // field changes, Changed observers are notification-only.
         Changing?.Invoke(this, args);
+        var previous = field;
         field = value;
+        try
+        {
+            PublishStateAndChanged(args);
+            return true;
+        }
+        catch (Exception failure)
+        {
+            field = previous;
+            try
+            {
+                PublishStateAndChanged(args);
+            }
+            catch (Exception restoreFailure)
+            {
+                throw new AggregateException(
+                    "Layer property apply and rollback both failed.",
+                    failure,
+                    restoreFailure);
+            }
+
+            throw;
+        }
+    }
+
+    private void PublishStateAndChanged(CadLayerChangedEventArgs args)
+    {
+        StateChanged?.Invoke(this, args);
         PublishChanged(args);
-        return true;
     }
 
     private void PublishChanged(CadLayerChangedEventArgs args)

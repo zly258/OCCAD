@@ -66,7 +66,7 @@ public sealed class CadDocument
     public CadDocument(CadLayerManager layers)
     {
         _layers = layers ?? throw new ArgumentNullException(nameof(layers));
-        _layers.Changed += LayersChanged;
+        _layers.StateChanged += LayersChanged;
     }
 
     public IReadOnlyList<CadEntity> Entities => _entities;
@@ -268,7 +268,7 @@ public sealed class CadDocument
         {
             _entities.Add(entity);
             _entitiesById.Add(entity.Id, entity);
-            entity.Changed += EntityChanged;
+            entity.StateChanged += EntityChanged;
         }
         foreach (var entity in values) PublishChange(CadDocumentChangeKind.Added, entity);
     }
@@ -316,7 +316,7 @@ public sealed class CadDocument
         {
             _entities.Remove(entity);
             _entitiesById.Remove(entity.Id);
-            entity.Changed -= EntityChanged;
+            entity.StateChanged -= EntityChanged;
         }
         foreach (var entity in values) PublishChange(CadDocumentChangeKind.Removed, entity);
         return values.Length;

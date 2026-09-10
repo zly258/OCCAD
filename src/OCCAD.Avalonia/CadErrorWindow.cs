@@ -19,10 +19,10 @@ internal sealed class CadErrorWindow : Window
         Title = CadLanguageManager.Text(
             "Cad.Text.ErrorTitle",
             "OCCAD Error");
-        Width = 680;
-        Height = 430;
-        MinWidth = 520;
-        MinHeight = 320;
+        Width = 640;
+        Height = 390;
+        MinWidth = 500;
+        MinHeight = 300;
         WindowStartupLocation =
             WindowStartupLocation.CenterOwner;
         Background = CadTheme.Surface;
@@ -33,13 +33,15 @@ internal sealed class CadErrorWindow : Window
                 "Cad.Text.ErrorMessage",
                 "OCCAD encountered an error. Details were written to the application log."),
             TextWrapping = TextWrapping.Wrap,
-            Foreground = CadTheme.Text
+            Foreground = CadTheme.Text,
+            FontWeight = FontWeight.SemiBold
         };
 
         var source = new TextBlock
         {
             Text = context,
-            Foreground = CadTheme.Muted
+            Foreground = CadTheme.Muted,
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
 
         var details = new TextBox
@@ -60,7 +62,8 @@ internal sealed class CadErrorWindow : Window
                 " " +
                 CadDiagnostics.LogPath,
             TextWrapping = TextWrapping.Wrap,
-            Foreground = CadTheme.Muted
+            Foreground = CadTheme.Muted,
+            FontSize = CadTheme.SmallFontSize
         };
 
         var close = new Button
@@ -91,32 +94,46 @@ internal sealed class CadErrorWindow : Window
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Spacing = 4
+            Spacing = 5
         };
         buttons.Children.Add(close);
         buttons.Children.Add(exit);
 
-        var root = new Grid
+        var content = new Grid
         {
-            Margin = new Thickness(CadTheme.DialogPadding),
+            Margin = new Thickness(12, 10, 12, 8),
             RowDefinitions = new RowDefinitions(
-                "Auto,Auto,*,Auto,Auto")
+                "Auto,Auto,*,Auto")
         };
-        root.Children.Add(message);
+        content.Children.Add(message);
 
         Grid.SetRow(source, 1);
-        source.Margin = new Thickness(0, 8, 0, 8);
-        root.Children.Add(source);
+        source.Margin = new Thickness(0, 5, 0, 7);
+        content.Children.Add(source);
 
         Grid.SetRow(details, 2);
-        root.Children.Add(details);
+        content.Children.Add(details);
 
         Grid.SetRow(path, 3);
-        path.Margin = new Thickness(0, 9, 0, 9);
-        root.Children.Add(path);
+        path.Margin = new Thickness(0, 7, 0, 0);
+        content.Children.Add(path);
 
-        Grid.SetRow(buttons, 4);
-        root.Children.Add(buttons);
+        var footer = new Border
+        {
+            Background = CadTheme.PanelAlt,
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(10, 6),
+            Child = buttons
+        };
+
+        var root = new Grid
+        {
+            RowDefinitions = new RowDefinitions("*,Auto")
+        };
+        root.Children.Add(content);
+        Grid.SetRow(footer, 1);
+        root.Children.Add(footer);
 
         Content = root;
     }

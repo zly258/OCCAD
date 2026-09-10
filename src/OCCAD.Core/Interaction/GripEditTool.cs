@@ -1,3 +1,4 @@
+using System.Drawing;
 using OcctNet;
 
 namespace OCCAD;
@@ -7,9 +8,10 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
     private readonly CadGripPoint _grip;
     private CadEntity? _before;
     private CadEntity? _preview;
+    private OcctPoint? _dragMarker;
+    private byte[]? _dragMarkerPixels;
     private bool _invalidGrip;
     private CadPrecisionInputKind _effectivePrecisionInputs;
-    private bool _sourcePresentationSuppressed;
 
     public GripEditTool(CadGripPoint grip)
     {
@@ -53,22 +55,14 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
                 Context.WorkPlane.YAxis);
         }
 
-        SuppressSourcePresentation();
-        Context.Preview.Show(_preview);
+        ShowReplacementPreview([_grip.Entity], [_preview]);
+        ShowDragMarker(_grip.Position);
     }
 
     protected override void OnDeactivated()
     {
-        try
-        {
-            // Remove the transient edit copy before restoring the real
-            // document presentation so the two are never visible together.
-            Context.Preview.Clear();
-        }
-        finally
-        {
-            RestoreSourcePresentation();
-        }
+        ClearDragMarker();
+        ClearReplacementPreview();
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
@@ -77,7 +71,12 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
 
         if (input.Kind == OcctPointerInputKind.Moved)
         {
-            TryMovePreview(Context.ResolvePoint(input.X, input.Y, ConstraintOrigin).Point);
+            var point = Context.ResolvePoint(
+                input.X,
+                input.Y,
+                ConstraintOrigin).Point;
+            if (TryMovePreview(point))
+                UpdateDragMarkerFromPreview();
             return true;
         }
 
@@ -125,6 +124,8 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
 
         if (!TryMovePreview(point))
             return false;
+
+        UpdateDragMarkerFromPreview();
 
         if (Context.Workspace.Entities.GeometryEquals(
                 _before,
@@ -174,10 +175,6 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
             return true;
         }
 
-        // Model and history are already committed at this point. Tool cleanup is
-        // deliberately outside the mutation rollback path: a transient cleanup
-        // failure must never roll back a successful model edit while leaving its
-        // history entry behind.
         workspace.Tools.CompleteCurrent();
         return true;
     }
@@ -203,9 +200,6 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
 
         try
         {
-            // Every pointer frame starts from the original geometry. This keeps
-            // indexed grips deterministic when a side/arc crosses its opposite
-            // side and avoids cumulative drift from the previous preview frame.
             if (_before is not null)
                 _preview.RestoreGeometrySnapshot(_before);
             _preview.MoveWorldGrip(_grip.Index, point);
@@ -241,54 +235,116 @@ public sealed class GripEditTool : CadTool, ICadPointInputTool
         }
     }
 
-    private void SuppressSourcePresentation()
+    private void ShowDragMarker(OcctPoint3d point)
     {
-        if (_sourcePresentationSuppressed ||
-            Context.Workspace.Engine is not
-            { IsInitialized: true } engine ||
-            _grip.Entity.ViewerObject is not
-            { } source ||
-            !engine.ContainsObject(source.Id))
+        if (!point.IsFinite ||
+            Context.Workspace.Engine is not { IsInitialized: true } engine)
             return;
 
-        using var batch =
-            engine.BeginDisplayBatch();
-        engine.SetObjectSelectable(
-            source,
-            false);
-        engine.SetObjectVisible(
-            source,
-            false);
-        _sourcePresentationSuppressed = true;
+        ClearDragMarker();
+
+        var size = Math.Min(35, Context.Workspace.Grips.HotMarkerSize + 2);
+        _dragMarkerPixels ??= CreateCircularMarkerPixels(
+            size,
+            Color.FromArgb(255, 245, 178, 35));
+
+        var marker = engine.AddPointPixmap(
+            point,
+            size,
+            size,
+            _dragMarkerPixels);
+        if (marker is not { } createdMarker)
+            return;
+
+        _dragMarker = createdMarker;
+        engine.SetObjectSelectable(createdMarker, false);
+        engine.SetDisplayPriority(createdMarker, 10);
     }
 
-    private void RestoreSourcePresentation()
+    private void UpdateDragMarker(OcctPoint3d point)
     {
-        if (!_sourcePresentationSuppressed)
+        if (!point.IsFinite)
             return;
 
-        _sourcePresentationSuppressed = false;
-
-        if (Context.Workspace.Engine is not
-            { IsInitialized: true } engine ||
-            _grip.Entity.ViewerObject is not
-            { } source ||
-            !engine.ContainsObject(source.Id))
+        var engine = Context.Workspace.Engine;
+        if (engine is not { IsInitialized: true })
             return;
 
-        var appearance =
-            Context.Workspace.Document
-                .ResolveAppearance(
-                    _grip.Entity);
+        if (_dragMarker is not { } marker ||
+            !engine.ContainsObject(marker.Id))
+        {
+            ShowDragMarker(point);
+            return;
+        }
 
-        using var batch =
-            engine.BeginDisplayBatch();
-        engine.SetObjectVisible(
-            source,
-            appearance.Visible);
-        engine.SetObjectSelectable(
-            source,
-            appearance.Selectable);
+        engine.UpdatePoints([
+            new OcctPointStateUpdate(
+                marker,
+                point,
+                true)
+        ]);
+    }
+
+    private void UpdateDragMarkerFromPreview()
+    {
+        if (_preview is null)
+            return;
+
+        var grips = _preview.GetWorldGripPoints();
+        for (var index = 0; index < grips.Count; index++)
+        {
+            if (grips[index].Index != _grip.Index)
+                continue;
+
+            UpdateDragMarker(grips[index].Position);
+            return;
+        }
+    }
+
+    private void ClearDragMarker()
+    {
+        var marker = _dragMarker;
+        _dragMarker = null;
+        if (marker is not { } existingMarker ||
+            Context.Workspace.Engine is not { IsInitialized: true } engine ||
+            !engine.ContainsObject(existingMarker.Id))
+            return;
+
+        try
+        {
+            engine.Delete(existingMarker);
+        }
+        catch (Exception exception) when (IsRecoverable(exception))
+        {
+        }
+    }
+
+    private static byte[] CreateCircularMarkerPixels(
+        int size,
+        Color color)
+    {
+        var pixels = new byte[size * size * 4];
+        var center = size / 2;
+        var radius = Math.Max(2, center - 1);
+
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var dx = x - center;
+                var dy = y - center;
+                if (dx * dx + dy * dy > radius * radius)
+                    continue;
+
+                var offset = (y * size + x) * 4;
+                pixels[offset] = color.B;
+                pixels[offset + 1] = color.G;
+                pixels[offset + 2] = color.R;
+                pixels[offset + 3] = color.A;
+            }
+        }
+
+        return pixels;
     }
 
     private void SetGripPrompt(

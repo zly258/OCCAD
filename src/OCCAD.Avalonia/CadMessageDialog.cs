@@ -22,10 +22,13 @@ internal enum CadMessageDialogKind
     Error
 }
 
+/// <summary>
+/// Compact industrial CAD message dialog. The visual language intentionally
+/// avoids decorative icons and keeps message text and actions dominant.
+/// </summary>
 internal sealed class CadMessageDialog : Window
 {
-    private CadDialogResult _result =
-        CadDialogResult.Cancel;
+    private CadDialogResult _result = CadDialogResult.Cancel;
 
     private CadMessageDialog(
         string title,
@@ -34,276 +37,154 @@ internal sealed class CadMessageDialog : Window
         CadMessageDialogKind kind)
     {
         Title = title;
-        Width = 460;
-        MinWidth = 420;
-        MaxWidth = 680;
-        MinHeight = 170;
-        MaxHeight = 520;
+        Width = 420;
+        MinWidth = 360;
+        MaxWidth = 620;
+        MinHeight = 128;
+        MaxHeight = 440;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
-        WindowStartupLocation =
-            WindowStartupLocation.CenterOwner;
-        Background = CadTheme.WindowBrush;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Background = CadTheme.Surface;
 
-        var statusBrush =
-            StatusBrush(kind);
-        var statusText =
-            StatusText(kind);
-
-        var headerText = new TextBlock
-        {
-            Text = statusText,
-            FontWeight = FontWeight.SemiBold,
-            Foreground = CadTheme.Text,
-            VerticalAlignment =
-                VerticalAlignment.Center
-        };
-
-        var header = new Border
-        {
-            MinHeight = 32,
-            Background = CadTheme.Header,
-            BorderBrush = CadTheme.BorderStrong,
-            BorderThickness =
-                new Thickness(0, 0, 0, 1),
-            Padding = new Thickness(
-                CadTheme.DialogPadding,
-                0),
-            Child = headerText
-        };
-
-        var text = new TextBlock
+        var messageText = new TextBlock
         {
             Text = message,
             TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Left,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center,
             Foreground = CadTheme.Text,
-            LineHeight = 19,
-            VerticalAlignment =
-                VerticalAlignment.Top
+            LineHeight = 18,
+            FontSize = CadTheme.FontSize
         };
 
         var messageHost = new ScrollViewer
         {
-            Content = text,
-            MaxHeight = 300,
+            Content = messageText,
+            MaxHeight = 260,
+            Margin = new Thickness(16, 14, 16, 14),
             HorizontalScrollBarVisibility =
                 global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             VerticalScrollBarVisibility =
                 global::Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
         };
 
-        var accent = new Border
-        {
-            Width = 4,
-            Background = statusBrush
-        };
-
-        var body = new Grid
-        {
-            ColumnSpacing = 10,
-            Margin = new Thickness(
-                CadTheme.DialogPadding,
-                12)
-        };
-        body.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(4)));
-        body.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(
-                    1,
-                    GridUnitType.Star)));
-        body.Children.Add(accent);
-        Grid.SetColumn(messageHost, 1);
-        body.Children.Add(messageHost);
-
-        var buttons =
-            BuildButtons(yesNoCancel);
+        var buttons = BuildButtons(yesNoCancel);
         var footer = new Border
         {
-            MinHeight = 44,
+            MinHeight = 40,
             Background = CadTheme.PanelAlt,
             BorderBrush = CadTheme.Border,
-            BorderThickness =
-                new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(
-                CadTheme.DialogPadding,
-                8),
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(10, 6),
             Child = buttons
         };
 
         var root = new Grid();
-        root.RowDefinitions.Add(
-            new RowDefinition(
-                GridLength.Auto));
-        root.RowDefinitions.Add(
-            new RowDefinition(
-                new GridLength(
-                    1,
-                    GridUnitType.Star)));
-        root.RowDefinitions.Add(
-            new RowDefinition(
-                GridLength.Auto));
-
-        root.Children.Add(header);
-        Grid.SetRow(body, 1);
-        root.Children.Add(body);
-        Grid.SetRow(footer, 2);
+        root.RowDefinitions.Add(new RowDefinition(1, GridUnitType.Star));
+        root.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        root.Children.Add(messageHost);
+        Grid.SetRow(footer, 1);
         root.Children.Add(footer);
         Content = root;
 
         KeyDown += (_, args) =>
         {
-            if (args.Key != Key.Escape)
-                return;
-
-            args.Handled = true;
-            CloseWith(
-                CadDialogResult.Cancel);
+            if (args.Key == Key.Escape)
+            {
+                args.Handled = true;
+                CloseWith(CadDialogResult.Cancel);
+            }
+            else if (args.Key == Key.Enter)
+            {
+                args.Handled = true;
+                CloseWith(yesNoCancel ? CadDialogResult.Yes : CadDialogResult.Ok);
+            }
         };
     }
 
     public static Task<CadDialogResult> ShowAsync(
-        Window owner,
+        Window? owner,
         string title,
         string message,
         bool yesNoCancel = false,
-        CadMessageDialogKind kind =
-            CadMessageDialogKind.Information) =>
-        new CadMessageDialog(
+        CadMessageDialogKind kind = CadMessageDialogKind.Information)
+    {
+        var dialog = new CadMessageDialog(
             title,
             message,
             yesNoCancel,
-            yesNoCancel &&
-            kind ==
-            CadMessageDialogKind.Information
-                ? CadMessageDialogKind.Question
-                : kind)
-            .ShowDialog<CadDialogResult>(
-                owner);
+            kind);
 
-    private Control BuildButtons(
-        bool yesNoCancel)
+        if (owner is { IsVisible: true })
+            return dialog.ShowDialog<CadDialogResult>(owner);
+
+        dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        var tcs = new TaskCompletionSource<CadDialogResult>();
+        dialog.Closed += (_, _) => tcs.TrySetResult(dialog._result);
+        dialog.Show();
+        return tcs.Task;
+    }
+
+    private Control BuildButtons(bool yesNoCancel)
     {
         var buttons = new StackPanel
         {
-            Orientation =
-                Orientation.Horizontal,
-            HorizontalAlignment =
-                HorizontalAlignment.Right,
-            Spacing = 6
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 5
         };
 
         if (yesNoCancel)
         {
             var yes = Button(
-                CadLanguageManager.Text(
-                    "Cad.Text.Yes",
-                    "Yes"),
+                CadLanguageManager.Text("Cad.Text.Yes", "Yes"),
                 primary: true);
-            yes.Click += (_, _) =>
-                CloseWith(
-                    CadDialogResult.Yes);
+            yes.Click += (_, _) => CloseWith(CadDialogResult.Yes);
             buttons.Children.Add(yes);
 
             var no = Button(
-                CadLanguageManager.Text(
-                    "Cad.Text.No",
-                    "No"));
-            no.Click += (_, _) =>
-                CloseWith(
-                    CadDialogResult.No);
+                CadLanguageManager.Text("Cad.Text.No", "No"));
+            no.Click += (_, _) => CloseWith(CadDialogResult.No);
             buttons.Children.Add(no);
 
             var cancel = Button(
-                CadLanguageManager.Text(
-                    "Cad.Text.Cancel",
-                    "Cancel"));
-            cancel.Click += (_, _) =>
-                CloseWith(
-                    CadDialogResult.Cancel);
+                CadLanguageManager.Text("Cad.Text.Cancel", "Cancel"));
+            cancel.Click += (_, _) => CloseWith(CadDialogResult.Cancel);
             buttons.Children.Add(cancel);
         }
         else
         {
             var ok = Button(
-                CadLanguageManager.Text(
-                    "Cad.Text.Ok",
-                    "OK"),
+                CadLanguageManager.Text("Cad.Text.OK", "OK"),
                 primary: true);
-            ok.Click += (_, _) =>
-                CloseWith(
-                    CadDialogResult.Ok);
+            ok.Click += (_, _) => CloseWith(CadDialogResult.Ok);
             buttons.Children.Add(ok);
         }
 
         return buttons;
     }
 
-    private void CloseWith(
-        CadDialogResult result)
+    private void CloseWith(CadDialogResult result)
     {
         _result = result;
         Close(_result);
     }
 
-    private static Button Button(
-        string text,
-        bool primary = false)
+    private static Button Button(string text, bool primary = false)
     {
         var button = new Button
         {
             Content = text,
-            MinWidth =
-                CadTheme.DialogButtonWidth,
-            MinHeight =
-                CadTheme.ControlHeight,
-            HorizontalContentAlignment =
-                HorizontalAlignment.Center,
-            VerticalContentAlignment =
-                VerticalAlignment.Center
+            MinWidth = CadTheme.DialogButtonWidth,
+            MinHeight = CadTheme.ControlHeight,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center
         };
         button.Classes.Add("cad-compact");
         if (primary)
             button.Classes.Add("cad-primary");
         return button;
     }
-
-    private static IBrush StatusBrush(
-        CadMessageDialogKind kind) =>
-        kind switch
-        {
-            CadMessageDialogKind.Error =>
-                new SolidColorBrush(
-                    Color.Parse("#C74646")),
-            CadMessageDialogKind.Warning =>
-                new SolidColorBrush(
-                    Color.Parse("#C28A27")),
-            CadMessageDialogKind.Question =>
-                CadTheme.Accent,
-            _ =>
-                CadTheme.BorderStrong
-        };
-
-    private static string StatusText(
-        CadMessageDialogKind kind) =>
-        kind switch
-        {
-            CadMessageDialogKind.Error =>
-                CadLanguageManager.Text(
-                    "Cad.Text.Error",
-                    "Error"),
-            CadMessageDialogKind.Warning =>
-                CadLanguageManager.Text(
-                    "Cad.Text.Warning",
-                    "Warning"),
-            CadMessageDialogKind.Question =>
-                CadLanguageManager.Text(
-                    "Cad.Text.Question",
-                    "Question"),
-            _ =>
-                CadLanguageManager.Text(
-                    "Cad.Text.Information",
-                    "Information")
-        };
 }

@@ -172,8 +172,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                                 "Selection [{0}]"),
                             _entities.Length);
 
-            _host.Children.Add(
-                CreateInspectorTitle(title));
+            _host.Children.Add(CreateInspectorTitle(title));
+            _host.Children.Add(CreateColumnHeader());
 
             if (_subobject is { } subobject)
                 AddSubobjectDetails(subobject);
@@ -210,8 +210,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         if (targets.Count == 0)
             return [];
 
-        var common = BrowsableProperties(targets[0])
-            .ToList();
+        var common = BrowsableProperties(targets[0]).ToList();
 
         foreach (var target in targets.Skip(1))
         {
@@ -226,8 +225,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         }
 
         return common
-            .Select(descriptor =>
-                new PropertySlot(descriptor, targets))
+            .Select(descriptor => new PropertySlot(descriptor, targets))
             .ToArray();
     }
 
@@ -235,40 +233,25 @@ internal sealed class CadPropertyInspectorController : IDisposable
         object target) =>
         CadPropertyCatalog.Describe(target);
 
-    private void AddSubobjectDetails(
-        CadSubobjectSelection selection)
+    private void AddSubobjectDetails(CadSubobjectSelection selection)
     {
         var rows = new List<(string Label, string Value)>();
 
         if (selection.TryGetPathSegment(out var segment))
         {
-            rows.Add((
-                Text("Cad.Property.SubobjectIndex", "Index"),
+            rows.Add((Text("Cad.Property.SubobjectIndex", "Index"),
                 (segment.Index + 1).ToString(CultureInfo.CurrentCulture)));
-            rows.Add((
-                Text("Cad.Property.SubobjectType", "Type"),
+            rows.Add((Text("Cad.Property.SubobjectType", "Type"),
                 segment.Type == CadPathSegmentType.Line
                     ? Text("Cad.Text.PathSegmentLine", "Line")
                     : Text("Cad.Text.PathSegmentArc", "Arc")));
-            rows.Add((
-                Text("Cad.Property.Length", "Length"),
-                FormatNumber(segment.Length)));
-            rows.Add((
-                Text("Cad.Property.StartPoint", "Start"),
-                FormatPoint(segment.Start)));
-            rows.Add((
-                Text("Cad.Property.EndPoint", "End"),
-                FormatPoint(segment.End)));
+            rows.Add((Text("Cad.Property.Length", "Length"), FormatNumber(segment.Length)));
+            rows.Add((Text("Cad.Property.StartPoint", "Start"), FormatPoint(segment.Start)));
+            rows.Add((Text("Cad.Property.EndPoint", "End"), FormatPoint(segment.End)));
             if (segment.Radius is { } radius)
-            {
-                rows.Add((
-                    Text("Cad.Property.Radius", "Radius"),
-                    FormatNumber(radius)));
-            }
+                rows.Add((Text("Cad.Property.Radius", "Radius"), FormatNumber(radius)));
 
-            AddReadOnlyGroup(
-                Text("Cad.Category.Subobject", "Subobject"),
-                rows);
+            AddReadOnlyGroup(Text("Cad.Category.Subobject", "Subobject"), rows);
             return;
         }
 
@@ -280,26 +263,17 @@ internal sealed class CadPropertyInspectorController : IDisposable
         OcctShape? temporary = null;
         try
         {
-            rows.Add((
-                Text("Cad.Property.SubobjectIndex", "Index"),
-                (selection.SubshapeIndex + 1)
-                    .ToString(CultureInfo.CurrentCulture)));
+            rows.Add((Text("Cad.Property.SubobjectIndex", "Index"),
+                (selection.SubshapeIndex + 1).ToString(CultureInfo.CurrentCulture)));
 
             switch (selection.SubshapeType)
             {
                 case OcctShapeType.Vertex:
-                {
-                    rows.Add((
-                        Text("Cad.Property.SubobjectType", "Type"),
+                    rows.Add((Text("Cad.Property.SubobjectType", "Type"),
                         Text("Cad.Text.SubobjectVertex", "Vertex")));
-                    rows.Add((
-                        Text("Cad.Property.Position", "Position"),
-                        FormatPoint(
-                            engine.GetVertexPoint(
-                                owner,
-                                selection.SubshapeIndex))));
+                    rows.Add((Text("Cad.Property.Position", "Position"),
+                        FormatPoint(engine.GetVertexPoint(owner, selection.SubshapeIndex))));
                     break;
-                }
 
                 case OcctShapeType.Edge:
                 {
@@ -308,30 +282,16 @@ internal sealed class CadPropertyInspectorController : IDisposable
                         OcctShapeType.Edge,
                         selection.SubshapeIndex);
                     temporary = edgeShape;
-                    var curveType =
-                        engine.GetEdgeCurveType(edgeShape);
-                    var endpoints =
-                        engine.GetEdgeEndpoints(edgeShape);
-                    var properties =
-                        engine.GetShapeLinearProperties(edgeShape);
+                    var curveType = engine.GetEdgeCurveType(edgeShape);
+                    var endpoints = engine.GetEdgeEndpoints(edgeShape);
+                    var properties = engine.GetShapeLinearProperties(edgeShape);
 
-                    rows.Add((
-                        Text("Cad.Property.SubobjectType", "Type"),
-                        Text(
-                            $"Cad.Value.OcctCurveType.{curveType}",
-                            curveType.ToString())));
-                    rows.Add((
-                        Text("Cad.Property.Length", "Length"),
-                        FormatNumber(properties.Mass)));
-                    rows.Add((
-                        Text("Cad.Property.StartPoint", "Start"),
-                        FormatPoint(endpoints.Start)));
-                    rows.Add((
-                        Text("Cad.Property.EndPoint", "End"),
-                        FormatPoint(endpoints.End)));
-                    rows.Add((
-                        Text("Cad.Property.Center", "Center"),
-                        FormatPoint(properties.CenterOfMass)));
+                    rows.Add((Text("Cad.Property.SubobjectType", "Type"),
+                        Text($"Cad.Value.OcctCurveType.{curveType}", curveType.ToString())));
+                    rows.Add((Text("Cad.Property.Length", "Length"), FormatNumber(properties.Mass)));
+                    rows.Add((Text("Cad.Property.StartPoint", "Start"), FormatPoint(endpoints.Start)));
+                    rows.Add((Text("Cad.Property.EndPoint", "End"), FormatPoint(endpoints.End)));
+                    rows.Add((Text("Cad.Property.Center", "Center"), FormatPoint(properties.CenterOfMass)));
                     break;
                 }
 
@@ -342,74 +302,48 @@ internal sealed class CadPropertyInspectorController : IDisposable
                         OcctShapeType.Face,
                         selection.SubshapeIndex);
                     temporary = faceShape;
-                    var surfaceType =
-                        engine.GetFaceSurfaceType(faceShape);
-                    var properties =
-                        engine.GetShapeSurfaceProperties(faceShape);
-                    rows.Add((
-                        Text("Cad.Property.SubobjectType", "Type"),
-                        Text(
-                            $"Cad.Value.OcctSurfaceType.{surfaceType}",
-                            surfaceType.ToString())));
-                    rows.Add((
-                        Text("Cad.Property.Area", "Area"),
-                        FormatNumber(properties.Mass)));
-                    rows.Add((
-                        Text("Cad.Property.Center", "Center"),
-                        FormatPoint(properties.CenterOfMass)));
+                    var surfaceType = engine.GetFaceSurfaceType(faceShape);
+                    var properties = engine.GetShapeSurfaceProperties(faceShape);
+                    rows.Add((Text("Cad.Property.SubobjectType", "Type"),
+                        Text($"Cad.Value.OcctSurfaceType.{surfaceType}", surfaceType.ToString())));
+                    rows.Add((Text("Cad.Property.Area", "Area"), FormatNumber(properties.Mass)));
+                    rows.Add((Text("Cad.Property.Center", "Center"), FormatPoint(properties.CenterOfMass)));
 
                     try
                     {
-                        var bounds =
-                            engine.GetFaceUvBounds(faceShape);
-                        var u =
-                            (bounds.UMin + bounds.UMax) * 0.5;
-                        var v =
-                            (bounds.VMin + bounds.VMax) * 0.5;
-                        var evaluation =
-                            engine.EvaluateFace(
-                                faceShape,
-                                u,
-                                v);
-                        rows.Add((
-                            Text("Cad.Property.Normal", "Normal"),
-                            FormatVector(evaluation.Normal)));
+                        var bounds = engine.GetFaceUvBounds(faceShape);
+                        var evaluation = engine.EvaluateFace(
+                            faceShape,
+                            (bounds.UMin + bounds.UMax) * 0.5,
+                            (bounds.VMin + bounds.VMax) * 0.5);
+                        rows.Add((Text("Cad.Property.Normal", "Normal"), FormatVector(evaluation.Normal)));
                     }
-                    catch (Exception exception)
-                        when (IsRecoverable(exception))
+                    catch (Exception exception) when (IsRecoverable(exception))
                     {
                     }
-
                     break;
                 }
 
                 default:
-                    rows.Add((
-                        Text("Cad.Property.SubobjectType", "Type"),
+                    rows.Add((Text("Cad.Property.SubobjectType", "Type"),
                         Text(
                             $"Cad.Text.Subobject{selection.SubshapeType}",
                             selection.SubshapeType.ToString())));
                     break;
             }
         }
-        catch (Exception exception)
-            when (IsRecoverable(exception))
+        catch (Exception exception) when (IsRecoverable(exception))
         {
-            rows.Add((
-                Text("Cad.Property.Details", "Details"),
+            rows.Add((Text("Cad.Property.Details", "Details"),
                 exception.GetBaseException().Message));
         }
         finally
         {
             if (temporary is { } temporaryShape)
-                TryDeleteTemporaryShape(
-                    engine,
-                    temporaryShape);
+                TryDeleteTemporaryShape(engine, temporaryShape);
         }
 
-        AddReadOnlyGroup(
-            Text("Cad.Category.Subobject", "Subobject"),
-            rows);
+        AddReadOnlyGroup(Text("Cad.Category.Subobject", "Subobject"), rows);
     }
 
     private void AddReadOnlyGroup(
@@ -422,52 +356,39 @@ internal sealed class CadPropertyInspectorController : IDisposable
         AddPropertyGroup(
             "Subobject",
             title,
-            rows.Select(
-                row => CreateReadOnlyRow(
-                    row.Label,
-                    row.Value)));
+            rows.Select(row => CreateReadOnlyRow(row.Label, row.Value)));
     }
 
-    private static Control CreateReadOnlyRow(
-        string label,
-        string value)
+    private static Control CreateReadOnlyRow(string label, string value)
     {
         var row = CreatePropertyGrid();
-
         row.Children.Add(new TextBlock
         {
             Text = label,
             Foreground = CadTheme.Text,
-            VerticalAlignment =
-                VerticalAlignment.Center,
-            TextTrimming =
-                TextTrimming.CharacterEllipsis
+            Margin = new Thickness(5, 0, 4, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
         });
 
         var text = new TextBlock
         {
             Text = value,
             Foreground = CadTheme.Muted,
-            VerticalAlignment =
-                VerticalAlignment.Center,
-            TextTrimming =
-                TextTrimming.CharacterEllipsis
+            Margin = new Thickness(4, 0, 3, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
-        Grid.SetColumn(text, 1);
+        Grid.SetColumn(text, 2);
         row.Children.Add(text);
-
         return WrapPropertyRow(row);
     }
 
-    private static string Text(
-        string key,
-        string fallback) =>
+    private static string Text(string key, string fallback) =>
         CadLanguageManager.Text(key, fallback);
 
     private static string FormatNumber(double value) =>
-        value.ToString(
-            "0.######",
-            CultureInfo.CurrentCulture);
+        value.ToString("0.######", CultureInfo.CurrentCulture);
 
     private static string FormatPoint(OcctPoint3d point) =>
         string.Format(
@@ -478,23 +399,16 @@ internal sealed class CadPropertyInspectorController : IDisposable
             point.Z);
 
     private static string FormatVector(OcctVector3d vector) =>
-        FormatPoint(
-            new OcctPoint3d(
-                vector.X,
-                vector.Y,
-                vector.Z));
+        FormatPoint(new OcctPoint3d(vector.X, vector.Y, vector.Z));
 
-    private static void TryDeleteTemporaryShape(
-        OcctEngine engine,
-        OcctShape shape)
+    private static void TryDeleteTemporaryShape(OcctEngine engine, OcctShape shape)
     {
         try
         {
             if (engine.ContainsObject(shape.Id))
                 engine.Delete(shape);
         }
-        catch (Exception exception)
-            when (IsRecoverable(exception))
+        catch (Exception exception) when (IsRecoverable(exception))
         {
         }
     }
@@ -507,13 +421,13 @@ internal sealed class CadPropertyInspectorController : IDisposable
     private Control CreatePropertyRow(PropertySlot slot)
     {
         var row = CreatePropertyGrid();
-
         var label = new TextBlock
         {
             Text = CadLanguageManager.Text(
                 slot.Descriptor.Value.DisplayKey,
                 slot.Descriptor.DisplayName),
             Foreground = CadTheme.Text,
+            Margin = new Thickness(5, 0, 4, 0),
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
             FontSize = CadTheme.FontSize
@@ -529,67 +443,94 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         row.Children.Add(label);
         var editor = CreateEditor(slot);
-        Grid.SetColumn(editor, 1);
+        editor.Margin = new Thickness(4, 0, 3, 0);
+        Grid.SetColumn(editor, 2);
         row.Children.Add(editor);
         return WrapPropertyRow(row);
     }
 
     private static Grid CreatePropertyGrid()
     {
-        var row = new Grid
+        var row = new Grid { ColumnSpacing = 0 };
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(CadTheme.PropertyLabelWidth)));
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(1)));
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+
+        var separator = new Border
         {
-            ColumnSpacing = 8
+            Width = 1,
+            Background = CadTheme.BorderStrong,
+            IsHitTestVisible = false
         };
-        row.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(
-                    CadTheme.PropertyLabelWidth)));
-        row.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(
-                    1,
-                    GridUnitType.Star)));
+        Grid.SetColumn(separator, 1);
+        row.Children.Add(separator);
         return row;
     }
 
-    private static Border WrapPropertyRow(
-        Control content) =>
+    private static Border WrapPropertyRow(Control content) =>
         new()
         {
             MinHeight = CadTheme.PropertyRowHeight,
             Background = CadTheme.Surface,
             BorderBrush = CadTheme.Border,
-            BorderThickness =
-                new Thickness(0, 0, 0, 1),
-            Padding = new Thickness(
-                CadTheme.PropertyRowIndent,
-                0,
-                7,
-                0),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(0),
             Child = content
         };
 
-    private static Border CreateInspectorTitle(
-        string title) =>
+    private static Border CreateInspectorTitle(string title) =>
         new()
         {
             MinHeight = CadTheme.PropertyTitleHeight,
             Background = CadTheme.PanelAlt,
             BorderBrush = CadTheme.Border,
-            BorderThickness =
-                new Thickness(0, 0, 0, 1),
-            Padding = new Thickness(9, 0),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(7, 0),
             Child = new TextBlock
             {
                 Text = title,
                 FontWeight = FontWeight.SemiBold,
                 Foreground = CadTheme.Text,
-                VerticalAlignment =
-                    VerticalAlignment.Center,
-                TextTrimming =
-                    TextTrimming.CharacterEllipsis
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
             }
         };
+
+    private static Border CreateColumnHeader()
+    {
+        var grid = CreatePropertyGrid();
+        var property = new TextBlock
+        {
+            Text = Text("Cad.Text.Property", "Property"),
+            FontWeight = FontWeight.SemiBold,
+            Foreground = CadTheme.Text,
+            Margin = new Thickness(5, 0, 4, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var value = new TextBlock
+        {
+            Text = Text("Cad.Text.Value", "Value"),
+            FontWeight = FontWeight.SemiBold,
+            Foreground = CadTheme.Text,
+            Margin = new Thickness(4, 0, 3, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(value, 2);
+        grid.Children.Add(property);
+        grid.Children.Add(value);
+
+        return new Border
+        {
+            Height = CadTheme.PropertyRowHeight,
+            Background = CadTheme.Header,
+            BorderBrush = CadTheme.BorderStrong,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = grid
+        };
+    }
 
     private void AddPropertyGroup(
         string categoryKey,
@@ -597,15 +538,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
         IEnumerable<Control> rows)
     {
         var collapsed =
-            _collapsedCategories.TryGetValue(
-                categoryKey,
-                out var stored) &&
-            stored;
-
-        var body = new StackPanel
-        {
-            IsVisible = !collapsed
-        };
+            _collapsedCategories.TryGetValue(categoryKey, out var stored) && stored;
+        var body = new StackPanel { IsVisible = !collapsed };
         foreach (var row in rows)
             body.Children.Add(row);
 
@@ -615,34 +549,25 @@ internal sealed class CadPropertyInspectorController : IDisposable
             Width = CadTheme.PropertyChevronWidth,
             FontSize = CadTheme.SmallFontSize,
             Foreground = CadTheme.Muted,
-            VerticalAlignment =
-                VerticalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
             TextAlignment = TextAlignment.Center
         };
-
         var titleText = new TextBlock
         {
             Text = title,
             FontWeight = FontWeight.SemiBold,
             Foreground = CadTheme.Text,
-            VerticalAlignment =
-                VerticalAlignment.Center,
-            TextTrimming =
-                TextTrimming.CharacterEllipsis
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
-
         var headerContent = new Grid
         {
-            ColumnSpacing = 3,
-            Margin = new Thickness(5, 0, 7, 0)
+            ColumnSpacing = 2,
+            Margin = new Thickness(3, 0, 5, 0)
         };
+        headerContent.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
         headerContent.ColumnDefinitions.Add(
-            new ColumnDefinition(GridLength.Auto));
-        headerContent.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(
-                    1,
-                    GridUnitType.Star)));
+            new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
         headerContent.Children.Add(chevron);
         Grid.SetColumn(titleText, 1);
         headerContent.Children.Add(titleText);
@@ -650,28 +575,23 @@ internal sealed class CadPropertyInspectorController : IDisposable
         var header = new Button
         {
             Content = headerContent,
-            Height =
-                CadTheme.PropertyCategoryHeaderHeight,
+            Height = CadTheme.PropertyCategoryHeaderHeight,
             Padding = new Thickness(0),
             Margin = new Thickness(0),
-            HorizontalContentAlignment =
-                HorizontalAlignment.Stretch,
-            VerticalContentAlignment =
-                VerticalAlignment.Center,
-            Background = CadTheme.Toolbar,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = CadTheme.Header,
             Foreground = CadTheme.Text,
-            BorderBrush = CadTheme.BorderStrong,
-            BorderThickness =
-                new Thickness(0, 1, 0, 1)
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            CornerRadius = new CornerRadius(0)
         };
         header.Click += (_, _) =>
         {
             var nextCollapsed = body.IsVisible;
             body.IsVisible = !nextCollapsed;
-            chevron.Text =
-                nextCollapsed ? "▸" : "▾";
-            _collapsedCategories[categoryKey] =
-                nextCollapsed;
+            chevron.Text = nextCollapsed ? "▸" : "▾";
+            _collapsedCategories[categoryKey] = nextCollapsed;
         };
 
         var section = new StackPanel();
@@ -684,49 +604,28 @@ internal sealed class CadPropertyInspectorController : IDisposable
     {
         var descriptor = slot.Descriptor;
         var value = slot.CommonValue(out var isMixed);
-        var semantic = descriptor.Value.Semantic;
-        var isLayer =
-            semantic == CadValueSemantic.Layer &&
-            _entities.Length > 0;
+        var entityContext = _entities.Length > 0;
 
-        if (isLayer)
-            return CreateLayerEditor(value as string, isMixed);
-        if (descriptor.IsReadOnly)
-            return ReadOnlyValue(descriptor, value, isMixed);
-
-        var byLayerProperty = descriptor.Name switch
+        return CadPropertyEditorFactory.Resolve(descriptor, entityContext) switch
         {
-            nameof(CadEntity.Color) =>
-                nameof(CadEntity.ColorByLayer),
-            nameof(CadEntity.LineStyle) =>
-                nameof(CadEntity.LineStyleByLayer),
-            nameof(CadEntity.LineWidth) =>
-                nameof(CadEntity.LineWidthByLayer),
-            _ => null
+            CadPropertyEditorKind.Layer =>
+                CreateLayerEditor(value as string, isMixed),
+            CadPropertyEditorKind.ByLayer =>
+                CreateByLayerEditor(
+                    slot,
+                    CadPropertyEditorFactory.ByLayerProperty(descriptor)!,
+                    value,
+                    isMixed),
+            CadPropertyEditorKind.Boolean =>
+                CreateBooleanEditor(slot, value, isMixed),
+            CadPropertyEditorKind.Choice =>
+                CreateEnumEditor(slot, value, isMixed),
+            CadPropertyEditorKind.Color =>
+                CreateColorEditor(slot, value, isMixed: isMixed),
+            CadPropertyEditorKind.Text =>
+                CreateTextEditor(slot, value, isMixed),
+            _ => ReadOnlyValue(descriptor, value, isMixed)
         };
-        if (byLayerProperty is not null &&
-            _entities.Length > 0)
-        {
-            return CreateByLayerEditor(
-                slot,
-                byLayerProperty,
-                value,
-                isMixed);
-        }
-
-        if (semantic == CadValueSemantic.Boolean)
-            return CreateBooleanEditor(slot, value, isMixed);
-        if (semantic is CadValueSemantic.Enum or CadValueSemantic.Choice)
-            return CreateEnumEditor(slot, value, isMixed);
-        if (semantic == CadValueSemantic.Color)
-            return CreateColorEditor(
-                slot,
-                value,
-                isMixed: isMixed);
-        if (CanEditAsText(descriptor))
-            return CreateTextEditor(slot, value, isMixed);
-
-        return ReadOnlyValue(descriptor, value, isMixed);
     }
 
     private Control CreateByLayerEditor(
@@ -737,126 +636,81 @@ internal sealed class CadPropertyInspectorController : IDisposable
     {
         var flags = _entities
             .Select(entity =>
-                TypeDescriptor
-                    .GetProperties(entity, true)
-                    .Find(
-                        byLayerProperty,
-                        ignoreCase: false)?
+                TypeDescriptor.GetProperties(entity, true)
+                    .Find(byLayerProperty, ignoreCase: false)?
                     .GetValue(entity) as bool?)
             .ToArray();
 
         var first = flags.FirstOrDefault();
-        var mixedByLayer =
-            flags.Any(flag => flag != first);
-
+        var mixedByLayer = flags.Any(flag => flag != first);
         var editorValue = value;
         var editorMixed = isMixed || mixedByLayer;
+
         if (!mixedByLayer && first == true)
         {
             var resolved = _entities
                 .Select(entity =>
                 {
-                    var appearance =
-                        _workspace.Document
-                            .ResolveAppearance(entity);
+                    var appearance = _workspace.Document.ResolveAppearance(entity);
                     return slot.Descriptor.Name switch
                     {
-                        nameof(CadEntity.Color) =>
-                            (object)appearance.Color,
-                        nameof(CadEntity.LineStyle) =>
-                            appearance.LineStyle,
-                        nameof(CadEntity.LineWidth) =>
-                            appearance.LineWidth,
+                        nameof(CadEntity.Color) => (object)appearance.Color,
+                        nameof(CadEntity.LineStyle) => appearance.LineStyle,
+                        nameof(CadEntity.LineWidth) => appearance.LineWidth,
                         _ => value
                     };
                 })
                 .ToArray();
 
-            editorValue =
-                resolved.FirstOrDefault();
-            editorMixed =
-                resolved.Skip(1)
-                    .Any(item =>
-                        !Equals(
-                            editorValue,
-                            item));
+            editorValue = resolved.FirstOrDefault();
+            editorMixed = resolved.Skip(1).Any(item => !Equals(editorValue, item));
             if (editorMixed)
                 editorValue = null;
         }
 
         var byLayer = new CheckBox
         {
-            Content = CadLanguageManager.Text(
-                "Cad.Text.ByLayer",
-                "ByLayer"),
+            Content = CadLanguageManager.Text("Cad.Text.ByLayer", "ByLayer"),
             IsThreeState = mixedByLayer,
-            IsChecked = mixedByLayer
-                ? null
-                : first == true,
-            VerticalAlignment =
-                VerticalAlignment.Center
+            IsChecked = mixedByLayer ? null : first == true,
+            VerticalAlignment = VerticalAlignment.Center
         };
-        ToolTip.SetTip(
-            byLayer,
-            CadLanguageManager.Text(
-                "Cad.Text.ByLayer",
-                "ByLayer"));
+        ToolTip.SetTip(byLayer, CadLanguageManager.Text("Cad.Text.ByLayer", "ByLayer"));
         byLayer.IsCheckedChanged += (_, _) =>
         {
-            if (_refreshing ||
-                byLayer.IsChecked is not { } next)
+            if (_refreshing || byLayer.IsChecked is not { } next)
                 return;
-
-            ApplyHiddenEntityProperty(
-                byLayerProperty,
-                next);
+            ApplyHiddenEntityProperty(byLayerProperty, next);
         };
 
-        Control valueEditor =
-            slot.Descriptor.Value.Semantic switch
-            {
-                CadValueSemantic.Color =>
-                    CreateColorEditor(
-                        slot,
-                        editorValue,
-                        showByLayerText: false,
-                        isMixed: editorMixed),
-                CadValueSemantic.Enum or
-                CadValueSemantic.Choice =>
-                    CreateEnumEditor(
-                        slot,
-                        editorValue,
-                        editorMixed),
-                _ when CanEditAsText(slot.Descriptor) =>
-                    CreateTextEditor(
-                        slot,
-                        editorValue,
-                        editorMixed),
-                _ =>
-                    ReadOnlyValue(
-                        slot.Descriptor,
-                        editorValue,
-                        editorMixed)
-            };
+        Control valueEditor = CadPropertyEditorFactory.Resolve(
+            slot.Descriptor,
+            entityContext: false) switch
+        {
+            CadPropertyEditorKind.Choice =>
+                CreateEnumEditor(slot, editorValue, editorMixed),
+            CadPropertyEditorKind.Color =>
+                CreateColorEditor(
+                    slot,
+                    editorValue,
+                    showByLayerText: false,
+                    isMixed: editorMixed),
+            CadPropertyEditorKind.Text =>
+                CreateTextEditor(slot, editorValue, editorMixed),
+            _ => ReadOnlyValue(slot.Descriptor, editorValue, editorMixed)
+        };
 
-        valueEditor.VerticalAlignment =
-            VerticalAlignment.Center;
-        valueEditor.HorizontalAlignment =
-            HorizontalAlignment.Stretch;
+        valueEditor.VerticalAlignment = VerticalAlignment.Center;
+        valueEditor.HorizontalAlignment = HorizontalAlignment.Stretch;
 
         var grid = new Grid
         {
-            ColumnSpacing = 7,
-            VerticalAlignment =
-                VerticalAlignment.Center
+            ColumnSpacing = 5,
+            VerticalAlignment = VerticalAlignment.Center
         };
+        grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
         grid.ColumnDefinitions.Add(
-            new ColumnDefinition(GridLength.Auto));
-        grid.ColumnDefinitions.Add(
-            new ColumnDefinition(
-                new GridLength(
-                    1,
-                    GridUnitType.Star)));
+            new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
         grid.Children.Add(byLayer);
         Grid.SetColumn(valueEditor, 1);
         grid.Children.Add(valueEditor);
@@ -867,13 +721,9 @@ internal sealed class CadPropertyInspectorController : IDisposable
     {
         var combo = new ComboBox
         {
-            HorizontalAlignment =
-                HorizontalAlignment.Stretch,
-            VerticalAlignment =
-                VerticalAlignment.Center,
-            ItemsSource = _workspace.Layers.Layers
-                .Select(static layer => layer.Name)
-                .ToArray(),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center,
+            ItemsSource = _workspace.Layers.Layers.Select(static layer => layer.Name).ToArray(),
             SelectedItem = isMixed ? null : value,
             PlaceholderText = isMixed ? "—" : null
         };
@@ -894,8 +744,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
     {
         var editor = new CheckBox
         {
-            VerticalAlignment =
-                VerticalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
             IsThreeState = isMixed,
             IsChecked = isMixed ? null : value is bool flag && flag
         };
@@ -925,10 +774,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         var combo = new ComboBox
         {
-            HorizontalAlignment =
-                HorizontalAlignment.Stretch,
-            VerticalAlignment =
-                VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center,
             ItemsSource = items,
             SelectedItem = isMixed
                 ? null
@@ -951,19 +798,15 @@ internal sealed class CadPropertyInspectorController : IDisposable
         bool showByLayerText = true,
         bool isMixed = false)
     {
-        var entityTargets = slot.Targets
-            .OfType<CadEntity>()
-            .ToArray();
-        var byLayer =
-            entityTargets.Length > 0 &&
-            entityTargets.All(entity => entity.ColorByLayer);
-        var drawing =
-            byLayer && entityTargets.Length > 0
-                ? _workspace.Document.ResolveAppearance(
-                    entityTargets[0]).Color
-                : value is DrawingColor color
-                    ? color
-                    : DrawingColor.LightGray;
+        var entityTargets = slot.Targets.OfType<CadEntity>().ToArray();
+        var byLayer = entityTargets.Length > 0 &&
+                      entityTargets.All(entity => entity.ColorByLayer);
+        var drawing = byLayer && entityTargets.Length > 0
+            ? _workspace.Document.ResolveAppearance(entityTargets[0]).Color
+            : value is DrawingColor color
+                ? color
+                : DrawingColor.LightGray;
+
         var button = new Button
         {
             MinHeight = CadTheme.ControlHeight,
@@ -973,11 +816,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
             Padding = new Thickness(6, 1),
             Background = isMixed
                 ? CadTheme.PanelAlt
-                : new SolidColorBrush(
-                    ToMediaColor(drawing)),
-            Foreground = isMixed
-                ? CadTheme.Muted
-                : ColorTextBrush(drawing),
+                : new SolidColorBrush(ToMediaColor(drawing)),
+            Foreground = isMixed ? CadTheme.Muted : ColorTextBrush(drawing),
             Content = isMixed
                 ? "—"
                 : byLayer && showByLayerText
@@ -985,14 +825,11 @@ internal sealed class CadPropertyInspectorController : IDisposable
                     : $"#{drawing.R:X2}{drawing.G:X2}{drawing.B:X2}"
         };
         button.Classes.Add("cad-compact");
-        ToolTip.SetTip(
-            button,
-            CadLanguageManager.Text("Cad.Text.Color", "Color"));
+        ToolTip.SetTip(button, CadLanguageManager.Text("Cad.Text.Color", "Color"));
         button.Click += async (_, _) =>
         {
             if (_refreshing)
                 return;
-
             var selected = await CadColorDialog.ShowAsync(_owner, drawing);
             if (selected is { } next)
                 ApplyValue(slot, next);
@@ -1008,19 +845,20 @@ internal sealed class CadPropertyInspectorController : IDisposable
         var descriptor = slot.Descriptor;
         var editor = new TextBox
         {
-            HorizontalAlignment =
-                HorizontalAlignment.Stretch,
-            VerticalAlignment =
-                VerticalAlignment.Center,
-            Text = isMixed ? string.Empty : ConvertToText(descriptor, value),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center,
+            Text = isMixed
+                ? string.Empty
+                : CadPropertyEditorFactory.FormatValue(descriptor, value),
             PlaceholderText = isMixed ? "—" : null
         };
         editor.Classes.Add("cad-input");
 
         void Commit()
         {
-            if (_refreshing) return;
-            if (!TryConvertFromText(
+            if (_refreshing)
+                return;
+            if (!CadPropertyEditorFactory.TryParseValue(
                     descriptor,
                     editor.Text ?? string.Empty,
                     out var converted))
@@ -1033,7 +871,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         editor.KeyDown += (_, e) =>
         {
-            if (e.Key != global::Avalonia.Input.Key.Enter) return;
+            if (e.Key != global::Avalonia.Input.Key.Enter)
+                return;
             Commit();
             e.Handled = true;
         };
@@ -1047,102 +886,15 @@ internal sealed class CadPropertyInspectorController : IDisposable
         bool isMixed) =>
         new TextBlock
         {
-            Text = isMixed ? "—" : ConvertToText(descriptor, value),
+            Text = isMixed
+                ? "—"
+                : CadPropertyEditorFactory.FormatValue(descriptor, value),
             Foreground = CadTheme.Muted,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
 
-    private static bool CanEditAsText(CadPropertyDescriptor descriptor)
-    {
-        var converter = descriptor.Converter;
-        return descriptor.PropertyType == typeof(string) ||
-               descriptor.PropertyType == typeof(double) ||
-               descriptor.PropertyType == typeof(float) ||
-               descriptor.PropertyType == typeof(decimal) ||
-               descriptor.PropertyType == typeof(int) ||
-               descriptor.PropertyType == typeof(long) ||
-               converter.CanConvertFrom(typeof(string));
-    }
-
-    private static string ConvertToText(
-        CadPropertyDescriptor descriptor,
-        object? value)
-    {
-        if (value is null)
-            return string.Empty;
-        if (value is double number)
-            return number.ToString("0.######", CultureInfo.CurrentCulture);
-
-        try
-        {
-            return descriptor.Converter.ConvertToString(
-                       null,
-                       CultureInfo.CurrentCulture,
-                       value) ??
-                   value.ToString() ??
-                   string.Empty;
-        }
-        catch
-        {
-            return value.ToString() ?? string.Empty;
-        }
-    }
-
-    private static bool TryConvertFromText(
-        CadPropertyDescriptor descriptor,
-        string text,
-        out object? value)
-    {
-        try
-        {
-            if (descriptor.PropertyType == typeof(double))
-            {
-                if (!double.TryParse(
-                        text,
-                        NumberStyles.Float,
-                        CultureInfo.CurrentCulture,
-                        out var number) &&
-                    !double.TryParse(
-                        text,
-                        NumberStyles.Float,
-                        CultureInfo.InvariantCulture,
-                        out number))
-                {
-                    value = null;
-                    return false;
-                }
-
-                if (!double.IsFinite(number) ||
-                    descriptor.Value.Minimum is { } minimum &&
-                    number < minimum ||
-                    descriptor.Value.Maximum is { } maximum &&
-                    number > maximum)
-                {
-                    value = null;
-                    return false;
-                }
-
-                value = number;
-                return true;
-            }
-
-            value = descriptor.Converter.ConvertFromString(
-                null,
-                CultureInfo.CurrentCulture,
-                text);
-            return true;
-        }
-        catch
-        {
-            value = null;
-            return false;
-        }
-    }
-
-    private void ApplyHiddenEntityProperty(
-        string propertyName,
-        object value)
+    private void ApplyHiddenEntityProperty(string propertyName, object value)
     {
         if (_entities.Length == 0)
             return;
@@ -1152,11 +904,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 _entities,
                 propertyName,
                 value,
-                out var error) &&
-            error is not null)
-        {
+                out var error) && error is not null)
             ShowPropertyError(error);
-        }
 
         Rebuild();
     }
@@ -1174,8 +923,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
         }
         catch (Exception exception)
         {
-            if (!wasModified &&
-                _workspace.History.CurrentStateId == historyState)
+            if (!wasModified && _workspace.History.CurrentStateId == historyState)
                 _workspace.MarkSaved();
             ShowPropertyError(exception);
         }
@@ -1195,11 +943,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                     _entities,
                     slot.Descriptor.Name,
                     value,
-                    out var error) &&
-                error is not null)
-            {
+                    out var error) && error is not null)
                 ShowPropertyError(error);
-            }
             Rebuild();
             return;
         }
@@ -1238,8 +983,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
                     restoreFailure);
             }
 
-            if (!wasModified &&
-                _workspace.History.CurrentStateId == historyState)
+            if (!wasModified && _workspace.History.CurrentStateId == historyState)
                 _workspace.MarkSaved();
             ShowPropertyError(exception);
         }
@@ -1250,7 +994,6 @@ internal sealed class CadPropertyInspectorController : IDisposable
     private void ShowPropertyError(Exception error)
     {
         ArgumentNullException.ThrowIfNull(error);
-
         var messages = error is AggregateException aggregate
             ? aggregate.Flatten().InnerExceptions
                 .Select(static item => item.GetBaseException().Message)
@@ -1268,19 +1011,14 @@ internal sealed class CadPropertyInspectorController : IDisposable
             kind: CadMessageDialogKind.Error);
     }
 
-    private string LocalizeSubobjectTitle(
-        CadSubobjectSelection selection)
+    private string LocalizeSubobjectTitle(CadSubobjectSelection selection)
     {
         var entityName = LocalizeEntityName(selection.Entity);
         if (selection.TryGetPathSegment(out var segment))
         {
             var type = segment.Type == CadPathSegmentType.Line
-                ? CadLanguageManager.Text(
-                    "Cad.Text.PathSegmentLine",
-                    "Line")
-                : CadLanguageManager.Text(
-                    "Cad.Text.PathSegmentArc",
-                    "Arc");
+                ? CadLanguageManager.Text("Cad.Text.PathSegmentLine", "Line")
+                : CadLanguageManager.Text("Cad.Text.PathSegmentArc", "Arc");
             var segmentText = string.Format(
                 CultureInfo.CurrentCulture,
                 CadLanguageManager.Text(
@@ -1321,9 +1059,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
             0.2126 * value.R +
             0.7152 * value.G +
             0.0722 * value.B;
-        return luminance < 140.0
-            ? Brushes.White
-            : CadTheme.Text;
+        return luminance < 140.0 ? Brushes.White : CadTheme.Text;
     }
 
     private void EnsureNotDisposed() =>

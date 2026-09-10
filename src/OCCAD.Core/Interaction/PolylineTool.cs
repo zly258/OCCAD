@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -61,7 +61,10 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
             return true;
         }
 
-        CommitPreview(new CadPolylineEntity(_points, closed: true));
+        var entity = new CadPolylineEntity(_points, closed: true);
+        _points.Clear();
+        _preview = null;
+        CommitPreview(entity);
         success = true;
         message = "Close";
         return true;
@@ -82,7 +85,10 @@ public sealed class PolylineTool : CadDrawingTool, ICadPointInputTool, ICadComma
     protected override bool OnFinish()
     {
         if (!CanFinishCore) return false;
-        CommitPreview(new CadPolylineEntity(_points));
+        var entity = new CadPolylineEntity(_points);
+        _points.Clear();
+        _preview = null;
+        CommitPreview(entity);
         return true;
     }
 

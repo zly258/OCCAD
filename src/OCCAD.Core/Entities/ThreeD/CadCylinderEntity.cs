@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Text.Json.Nodes;
 using OcctNet;
 
@@ -54,15 +54,7 @@ public sealed class CadCylinderEntity : CadEntity
         return
         [
             new(this, _origin, CadSnapType.Center, 0, bottomPlane),
-            new(this, top, CadSnapType.Center, 1, topPlane),
-            new(this, CadTransformMath.Add(_origin, xAxis, _radius), CadSnapType.Quadrant, 2, bottomPlane),
-            new(this, CadTransformMath.Add(_origin, yAxis, _radius), CadSnapType.Quadrant, 3, bottomPlane),
-            new(this, CadTransformMath.Add(_origin, xAxis, -_radius), CadSnapType.Quadrant, 4, bottomPlane),
-            new(this, CadTransformMath.Add(_origin, yAxis, -_radius), CadSnapType.Quadrant, 5, bottomPlane),
-            new(this, CadTransformMath.Add(top, xAxis, _radius), CadSnapType.Quadrant, 6, topPlane),
-            new(this, CadTransformMath.Add(top, yAxis, _radius), CadSnapType.Quadrant, 7, topPlane),
-            new(this, CadTransformMath.Add(top, xAxis, -_radius), CadSnapType.Quadrant, 8, topPlane),
-            new(this, CadTransformMath.Add(top, yAxis, -_radius), CadSnapType.Quadrant, 9, topPlane)
+            new(this, top, CadSnapType.Center, 1, topPlane)
         ];
     }
 
@@ -71,18 +63,25 @@ public sealed class CadCylinderEntity : CadEntity
         var top = CadTransformMath.Add(_origin, _axis, _height);
         var center = CadTransformMath.Add(_origin, _axis, _height * 0.5);
         var (xAxis, yAxis) = CadTransformMath.PerpendicularAxes(_axis);
-        var bottomVertical = new CadGripWorkPlane(_origin, new OcctVector3d(-_axis.X, -_axis.Y, -_axis.Z), xAxis, true, 0.0);
+        var negativeAxis = new OcctVector3d(-_axis.X, -_axis.Y, -_axis.Z);
+        var negativeX = new OcctVector3d(-xAxis.X, -xAxis.Y, -xAxis.Z);
+        var negativeY = new OcctVector3d(-yAxis.X, -yAxis.Y, -yAxis.Z);
+        var bottomVertical = new CadGripWorkPlane(_origin, negativeAxis, xAxis, true, 0.0);
         var topVertical = new CadGripWorkPlane(top, _axis, xAxis, true, 0.0);
-        var topPlane = new CadGripWorkPlane(top, xAxis, yAxis);
+        var radiusX = new CadGripWorkPlane(top, xAxis, yAxis, true, 0.0);
+        var radiusY = new CadGripWorkPlane(top, yAxis, _axis, true, 0.0);
+        var radiusNegativeX = new CadGripWorkPlane(top, negativeX, yAxis, true, 0.0);
+        var radiusNegativeY = new CadGripWorkPlane(top, negativeY, _axis, true, 0.0);
+
         return
         [
-            new(this, 0, center),
-            new(this, 1, _origin, bottomVertical, top, CadPrecisionInputKind.Length),
-            new(this, 2, top, topVertical, _origin, CadPrecisionInputKind.Length),
-            new(this, 3, CadTransformMath.Add(top, xAxis, _radius), topPlane, top, CadPrecisionInputKind.Length),
-            new(this, 4, CadTransformMath.Add(top, yAxis, _radius), topPlane, top, CadPrecisionInputKind.Length),
-            new(this, 5, CadTransformMath.Add(top, xAxis, -_radius), topPlane, top, CadPrecisionInputKind.Length),
-            new(this, 6, CadTransformMath.Add(top, yAxis, -_radius), topPlane, top, CadPrecisionInputKind.Length)
+            new(this, 0, center, Kind: CadGripKind.Center),
+            new(this, 1, _origin, bottomVertical, top, CadPrecisionInputKind.Length, CadGripKind.Height),
+            new(this, 2, top, topVertical, _origin, CadPrecisionInputKind.Length, CadGripKind.Height),
+            new(this, 3, CadTransformMath.Add(top, xAxis, _radius), radiusX, top, CadPrecisionInputKind.Length, CadGripKind.Radius),
+            new(this, 4, CadTransformMath.Add(top, yAxis, _radius), radiusY, top, CadPrecisionInputKind.Length, CadGripKind.Radius),
+            new(this, 5, CadTransformMath.Add(top, xAxis, -_radius), radiusNegativeX, top, CadPrecisionInputKind.Length, CadGripKind.Radius),
+            new(this, 6, CadTransformMath.Add(top, yAxis, -_radius), radiusNegativeY, top, CadPrecisionInputKind.Length, CadGripKind.Radius)
         ];
     }
 
@@ -119,7 +118,10 @@ public sealed class CadCylinderEntity : CadEntity
                     var top = CadTransformMath.Add(_origin, _axis, _height);
                     var delta = CadTransformMath.Between(top, targetPoint);
                     var axial = CadTransformMath.Dot(delta, _axis);
-                    var planar = new OcctVector3d(delta.X - _axis.X * axial, delta.Y - _axis.Y * axial, delta.Z - _axis.Z * axial);
+                    var planar = new OcctVector3d(
+                        delta.X - _axis.X * axial,
+                        delta.Y - _axis.Y * axial,
+                        delta.Z - _axis.Z * axial);
                     var radius = Math.Sqrt(planar.LengthSquared);
                     if (radius <= 1e-9) return;
                     _radius = radius;
@@ -130,21 +132,64 @@ public sealed class CadCylinderEntity : CadEntity
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
-    public override CadEntity Duplicate() => CopyPropertiesTo(new CadCylinderEntity(_origin, _axis, _radius, _height));
+    public override CadEntity Duplicate() =>
+        CopyPropertiesTo(new CadCylinderEntity(_origin, _axis, _radius, _height));
+
     public override void RestoreGeometry(CadEntity snapshot)
     {
-        if (snapshot is not CadCylinderEntity value) throw new ArgumentException("Snapshot type does not match.", nameof(snapshot));
+        if (snapshot is not CadCylinderEntity value)
+            throw new ArgumentException("Snapshot type does not match.", nameof(snapshot));
         _origin = value._origin;
         _axis = value._axis;
         _radius = value._radius;
         _height = value._height;
         RaiseGeometryChanged(nameof(RestoreGeometry));
     }
-    public override void Translate(OcctVector3d displacement) { ValidateDisplacement(displacement); _origin = Translated(_origin, displacement); RaiseGeometryChanged(nameof(Translate)); }
-    public override void Rotate(OcctPoint3d center, OcctVector3d axis, double angleDegrees) { _origin = CadTransformMath.RotatePoint(_origin, center, axis, angleDegrees); _axis = CadTransformMath.RotateVector(_axis, axis, angleDegrees).Normalized(); RaiseGeometryChanged(nameof(Rotate)); }
-    public override void Scale(OcctPoint3d center, double factor) { CadTransformMath.ValidateScale(factor); _origin = CadTransformMath.ScalePoint(_origin, center, factor); _radius *= factor; _height *= factor; RaiseGeometryChanged(nameof(Scale)); }
-    private void SetOrigin(double x, double y, double z) { ValidateFinite(x, nameof(x)); ValidateFinite(y, nameof(y)); ValidateFinite(z, nameof(z)); SetGeometry(ref _origin, new OcctPoint3d(x, y, z)); }
 
-    internal static JsonObject WriteGeometry(CadCylinderEntity entity) => new() { ["origin"] = CadEntityJson.Point(entity.Origin), ["axis"] = CadEntityJson.Vector(entity.Axis), ["radius"] = entity.Radius, ["height"] = entity.Height };
-    internal static CadCylinderEntity ReadGeometry(JsonObject data) => new(CadEntityJson.ReadPoint(data, "origin"), CadEntityJson.ReadVector(data, "axis"), CadEntityJson.ReadDouble(data, "radius"), CadEntityJson.ReadDouble(data, "height"));
+    public override void Translate(OcctVector3d displacement)
+    {
+        ValidateDisplacement(displacement);
+        _origin = Translated(_origin, displacement);
+        RaiseGeometryChanged(nameof(Translate));
+    }
+
+    public override void Rotate(OcctPoint3d center, OcctVector3d axis, double angleDegrees)
+    {
+        _origin = CadTransformMath.RotatePoint(_origin, center, axis, angleDegrees);
+        _axis = CadTransformMath.RotateVector(_axis, axis, angleDegrees).Normalized();
+        RaiseGeometryChanged(nameof(Rotate));
+    }
+
+    public override void Scale(OcctPoint3d center, double factor)
+    {
+        CadTransformMath.ValidateScale(factor);
+        _origin = CadTransformMath.ScalePoint(_origin, center, factor);
+        _radius *= factor;
+        _height *= factor;
+        RaiseGeometryChanged(nameof(Scale));
+    }
+
+    private void SetOrigin(double x, double y, double z)
+    {
+        ValidateFinite(x, nameof(x));
+        ValidateFinite(y, nameof(y));
+        ValidateFinite(z, nameof(z));
+        SetGeometry(ref _origin, new OcctPoint3d(x, y, z));
+    }
+
+    internal static JsonObject WriteGeometry(CadCylinderEntity entity) =>
+        new()
+        {
+            ["origin"] = CadEntityJson.Point(entity.Origin),
+            ["axis"] = CadEntityJson.Vector(entity.Axis),
+            ["radius"] = entity.Radius,
+            ["height"] = entity.Height
+        };
+
+    internal static CadCylinderEntity ReadGeometry(JsonObject data) =>
+        new(
+            CadEntityJson.ReadPoint(data, "origin"),
+            CadEntityJson.ReadVector(data, "axis"),
+            CadEntityJson.ReadDouble(data, "radius"),
+            CadEntityJson.ReadDouble(data, "height"));
 }

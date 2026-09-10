@@ -1,4 +1,3 @@
-using System.Globalization;
 using OcctNet;
 
 namespace OCCAD;
@@ -15,19 +14,35 @@ public sealed class ExtrudeTool :
 
     public override string Id => "extrude";
     public override string DisplayName => "Extrude";
+
     public override CadToolInputKind InputKind =>
         State == CadToolState.WaitForSelect
             ? CadToolInputKind.Selection
             : CadToolInputKind.Point;
+
     public override CadToolInteractionPolicy InteractionPolicy =>
         State == CadToolState.WaitForSelect
             ? CadToolInteractionPolicy.Selection
             : CadToolInteractionPolicy.Drawing;
+
     public override string PrecisionLengthLabel => "Height";
+
     public override OcctPoint3d? PrecisionReferencePoint =>
         State == CadToolState.Drawing && Entities.Count == 1
             ? _center
             : base.PrecisionReferencePoint;
+
+    // Extrude supports parameter-only precision input. Once a valid profile is
+    // selected, Height/Reverse define a complete preview and Accept/Enter can
+    // commit without requiring another pointer event.
+    public override bool CanCommitCurrentStage =>
+        State == CadToolState.WaitForSelect
+            ? base.CanCommitCurrentStage
+            : IsActive &&
+              State == CadToolState.Drawing &&
+              Entities.Count == 1 &&
+              double.IsFinite(_height) &&
+              _height >= MinimumHeight;
 
     protected override bool AutoCommitValidSelection => true;
 
@@ -58,8 +73,7 @@ public sealed class ExtrudeTool :
                 "extrude.profiles",
                 CadPlanarProfileGeometry.IsSupported));
 
-        if (!IsSelectionValid(
-                Context.Selection.Selected.ToArray()))
+        if (!IsSelectionValid(Context.Selection.Selected.ToArray()))
             Context.Selection.Clear();
 
         base.OnActivated();
@@ -74,13 +88,10 @@ public sealed class ExtrudeTool :
             return;
         }
 
-        var profile =
-            CadPlanarProfileGeometry.Snapshot(Entities[0]);
+        var profile = CadPlanarProfileGeometry.Snapshot(Entities[0]);
         _center = CadPlanarProfileGeometry.Center(profile);
-        _normal =
-            CadPlanarProfileGeometry.Normal(profile).Normalized();
-        var axes =
-            CadTransformMath.PerpendicularAxes(_normal);
+        _normal = CadPlanarProfileGeometry.Normal(profile).Normalized();
+        var axes = CadTransformMath.PerpendicularAxes(_normal);
 
         SetSelectionFilter(null);
         SetWorkPlane(
@@ -91,44 +102,36 @@ public sealed class ExtrudeTool :
         SetStageLocalized(
             1,
             "Cad.Prompt.extrude.Height",
-            "Extrude: move the pointer to set signed height, click to accept [Backspace profile, Esc cancel]",
+            "Extrude: move the pointer or enter Height, then Accept [Backspace profile, Esc cancel]",
             CadPrecisionInputKind.Length);
         LockStageAngle(90.0);
         RefreshPreview();
     }
 
-    public override bool HandlePointer(
-        OcctPointerInputEventArgs input)
+    public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
-        if (CancelOnRightClick(input))
-            return true;
-
         if (State == CadToolState.WaitForSelect ||
             Entities.Count != 1)
             return false;
 
         if (input.Kind == OcctPointerInputKind.Moved)
         {
-            var point =
-                Context.ResolvePoint(
-                    input.X,
-                    input.Y,
-                    _center).Point;
+            var point = Context.ResolvePoint(
+                input.X,
+                input.Y,
+                _center).Point;
             if (TrySetHeightFromPoint(point))
                 RefreshPreview();
-            else
-                Context.Preview.Clear();
             return true;
         }
 
         if (input.Kind == OcctPointerInputKind.Pressed &&
             input.Button == OcctPointerButton.Left)
         {
-            var point =
-                Context.ResolvePoint(
-                    input.X,
-                    input.Y,
-                    _center).Point;
+            var point = Context.ResolvePoint(
+                input.X,
+                input.Y,
+                _center).Point;
             return TryAcceptPoint(point);
         }
 
@@ -139,7 +142,7 @@ public sealed class ExtrudeTool :
     {
         if (!IsActive ||
             State != CadToolState.Drawing ||
-            Stage != 1 ||
+            Entities.Count != 1 ||
             !point.IsFinite ||
             !TrySetHeightFromPoint(point))
             return false;
@@ -147,6 +150,9 @@ public sealed class ExtrudeTool :
         RefreshPreview();
         return CommitExtrude();
     }
+
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
+        CommitExtrude();
 
     protected override bool CanStepBackCore =>
         State == CadToolState.Drawing &&
@@ -165,42 +171,36 @@ public sealed class ExtrudeTool :
     protected override bool CanFinishCore =>
         State == CadToolState.Drawing &&
         Entities.Count == 1 &&
+        double.IsFinite(_height) &&
         _height >= MinimumHeight;
 
-    protected override bool OnFinish() =>
-        CommitExtrude();
+    protected override bool OnFinish() => CommitExtrude();
 
-    protected override bool OnPrecisionInputApplied(
-        CadPrecisionInput input)
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
     {
         if (input.Length is { } length)
         {
-            if (!double.IsFinite(length) ||
-                length < MinimumHeight)
+            if (!double.IsFinite(length) || length < MinimumHeight)
                 return false;
-
             _height = length;
         }
 
         RefreshPreview();
+        NotifyUpdated();
         return true;
     }
 
-    protected override bool OnSetParameter(
-        string id,
-        string value)
+    protected override bool OnSetParameter(string id, string value)
     {
-        if (id.Equals(
-                "Height",
-                StringComparison.OrdinalIgnoreCase))
+        if (id.Equals("Height", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryPositive(value, out var height))
+            if (!CadValueTextConverter.TryParseFiniteDouble(value, out var height) ||
+                height < MinimumHeight ||
+                height > 1e12)
                 return false;
             _height = height;
         }
-        else if (id.Equals(
-                     "Reverse",
-                     StringComparison.OrdinalIgnoreCase))
+        else if (id.Equals("Reverse", StringComparison.OrdinalIgnoreCase))
         {
             if (!bool.TryParse(value, out var reverse))
                 return false;
@@ -224,19 +224,18 @@ public sealed class ExtrudeTool :
         _normal = OcctVector3d.UnitZ;
     }
 
-    private bool TrySetHeightFromPoint(
-        OcctPoint3d point)
+    private bool TrySetHeightFromPoint(OcctPoint3d point)
     {
-        var signed =
-            CadTransformMath.Dot(
-                CadTransformMath.Between(_center, point),
-                _normal);
+        var signed = CadTransformMath.Dot(
+            CadTransformMath.Between(_center, point),
+            _normal);
         if (!double.IsFinite(signed) ||
             Math.Abs(signed) < MinimumHeight)
             return false;
 
         _height = Math.Abs(signed);
         _reverse = signed < 0.0;
+        NotifyUpdated();
         return true;
     }
 
@@ -245,9 +244,7 @@ public sealed class ExtrudeTool :
         if (!TryCreate(out var entity))
             return false;
 
-        Context.Workspace.AddGeneratedEntities(
-            [entity],
-            "Extrude");
+        Context.Workspace.AddGeneratedEntities([entity], "Extrude");
         Context.Workspace.Tools.CompleteCurrent();
         return true;
     }
@@ -260,8 +257,7 @@ public sealed class ExtrudeTool :
             Context.Preview.Clear();
     }
 
-    private bool TryCreate(
-        out CadExtrudeEntity entity)
+    private bool TryCreate(out CadExtrudeEntity entity)
     {
         entity = null!;
         if (Entities.Count != 1 ||
@@ -270,35 +266,9 @@ public sealed class ExtrudeTool :
             _height < MinimumHeight)
             return false;
 
-        var vector =
-            _normal *
-            (_height * (_reverse ? -1.0 : 1.0));
-
-        entity = new CadExtrudeEntity(
-            Entities[0],
-            vector);
+        var vector = _normal * (_height * (_reverse ? -1.0 : 1.0));
+        entity = new CadExtrudeEntity(Entities[0], vector);
         entity.BindProfileSource(Entities[0]);
         return true;
-    }
-
-    private static bool TryPositive(
-        string text,
-        out double value)
-    {
-        var parsed =
-            double.TryParse(
-                text,
-                NumberStyles.Float,
-                CultureInfo.CurrentCulture,
-                out value) ||
-            double.TryParse(
-                text,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out value);
-
-        return parsed &&
-               double.IsFinite(value) &&
-               value >= MinimumHeight;
     }
 }

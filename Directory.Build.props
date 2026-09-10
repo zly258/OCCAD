@@ -9,7 +9,18 @@
     <Authors>zly258</Authors>
     <Company>zly258</Company>
     <Product>OCCAD</Product>
+
+    <OcctBridgeRuntimeIdentifier Condition="$([MSBuild]::IsOSPlatform('Windows'))">win-x64</OcctBridgeRuntimeIdentifier>
+    <OcctBridgeRuntimeIdentifier Condition="$([MSBuild]::IsOSPlatform('Linux'))">linux-x64</OcctBridgeRuntimeIdentifier>
+
     <OcctBridgeDistRoot Condition="'$(OCCTCSHARPBRIDGE_SDK)' != ''">$(OCCTCSHARPBRIDGE_SDK)</OcctBridgeDistRoot>
-    <OcctBridgeDistRoot Condition="'$(OcctBridgeDistRoot)' == ''">$(ProgramFiles)\OcctCSharpBridge\SDK\3.0\win-x64</OcctBridgeDistRoot>
+    <OcctBridgeDistRoot Condition="'$(OcctBridgeDistRoot)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">$(ProgramFiles)\OcctCSharpBridge\SDK\3.0\win-x64</OcctBridgeDistRoot>
+    <OcctBridgeDistRoot Condition="'$(OcctBridgeDistRoot)' == '' and $([MSBuild]::IsOSPlatform('Linux'))">$(HOME)/.local/share/OcctCSharpBridge/SDK/3.0/linux-x64</OcctBridgeDistRoot>
+
+    <OcctBridgeNativeFileName Condition="$([MSBuild]::IsOSPlatform('Windows'))">OcctNative.dll</OcctBridgeNativeFileName>
+    <OcctBridgeNativeFileName Condition="$([MSBuild]::IsOSPlatform('Linux'))">libOcctNative.so</OcctBridgeNativeFileName>
+
+    <OcctBridgePortableRoot Condition="Exists('$(OcctBridgeDistRoot)/portable/package-manifest.json')">$(OcctBridgeDistRoot)/portable</OcctBridgePortableRoot>
+    <OcctBridgePortableRoot Condition="'$(OcctBridgePortableRoot)' == '' and Exists('$(OcctBridgeDistRoot)/package-manifest.json')">$(OcctBridgeDistRoot)</OcctBridgePortableRoot>
   </PropertyGroup>
 </Project>

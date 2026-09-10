@@ -11,7 +11,7 @@ internal static class CadLanguageManager
     private static readonly Dictionary<string, IReadOnlyDictionary<string, string>> Cache =
         new(StringComparer.OrdinalIgnoreCase);
 
-    public static string CurrentLanguage { get; private set; } = "zh-CN";
+    public static string CurrentLanguage { get; private set; } = "en-US";
     public static event EventHandler? Changed;
 
     public static string Text(string key, string fallback)
@@ -20,9 +20,7 @@ internal static class CadLanguageManager
         ArgumentNullException.ThrowIfNull(fallback);
 
         var values = Get(CurrentLanguage);
-        return values.TryGetValue(key, out var value)
-            ? value
-            : fallback;
+        return values.TryGetValue(key, out var value) ? value : fallback;
     }
 
     public static string ToolPrompt(CadToolPrompt prompt)
@@ -140,10 +138,7 @@ internal static class CadLanguageManager
     public static void Apply(string language)
     {
         var normalized = Supported.FirstOrDefault(
-            value => string.Equals(
-                value,
-                language,
-                StringComparison.OrdinalIgnoreCase)) ?? "en-US";
+            value => string.Equals(value, language, StringComparison.OrdinalIgnoreCase)) ?? "en-US";
 
         CurrentLanguage = normalized;
         var culture = CultureInfo.GetCultureInfo(normalized);
@@ -180,9 +175,7 @@ internal static class CadLanguageManager
             .ToArray();
 
         var duplicates = entries
-            .GroupBy(
-                value => value.Key!,
-                StringComparer.OrdinalIgnoreCase)
+            .GroupBy(value => value.Key!, StringComparer.OrdinalIgnoreCase)
             .Where(group => group.Count() > 1)
             .Select(group => group.Key)
             .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)

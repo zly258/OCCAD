@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -116,10 +116,22 @@ public sealed class CadWorkPlane
         var next = CreatePresetFrame(
             preset,
             origin ?? OcctPoint3d.Origin);
-        if (_userPlane == next) return;
-
+        var changed = _userPlane != next;
         _userPlane = next;
-        Changed?.Invoke(this, EventArgs.Empty);
+
+        if (_toolPlane is not null && !_toolPlaneFixed)
+        {
+            var toolOrigin = origin ?? _toolPlane.Value.Origin;
+            var nextToolPlane = CreatePresetFrame(preset, toolOrigin);
+            if (_toolPlane != nextToolPlane)
+            {
+                _toolPlane = nextToolPlane;
+                changed = true;
+            }
+        }
+
+        if (changed)
+            Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public void SetCustom(

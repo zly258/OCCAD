@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Text.Json.Nodes;
 using OcctNet;
 
@@ -68,28 +68,24 @@ public sealed class CadCircleEntity : CadEntity
     {
         var (xAxis, yAxis) = PlaneAxes(_normal);
         var plane = new CadSnapWorkPlane(_center, xAxis, yAxis);
-        return
-        [
-            new(this, _center, CadSnapType.Center, 0, plane),
-            new(this, _center + xAxis * _radius, CadSnapType.Quadrant, 1, plane),
-            new(this, _center - xAxis * _radius, CadSnapType.Quadrant, 2, plane),
-            new(this, _center + yAxis * _radius, CadSnapType.Quadrant, 3, plane),
-            new(this, _center - yAxis * _radius, CadSnapType.Quadrant, 4, plane)
-        ];
+        return [new(this, _center, CadSnapType.Center, 0, plane)];
     }
 
     public override IReadOnlyList<CadGripPoint> GetGripPoints()
     {
-        var snaps = GetSnapPoints();
         var (xAxis, yAxis) = PlaneAxes(_normal);
-        var plane = new CadGripWorkPlane(_center, xAxis, yAxis);
+        var positiveX = new CadGripWorkPlane(_center, xAxis, yAxis, true, 0.0);
+        var negativeX = new CadGripWorkPlane(_center, xAxis, yAxis, true, 180.0);
+        var positiveY = new CadGripWorkPlane(_center, xAxis, yAxis, true, 90.0);
+        var negativeY = new CadGripWorkPlane(_center, xAxis, yAxis, true, -90.0);
+
         return
         [
-            new(this, 0, snaps[0].Position, Kind: CadGripKind.Center),
-            new(this, 1, snaps[1].Position, plane, _center, CadPrecisionInputKind.Length, CadGripKind.Radius),
-            new(this, 2, snaps[2].Position, plane, _center, CadPrecisionInputKind.Length, CadGripKind.Radius),
-            new(this, 3, snaps[3].Position, plane, _center, CadPrecisionInputKind.Length, CadGripKind.Radius),
-            new(this, 4, snaps[4].Position, plane, _center, CadPrecisionInputKind.Length, CadGripKind.Radius)
+            new(this, 0, _center, Kind: CadGripKind.Center),
+            new(this, 1, _center + xAxis * _radius, positiveX, _center, CadPrecisionInputKind.Length, CadGripKind.Radius),
+            new(this, 2, _center - xAxis * _radius, negativeX, _center, CadPrecisionInputKind.Length, CadGripKind.Radius),
+            new(this, 3, _center + yAxis * _radius, positiveY, _center, CadPrecisionInputKind.Length, CadGripKind.Radius),
+            new(this, 4, _center - yAxis * _radius, negativeY, _center, CadPrecisionInputKind.Length, CadGripKind.Radius)
         ];
     }
 

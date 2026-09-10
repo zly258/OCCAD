@@ -1,4 +1,3 @@
-﻿using System.Globalization;
 using OcctNet;
 
 namespace OCCAD;
@@ -6,10 +5,10 @@ namespace OCCAD;
 public sealed class TextTool : CadDrawingTool, ICadPointInputTool
 {
     private string _text = "Text";
-    private double _height = 5;
-    private double _angleDegrees; private OcctVector3d _normal;
-    private OcctVector3d _xAxis;
-    private OcctPoint3d? _previewPoint;
+    private double _height = 5.0;
+    private double _angleDegrees;
+    private string _fontName = "Arial";
+    private CadTextEntity? _preview;
 
     public override string Id => "text";
     public override string DisplayName => "Text";
@@ -18,16 +17,25 @@ public sealed class TextTool : CadDrawingTool, ICadPointInputTool
         new(
             "Text",
             [
-                new CadStringToolParameterDescriptor("Text", "Content", _text),
-                new CadDoubleToolParameterDescriptor("Height", "Height", _height, 1e-9, 1_000_000),
-                new CadDoubleToolParameterDescriptor("Angle", "Angle", _angleDegrees, -360_000, 360_000)
+                new CadStringToolParameterDescriptor("Text", "Text", _text),
+                new CadDoubleToolParameterDescriptor(
+                    "Height",
+                    "Height",
+                    _height,
+                    1e-9,
+                    double.MaxValue),
+                new CadDoubleToolParameterDescriptor(
+                    "Angle",
+                    "Angle",
+                    _angleDegrees,
+                    -360000.0,
+                    360000.0),
+                new CadStringToolParameterDescriptor("Font", "Font", _fontName)
             ]);
 
     protected override void OnActivated()
     {
-        _normal = Context.WorkPlane.Normal;
-        _xAxis = Context.WorkPlane.XAxis;
-        _previewPoint = null;
+        _preview = null;
         SetStageLocalized(
             0,
             "Cad.Prompt.Text.Position",
@@ -36,17 +44,20 @@ public sealed class TextTool : CadDrawingTool, ICadPointInputTool
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
-        if (CancelOnRightClick(input)) return true;
+        if (CancelOnRightClick(input))
+            return true;
+
         if (input.Kind == OcctPointerInputKind.Moved)
         {
-            UpdatePreview(Resolve(input));
+            UpdatePreview(Context.ResolvePoint(input.X, input.Y).Point);
             return true;
         }
 
         if (input.Kind != OcctPointerInputKind.Pressed ||
             input.Button != OcctPointerButton.Left)
             return false;
-        return AcceptPoint(Resolve(input));
+
+        return AcceptPoint(Context.ResolvePoint(input.X, input.Y).Point);
     }
 
     protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
@@ -59,55 +70,85 @@ public sealed class TextTool : CadDrawingTool, ICadPointInputTool
     {
         if (id.Equals("Text", StringComparison.OrdinalIgnoreCase))
         {
-            if (string.IsNullOrWhiteSpace(value)) return false;
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
             _text = value;
         }
         else if (id.Equals("Height", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryDouble(value, out var number) || number <= 1e-9 || number > 1_000_000)
+            if (!CadValueTextConverter.TryParseFiniteDouble(value, out var height) ||
+                height <= 1e-9)
                 return false;
-            _height = number;
+            _height = height;
         }
         else if (id.Equals("Angle", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryDouble(value, out var number) || number < -360_000 || number > 360_000)
+            if (!CadValueTextConverter.TryParseFiniteDouble(value, out _angleDegrees))
                 return false;
-            _angleDegrees = number;
         }
-
+        else if (id.Equals("Font", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            _fontName = value.Trim();
+        }
         else
         {
             return false;
         }
 
-        if (_previewPoint is { } point) Show(point);
+        RefreshPreviewFromLastPointer();
         NotifyUpdated();
         return true;
     }
 
+    protected override void OnCanceled()
+    {
+        _preview = null;
+    }
+
     private bool AcceptPoint(OcctPoint3d point)
     {
-        if (!point.IsFinite) return false;
-        CommitPreview(Create(point));
+        if (!point.IsFinite)
+            return false;
+
+        var entity = CreateEntity(point);
+        _preview = null;
+        CommitPreview(entity);
         return true;
     }
 
     private void UpdatePreview(OcctPoint3d point)
     {
-        if (!point.IsFinite) return;
-        _previewPoint = point;
-        Show(point);
+        if (!point.IsFinite)
+        {
+            _preview = null;
+            Context.Preview.Clear();
+            return;
+        }
+
+        try
+        {
+            _preview = CreateEntity(point);
+            ShowPreview(_preview);
+        }
+        catch (ArgumentException)
+        {
+            _preview = null;
+            Context.Preview.Clear();
+        }
     }
 
-    private void Show(OcctPoint3d point) => ShowPreview(Create(point));
-
-    private CadTextEntity Create(OcctPoint3d point) =>
-        new(_text, point, _normal, _xAxis, _height, _angleDegrees);
-
-    private static bool TryDouble(string value, out double number) =>
-        (double.TryParse(value, NumberStyles.Float, CultureInfo.CurrentCulture, out number) ||
-         double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out number)) &&
-        double.IsFinite(number);
+    private CadTextEntity CreateEntity(OcctPoint3d point)
+    {
+        var frame = Context.WorkPlane.EffectivePlane;
+        return new CadTextEntity(
+            _text,
+            point,
+            frame.Normal,
+            frame.XAxis,
+            _height,
+            _angleDegrees,
+            _fontName);
+    }
 }
-
-

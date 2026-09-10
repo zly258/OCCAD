@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using DrawingColor = System.Drawing.Color;
+using MediaColor = Avalonia.Media.Color;
 
 namespace OCCAD.Avalonia;
 
@@ -27,14 +28,14 @@ internal sealed class CadSettingsDialog : Window
         Title = Text(
             "Cad.Text.Preferences",
             "Preferences");
-        Width = 520;
-        MinWidth = 480;
-        Height = 520;
-        MinHeight = 480;
+        Width = 470;
+        MinWidth = 440;
+        Height = 450;
+        MinHeight = 410;
         WindowStartupLocation =
             WindowStartupLocation.CenterOwner;
         CanResize = false;
-        Background = CadTheme.WindowBrush;
+        Background = CadTheme.Surface;
 
         ApplyValues(settings);
 
@@ -45,7 +46,7 @@ internal sealed class CadSettingsDialog : Window
         _backgroundButton.HorizontalContentAlignment =
             HorizontalAlignment.Left;
         _backgroundButton.Padding =
-            new Thickness(8, 1);
+            new Thickness(5, 0);
         _backgroundButton.BorderBrush =
             CadTheme.Border;
         _backgroundButton.BorderThickness =
@@ -141,7 +142,7 @@ internal sealed class CadSettingsDialog : Window
             Content = Text(
                 "Cad.Text.ResetDefaults",
                 "Reset Defaults"),
-            MinWidth = 104
+            MinWidth = 96
         };
         reset.Classes.Add("cad-compact");
         reset.Click += (_, _) =>
@@ -174,11 +175,8 @@ internal sealed class CadSettingsDialog : Window
         var buttons = new DockPanel
         {
             LastChildFill = false,
-            Margin = new Thickness(
-                CadTheme.DialogPadding,
-                8,
-                CadTheme.DialogPadding,
-                CadTheme.DialogPadding)
+            Background = CadTheme.PanelAlt,
+            Margin = new Thickness(0)
         };
         DockPanel.SetDock(reset, Dock.Left);
         buttons.Children.Add(reset);
@@ -186,12 +184,21 @@ internal sealed class CadSettingsDialog : Window
         var right = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 6
+            Spacing = 5
         };
         right.Children.Add(cancel);
         right.Children.Add(ok);
         DockPanel.SetDock(right, Dock.Right);
         buttons.Children.Add(right);
+
+        var footer = new Border
+        {
+            Background = CadTheme.PanelAlt,
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(10, 6),
+            Child = buttons
+        };
 
         var grid = new Grid();
         grid.RowDefinitions.Add(
@@ -207,16 +214,12 @@ internal sealed class CadSettingsDialog : Window
         {
             Content = content,
             HorizontalScrollBarVisibility =
-                ScrollBarVisibility.Disabled,
-            Margin = new Thickness(
-                CadTheme.DialogPadding,
-                CadTheme.DialogPadding,
-                CadTheme.DialogPadding,
-                0)
+                global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+            Margin = new Thickness(10, 8, 10, 8)
         };
         grid.Children.Add(scroll);
-        Grid.SetRow(buttons, 1);
-        grid.Children.Add(buttons);
+        Grid.SetRow(footer, 1);
+        grid.Children.Add(footer);
 
         Content = grid;
     }
@@ -278,7 +281,7 @@ internal sealed class CadSettingsDialog : Window
         _backgroundButton.Content =
             CadApplicationSettings.ColorToHex(
                 _background);
-        var media = Avalonia.Media.Color.FromArgb(
+        var media = MediaColor.FromArgb(
             _background.A,
             _background.R,
             _background.G,
@@ -298,35 +301,36 @@ internal sealed class CadSettingsDialog : Window
                 CadApplicationSettings.ColorToHex(
                     _background),
             GripSize =
-                ParseInt(_gripSize, "Grip size"),
+                ParseInt(_gripSize,
+                    Text("Cad.Settings.GripSize", "Grip size")),
             GripTolerance =
                 ParseDouble(
                     _gripTolerance,
-                    "Grip tolerance"),
+                    Text("Cad.Settings.GripTolerance", "Grip tolerance")),
             SnapMarkerSize =
                 ParseInt(
                     _snapMarkerSize,
-                    "Snap marker size"),
+                    Text("Cad.Settings.SnapMarkerSize", "Snap marker size")),
             SnapTolerance =
                 ParseDouble(
                     _snapTolerance,
-                    "Snap tolerance"),
+                    Text("Cad.Settings.SnapTolerance", "Snap tolerance")),
             ZoomSensitivity =
                 ParseDouble(
                     _zoomSensitivity,
-                    "Zoom sensitivity"),
+                    Text("Cad.Settings.ZoomSensitivity", "Zoom sensitivity")),
             SelectionTolerance =
                 ParseInt(
                     _selectionTolerance,
-                    "Selection tolerance"),
+                    Text("Cad.Settings.SelectionTolerance", "Selection tolerance")),
             DisplayDeviationCoefficient =
                 ParseDouble(
                     _displayDeviation,
-                    "Display precision"),
+                    Text("Cad.Settings.DisplayDeviation", "Display precision")),
             DisplayDeviationAngleDegrees =
                 ParseDouble(
                     _displayAngle,
-                    "Display angle")
+                    Text("Cad.Settings.DisplayAngle", "Display angle"))
         };
 
     private void ApplyValues(
@@ -370,8 +374,8 @@ internal sealed class CadSettingsDialog : Window
             BorderBrush = CadTheme.BorderStrong,
             BorderThickness =
                 new Thickness(0, 1, 0, 1),
-            Padding = new Thickness(8, 0),
-            Margin = new Thickness(0, 6, 0, 0),
+            Padding = new Thickness(6, 0),
+            Margin = new Thickness(0, 5, 0, 0),
             Child = new TextBlock
             {
                 Text = text,
@@ -393,13 +397,16 @@ internal sealed class CadSettingsDialog : Window
 
         var grid = new Grid
         {
-            MinHeight = 32,
-            ColumnSpacing = 8,
-            Margin = new Thickness(8, 1)
+            MinHeight = CadTheme.PropertyRowHeight + 2,
+            ColumnSpacing = 0,
+            Margin = new Thickness(0)
         };
         grid.ColumnDefinitions.Add(
             new ColumnDefinition(
-                new GridLength(190)));
+                new GridLength(166)));
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition(
+                new GridLength(1)));
         grid.ColumnDefinitions.Add(
             new ColumnDefinition(
                 new GridLength(
@@ -409,15 +416,27 @@ internal sealed class CadSettingsDialog : Window
             new ColumnDefinition(
                 GridLength.Auto));
 
-        grid.Children.Add(new TextBlock
+        var labelText = new TextBlock
         {
             Text = label,
             VerticalAlignment =
                 VerticalAlignment.Center,
-            Foreground = CadTheme.Text
-        });
+            Foreground = CadTheme.Text,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Margin = new Thickness(5, 0)
+        };
+        grid.Children.Add(labelText);
 
-        Grid.SetColumn(editor, 1);
+        var separator = new Border
+        {
+            Width = 1,
+            Background = CadTheme.Border
+        };
+        Grid.SetColumn(separator, 1);
+        grid.Children.Add(separator);
+
+        editor.Margin = new Thickness(4, 0);
+        Grid.SetColumn(editor, 2);
         grid.Children.Add(editor);
 
         if (!string.IsNullOrWhiteSpace(suffix))
@@ -428,9 +447,9 @@ internal sealed class CadSettingsDialog : Window
                 Foreground = CadTheme.Muted,
                 VerticalAlignment =
                     VerticalAlignment.Center,
-                Margin = new Thickness(2, 0, 0, 0)
+                Margin = new Thickness(1, 0, 5, 0)
             };
-            Grid.SetColumn(suffixText, 2);
+            Grid.SetColumn(suffixText, 3);
             grid.Children.Add(suffixText);
         }
 
@@ -467,7 +486,12 @@ internal sealed class CadSettingsDialog : Window
             return value;
 
         throw new FormatException(
-            $"{name} is not a valid integer.");
+            string.Format(
+                CultureInfo.CurrentCulture,
+                Text(
+                    "Cad.Settings.ParseIntError",
+                    "{0} must be a valid integer."),
+                name));
     }
 
     private static double ParseDouble(
@@ -489,7 +513,12 @@ internal sealed class CadSettingsDialog : Window
         }
 
         throw new FormatException(
-            $"{name} is not a valid number.");
+            string.Format(
+                CultureInfo.CurrentCulture,
+                Text(
+                    "Cad.Settings.ParseDoubleError",
+                    "{0} must be a valid number."),
+                name));
     }
 
     private static string Format(

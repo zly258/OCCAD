@@ -154,14 +154,13 @@ public sealed class CadRevolveEntity : CadFeatureEntity
 
     protected override OcctShape BuildFeatureResult(OcctEngine engine)
     {
-        var face =
-            CadPlanarProfileGeometry.BuildFace(
-                engine,
-                _profile);
+        var inputShape = CadPlanarProfileGeometry.IsClosedProfile(_profile)
+            ? CadPlanarProfileGeometry.BuildFace(engine, _profile)
+            : _profile.BuildShape(engine);
         try
         {
             return engine.Revolve(
-                face,
+                inputShape,
                 _axisPoint,
                 _axisDirection,
                 _angleDegrees,
@@ -169,8 +168,8 @@ public sealed class CadRevolveEntity : CadFeatureEntity
         }
         finally
         {
-            if (engine.ContainsObject(face.Id))
-                engine.Delete(face);
+            if (engine.ContainsObject(inputShape.Id))
+                engine.Delete(inputShape);
         }
     }
 

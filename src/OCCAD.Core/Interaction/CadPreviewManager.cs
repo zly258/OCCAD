@@ -21,8 +21,7 @@ public sealed class CadPreviewManager
 
     internal CadPreviewManager(CadDocument document)
     {
-        _document =
-            document ?? throw new ArgumentNullException(nameof(document));
+        _document = document ?? throw new ArgumentNullException(nameof(document));
     }
 
     public IReadOnlyList<CadEntity> Entities => _entities;
@@ -91,11 +90,8 @@ public sealed class CadPreviewManager
                 var shape = entity.BuildPresentation(engine);
                 nextShapes.Add(shape);
 
-                var tag =
-                    $"{_tagPrefix}.{++_nextTagId}";
-                engine.SetApplicationTag(
-                    shape,
-                    tag);
+                var tag = $"{_tagPrefix}.{++_nextTagId}";
+                engine.SetApplicationTag(shape, tag);
                 _ownedTags[shape.Id] = tag;
 
                 engine.SetLocalTransformation(
@@ -128,8 +124,7 @@ public sealed class CadPreviewManager
         _shapes.AddRange(nextShapes);
     }
 
-    private CadResolvedAppearance ResolveAppearance(
-        CadEntity entity) =>
+    private CadResolvedAppearance ResolveAppearance(CadEntity entity) =>
         _document is null
             ? new CadResolvedAppearance(
                 entity.Color,
@@ -139,35 +134,44 @@ public sealed class CadPreviewManager
                 entity.Selectable)
             : _document.ResolveAppearance(entity);
 
-    private void DeleteOwnedObjects(
-        OcctEngine engine)
+    private void DeleteOwnedObjects(OcctEngine engine)
     {
+        // Only delete objects owned by this preview manager.  A previous
+        // implementation scanned every OCCAD.Preview.* tag globally; that
+        // allowed one transient owner to erase another owner's presentation
+        // and made tool transitions non-deterministic.
+        if (_shapes.Count > 0)
+        {
+            var liveShapes = _shapes
+                .Where(shape => shape is not null && engine.ContainsObject(shape.Id))
+                .ToArray();
+            TryDeleteObjects(engine, liveShapes);
+            _shapes.Clear();
+        }
+
         if (_ownedTags.Count == 0)
             return;
 
-        var tags = _ownedTags.Values
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
-        foreach (var tag in tags)
+        foreach (var tag in _ownedTags.Values.Distinct(StringComparer.Ordinal))
         {
-            var value =
-                engine.FindObjectByApplicationTag(tag);
-            if (value is not null)
-                engine.Delete(value);
-
-            if (engine.FindObjectByApplicationTag(tag) is not null)
+            IOcctObject? value;
+            try
             {
-                throw new InvalidOperationException(
-                    $"Preview object '{tag}' was not removed from the OCCT scene.");
+                value = engine.FindObjectByApplicationTag(tag);
             }
+            catch (Exception exception) when (IsRecoverable(exception))
+            {
+                continue;
+            }
+
+            if (value is not null)
+                TryDeleteObjects(engine, [value]);
         }
 
         _ownedTags.Clear();
     }
 
-    private void PurgeMissingOwnership(
-        OcctEngine engine)
+    private void PurgeMissingOwnership(OcctEngine engine)
     {
         foreach (var pair in _ownedTags.ToArray())
         {

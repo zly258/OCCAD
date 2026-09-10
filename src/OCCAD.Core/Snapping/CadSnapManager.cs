@@ -10,16 +10,22 @@ public sealed class CadSnapManager
     private const int MarkerDisplayPriority = 10;
     private const double PriorityTieDistancePixels = 2.0;
     private const double HysteresisPixels = 2.5;
-    private const CadSnapType AllModes =
+
+    // Quadrant remains a serialized compatibility flag in CadSnapType, but it
+    // is intentionally excluded from every runtime/user object-snap mode.
+    private const CadSnapType RuntimeModes =
         CadSnapType.Endpoint |
         CadSnapType.Midpoint |
         CadSnapType.Center |
         CadSnapType.Vertex |
-        CadSnapType.Quadrant |
         CadSnapType.Nearest |
         CadSnapType.Intersection |
         CadSnapType.Perpendicular |
         CadSnapType.Tangent;
+
+    private const CadSnapType CompatibleModes =
+        RuntimeModes |
+        CadSnapType.Quadrant;
 
     private readonly CadDocument _document;
     private readonly Dictionary<CadEntity, IReadOnlyList<CadSnapPoint>> _snapPointCache = [];
@@ -78,8 +84,9 @@ public sealed class CadSnapManager
         set
         {
             ValidateModes(value, nameof(value));
-            if (_modes == value) return;
-            _modes = value;
+            var normalized = NormalizeModes(value);
+            if (_modes == normalized) return;
+            _modes = normalized;
             ResetCandidateState();
         }
     }
@@ -89,15 +96,21 @@ public sealed class CadSnapManager
         get => _temporaryModes;
         set
         {
+            CadSnapType? normalized = null;
             if (value is { } modes)
+            {
                 ValidateModes(modes, nameof(value));
-            if (_temporaryModes == value) return;
-            _temporaryModes = value;
+                normalized = NormalizeModes(modes);
+            }
+
+            if (_temporaryModes == normalized) return;
+            _temporaryModes = normalized;
             ResetCandidateState();
         }
     }
 
-    public CadSnapType EffectiveModes => TemporaryModes ?? Modes;
+    public CadSnapType EffectiveModes =>
+        NormalizeModes(TemporaryModes ?? Modes);
 
     public double PixelTolerance { get; set; } = 10.0;
 
@@ -128,6 +141,7 @@ public sealed class CadSnapManager
                     snap.Type);
         }
     }
+
     public CadSnapPoint? Current { get; private set; }
     public IReadOnlyList<CadSnapPoint> Candidates => _candidates;
     public int CurrentCandidateIndex => _currentCandidateIndex;
@@ -229,29 +243,24 @@ public sealed class CadSnapManager
 
             ranked.Sort(static (left, right) =>
             {
-                var leftDistance =
-                    Math.Sqrt(left.DistanceSquared);
-                var rightDistance =
-                    Math.Sqrt(right.DistanceSquared);
+                var leftDistance = Math.Sqrt(left.DistanceSquared);
+                var rightDistance = Math.Sqrt(right.DistanceSquared);
 
                 if (Math.Abs(leftDistance - rightDistance) >
                     PriorityTieDistancePixels)
                     return leftDistance.CompareTo(rightDistance);
 
-                var result =
-                    left.Priority.CompareTo(right.Priority);
+                var result = left.Priority.CompareTo(right.Priority);
                 if (result != 0)
                     return result;
 
-                result =
-                    left.DepthDistanceSquared.CompareTo(
-                        right.DepthDistanceSquared);
+                result = left.DepthDistanceSquared.CompareTo(
+                    right.DepthDistanceSquared);
                 if (result != 0)
                     return result;
 
-                result =
-                    left.DistanceSquared.CompareTo(
-                        right.DistanceSquared);
+                result = left.DistanceSquared.CompareTo(
+                    right.DistanceSquared);
                 return result != 0
                     ? result
                     : left.Order.CompareTo(right.Order);
@@ -279,16 +288,13 @@ public sealed class CadSnapManager
                             previous))
                         continue;
 
-                    var bestDistance =
-                        Math.Sqrt(
-                            ranked[0].DistanceSquared);
-                    var currentDistance =
-                        Math.Sqrt(
-                            ranked[index].DistanceSquared);
+                    var bestDistance = Math.Sqrt(
+                        ranked[0].DistanceSquared);
+                    var currentDistance = Math.Sqrt(
+                        ranked[index].DistanceSquared);
 
                     if (currentDistance <=
-                        bestDistance +
-                        HysteresisPixels)
+                        bestDistance + HysteresisPixels)
                     {
                         hysteresisIndex = index;
                     }
@@ -328,8 +334,12 @@ public sealed class CadSnapManager
                     !source.Position.IsFinite)
                     return;
 
-                var candidate = ApplyPlanePolicy(source, workPlane, policy);
-                if (candidate is null) return;
+                var candidate = ApplyPlanePolicy(
+                    source,
+                    workPlane,
+                    policy);
+                if (candidate is null)
+                    return;
 
                 if (ranked.Any(existing =>
                         existing.Point.Type == candidate.Value.Type &&
@@ -343,17 +353,17 @@ public sealed class CadSnapManager
                 var distanceSquared =
                     (double)dx * dx +
                     (double)dy * dy;
-                if (distanceSquared > limitSquared) return;
+                if (distanceSquared > limitSquared)
+                    return;
 
+                var depthDistance =
+                    candidate.Value.Position.DistanceTo(queryPoint);
                 ranked.Add(
                     new CadSnapCandidate(
                         candidate.Value,
                         PriorityGroup(candidate.Value.Type),
                         distanceSquared,
-                        candidate.Value.Position
-                            .DistanceTo(queryPoint) *
-                        candidate.Value.Position
-                            .DistanceTo(queryPoint),
+                        depthDistance * depthDistance,
                         order++));
             }
         }
@@ -419,7 +429,9 @@ public sealed class CadSnapManager
 
     private bool CycleCandidate(int direction)
     {
-        if (_candidates.Count <= 1) return false;
+        if (_candidates.Count <= 1)
+            return false;
+
         _currentCandidateIndex =
             (_currentCandidateIndex + direction) %
             _candidates.Count;
@@ -456,7 +468,6 @@ public sealed class CadSnapManager
              (CadSnapType.Endpoint |
               CadSnapType.Midpoint |
               CadSnapType.Center |
-              CadSnapType.Quadrant |
               CadSnapType.Nearest |
               CadSnapType.Intersection |
               CadSnapType.Perpendicular |
@@ -591,7 +602,6 @@ public sealed class CadSnapManager
         var needsCopiedEdge =
             (modes &
              (CadSnapType.Center |
-              CadSnapType.Quadrant |
               CadSnapType.Nearest |
               CadSnapType.Perpendicular |
               CadSnapType.Tangent)) != 0;
@@ -664,11 +674,7 @@ public sealed class CadSnapManager
                 }
             }
 
-            var wantsCircle =
-                (modes &
-                 (CadSnapType.Center |
-                  CadSnapType.Quadrant)) != 0;
-            if (wantsCircle &&
+            if ((modes & CadSnapType.Center) != 0 &&
                 engine.GetEdgeCurveType(edge) == OcctCurveType.Circle &&
                 TryGetCircularEdgeFrame(
                     engine,
@@ -676,35 +682,13 @@ public sealed class CadSnapManager
                     edgeIndex,
                     out var circle))
             {
-                if ((modes & CadSnapType.Center) != 0)
-                {
-                    AddUnique(
-                        result,
-                        new CadSnapPoint(
-                            entity,
-                            circle.Center,
-                            CadSnapType.Center,
-                            edgeIndex));
-                }
-
-                if ((modes & CadSnapType.Quadrant) != 0)
-                {
-                    foreach (var quadrant in CircularQuadrants(circle))
-                    {
-                        var projection =
-                            engine.ProjectPointToEdge(edge, quadrant);
-                        if (projection.Distance > 1e-7)
-                            continue;
-
-                        AddUnique(
-                            result,
-                            new CadSnapPoint(
-                                entity,
-                                quadrant,
-                                CadSnapType.Quadrant,
-                                edgeIndex));
-                    }
-                }
+                AddUnique(
+                    result,
+                    new CadSnapPoint(
+                        entity,
+                        circle.Center,
+                        CadSnapType.Center,
+                        edgeIndex));
             }
         }
         finally
@@ -818,15 +802,6 @@ public sealed class CadSnapManager
         return true;
     }
 
-    private static IEnumerable<OcctPoint3d> CircularQuadrants(
-        CircularEdgeFrame circle)
-    {
-        yield return circle.Center + circle.XAxis * circle.Radius;
-        yield return circle.Center + circle.YAxis * circle.Radius;
-        yield return circle.Center - circle.XAxis * circle.Radius;
-        yield return circle.Center - circle.YAxis * circle.Radius;
-    }
-
     private static void AddUnique(
         List<CadSnapPoint> result,
         CadSnapPoint candidate)
@@ -926,7 +901,8 @@ public sealed class CadSnapManager
                         continue;
 
                     var candidate = ApplyPlanePolicy(point, plane, policy);
-                    if (candidate is null) continue;
+                    if (candidate is null)
+                        continue;
                     if (viewport.ProjectionType == OcctProjectionType.Perspective &&
                         (candidate.Value.Position - camera.Eye)
                             .Dot(camera.Center - camera.Eye) <= 0)
@@ -936,6 +912,7 @@ public sealed class CadSnapManager
                     _centerPoints.Add((screen.X, screen.Y, candidate.Value));
                 }
             }
+
             _centerPoints.Sort(
                 static (left, right) => left.X.CompareTo(right.X));
             _centerProjection = projection;
@@ -955,7 +932,8 @@ public sealed class CadSnapManager
         for (var index = low; index < _centerPoints.Count; index++)
         {
             var center = _centerPoints[index];
-            if (center.X > x + tolerance) break;
+            if (center.X > x + tolerance)
+                break;
             if (Math.Abs((double)center.Y - y) <= tolerance)
                 yield return center.Point;
         }
@@ -1023,8 +1001,7 @@ public sealed class CadSnapManager
         ReferenceEquals(left.Entity, right.Entity) &&
         left.Type == right.Type &&
         left.Index == right.Index &&
-        left.Position.DistanceTo(
-            right.Position) <= 1e-8;
+        left.Position.DistanceTo(right.Position) <= 1e-8;
 
     internal static int PriorityGroup(CadSnapType type) => type switch
     {
@@ -1032,19 +1009,21 @@ public sealed class CadSnapManager
         CadSnapType.Intersection => 1,
         CadSnapType.Midpoint => 2,
         CadSnapType.Center => 3,
-        CadSnapType.Quadrant => 4,
-        CadSnapType.Perpendicular => 5,
-        CadSnapType.Tangent => 6,
-        CadSnapType.Nearest => 7,
-        _ => 8
+        CadSnapType.Perpendicular => 4,
+        CadSnapType.Tangent => 5,
+        CadSnapType.Nearest => 6,
+        _ => 7
     };
+
+    private static CadSnapType NormalizeModes(CadSnapType value) =>
+        value & RuntimeModes;
 
     private static void ValidateModes(
         CadSnapType value,
         string parameterName)
     {
         var raw = (int)value;
-        var allowed = (int)AllModes;
+        var allowed = (int)CompatibleModes;
         if ((raw & ~allowed) != 0)
             throw new ArgumentOutOfRangeException(parameterName);
     }
@@ -1140,7 +1119,8 @@ public sealed class CadSnapManager
 
     private void HideMarker()
     {
-        if (_marker is not { } marker) return;
+        if (_marker is not { } marker)
+            return;
         if (_engine is { IsInitialized: true } engine &&
             engine.ContainsObject(marker.Id))
             engine.SetObjectVisible(marker, false);
@@ -1148,7 +1128,9 @@ public sealed class CadSnapManager
 
     private void DeleteMarker()
     {
-        if (_marker is not { } marker) return;
+        if (_marker is not { } marker)
+            return;
+
         try
         {
             if (_engine is { IsInitialized: true } engine &&
@@ -1178,7 +1160,9 @@ public sealed class CadSnapManager
         Enum.GetValues<CadSnapType>()
             .Where(static type =>
                 type != CadSnapType.None &&
-                type != CadSnapType.Default)
+                type != CadSnapType.Default &&
+                type != CadSnapType.Quadrant &&
+                (type & RuntimeModes) == type)
             .ToDictionary(
                 static type => type,
                 type => CreateMarkerPixels(type, size));
@@ -1187,99 +1171,65 @@ public sealed class CadSnapManager
         CadSnapType type,
         int size)
     {
-        var pixels =
-            new byte[size * size * 4];
-        var color =
-            Color.FromArgb(238, 220, 45, 45);
+        var pixels = new byte[size * size * 4];
+        var color = Color.FromArgb(245, 220, 45, 45);
         var center = size / 2;
         var radius = Math.Max(3, center - 2);
+        var stroke = Math.Max(1, size / 7);
 
-        for (var y = 0;
-             y < size;
-             y++)
+        for (var y = 0; y < size; y++)
         {
-            for (var x = 0;
-                 x < size;
-                 x++)
+            for (var x = 0; x < size; x++)
             {
                 var dx = x - center;
                 var dy = y - center;
                 var adx = Math.Abs(dx);
                 var ady = Math.Abs(dy);
 
+                // Object-snap glyphs are intentionally solid. At small CAD
+                // marker sizes outline-only glyphs become ambiguous on dark
+                // scenes and under DPI scaling.
                 var draw = type switch
                 {
                     CadSnapType.Endpoint =>
-                        Math.Max(adx, ady) ==
-                        radius,
+                        Math.Max(adx, ady) <= radius,
 
                     CadSnapType.Midpoint =>
-                        IsTriangleOutline(
-                            dx,
-                            dy,
-                            radius),
+                        IsTriangleFilled(dx, dy, radius),
 
                     CadSnapType.Center =>
-                        IsCircleOutline(
-                            dx,
-                            dy,
-                            radius),
+                        dx * dx + dy * dy <= radius * radius,
 
                     CadSnapType.Vertex =>
-                        Math.Abs(
-                            adx + ady -
-                            radius) <= 1,
-
-                    CadSnapType.Quadrant =>
-                        Math.Abs(
-                            adx + ady -
-                            radius) <= 1,
+                        adx + ady <= radius,
 
                     CadSnapType.Intersection =>
-                        Math.Abs(
-                            adx - ady) <= 1 &&
+                        Math.Abs(adx - ady) <= stroke &&
                         adx <= radius &&
                         ady <= radius,
 
                     CadSnapType.Perpendicular =>
-                        (Math.Abs(dx + radius - 1) <= 1 &&
-                         dy >= -radius &&
-                         dy <= radius) ||
-                        (dx >= -radius + 1 &&
-                         dx <= radius &&
-                         Math.Abs(dy - radius + 1) <= 1),
+                        (adx >= radius - stroke && ady <= radius) ||
+                        (ady >= radius - stroke && adx <= radius),
 
                     CadSnapType.Tangent =>
-                        IsCircleOutline(
-                            dx,
-                            dy + 1,
-                            Math.Max(2, radius - 1)) ||
-                        (Math.Abs(dy + radius) <= 1 &&
-                         dx >= -radius &&
-                         dx <= radius),
+                        dx * dx + (dy + 1) * (dy + 1) <=
+                            Math.Max(2, radius - 1) *
+                            Math.Max(2, radius - 1) ||
+                        (Math.Abs(dy + radius) <= stroke && adx <= radius),
 
                     CadSnapType.Nearest =>
-                        (Math.Abs(dx) <= 1 &&
-                         ady <= radius) ||
-                        (Math.Abs(dy) <= 1 &&
-                         adx <= radius),
+                        (adx <= stroke && ady <= radius) ||
+                        (ady <= stroke && adx <= radius),
 
                     _ =>
-                        Math.Max(adx, ady) ==
-                        radius
+                        Math.Max(adx, ady) <= radius
                 };
-
-                // Leave the exact resolved point visible through the marker.
-                if (adx <= 1 &&
-                    ady <= 1)
-                    draw = false;
 
                 if (!draw)
                     continue;
 
-                var offset =
-                    (y * size + x) *
-                    4;
+                var offset = (y * size + x) * 4;
                 pixels[offset] = color.B;
                 pixels[offset + 1] = color.G;
                 pixels[offset + 2] = color.R;
@@ -1290,46 +1240,21 @@ public sealed class CadSnapManager
         return pixels;
     }
 
-    private static bool IsCircleOutline(
-        int dx,
-        int dy,
-        int radius)
-    {
-        var distanceSquared =
-            dx * dx + dy * dy;
-        var outer =
-            radius * radius;
-        var inner =
-            Math.Max(1, radius - 2);
-        return distanceSquared <= outer &&
-               distanceSquared >=
-               inner * inner;
-    }
-
-    private static bool IsTriangleOutline(
+    private static bool IsTriangleFilled(
         int dx,
         int dy,
         int radius)
     {
         var top = -radius;
         var bottom = radius;
-        if (dy < top ||
-            dy > bottom)
+        if (dy < top || dy > bottom)
             return false;
-
-        if (dy >= bottom - 1)
-            return Math.Abs(dx) <= radius;
 
         var progress =
             (double)(dy - top) /
             Math.Max(1, bottom - top);
-        var edge =
-            (int)Math.Round(
-                progress * radius);
-
-        return Math.Abs(
-                   Math.Abs(dx) -
-                   edge) <= 1;
+        var halfWidth =
+            (int)Math.Round(progress * radius);
+        return Math.Abs(dx) <= halfWidth;
     }
-
 }

@@ -1,181 +1,289 @@
-using System.Globalization;
 using OcctNet;
 
 namespace OCCAD;
 
 public sealed class LengthDimensionTool : CadDrawingTool, ICadPointInputTool
 {
-    private readonly List<OcctPoint3d> _points = [];
-    private OcctPoint3d _planeOrigin;
-    private OcctVector3d _planeX;
-    private OcctVector3d _planeY;
-    private OcctVector3d _normal;
-    private double _textHeight = 4;
+    private OcctPoint3d? _start;
+    private OcctPoint3d? _end;
+    private double _textHeight = 4.0;
     private double _arrowSize = 2.5;
+    private string _fontName = "Arial";
     private CadLengthDimensionEntity? _preview;
+    private WorkPlaneFrame _initialPlane;
 
     public override string Id => "lengthdimension";
     public override string DisplayName => "Length Dimension";
-    protected override bool CanStepBackCore => _points.Count > 0;
 
     public override CadToolPanelDescriptor ParameterPanel =>
         new(
             "Length Dimension",
             [
-                new CadDoubleToolParameterDescriptor("TextHeight", "Text Height", _textHeight, 1e-9, 1_000_000),
-                new CadDoubleToolParameterDescriptor("ArrowSize", "Arrow Size", _arrowSize, 1e-9, 1_000_000)
+                new CadDoubleToolParameterDescriptor(
+                    "TextHeight",
+                    "Text Height",
+                    _textHeight,
+                    1e-9,
+                    double.MaxValue),
+                new CadDoubleToolParameterDescriptor(
+                    "ArrowSize",
+                    "Arrow Size",
+                    _arrowSize,
+                    1e-9,
+                    double.MaxValue),
+                new CadStringToolParameterDescriptor(
+                    "Font",
+                    "Font",
+                    _fontName)
             ]);
+
+    protected override bool CanStepBackCore => _start is not null;
 
     protected override void OnActivated()
     {
-        _points.Clear();
+        _start = null;
+        _end = null;
         _preview = null;
-        _planeOrigin = Context.WorkPlane.Origin;
-        _planeX = Context.WorkPlane.XAxis;
-        _planeY = Context.WorkPlane.YAxis;
-        _normal = Context.WorkPlane.Normal;
-        UpdatePrompt();
+        _initialPlane = CaptureWorkPlaneFrame();
+        RestorePrompt();
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
-        if (CancelOnRightClick(input)) return true;
-        if (input.Kind == OcctPointerInputKind.Moved && _points.Count > 0)
+        if (CancelOnRightClick(input))
+            return true;
+
+        if (input.Kind == OcctPointerInputKind.Moved)
         {
-            UpdatePreview(Resolve(input, _points[^1]));
+            var reference = _end is not null
+                ? Context.WorkPlane.Origin
+                : _start;
+            var point = Context.ResolvePoint(input.X, input.Y, reference).Point;
+            if (_end is { } end && _start is { } start)
+                UpdatePreview(start, end, point);
             return true;
         }
+
         if (input.Kind != OcctPointerInputKind.Pressed ||
             input.Button != OcctPointerButton.Left)
             return false;
-        return AcceptPoint(Resolve(input, _points.Count == 0 ? null : _points[^1]));
+
+        var referencePoint = _end is not null
+            ? Context.WorkPlane.Origin
+            : _start;
+        return AcceptPoint(
+            Context.ResolvePoint(input.X, input.Y, referencePoint).Point);
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(pointer, _points.Count == 0 ? null : _points[^1], AcceptPoint);
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        var reference = _end is not null
+            ? Context.WorkPlane.Origin
+            : _start;
+        return CommitResolvedPoint(pointer, reference, AcceptPoint);
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive && State == CadToolState.Drawing && AcceptPoint(point);
 
     protected override bool OnSetParameter(string id, string value)
     {
-        if (!TryPositive(value, out var number)) return false;
         if (id.Equals("TextHeight", StringComparison.OrdinalIgnoreCase))
-            _textHeight = number;
+        {
+            if (!TryPositive(value, out _textHeight))
+                return false;
+        }
         else if (id.Equals("ArrowSize", StringComparison.OrdinalIgnoreCase))
-            _arrowSize = number;
+        {
+            if (!TryPositive(value, out _arrowSize))
+                return false;
+        }
+        else if (id.Equals("Font", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            _fontName = value.Trim();
+        }
         else
+        {
             return false;
-        if (_preview is not null) UpdatePreview(_preview.GetGripPoints()[2].Position);
+        }
+
+        RefreshPreviewFromLastPointer();
         NotifyUpdated();
         return true;
     }
 
     protected override bool OnStepBack()
     {
-        if (_points.Count == 0) return false;
-        _points.RemoveAt(_points.Count - 1);
+        if (_end is not null)
+        {
+            _end = null;
+            _preview = null;
+            Context.Preview.Clear();
+            if (_start is { } start)
+                RestoreWorkPlaneFrame(_initialPlane, start);
+            RestorePrompt();
+            return true;
+        }
+
+        if (_start is null)
+            return false;
+
+        _start = null;
         _preview = null;
         Context.Preview.Clear();
-        Context.WorkPlane.SetToolPlaneFixed(false);
-        if (_points.Count > 0)
-        {
-            Context.WorkPlane.SetOrigin(_points[0]);
-            Context.WorkPlane.SetToolPlaneFixed(true);
-        }
-        else
-        {
-            Context.WorkPlane.SetOrigin(_planeOrigin);
-        }
-        UpdatePrompt();
+        RestoreWorkPlaneFrame(_initialPlane);
+        RestorePrompt();
         return true;
+    }
+
+    protected override void OnCanceled()
+    {
+        _start = null;
+        _end = null;
+        _preview = null;
     }
 
     private bool AcceptPoint(OcctPoint3d point)
     {
-        if (!point.IsFinite) return false;
-        point = Project(point);
-        if (_points.Count == 0)
+        if (!point.IsFinite)
+            return false;
+
+        if (_start is null)
         {
-            _points.Add(point);
-            Context.WorkPlane.SetOrigin(point);
-            Context.WorkPlane.SetToolPlaneFixed(true);
-            UpdatePrompt();
-            return true;
-        }
-        if (_points.Count == 1)
-        {
-            if ((point - _points[0]).Length <= 1e-9)
-                return false;
-            _points.Add(point);
-            UpdatePrompt();
+            _start = point;
+            RestoreWorkPlaneFrame(_initialPlane, point);
+            RestorePrompt();
             return true;
         }
 
-        var entity = Create(point);
-        if (entity is null)
+        if (_end is null)
+        {
+            if (_start.Value.DistanceTo(point) <= 1e-9)
+                return false;
+
+            _end = point;
+            if (!ConfigureDimensionLineStage(_start.Value, point))
+            {
+                _end = null;
+                return false;
+            }
+            return true;
+        }
+
+        if (!TryCreateEntity(_start.Value, _end.Value, point, out var entity))
             return false;
+
+        _preview = null;
         CommitPreview(entity);
         return true;
     }
 
-    private void UpdatePreview(OcctPoint3d point)
+    private bool ConfigureDimensionLineStage(
+        OcctPoint3d start,
+        OcctPoint3d end)
     {
-        point = Project(point);
-        if (_points.Count == 1)
-        {
-            if ((point - _points[0]).Length <= 1e-9)
-            {
-                _preview = null;
-                Context.Preview.Clear();
-                return;
-            }
+        var segment = end - start;
+        if (!segment.TryNormalize(out var axis))
+            return false;
 
-            ShowPreview(new CadLineEntity(_points[0], point));
-            return;
-        }
+        var normal = Context.WorkPlane.Normal;
+        var offsetDirection = normal.Cross(axis);
+        if (!offsetDirection.TryNormalize(out var yAxis))
+            return false;
 
-        if (_points.Count != 2)
+        var middle = start + segment * 0.5;
+        SetWorkPlane(middle, axis, yAxis, lockPlane: true);
+        RestorePrompt();
+        LockStageAngle(90.0);
+        return true;
+    }
+
+    private void UpdatePreview(
+        OcctPoint3d start,
+        OcctPoint3d end,
+        OcctPoint3d offsetPoint)
+    {
+        if (!TryCreateEntity(start, end, offsetPoint, out var entity))
         {
             _preview = null;
             Context.Preview.Clear();
             return;
         }
 
-        _preview = Create(point);
-        if (_preview is not null)
-            ShowPreview(_preview);
-        else
-            Context.Preview.Clear();
+        _preview = entity;
+        ShowPreview(_preview);
     }
 
-    private CadLengthDimensionEntity? Create(OcctPoint3d placement)
+    private bool TryCreateEntity(
+        OcctPoint3d start,
+        OcctPoint3d end,
+        OcctPoint3d offsetPoint,
+        out CadLengthDimensionEntity entity)
     {
-        var axis = (_points[1] - _points[0]).Normalized();
-        var perpendicular = _normal.Cross(axis).Normalized();
-        var middle = _points[0] + (_points[1] - _points[0]) * 0.5;
-        var offset = (placement - middle).Dot(perpendicular);
-        if (Math.Abs(offset) <= 1e-9) return null;
-        return new CadLengthDimensionEntity(
-            _points[0], _points[1], _normal, offset, _textHeight, _arrowSize);
+        entity = null!;
+        var frame = Context.WorkPlane.EffectivePlane;
+        var segment = end - start;
+        if (!segment.TryNormalize(out var axis))
+            return false;
+
+        var offsetDirection = frame.Normal.Cross(axis);
+        if (!offsetDirection.TryNormalize(out var normalizedOffset))
+            return false;
+
+        var middle = start + segment * 0.5;
+        var offset = (offsetPoint - middle).Dot(normalizedOffset);
+        if (!double.IsFinite(offset))
+            return false;
+
+        try
+        {
+            entity = new CadLengthDimensionEntity(
+                start,
+                end,
+                frame.Normal,
+                offset,
+                _textHeight,
+                _arrowSize,
+                _fontName);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
-    private OcctPoint3d Project(OcctPoint3d point) =>
-        CadPlaneGeometry.ProjectToPlane(_planeOrigin, point, _planeX, _planeY);
-
-    private void UpdatePrompt()
+    private void RestorePrompt()
     {
-        if (_points.Count == 0)
-            SetStageLocalized(0, "Cad.Prompt.LengthDimension.First", "Length dimension: specify first extension origin [Esc cancel]");
-        else if (_points.Count == 1)
-            SetStageLocalized(1, "Cad.Prompt.LengthDimension.Second", "Length dimension: specify second extension origin [Backspace undo, Esc cancel]", CadPrecisionInputKind.Length);
-        else
-            SetStageLocalized(2, "Cad.Prompt.LengthDimension.Position", "Length dimension: specify dimension line position [Backspace undo, Esc cancel]", CadPrecisionInputKind.Length);
+        if (_start is null)
+        {
+            SetStageLocalized(
+                0,
+                "Cad.Prompt.LengthDimension.First",
+                "Dimension: specify first extension point [Esc cancel]");
+            return;
+        }
+
+        if (_end is null)
+        {
+            SetStageLocalized(
+                1,
+                "Cad.Prompt.LengthDimension.Second",
+                "Dimension: specify second extension point [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.LengthAndAngle);
+            return;
+        }
+
+        SetStageLocalized(
+            2,
+            "Cad.Prompt.LengthDimension.Line",
+            "Dimension: specify dimension-line offset [Backspace undo, Esc cancel]",
+            CadPrecisionInputKind.Length);
     }
 
-    private static bool TryPositive(string text, out double value) =>
-        (double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value) ||
-         double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value)) &&
-        double.IsFinite(value) && value > 1e-9 && value <= 1_000_000;
+    private static bool TryPositive(string value, out double number) =>
+        CadValueTextConverter.TryParseFiniteDouble(value, out number) &&
+        number > 1e-9;
 }
-

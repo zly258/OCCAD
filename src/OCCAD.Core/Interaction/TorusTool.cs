@@ -1,10 +1,11 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
 public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
 {
     private const double MinSize = 0.1;
+
     private OcctPoint3d _center;
     private OcctPoint3d _majorPoint;
     private OcctVector3d _xAxis;
@@ -17,12 +18,11 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
 
     public override string Id => "torus";
     public override string DisplayName => "Torus";
-
     protected override bool CanStepBackCore => Stage > 0;
 
     protected override void OnActivated()
     {
-        _preview = null;
+        Reset();
         _initialPlane = CaptureWorkPlaneFrame();
         SetStageLocalized(
             0,
@@ -32,26 +32,37 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
-        if (CancelOnRightClick(input)) return true;
+        if (CancelOnRightClick(input))
+            return true;
 
         if (input.Kind == OcctPointerInputKind.Moved && Stage > 0)
         {
-            Update(Context.ResolvePoint(input.X, input.Y, ReferencePoint()).Point);
+            Update(
+                Context.ResolvePoint(
+                    input.X,
+                    input.Y,
+                    ReferencePoint()).Point);
             return true;
         }
 
-        if (input.Kind != OcctPointerInputKind.Pressed || input.Button != OcctPointerButton.Left)
+        if (input.Kind != OcctPointerInputKind.Pressed ||
+            input.Button != OcctPointerButton.Left)
             return false;
 
         return AcceptPoint(
-            Context.ResolvePoint(input.X, input.Y, ReferencePoint()).Point);
+            Context.ResolvePoint(
+                input.X,
+                input.Y,
+                ReferencePoint()).Point);
     }
 
     protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
         CommitResolvedPoint(pointer, ReferencePoint(), AcceptPoint);
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
-        IsActive && State == CadToolState.Drawing && AcceptPoint(point);
+        IsActive &&
+        State == CadToolState.Drawing &&
+        AcceptPoint(point);
 
     protected override bool OnStepBack()
     {
@@ -86,7 +97,9 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
 
     private bool AcceptPoint(OcctPoint3d point)
     {
-        if (!point.IsFinite) return false;
+        if (!point.IsFinite)
+            return false;
+
         if (Stage == 0)
         {
             _center = point;
@@ -106,9 +119,14 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
         if (Stage == 1)
         {
             var majorPoint = ProjectMajorPoint(point);
-            _majorRadius = CadPlaneGeometry.RadialDistance(_center, majorPoint, _xAxis, _yAxis);
+            _majorRadius = CadPlaneGeometry.RadialDistance(
+                _center,
+                majorPoint,
+                _xAxis,
+                _yAxis);
             if (_majorRadius <= 1e-9)
                 return false;
+
             _majorPoint = majorPoint;
             _radialAxis = CadTransformMath.Normalize(
                 CadTransformMath.Between(_center, _majorPoint),
@@ -119,11 +137,12 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
                 "Torus: specify tube radius [Backspace undo, Esc cancel]",
                 CadPrecisionInputKind.Length);
             SetWorkPlane(_majorPoint, _radialAxis, _axis);
-            Show(new CadTorusEntity(
-                _center,
-                _axis,
-                _majorRadius,
-                _majorRadius * 0.2));
+            Show(
+                new CadTorusEntity(
+                    _center,
+                    _axis,
+                    _majorRadius,
+                    _majorRadius * 0.2));
             return true;
         }
 
@@ -134,23 +153,29 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
         Update(tubePoint);
         if (_preview is null)
             return false;
+
         CommitPreview(_preview);
         return true;
     }
 
-    private OcctPoint3d? ReferencePoint() => Stage switch
-    {
-        1 => _center,
-        2 => _majorPoint,
-        _ => null
-    };
+    private OcctPoint3d? ReferencePoint() =>
+        Stage switch
+        {
+            1 => _center,
+            2 => _majorPoint,
+            _ => null
+        };
 
     private void Update(OcctPoint3d point)
     {
         if (Stage == 1)
         {
             var majorPoint = ProjectMajorPoint(point);
-            var major = CadPlaneGeometry.RadialDistance(_center, majorPoint, _xAxis, _yAxis);
+            var major = CadPlaneGeometry.RadialDistance(
+                _center,
+                majorPoint,
+                _xAxis,
+                _yAxis);
             if (major <= 1e-9)
             {
                 _preview = null;
@@ -158,32 +183,43 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
                 return;
             }
 
-            Show(new CadTorusEntity(
-                _center,
-                _axis,
-                major,
-                major * 0.2));
+            Show(
+                new CadTorusEntity(
+                    _center,
+                    _axis,
+                    major,
+                    major * 0.2));
             return;
         }
 
-        if (Stage != 2) return;
+        if (Stage != 2)
+            return;
 
         var tubePoint = ProjectTubePoint(point);
         var minorRadius = ResolveMinorRadius(
             _majorRadius,
             _majorPoint.DistanceTo(tubePoint));
-        Show(new CadTorusEntity(
-            _center,
-            _axis,
-            _majorRadius,
-            minorRadius));
+        Show(
+            new CadTorusEntity(
+                _center,
+                _axis,
+                _majorRadius,
+                minorRadius));
     }
 
     private OcctPoint3d ProjectMajorPoint(OcctPoint3d point) =>
-        CadPlaneGeometry.ProjectToPlane(_center, point, _xAxis, _yAxis);
+        CadPlaneGeometry.ProjectToPlane(
+            _center,
+            point,
+            _xAxis,
+            _yAxis);
 
     private OcctPoint3d ProjectTubePoint(OcctPoint3d point) =>
-        CadPlaneGeometry.ProjectToPlane(_majorPoint, point, _radialAxis, _axis);
+        CadPlaneGeometry.ProjectToPlane(
+            _majorPoint,
+            point,
+            _radialAxis,
+            _axis);
 
     private void Show(CadTorusEntity entity)
     {
@@ -208,5 +244,6 @@ public sealed class TorusTool : CadDrawingTool, ICadPointInputTool
     private void Reset()
     {
         _preview = null;
+        _majorRadius = 0.0;
     }
 }

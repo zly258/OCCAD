@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Text.Json.Nodes;
 using OcctNet;
 
@@ -32,29 +32,32 @@ public sealed class CadSphereEntity : CadEntity
     [Category("Measurement"), ReadOnly(true)]
     public double Volume => 4.0 * Math.PI * _radius * _radius * _radius / 3.0;
 
-    internal override OcctShape BuildShape(OcctEngine engine) => engine.MakeSphere(_radius, _center.X, _center.Y, _center.Z);
+    internal override OcctShape BuildShape(OcctEngine engine) =>
+        engine.MakeSphere(_radius, _center.X, _center.Y, _center.Z);
 
     public override IReadOnlyList<CadSnapPoint> GetSnapPoints() =>
-    [
-        new(this, _center, CadSnapType.Center, 0),
-        new(this, _center + OcctVector3d.UnitX * _radius, CadSnapType.Quadrant, 1),
-        new(this, _center + OcctVector3d.UnitY * _radius, CadSnapType.Quadrant, 2),
-        new(this, _center - OcctVector3d.UnitX * _radius, CadSnapType.Quadrant, 3),
-        new(this, _center - OcctVector3d.UnitY * _radius, CadSnapType.Quadrant, 4),
-        new(this, _center + OcctVector3d.UnitZ * _radius, CadSnapType.Quadrant, 5),
-        new(this, _center - OcctVector3d.UnitZ * _radius, CadSnapType.Quadrant, 6)
-    ];
+        [new(this, _center, CadSnapType.Center, 0)];
 
     public override IReadOnlyList<CadGripPoint> GetGripPoints()
     {
-        var plane = new CadGripWorkPlane(_center, OcctVector3d.UnitX, OcctVector3d.UnitY);
+        var negativeX = new OcctVector3d(-1.0, 0.0, 0.0);
+        var negativeY = new OcctVector3d(0.0, -1.0, 0.0);
+        var negativeZ = new OcctVector3d(0.0, 0.0, -1.0);
+        var xy = new CadGripWorkPlane(_center, OcctVector3d.UnitX, OcctVector3d.UnitY, true, 0.0);
+        var yx = new CadGripWorkPlane(_center, negativeX, OcctVector3d.UnitY, true, 0.0);
+        var yz = new CadGripWorkPlane(_center, OcctVector3d.UnitY, OcctVector3d.UnitZ, true, 0.0);
+        var zy = new CadGripWorkPlane(_center, negativeY, OcctVector3d.UnitZ, true, 0.0);
+        var zx = new CadGripWorkPlane(_center, OcctVector3d.UnitZ, OcctVector3d.UnitX, true, 0.0);
+        var xz = new CadGripWorkPlane(_center, negativeZ, OcctVector3d.UnitX, true, 0.0);
         return
         [
-            new(this, 0, _center),
-            new(this, 1, _center + OcctVector3d.UnitX * _radius, plane, _center, CadPrecisionInputKind.Length),
-            new(this, 2, _center + OcctVector3d.UnitY * _radius, plane, _center, CadPrecisionInputKind.Length),
-            new(this, 3, _center - OcctVector3d.UnitX * _radius, plane, _center, CadPrecisionInputKind.Length),
-            new(this, 4, _center - OcctVector3d.UnitY * _radius, plane, _center, CadPrecisionInputKind.Length)
+            new(this, 0, _center, Kind: CadGripKind.Center),
+            new(this, 1, _center + OcctVector3d.UnitX * _radius, xy, _center, CadPrecisionInputKind.Length, CadGripKind.Radius),
+            new(this, 2, _center - OcctVector3d.UnitX * _radius, yx, _center, CadPrecisionInputKind.Length, CadGripKind.Radius),
+            new(this, 3, _center + OcctVector3d.UnitY * _radius, yz, _center, CadPrecisionInputKind.Length, CadGripKind.Radius),
+            new(this, 4, _center - OcctVector3d.UnitY * _radius, zy, _center, CadPrecisionInputKind.Length, CadGripKind.Radius),
+            new(this, 5, _center + OcctVector3d.UnitZ * _radius, zx, _center, CadPrecisionInputKind.Length, CadGripKind.Radius),
+            new(this, 6, _center - OcctVector3d.UnitZ * _radius, xz, _center, CadPrecisionInputKind.Length, CadGripKind.Radius)
         ];
     }
 
@@ -65,7 +68,7 @@ public sealed class CadSphereEntity : CadEntity
         {
             _center = targetPoint;
         }
-        else if (index is >= 1 and <= 4)
+        else if (index is >= 1 and <= 6)
         {
             var radius = _center.DistanceTo(targetPoint);
             if (radius <= 1e-9) return;
@@ -79,11 +82,13 @@ public sealed class CadSphereEntity : CadEntity
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
-    public override CadEntity Duplicate() => CopyPropertiesTo(new CadSphereEntity(_center, _radius));
+    public override CadEntity Duplicate() =>
+        CopyPropertiesTo(new CadSphereEntity(_center, _radius));
 
     public override void RestoreGeometry(CadEntity snapshot)
     {
-        if (snapshot is not CadSphereEntity value) throw new ArgumentException("Snapshot type does not match.", nameof(snapshot));
+        if (snapshot is not CadSphereEntity value)
+            throw new ArgumentException("Snapshot type does not match.", nameof(snapshot));
         _center = value._center;
         _radius = value._radius;
         RaiseGeometryChanged(nameof(RestoreGeometry));
@@ -112,7 +117,9 @@ public sealed class CadSphereEntity : CadEntity
 
     private void SetCenter(double x, double y, double z)
     {
-        ValidateFinite(x, nameof(x)); ValidateFinite(y, nameof(y)); ValidateFinite(z, nameof(z));
+        ValidateFinite(x, nameof(x));
+        ValidateFinite(y, nameof(y));
+        ValidateFinite(z, nameof(z));
         SetGeometry(ref _center, new OcctPoint3d(x, y, z));
     }
 

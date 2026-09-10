@@ -27,7 +27,7 @@ public sealed class CadDraftingSettings
     private double _lockedLength;
     private bool _angleLockEnabled;
     private double _lockedAngleDegrees;
-    private bool _orthogonalTrackingEnabled = true;
+    private bool _orthogonalTrackingEnabled;
     private bool _polarTrackingEnabled;
     private double _polarIncrementDegrees = 45.0;
     private double _trackingToleranceDegrees = 2.0;
@@ -197,7 +197,10 @@ public sealed class CadDraftingSettings
                 PolarIncrementDegrees);
         }
 
-        if (bestDelta > TrackingToleranceDegrees)
+        // Orthogonal mode is a hard horizontal/vertical constraint in the
+        // active work plane. Polar mode remains a tolerance-based tracker.
+        if (!OrthogonalTrackingEnabled &&
+            bestDelta > TrackingToleranceDegrees)
             return null;
 
         var radians = bestAngle * Math.PI / 180.0;

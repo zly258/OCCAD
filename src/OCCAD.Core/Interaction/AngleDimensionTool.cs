@@ -1,85 +1,342 @@
-using System.Globalization;
 using OcctNet;
 
 namespace OCCAD;
 
 public sealed class AngleDimensionTool : CadDrawingTool, ICadPointInputTool
 {
-    private readonly List<CadLineEntity> _lines=[];
-    private OcctPoint3d _vertex;
-    private OcctVector3d _firstDirection,_secondDirection,_normal;
-    private double _textHeight=4,_arrowSize=2.5;
+    private OcctPoint3d? _vertex;
+    private OcctPoint3d? _firstRayPoint;
+    private OcctPoint3d? _secondRayPoint;
+    private double _textHeight = 4.0;
+    private double _arrowSize = 2.5;
+    private string _fontName = "Arial";
+    private CadAngleDimensionEntity? _preview;
+    private WorkPlaneFrame _initialPlane;
 
-    public override string Id=>"angledimension";
-    public override string DisplayName=>"Angle Dimension";
-    public override CadToolInputKind InputKind =>
-        _lines.Count < 2
-            ? CadToolInputKind.Selection
-            : CadToolInputKind.Point;
-    public override CadToolInteractionPolicy InteractionPolicy =>
-        base.InteractionPolicy with
-        {
-            PreselectionEnabled = _lines.Count < 2
-        };
-    protected override bool CanStepBackCore=>_lines.Count>0;
-    public override CadToolPanelDescriptor ParameterPanel=>new("Angle Dimension",
-        [new CadDoubleToolParameterDescriptor("TextHeight","Text Height",_textHeight,1e-9,1_000_000),new CadDoubleToolParameterDescriptor("ArrowSize","Arrow Size",_arrowSize,1e-9,1_000_000)]);
+    public override string Id => "angledimension";
+    public override string DisplayName => "Angle Dimension";
+    public override OcctPoint3d? PrecisionReferencePoint => _vertex;
 
-    protected override void OnActivated(){_lines.Clear();TryAcceptSelected();UpdatePrompt();}
+    public override CadToolPanelDescriptor ParameterPanel =>
+        new(
+            "Angle Dimension",
+            [
+                new CadDoubleToolParameterDescriptor(
+                    "TextHeight",
+                    "Text Height",
+                    _textHeight,
+                    1e-9,
+                    double.MaxValue),
+                new CadDoubleToolParameterDescriptor(
+                    "ArrowSize",
+                    "Arrow Size",
+                    _arrowSize,
+                    1e-9,
+                    double.MaxValue),
+                new CadStringToolParameterDescriptor(
+                    "Font",
+                    "Font",
+                    _fontName)
+            ]);
+
+    protected override bool CanStepBackCore => _vertex is not null;
+
+    protected override void OnActivated()
+    {
+        _vertex = null;
+        _firstRayPoint = null;
+        _secondRayPoint = null;
+        _preview = null;
+        _initialPlane = CaptureWorkPlaneFrame();
+        RestorePrompt();
+    }
+
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
-        if(CancelOnRightClick(input))return true;
-        if(_lines.Count<2 && input.Kind==OcctPointerInputKind.Pressed && input.Button==OcctPointerButton.Left)
+        if (CancelOnRightClick(input))
+            return true;
+
+        if (input.Kind == OcctPointerInputKind.Moved)
         {
-            foreach(var hit in Context.Engine.DetectAt(input.X,input.Y)){var e=Context.Document.FindByViewerObject(hit.Owner);if(e is CadLineEntity line && TryAcceptLine(line))return true;}return true;
+            var point = Context.ResolvePoint(
+                input.X,
+                input.Y,
+                PrecisionReferencePoint).Point;
+            if (_vertex is { } vertex &&
+                _firstRayPoint is { } first &&
+                _secondRayPoint is { } second)
+            {
+                UpdatePreview(vertex, first, second, point);
+            }
+            return true;
         }
-        if(_lines.Count==2 && input.Kind==OcctPointerInputKind.Moved){Show(Resolve(input,_vertex));return true;}
-        if(_lines.Count==2 && input.Kind==OcctPointerInputKind.Pressed && input.Button==OcctPointerButton.Left)return TryAcceptPoint(Resolve(input,_vertex));
-        return false;
+
+        if (input.Kind != OcctPointerInputKind.Pressed ||
+            input.Button != OcctPointerButton.Left)
+            return false;
+
+        return AcceptPoint(
+            Context.ResolvePoint(
+                input.X,
+                input.Y,
+                PrecisionReferencePoint).Point);
     }
-    protected override bool OnCommitCurrentStage(CadPointerPosition p)
+
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
+        CommitResolvedPoint(pointer, PrecisionReferencePoint, AcceptPoint);
+
+    public bool TryAcceptPoint(OcctPoint3d point) =>
+        IsActive && State == CadToolState.Drawing && AcceptPoint(point);
+
+    protected override bool OnSetParameter(string id, string value)
     {
-        if(_lines.Count<2){foreach(var hit in Context.Engine.DetectAt(p.X,p.Y)){if(Context.Document.FindByViewerObject(hit.Owner) is CadLineEntity line&&TryAcceptLine(line))return true;}return false;}
-        return CommitResolvedPoint(p,_vertex,TryAcceptPoint);
-    }
-    public bool TryAcceptLine(CadLineEntity line)
-    {
-        if(!IsActive||_lines.Contains(line)||!Context.Document.IsEntitySelectable(line)||_lines.Count>=2)return false;
-        if(_lines.Count==0){_lines.Add(line);UpdatePrompt();return true;}
-        if(!TryFrame(_lines[0],line,out _vertex,out _firstDirection,out _secondDirection,out _normal)){SetPromptLocalized("Cad.Prompt.angledimension.Invalid","Angle dimension: lines must share one endpoint and not be parallel [Esc cancel]");return false;}
-        _lines.Add(line);Context.WorkPlane.SetToolPlaneFixed(true);UpdatePrompt();return true;
-    }
-    public bool TryAcceptPoint(OcctPoint3d point)
-    {
-        if(!IsActive||_lines.Count!=2||!point.IsFinite)return false;
-        var delta=point-_vertex;delta-=_normal*delta.Dot(_normal);if(delta.Length<=1e-9)return false;
-        CommitPreview(new CadAngleDimensionEntity(_vertex,_firstDirection,_secondDirection,delta.Length,_textHeight,_arrowSize));return true;
-    }
-    protected override bool OnSetParameter(string id,string value)
-    {
-        if((!double.TryParse(value,NumberStyles.Float,CultureInfo.CurrentCulture,out var n)&&!double.TryParse(value,NumberStyles.Float,CultureInfo.InvariantCulture,out n))||!double.IsFinite(n)||n<=1e-9)return false;
-        if(id.Equals("TextHeight",StringComparison.OrdinalIgnoreCase))_textHeight=n;else if(id.Equals("ArrowSize",StringComparison.OrdinalIgnoreCase))_arrowSize=n;else return false;NotifyUpdated();return true;
-    }
-    protected override bool OnStepBack(){if(_lines.Count==0)return false;_lines.RemoveAt(_lines.Count-1);Context.Preview.Clear();Context.WorkPlane.SetToolPlaneFixed(false);UpdatePrompt();return true;}
-    private void TryAcceptSelected(){foreach(var line in Context.Selection.Selected.OfType<CadLineEntity>().Take(2))if(!TryAcceptLine(line))break;}
-    private void Show(OcctPoint3d point)
-    {
-        var delta=point-_vertex;
-        delta-=_normal*delta.Dot(_normal);
-        if(delta.Length>1e-9)
-            ShowPreview(new CadAngleDimensionEntity(_vertex,_firstDirection,_secondDirection,delta.Length,_textHeight,_arrowSize));
+        if (id.Equals("TextHeight", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryPositive(value, out _textHeight))
+                return false;
+        }
+        else if (id.Equals("ArrowSize", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryPositive(value, out _arrowSize))
+                return false;
+        }
+        else if (id.Equals("Font", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            _fontName = value.Trim();
+        }
         else
-            Context.Preview.Clear();
+        {
+            return false;
+        }
+
+        RefreshPreviewFromLastPointer();
+        NotifyUpdated();
+        return true;
     }
-    private void UpdatePrompt(){var key=_lines.Count switch{0=>"First",1=>"Second",_=>"Position"};var text=_lines.Count switch{0=>"Angle dimension: select first line [Esc cancel]",1=>"Angle dimension: select second line [Backspace undo, Esc cancel]",_=>"Angle dimension: specify arc position [Backspace undo, Esc cancel]"};SetStageLocalized(_lines.Count,$"Cad.Prompt.angledimension.{key}",text);}
-    private static bool TryFrame(CadLineEntity first,CadLineEntity second,out OcctPoint3d vertex,out OcctVector3d d1,out OcctVector3d d2,out OcctVector3d normal)
+
+    protected override bool OnStepBack()
     {
-        var firstStart=first.ToWorldPoint(first.Start);
-        var firstEnd=first.ToWorldPoint(first.End);
-        var secondStart=second.ToWorldPoint(second.Start);
-        var secondEnd=second.ToWorldPoint(second.End);
-        var pairs=new[]{(firstStart,firstEnd,secondStart,secondEnd),(firstStart,firstEnd,secondEnd,secondStart),(firstEnd,firstStart,secondStart,secondEnd),(firstEnd,firstStart,secondEnd,secondStart)};
-        foreach(var p in pairs)if((p.Item1-p.Item3).Length<=1e-7){vertex=p.Item1;d1=(p.Item2-vertex).Normalized();d2=(p.Item4-vertex).Normalized();var cross=d1.Cross(d2);if(cross.TryNormalize(out normal)&&Math.Abs(d1.Dot(d2))<1-1e-10)return true;break;}
-        vertex=default;d1=default;d2=default;normal=default;return false;
+        if (_secondRayPoint is not null)
+        {
+            _secondRayPoint = null;
+            ClearPreview();
+            RestorePrompt();
+            return true;
+        }
+
+        if (_firstRayPoint is not null)
+        {
+            _firstRayPoint = null;
+            ClearPreview();
+            RestorePrompt();
+            return true;
+        }
+
+        if (_vertex is null)
+            return false;
+
+        _vertex = null;
+        ClearPreview();
+        RestoreWorkPlaneFrame(_initialPlane);
+        RestorePrompt();
+        return true;
     }
+
+    protected override void OnCanceled()
+    {
+        _vertex = null;
+        _firstRayPoint = null;
+        _secondRayPoint = null;
+        _preview = null;
+    }
+
+    private bool AcceptPoint(OcctPoint3d point)
+    {
+        if (!point.IsFinite)
+            return false;
+
+        if (_vertex is null)
+        {
+            _vertex = point;
+            RestoreWorkPlaneFrame(_initialPlane, point);
+            RestorePrompt();
+            return true;
+        }
+
+        if (_firstRayPoint is null)
+        {
+            if (_vertex.Value.DistanceTo(point) <= 1e-9)
+                return false;
+            _firstRayPoint = point;
+            RestorePrompt();
+            return true;
+        }
+
+        if (_secondRayPoint is null)
+        {
+            if (!TryDirections(
+                    _vertex.Value,
+                    _firstRayPoint.Value,
+                    point,
+                    out _,
+                    out _))
+                return false;
+
+            _secondRayPoint = point;
+            RestorePrompt();
+            return true;
+        }
+
+        if (!TryCreateEntity(
+                _vertex.Value,
+                _firstRayPoint.Value,
+                _secondRayPoint.Value,
+                point,
+                out var entity))
+            return false;
+
+        _preview = null;
+        CommitPreview(entity);
+        return true;
+    }
+
+    private void UpdatePreview(
+        OcctPoint3d vertex,
+        OcctPoint3d firstRayPoint,
+        OcctPoint3d secondRayPoint,
+        OcctPoint3d radiusPoint)
+    {
+        if (!TryCreateEntity(
+                vertex,
+                firstRayPoint,
+                secondRayPoint,
+                radiusPoint,
+                out var entity))
+        {
+            ClearPreview();
+            return;
+        }
+
+        _preview = entity;
+        ShowPreview(_preview);
+    }
+
+    private bool TryCreateEntity(
+        OcctPoint3d vertex,
+        OcctPoint3d firstRayPoint,
+        OcctPoint3d secondRayPoint,
+        OcctPoint3d radiusPoint,
+        out CadAngleDimensionEntity entity)
+    {
+        entity = null!;
+        if (!TryDirections(
+                vertex,
+                firstRayPoint,
+                secondRayPoint,
+                out var firstDirection,
+                out var secondDirection))
+            return false;
+
+        var frame = Context.WorkPlane.EffectivePlane;
+        var delta = radiusPoint - vertex;
+        var axial = delta.Dot(frame.Normal);
+        var planar = delta - frame.Normal * axial;
+        var radius = Math.Sqrt(planar.LengthSquared);
+        if (!double.IsFinite(radius) || radius <= 1e-9)
+            return false;
+
+        try
+        {
+            entity = new CadAngleDimensionEntity(
+                vertex,
+                firstDirection,
+                secondDirection,
+                radius,
+                _textHeight,
+                _arrowSize,
+                _fontName);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private bool TryDirections(
+        OcctPoint3d vertex,
+        OcctPoint3d firstRayPoint,
+        OcctPoint3d secondRayPoint,
+        out OcctVector3d firstDirection,
+        out OcctVector3d secondDirection)
+    {
+        var frame = Context.WorkPlane.EffectivePlane;
+        firstDirection = ProjectDirection(vertex, firstRayPoint, frame.Normal);
+        secondDirection = ProjectDirection(vertex, secondRayPoint, frame.Normal);
+        if (!firstDirection.TryNormalize(out firstDirection) ||
+            !secondDirection.TryNormalize(out secondDirection))
+            return false;
+
+        return Math.Abs(firstDirection.Dot(secondDirection)) < 1.0 - 1e-10;
+    }
+
+    private static OcctVector3d ProjectDirection(
+        OcctPoint3d origin,
+        OcctPoint3d point,
+        OcctVector3d normal)
+    {
+        var delta = point - origin;
+        var axial = delta.Dot(normal);
+        return delta - normal * axial;
+    }
+
+    private void RestorePrompt()
+    {
+        if (_vertex is null)
+        {
+            SetStageLocalized(
+                0,
+                "Cad.Prompt.AngleDimension.Vertex",
+                "Angle Dimension: specify vertex [Esc cancel]");
+            return;
+        }
+
+        if (_firstRayPoint is null)
+        {
+            SetStageLocalized(
+                1,
+                "Cad.Prompt.AngleDimension.FirstRay",
+                "Angle Dimension: specify point on first ray [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.LengthAndAngle);
+            return;
+        }
+
+        if (_secondRayPoint is null)
+        {
+            SetStageLocalized(
+                2,
+                "Cad.Prompt.AngleDimension.SecondRay",
+                "Angle Dimension: specify point on second ray [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.LengthAndAngle);
+            return;
+        }
+
+        SetStageLocalized(
+            3,
+            "Cad.Prompt.AngleDimension.Line",
+            "Angle Dimension: specify dimension-arc radius [Backspace undo, Esc cancel]",
+            CadPrecisionInputKind.Length);
+    }
+
+    private void ClearPreview()
+    {
+        _preview = null;
+        Context.Preview.Clear();
+    }
+
+    private static bool TryPositive(string value, out double number) =>
+        CadValueTextConverter.TryParseFiniteDouble(value, out number) &&
+        number > 1e-9;
 }

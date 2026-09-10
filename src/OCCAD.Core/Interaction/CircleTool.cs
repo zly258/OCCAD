@@ -1,4 +1,3 @@
-﻿using System.Globalization;
 using OcctNet;
 
 namespace OCCAD;
@@ -43,30 +42,14 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
             if (Stage == 0)
             {
                 parameters.Add(new CadChoiceToolParameterDescriptor(
-                    "Method",
-                    "Method",
-                    _method,
+                    "Method", "Method", _method,
                     [CenterRadius, CenterDiameter, TwoPoints, ThreePoints, PointCenter]));
             }
 
             if (_method == CenterRadius)
-            {
-                parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
-                    "Radius",
-                    "Radius",
-                    _radius,
-                    1e-9,
-                    double.MaxValue));
-            }
+                parameters.Add(new CadOptionalDoubleToolParameterDescriptor("Radius", "Radius", _radius, 1e-9, double.MaxValue));
             else if (_method == CenterDiameter)
-            {
-                parameters.Add(new CadOptionalDoubleToolParameterDescriptor(
-                    "Diameter",
-                    "Diameter",
-                    _diameter,
-                    2e-9,
-                    double.MaxValue));
-            }
+                parameters.Add(new CadOptionalDoubleToolParameterDescriptor("Diameter", "Diameter", _diameter, 2e-9, double.MaxValue));
 
             return new CadToolPanelDescriptor("Circle", parameters);
         }
@@ -88,6 +71,15 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         RestorePrompt();
     }
 
+    protected internal override void OnWorkPlaneChanged()
+    {
+        _planeOrigin = Context.WorkPlane.Origin;
+        _normal = Context.WorkPlane.Normal;
+        _xAxis = Context.WorkPlane.XAxis;
+        _yAxis = Context.WorkPlane.YAxis;
+        base.OnWorkPlaneChanged();
+    }
+
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
         if (CancelOnRightClick(input)) return true;
@@ -102,9 +94,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
     }
 
     protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(
-            pointer,
-            _points.Count == 0 ? null : _points[^1],
+        CommitResolvedPoint(pointer, _points.Count == 0 ? null : _points[^1],
             point => AcceptPoint(ProjectToDrawingPlane(point)));
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
@@ -118,9 +108,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
             var normalized = value.Trim();
             if (normalized is not (CenterRadius or CenterDiameter or TwoPoints or ThreePoints or PointCenter))
                 return false;
-            if (string.Equals(_method, normalized, StringComparison.OrdinalIgnoreCase))
-                return true;
-
+            if (string.Equals(_method, normalized, StringComparison.OrdinalIgnoreCase)) return true;
             _method = normalized;
             _radius = null;
             _diameter = null;
@@ -166,8 +154,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
     private bool AcceptPoint(OcctPoint3d point)
     {
         if (!point.IsFinite) return false;
-        if (_points.Count > 0 && _points[^1].DistanceTo(point) <= 1e-9)
-            return false;
+        if (_points.Count > 0 && _points[^1].DistanceTo(point) <= 1e-9) return false;
 
         _points.Add(point);
         Context.WorkPlane.SetOrigin(point);
@@ -176,37 +163,17 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         {
             case CenterRadius:
             case CenterDiameter:
-                if (_points.Count == 1)
-                {
-                    RestorePrompt();
-                    return true;
-                }
+                if (_points.Count == 1) { RestorePrompt(); return true; }
                 return CommitCenterCircle(point);
-
             case TwoPoints:
-                if (_points.Count == 1)
-                {
-                    RestorePrompt();
-                    return true;
-                }
+                if (_points.Count == 1) { RestorePrompt(); return true; }
                 return CommitTwoPointCircle();
-
             case ThreePoints:
-                if (_points.Count < 3)
-                {
-                    RestorePrompt();
-                    return true;
-                }
+                if (_points.Count < 3) { RestorePrompt(); return true; }
                 return CommitThreePointCircle();
-
             case PointCenter:
-                if (_points.Count == 1)
-                {
-                    RestorePrompt();
-                    return true;
-                }
+                if (_points.Count == 1) { RestorePrompt(); return true; }
                 return CommitPointCenterCircle();
-
             default:
                 return false;
         }
@@ -219,12 +186,11 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         var radius = _method == CenterDiameter
             ? (_diameter ?? mouseDistance) * 0.5
             : _radius ?? mouseDistance;
-        if (radius <= 1e-9)
+        if (!double.IsFinite(radius) || radius <= 1e-9)
         {
             _points.RemoveAt(_points.Count - 1);
             return false;
         }
-
         Commit(new CadCircleEntity(center, _normal, radius));
         return true;
     }
@@ -234,12 +200,11 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         var first = _points[0];
         var second = _points[1];
         var radius = first.DistanceTo(second) * 0.5;
-        if (radius <= 1e-9)
+        if (!double.IsFinite(radius) || radius <= 1e-9)
         {
             _points.RemoveAt(_points.Count - 1);
             return false;
         }
-
         Commit(new CadCircleEntity(Midpoint(first, second), _normal, radius));
         return true;
     }
@@ -248,39 +213,25 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
     {
         var edge = _points[0];
         var center = _points[1];
-        var radius = CadPlaneGeometry.RadialDistance(
-            center,
-            edge,
-            _xAxis,
-            _yAxis);
-        if (radius <= 1e-9)
+        var radius = CadPlaneGeometry.RadialDistance(center, edge, _xAxis, _yAxis);
+        if (!double.IsFinite(radius) || radius <= 1e-9)
         {
             _points.RemoveAt(_points.Count - 1);
             return false;
         }
-
         Commit(new CadCircleEntity(center, _normal, radius));
         return true;
     }
 
     private bool CommitThreePointCircle()
     {
-        if (!TryCircleFromThreePoints(
-                _points[0],
-                _points[1],
-                _points[2],
-                out var center,
-                out var radius))
+        if (!TryCircleFromThreePoints(_points[0], _points[1], _points[2], out var center, out var radius))
         {
             _points.RemoveAt(_points.Count - 1);
             _invalidPointPrompt = true;
-            SetPromptLocalized(
-                "Cad.Prompt.Circle.Invalid",
-                "Circle: points do not define a valid circle.",
-                CadPrecisionInputKind.LengthAndAngle);
+            SetPromptLocalized("Cad.Prompt.Circle.Invalid", "Circle: points do not define a valid circle.", CadPrecisionInputKind.LengthAndAngle);
             return false;
         }
-
         _invalidPointPrompt = false;
         Commit(new CadCircleEntity(center, _normal, radius));
         return true;
@@ -289,60 +240,45 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
     private void UpdatePreview(OcctPoint3d cursor)
     {
         CadCircleEntity? entity = null;
-        switch (_method)
+        try
         {
-            case CenterRadius:
-            case CenterDiameter when _points.Count >= 1:
+            switch (_method)
+            {
+                case CenterRadius:
+                case CenterDiameter when _points.Count >= 1:
                 {
                     var mouseDistance = CadPlaneGeometry.RadialDistance(_points[0], cursor, _xAxis, _yAxis);
-                    var centerPreviewRadius = _method == CenterDiameter
-                        ? (_diameter ?? mouseDistance) * 0.5
-                        : _radius ?? mouseDistance;
-                    if (centerPreviewRadius > 1e-9)
-                        entity = new CadCircleEntity(_points[0], _normal, centerPreviewRadius);
+                    var radius = _method == CenterDiameter ? (_diameter ?? mouseDistance) * 0.5 : _radius ?? mouseDistance;
+                    if (double.IsFinite(radius) && radius > 1e-9)
+                        entity = new CadCircleEntity(_points[0], _normal, radius);
                     break;
                 }
-            case TwoPoints when _points.Count >= 1:
+                case TwoPoints when _points.Count >= 1:
                 {
-                    var twoPointPreviewRadius = _points[0].DistanceTo(cursor) * 0.5;
-                    if (twoPointPreviewRadius > 1e-9)
-                        entity = new CadCircleEntity(Midpoint(_points[0], cursor), _normal, twoPointPreviewRadius);
+                    var radius = _points[0].DistanceTo(cursor) * 0.5;
+                    if (double.IsFinite(radius) && radius > 1e-9)
+                        entity = new CadCircleEntity(Midpoint(_points[0], cursor), _normal, radius);
                     break;
                 }
-            case ThreePoints when _points.Count >= 2:
-                if (TryCircleFromThreePoints(
-                        _points[0],
-                        _points[1],
-                        cursor,
-                        out var center,
-                        out var radius))
-                {
-                    if (_invalidPointPrompt)
+                case ThreePoints when _points.Count >= 2:
+                    if (TryCircleFromThreePoints(_points[0], _points[1], cursor, out var center, out var threePointRadius))
                     {
-                        _invalidPointPrompt = false;
-                        RestorePrompt();
+                        if (_invalidPointPrompt) { _invalidPointPrompt = false; RestorePrompt(); }
+                        entity = new CadCircleEntity(center, _normal, threePointRadius);
                     }
-                    entity = new CadCircleEntity(
-                        center,
-                        _normal,
-                        radius);
-                }
-                break;
-
-            case PointCenter when _points.Count >= 1:
+                    break;
+                case PointCenter when _points.Count >= 1:
                 {
-                    var pointCenterRadius = CadPlaneGeometry.RadialDistance(
-                        cursor,
-                        _points[0],
-                        _xAxis,
-                        _yAxis);
-                    if (pointCenterRadius > 1e-9)
-                        entity = new CadCircleEntity(
-                            cursor,
-                            _normal,
-                            pointCenterRadius);
+                    var radius = CadPlaneGeometry.RadialDistance(cursor, _points[0], _xAxis, _yAxis);
+                    if (double.IsFinite(radius) && radius > 1e-9)
+                        entity = new CadCircleEntity(cursor, _normal, radius);
                     break;
                 }
+            }
+        }
+        catch (ArgumentException)
+        {
+            entity = null;
         }
 
         if (entity is null)
@@ -351,16 +287,13 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
             Context.Preview.Clear();
             return;
         }
-
         _preview = entity;
         ShowPreview(entity);
     }
 
     private void RefreshPreviewFromLastPointer()
     {
-        if (_points.Count == 0 || Context.Workspace.LastPointerPosition is not { } pointer)
-            return;
-
+        if (_points.Count == 0 || Context.Workspace.LastPointerPosition is not { } pointer) return;
         var point = Context.ResolvePoint(pointer.X, pointer.Y, _points[^1]).Point;
         UpdatePreview(ProjectToDrawingPlane(point));
     }
@@ -387,24 +320,18 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
     private OcctPoint3d ProjectToDrawingPlane(OcctPoint3d point) =>
         CadPlaneGeometry.ProjectToPlane(_planeOrigin, point, _xAxis, _yAxis);
 
-    private bool TryCircleFromThreePoints(
-        OcctPoint3d first,
-        OcctPoint3d second,
-        OcctPoint3d third,
-        out OcctPoint3d center,
-        out double radius)
+    private bool TryCircleFromThreePoints(OcctPoint3d first, OcctPoint3d second, OcctPoint3d third, out OcctPoint3d center, out double radius)
     {
         var a = ToPlane(first);
         var b = ToPlane(second);
         var c = ToPlane(third);
         var d = 2.0 * (a.X * (b.Y - c.Y) + b.X * (c.Y - a.Y) + c.X * (a.Y - b.Y));
-        if (Math.Abs(d) <= 1e-12)
+        if (!double.IsFinite(d) || Math.Abs(d) <= 1e-12)
         {
             center = default;
             radius = 0.0;
             return false;
         }
-
         var aa = a.X * a.X + a.Y * a.Y;
         var bb = b.X * b.X + b.Y * b.Y;
         var cc = c.X * c.X + c.Y * c.Y;
@@ -412,21 +339,20 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         var y = (aa * (c.X - b.X) + bb * (a.X - c.X) + cc * (b.X - a.X)) / d;
         center = _planeOrigin + _xAxis * x + _yAxis * y;
         radius = Math.Sqrt((x - a.X) * (x - a.X) + (y - a.Y) * (y - a.Y));
-        return radius > 1e-9;
+        return center.IsFinite && double.IsFinite(radius) && radius > 1e-9;
     }
 
     private CadPlanePoint ToPlane(OcctPoint3d point)
     {
         var delta = CadTransformMath.Between(_planeOrigin, point);
-        return new CadPlanePoint(
-            CadTransformMath.Dot(delta, _xAxis),
-            CadTransformMath.Dot(delta, _yAxis));
+        return new CadPlanePoint(CadTransformMath.Dot(delta, _xAxis), CadTransformMath.Dot(delta, _yAxis));
     }
 
     private void Commit(CadCircleEntity entity)
     {
-        CommitPreview(entity);
+        _points.Clear();
         _preview = null;
+        CommitPreview(entity);
     }
 
     private void Reset()
@@ -446,17 +372,8 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
             return true;
         }
 
-        var parsed = double.TryParse(
-                         text,
-                         NumberStyles.Float,
-                         CultureInfo.CurrentCulture,
-                         out var number) ||
-                     double.TryParse(
-                         text,
-                         NumberStyles.Float,
-                         CultureInfo.InvariantCulture,
-                         out number);
-        if (!parsed || !double.IsFinite(number) || number <= 0.0)
+        if (!CadValueTextConverter.TryParseFiniteDouble(text, out var number) ||
+            number <= 0.0)
         {
             value = null;
             return false;
@@ -467,8 +384,5 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
     }
 
     private static OcctPoint3d Midpoint(OcctPoint3d first, OcctPoint3d second) =>
-        new(
-            (first.X + second.X) * 0.5,
-            (first.Y + second.Y) * 0.5,
-            (first.Z + second.Z) * 0.5);
+        new((first.X + second.X) * 0.5, (first.Y + second.Y) * 0.5, (first.Z + second.Z) * 0.5);
 }

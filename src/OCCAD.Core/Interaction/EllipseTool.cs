@@ -1,4 +1,3 @@
-﻿using System.Globalization;
 using OcctNet;
 
 namespace OCCAD;
@@ -70,16 +69,30 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
-        if (CancelOnRightClick(input)) return true;
+        if (CancelOnRightClick(input))
+            return true;
+
         if (input.Kind == OcctPointerInputKind.Moved && _points.Count > 0)
         {
-            UpdatePreview(ProjectToDrawingPlane(Context.ResolvePoint(input.X, input.Y, ReferencePoint()).Point));
+            UpdatePreview(
+                ProjectToDrawingPlane(
+                    Context.ResolvePoint(
+                        input.X,
+                        input.Y,
+                        ReferencePoint()).Point));
             return true;
         }
-        if (input.Kind != OcctPointerInputKind.Pressed || input.Button != OcctPointerButton.Left)
+
+        if (input.Kind != OcctPointerInputKind.Pressed ||
+            input.Button != OcctPointerButton.Left)
             return false;
-        return AcceptPoint(ProjectToDrawingPlane(
-            Context.ResolvePoint(input.X, input.Y, ReferencePoint()).Point));
+
+        return AcceptPoint(
+            ProjectToDrawingPlane(
+                Context.ResolvePoint(
+                    input.X,
+                    input.Y,
+                    ReferencePoint()).Point));
     }
 
     protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
@@ -89,16 +102,21 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
             point => AcceptPoint(ProjectToDrawingPlane(point)));
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
-        IsActive && State == CadToolState.Drawing && AcceptPoint(ProjectToDrawingPlane(point));
+        IsActive &&
+        State == CadToolState.Drawing &&
+        AcceptPoint(ProjectToDrawingPlane(point));
 
     protected override bool OnSetParameter(string id, string value)
     {
         if (id.Equals("Method", StringComparison.OrdinalIgnoreCase))
         {
-            if (Stage != 0) return false;
+            if (Stage != 0)
+                return false;
+
             var normalized = value.Trim();
             if (normalized is not (CenterMajorMinor or AxisEndpointsMinor))
                 return false;
+
             if (string.Equals(_method, normalized, StringComparison.OrdinalIgnoreCase))
                 return true;
 
@@ -110,7 +128,8 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
 
         if (id.Equals("MajorRadius", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalPositive(value, out var major)) return false;
+            if (!TryOptionalPositive(value, out var major))
+                return false;
             if (major is { } majorValue &&
                 _minorRadiusParameter is { } minorValue &&
                 minorValue > majorValue)
@@ -119,7 +138,8 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
         }
         else if (id.Equals("MinorRadius", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalPositive(value, out var minor)) return false;
+            if (!TryOptionalPositive(value, out var minor))
+                return false;
             if (minor is { } minorValue &&
                 _majorRadiusParameter is { } majorValue &&
                 minorValue > majorValue)
@@ -128,7 +148,8 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
         }
         else if (id.Equals("Angle", StringComparison.OrdinalIgnoreCase))
         {
-            if (!TryOptionalFinite(value, out _angleDegrees)) return false;
+            if (!TryOptionalFinite(value, out _angleDegrees))
+                return false;
         }
         else
         {
@@ -142,7 +163,9 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
 
     protected override bool OnStepBack()
     {
-        if (_points.Count == 0) return false;
+        if (_points.Count == 0)
+            return false;
+
         _points.RemoveAt(_points.Count - 1);
         _preview = null;
         Context.Preview.Clear();
@@ -155,8 +178,11 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
 
     private bool AcceptPoint(OcctPoint3d point)
     {
-        if (!point.IsFinite) return false;
-        if (_points.Count > 0 && _points[^1].DistanceTo(point) <= 1e-9)
+        if (!point.IsFinite)
+            return false;
+
+        if (_points.Count > 0 &&
+            _points[^1].DistanceTo(point) <= 1e-9)
             return true;
 
         _points.Add(point);
@@ -182,13 +208,13 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
             return true;
         }
 
-        var entity = new CadEllipseEntity(
-            _center,
-            _normal,
-            _majorAxis,
-            _majorRadius,
-            minor);
-        CommitPreview(entity);
+        CommitPreview(
+            new CadEllipseEntity(
+                _center,
+                _normal,
+                _majorAxis,
+                _majorRadius,
+                minor));
         return true;
     }
 
@@ -215,7 +241,10 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
         return true;
     }
 
-    private bool TrySetMajor(OcctPoint3d first, OcctPoint3d second, bool fullAxis)
+    private bool TrySetMajor(
+        OcctPoint3d first,
+        OcctPoint3d second,
+        bool fullAxis)
     {
         var delta = CadTransformMath.Between(first, second);
         var x = CadTransformMath.Dot(delta, _planeX);
@@ -228,7 +257,8 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
         }
         else
         {
-            if (length <= 1e-9) return false;
+            if (length <= 1e-9)
+                return false;
             _majorAxis = new OcctVector3d(
                 _planeX.X * x + _planeY.X * y,
                 _planeX.Y * x + _planeY.Y * y,
@@ -241,11 +271,13 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
         }
         else
         {
-            if (length <= 1e-9) return false;
+            if (length <= 1e-9)
+                return false;
             _majorRadius = fullAxis ? length * 0.5 : length;
         }
 
-        return _minorRadiusParameter is not { } minorRadius || minorRadius <= _majorRadius;
+        return _minorRadiusParameter is not { } minorRadius ||
+               minorRadius <= _majorRadius;
     }
 
     private void UpdatePreview(OcctPoint3d cursor)
@@ -260,8 +292,14 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
                 {
                     var minor = _minorRadiusParameter ?? _majorRadius;
                     if (IsValidMinor(minor))
+                    {
                         entity = new CadEllipseEntity(
-                            _points[0], _normal, _majorAxis, _majorRadius, minor);
+                            _points[0],
+                            _normal,
+                            _majorAxis,
+                            _majorRadius,
+                            minor);
+                    }
                 }
             }
             else if (TrySetMajor(_points[0], cursor, fullAxis: true))
@@ -269,16 +307,28 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
                 _center = _points[0] + _majorAxis * _majorRadius;
                 var minor = _minorRadiusParameter ?? _majorRadius;
                 if (IsValidMinor(minor))
+                {
                     entity = new CadEllipseEntity(
-                        _center, _normal, _majorAxis, _majorRadius, minor);
+                        _center,
+                        _normal,
+                        _majorAxis,
+                        _majorRadius,
+                        minor);
+                }
             }
         }
         else if (_points.Count >= 2 && RestoreConstructionState())
         {
             var minor = _minorRadiusParameter ?? MinorRadius(cursor);
             if (IsValidMinor(minor))
+            {
                 entity = new CadEllipseEntity(
-                    _center, _normal, _majorAxis, _majorRadius, minor);
+                    _center,
+                    _normal,
+                    _majorAxis,
+                    _majorRadius,
+                    minor);
+            }
         }
 
         if (entity is null)
@@ -309,20 +359,27 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
             Context.Workspace.LastPointerPosition is not { } pointer)
             return;
 
-        var point = ProjectToDrawingPlane(
-            Context.ResolvePoint(pointer.X, pointer.Y, ReferencePoint()).Point);
-        UpdatePreview(point);
+        UpdatePreview(
+            ProjectToDrawingPlane(
+                Context.ResolvePoint(
+                    pointer.X,
+                    pointer.Y,
+                    ReferencePoint()).Point));
     }
 
     private double MinorRadius(OcctPoint3d point)
     {
         var minorAxis = _normal.Cross(_majorAxis).Normalized();
-        return Math.Abs(CadTransformMath.Dot(
-            CadTransformMath.Between(_center, point), minorAxis));
+        return Math.Abs(
+            CadTransformMath.Dot(
+                CadTransformMath.Between(_center, point),
+                minorAxis));
     }
 
     private bool IsValidMinor(double minor) =>
-        double.IsFinite(minor) && minor > 1e-9 && minor <= _majorRadius;
+        double.IsFinite(minor) &&
+        minor > 1e-9 &&
+        minor <= _majorRadius;
 
     private OcctVector3d AxisFromAngle(double angleDegrees)
     {
@@ -336,18 +393,28 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
     }
 
     private OcctPoint3d? ReferencePoint() =>
-        _points.Count >= 2 ? _center : _points.Count == 1 ? _points[0] : null;
+        _points.Count >= 2
+            ? _center
+            : _points.Count == 1
+                ? _points[0]
+                : null;
 
     private void RestorePrompt()
     {
         var (key, fallback) = (_method, _points.Count) switch
         {
-            (CenterMajorMinor, 0) => ("Cad.Prompt.Ellipse.Center", "Ellipse: specify center [Esc cancel]"),
-            (CenterMajorMinor, 1) => ("Cad.Prompt.Ellipse.Major", "Ellipse: specify major-axis point [Backspace undo, Esc cancel]"),
-            (CenterMajorMinor, _) => ("Cad.Prompt.Ellipse.Minor", "Ellipse: specify minor-axis distance [Backspace undo, Esc cancel]"),
-            (AxisEndpointsMinor, 0) => ("Cad.Prompt.Ellipse.AxisFirst", "Ellipse: specify first major-axis endpoint [Esc cancel]"),
-            (AxisEndpointsMinor, 1) => ("Cad.Prompt.Ellipse.AxisSecond", "Ellipse: specify second major-axis endpoint [Backspace undo, Esc cancel]"),
-            _ => ("Cad.Prompt.Ellipse.Minor", "Ellipse: specify minor-axis distance [Backspace undo, Esc cancel]")
+            (CenterMajorMinor, 0) =>
+                ("Cad.Prompt.Ellipse.Center", "Ellipse: specify center [Esc cancel]"),
+            (CenterMajorMinor, 1) =>
+                ("Cad.Prompt.Ellipse.Major", "Ellipse: specify major-axis point [Backspace undo, Esc cancel]"),
+            (CenterMajorMinor, _) =>
+                ("Cad.Prompt.Ellipse.Minor", "Ellipse: specify minor-axis distance [Backspace undo, Esc cancel]"),
+            (AxisEndpointsMinor, 0) =>
+                ("Cad.Prompt.Ellipse.AxisFirst", "Ellipse: specify first major-axis endpoint [Esc cancel]"),
+            (AxisEndpointsMinor, 1) =>
+                ("Cad.Prompt.Ellipse.AxisSecond", "Ellipse: specify second major-axis endpoint [Backspace undo, Esc cancel]"),
+            _ =>
+                ("Cad.Prompt.Ellipse.Minor", "Ellipse: specify minor-axis distance [Backspace undo, Esc cancel]")
         };
 
         if (_points.Count == 0)
@@ -369,7 +436,11 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
     }
 
     private OcctPoint3d ProjectToDrawingPlane(OcctPoint3d point) =>
-        CadPlaneGeometry.ProjectToPlane(_planeOrigin, point, _planeX, _planeY);
+        CadPlaneGeometry.ProjectToPlane(
+            _planeOrigin,
+            point,
+            _planeX,
+            _planeY);
 
     private void Reset()
     {
@@ -380,7 +451,9 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
         _angleDegrees = null;
     }
 
-    private static bool TryOptionalPositive(string text, out double? value)
+    private static bool TryOptionalPositive(
+        string text,
+        out double? value)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -388,7 +461,8 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
             return true;
         }
 
-        if (!TryFinite(text, out var parsed) || parsed <= 0.0)
+        if (!CadValueTextConverter.TryParseFiniteDouble(text, out var parsed) ||
+            parsed <= 0.0)
         {
             value = null;
             return false;
@@ -398,7 +472,9 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
         return true;
     }
 
-    private static bool TryOptionalFinite(string text, out double? value)
+    private static bool TryOptionalFinite(
+        string text,
+        out double? value)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -406,7 +482,7 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
             return true;
         }
 
-        if (!TryFinite(text, out var parsed))
+        if (!CadValueTextConverter.TryParseFiniteDouble(text, out var parsed))
         {
             value = null;
             return false;
@@ -414,20 +490,5 @@ public sealed class EllipseTool : CadDrawingTool, ICadPointInputTool
 
         value = parsed;
         return true;
-    }
-
-    private static bool TryFinite(string text, out double value)
-    {
-        var parsed = double.TryParse(
-                         text,
-                         NumberStyles.Float,
-                         CultureInfo.CurrentCulture,
-                         out value) ||
-                     double.TryParse(
-                         text,
-                         NumberStyles.Float,
-                         CultureInfo.InvariantCulture,
-                         out value);
-        return parsed && double.IsFinite(value);
     }
 }

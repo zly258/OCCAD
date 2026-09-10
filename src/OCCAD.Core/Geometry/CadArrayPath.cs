@@ -2,7 +2,6 @@
 
 namespace OCCAD;
 
-/// <summary>Owns an exact OCCT curve/wire snapshot sampled by cumulative arc length.</summary>
 public sealed class CadArrayPath : IDisposable
 {
     private const double Tolerance = 1e-7;
@@ -79,7 +78,6 @@ public sealed class CadArrayPath : IDisposable
         if (!double.IsFinite(distance) || distance < 0 || distance > Length + Tolerance)
             throw new ArgumentOutOfRangeException(nameof(distance));
         distance = Math.Min(distance, Length);
-        // At a corner, use the outgoing edge's tangent, except at the final endpoint.
         var segment = _segments[^1];
         foreach (var candidate in _segments)
             if (distance < candidate.Start + candidate.Length) { segment = candidate; break; }
@@ -118,31 +116,19 @@ public sealed class CadArrayPath : IDisposable
 
         return entity.Placement.IsIdentity
             ? shape
-            : _session.Transform(
-                shape,
-                entity.Placement.Transform);
+            : _session.Transform(shape, entity.Placement.Transform);
     }
 
     private OcctModelShape BuildPath(CadPathEntity path)
     {
         var edges = path.Segments
-            .Select(segment =>
-                segment switch
-                {
-                    CadLineSegment line =>
-                        _session.MakeLine(
-                            line.Start,
-                            line.End),
-                    CadArcSegment arc =>
-                        _session.MakeArc(
-                            arc.Start,
-                            arc.Middle,
-                            arc.End),
-                    _ => throw new InvalidOperationException(
-                        "Path contains an unsupported segment.")
-                })
+            .Select(segment => segment switch
+            {
+                CadLineSegment line => _session.MakeLine(line.Start, line.End),
+                CadArcSegment arc => _session.MakeArc(arc.Start, arc.Middle, arc.End),
+                _ => throw new InvalidOperationException("Path contains an unsupported segment.")
+            })
             .ToArray();
-
         return _session.MakeWire(edges);
     }
 

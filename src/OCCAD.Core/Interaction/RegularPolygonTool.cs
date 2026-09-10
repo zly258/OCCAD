@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using OcctNet;
 
 namespace OCCAD;
@@ -22,8 +22,7 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
     public override string Id => "regularpolygon";
     public override string DisplayName => "Regular Polygon";
     public override string PrecisionLengthLabel => "Radius";
-    protected override bool CanStepBackCore =>
-        _center is not null;
+    protected override bool CanStepBackCore => _center is not null;
 
     public override CadToolPanelDescriptor ParameterPanel =>
         new(
@@ -98,23 +97,19 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
             State != CadToolState.Drawing ||
             !point.IsFinite)
             return false;
+
         _currentPoint = point;
         return AcceptPoint(point);
     }
 
-    protected override bool OnSetParameter(
-        string id,
-        string value)
+    protected override bool OnSetParameter(string id, string value)
     {
-        if (string.Equals(
-                id,
-                "sides",
-                StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(id, "sides", StringComparison.OrdinalIgnoreCase))
         {
             if (!int.TryParse(
                     value,
                     NumberStyles.Integer,
-                    CultureInfo.InvariantCulture,
+                    CultureInfo.CurrentCulture,
                     out var sides) ||
                 sides < 3 ||
                 sides > 360)
@@ -126,20 +121,11 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
             return true;
         }
 
-        if (string.Equals(
-                id,
-                "mode",
-                StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(id, "mode", StringComparison.OrdinalIgnoreCase))
         {
-            if (string.Equals(
-                    value,
-                    InscribedMode,
-                    StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(value, InscribedMode, StringComparison.OrdinalIgnoreCase))
                 _inscribed = true;
-            else if (string.Equals(
-                         value,
-                         CircumscribedMode,
-                         StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(value, CircumscribedMode, StringComparison.OrdinalIgnoreCase))
                 _inscribed = false;
             else
                 return false;
@@ -198,19 +184,17 @@ public sealed class RegularPolygonTool : CadDrawingTool, ICadPointInputTool
         if (!TryGeometry(point, out var axis, out var radius))
             return false;
 
-        var polygon = new CadRegularPolygonEntity(
-            _center.Value,
-            _normal,
-            axis,
-            radius,
-            _sides);
-        CommitPreview(polygon);
+        CommitPreview(
+            new CadRegularPolygonEntity(
+                _center.Value,
+                _normal,
+                axis,
+                radius,
+                _sides));
         return true;
     }
 
-    private void UpdatePreview(
-        OcctPoint3d center,
-        OcctPoint3d point)
+    private void UpdatePreview(OcctPoint3d center, OcctPoint3d point)
     {
         if (!TryGeometry(point, out var axis, out var radius))
         {

@@ -220,6 +220,7 @@ public sealed partial class MainWindow
     {
         if (_closingConfirmed)
         {
+            SaveInteractionPreferences();
             DisposeWorkspace();
             base.OnClosing(e);
             return;
@@ -232,6 +233,10 @@ public sealed partial class MainWindow
 
     protected override void OnClosed(EventArgs e)
     {
+        // Covers non-standard shutdown paths as well. Save is idempotent and
+        // intentionally happens before the workspace is disposed.
+        if (!_disposed)
+            SaveInteractionPreferences();
         DisposeWorkspace();
         base.OnClosed(e);
     }

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Text.Json.Nodes;
 using OcctNet;
 
@@ -119,41 +119,28 @@ public sealed class CadArcEntity : CadEntity
     {
         var yAxis = _normal.Cross(_xAxis).Normalized();
         var plane = new CadSnapWorkPlane(_center, _xAxis, yAxis);
-        var result = new List<CadSnapPoint>
-        {
+        return
+        [
             new(this, _center, CadSnapType.Center, 0, plane),
             new(this, Start, CadSnapType.Endpoint, 1, plane),
             new(this, Middle, CadSnapType.Midpoint, 2, plane),
             new(this, End, CadSnapType.Endpoint, 3, plane)
-        };
-
-        var (quadrantX, quadrantY) = CadCircleEntity.PlaneAxes(_normal);
-        var quadrantPoints = new[]
-        {
-            _center + quadrantX * _radius,
-            _center + quadrantY * _radius,
-            _center - quadrantX * _radius,
-            _center - quadrantY * _radius
-        };
-        for (var index = 0; index < quadrantPoints.Length; index++)
-        {
-            if (!TryAngleOf(quadrantPoints[index], out var angle) || !ContainsAngle(angle))
-                continue;
-            result.Add(new CadSnapPoint(
-                this,
-                quadrantPoints[index],
-                CadSnapType.Quadrant,
-                4 + index,
-                plane));
-        }
-
-        return result;
+        ];
     }
 
     public override IReadOnlyList<CadGripPoint> GetGripPoints()
     {
         var yAxis = _normal.Cross(_xAxis).Normalized();
         var plane = new CadGripWorkPlane(_center, _xAxis, yAxis);
+        var middle = Middle;
+        var radialDirection = CadTransformMath.Between(_center, middle).Normalized();
+        var radialY = _normal.Cross(radialDirection).Normalized();
+        var radialPlane = new CadGripWorkPlane(
+            _center,
+            radialDirection,
+            radialY,
+            true,
+            0.0);
         return
         [
             new(this, 0, _center, plane, Kind: CadGripKind.Center),
@@ -163,21 +150,24 @@ public sealed class CadArcEntity : CadEntity
                 Start,
                 plane,
                 _center,
-                CadPrecisionInputKind.Angle),
+                CadPrecisionInputKind.Angle,
+                CadGripKind.Vertex),
             new(
                 this,
                 2,
                 End,
                 plane,
                 _center,
-                CadPrecisionInputKind.Angle),
+                CadPrecisionInputKind.Angle,
+                CadGripKind.Vertex),
             new(
                 this,
                 3,
-                Middle,
-                plane,
+                middle,
+                radialPlane,
                 _center,
-                CadPrecisionInputKind.Length)
+                CadPrecisionInputKind.Length,
+                CadGripKind.Radius)
         ];
     }
 
@@ -215,7 +205,10 @@ public sealed class CadArcEntity : CadEntity
 
             case 3:
                 {
-                    var radius = DistanceInPlane(targetPoint);
+                    var radialDirection = CadTransformMath.Between(_center, Middle).Normalized();
+                    var radius = Math.Abs(CadTransformMath.Dot(
+                        CadTransformMath.Between(_center, targetPoint),
+                        radialDirection));
                     if (radius <= 1e-9) return;
                     _radius = radius;
                     break;
@@ -439,13 +432,6 @@ public sealed class CadArcEntity : CadEntity
 
         angleDegrees = NormalizeDegrees(Math.Atan2(y, x) * 180.0 / Math.PI);
         return true;
-    }
-
-    private bool ContainsAngle(double angleDegrees)
-    {
-        if (_sweepAngleDegrees >= 0.0)
-            return NormalizeDegrees(angleDegrees - _startAngleDegrees) <= _sweepAngleDegrees + 1e-9;
-        return NormalizeDegrees(_startAngleDegrees - angleDegrees) <= -_sweepAngleDegrees + 1e-9;
     }
 
     private void SetFromThreePoints(

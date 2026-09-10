@@ -1,4 +1,3 @@
-﻿using System.Globalization;
 using OcctNet;
 
 namespace OCCAD;
@@ -23,24 +22,9 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
         new(
             "Rectangle",
             [
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "Width",
-                    "Width",
-                    _width,
-                    1e-9,
-                    double.MaxValue),
-                new CadOptionalDoubleToolParameterDescriptor(
-                    "Height",
-                    "Height",
-                    _height,
-                    1e-9,
-                    double.MaxValue),
-                new CadDoubleToolParameterDescriptor(
-                    "Angle",
-                    "Angle",
-                    _angleDegrees,
-                    -360000.0,
-                    360000.0)
+                new CadOptionalDoubleToolParameterDescriptor("Width", "Width", _width, 1e-9, double.MaxValue),
+                new CadOptionalDoubleToolParameterDescriptor("Height", "Height", _height, 1e-9, double.MaxValue),
+                new CadDoubleToolParameterDescriptor("Angle", "Angle", _angleDegrees, -360000.0, 360000.0)
             ]);
 
     protected override bool CanStepBackCore => _first is not null;
@@ -57,6 +41,15 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
         _baseY = Context.WorkPlane.YAxis;
         UpdateAxes();
         RestorePrompt();
+    }
+
+    protected internal override void OnWorkPlaneChanged()
+    {
+        _planeOrigin = Context.WorkPlane.Origin;
+        _baseX = Context.WorkPlane.XAxis;
+        _baseY = Context.WorkPlane.YAxis;
+        UpdateAxes();
+        base.OnWorkPlaneChanged();
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
@@ -92,7 +85,7 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
                 if (!TryOptionalPositive(value, out _height)) return false;
                 break;
             case "ANGLE":
-                if (!TryFinite(value, out _angleDegrees)) return false;
+                if (!CadValueTextConverter.TryParseFiniteDouble(value, out _angleDegrees)) return false;
                 UpdateAxes();
                 break;
             default:
@@ -131,9 +124,20 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
         if (!TryGeometry(_first.Value, point, out var center, out var width, out var height))
             return false;
 
-        _preview = new CadRectangleEntity(center, _xAxis, _yAxis, width, height);
-        CommitPreview(_preview);
-        return true;
+        try
+        {
+            var entity = new CadRectangleEntity(center, _xAxis, _yAxis, width, height);
+            _first = null;
+            _preview = null;
+            CommitPreview(entity);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            Context.Preview.Clear();
+            _preview = null;
+            return false;
+        }
     }
 
     private void UpdatePreview(OcctPoint3d first, OcctPoint3d second)
@@ -145,8 +149,16 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
             return;
         }
 
-        _preview = new CadRectangleEntity(center, _xAxis, _yAxis, width, height);
-        ShowPreview(_preview);
+        try
+        {
+            _preview = new CadRectangleEntity(center, _xAxis, _yAxis, width, height);
+            ShowPreview(_preview);
+        }
+        catch (ArgumentException)
+        {
+            Context.Preview.Clear();
+            _preview = null;
+        }
     }
 
     private bool TryGeometry(
@@ -156,25 +168,35 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
         out double width,
         out double height)
     {
+        center = first;
+        width = 0.0;
+        height = 0.0;
+        if (!first.IsFinite || !second.IsFinite ||
+            !_xAxis.TryNormalize(out var xAxis) ||
+            !_yAxis.TryNormalize(out var yAxis) ||
+            !xAxis.Cross(yAxis).TryNormalize(out _))
+            return false;
+
         var delta = CadTransformMath.Between(first, second);
-        var dx = CadTransformMath.Dot(delta, _xAxis);
-        var dy = CadTransformMath.Dot(delta, _yAxis);
+        var dx = CadTransformMath.Dot(delta, xAxis);
+        var dy = CadTransformMath.Dot(delta, yAxis);
+        if (!double.IsFinite(dx) || !double.IsFinite(dy))
+            return false;
+
         var signX = dx < 0.0 ? -1.0 : 1.0;
         var signY = dy < 0.0 ? -1.0 : 1.0;
-
         width = _width ?? Math.Abs(dx);
         height = _height ?? Math.Abs(dy);
-        center = first
-            + _xAxis * (signX * width * 0.5)
-            + _yAxis * (signY * height * 0.5);
+        if (!double.IsFinite(width) || !double.IsFinite(height) || width <= 1e-9 || height <= 1e-9)
+            return false;
 
-        return width > 1e-9 && height > 1e-9;
+        center = first + xAxis * (signX * width * 0.5) + yAxis * (signY * height * 0.5);
+        return center.IsFinite;
     }
 
     private void RefreshPreviewFromLastPointer()
     {
-        if (_first is not { } first ||
-            Context.Workspace.LastPointerPosition is not { } pointer)
+        if (_first is not { } first || Context.Workspace.LastPointerPosition is not { } pointer)
             return;
 
         var point = Context.ResolvePoint(pointer.X, pointer.Y, first).Point;
@@ -183,17 +205,34 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
 
     private void UpdateAxes()
     {
+        if (!_baseX.TryNormalize(out var baseX) ||
+            !_baseY.TryNormalize(out var baseY) ||
+            !baseX.Cross(baseY).TryNormalize(out _))
+        {
+            var frame = Context.WorkPlane.EffectivePlane;
+            baseX = frame.XAxis;
+            baseY = frame.YAxis;
+            _baseX = baseX;
+            _baseY = baseY;
+        }
+
         var radians = _angleDegrees * Math.PI / 180.0;
         var cos = Math.Cos(radians);
         var sin = Math.Sin(radians);
-        _xAxis = new OcctVector3d(
-            _baseX.X * cos + _baseY.X * sin,
-            _baseX.Y * cos + _baseY.Y * sin,
-            _baseX.Z * cos + _baseY.Z * sin).Normalized();
-        _yAxis = new OcctVector3d(
-            -_baseX.X * sin + _baseY.X * cos,
-            -_baseX.Y * sin + _baseY.Y * cos,
-            -_baseX.Z * sin + _baseY.Z * cos).Normalized();
+        var x = new OcctVector3d(
+            baseX.X * cos + baseY.X * sin,
+            baseX.Y * cos + baseY.Y * sin,
+            baseX.Z * cos + baseY.Z * sin);
+        var y = new OcctVector3d(
+            -baseX.X * sin + baseY.X * cos,
+            -baseX.Y * sin + baseY.Y * cos,
+            -baseX.Z * sin + baseY.Z * cos);
+
+        if (!x.TryNormalize(out _xAxis) || !y.TryNormalize(out _yAxis))
+        {
+            _xAxis = baseX;
+            _yAxis = baseY;
+        }
     }
 
     private void RestoreWorkPlane()
@@ -206,17 +245,11 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
     {
         if (_first is null)
         {
-            SetStageLocalized(
-                0,
-                "Cad.Prompt.Rectangle.First",
-                "Rectangle: specify first corner [Esc cancel]");
+            SetStageLocalized(0, "Cad.Prompt.Rectangle.First", "Rectangle: specify first corner [Esc cancel]");
             return;
         }
 
-        SetStageLocalized(
-            1,
-            "Cad.Prompt.Rectangle.Opposite",
-            "Rectangle: specify opposite corner [Backspace undo, Esc cancel]");
+        SetStageLocalized(1, "Cad.Prompt.Rectangle.Opposite", "Rectangle: specify opposite corner [Backspace undo, Esc cancel]");
     }
 
     private void Reset()
@@ -233,7 +266,7 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
             return true;
         }
 
-        if (!TryFinite(text, out var parsed) || parsed <= 0.0)
+        if (!CadValueTextConverter.TryParseFiniteDouble(text, out var parsed) || parsed <= 0.0)
         {
             value = null;
             return false;
@@ -241,20 +274,5 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
 
         value = parsed;
         return true;
-    }
-
-    private static bool TryFinite(string text, out double value)
-    {
-        var parsed = double.TryParse(
-                         text,
-                         NumberStyles.Float,
-                         CultureInfo.CurrentCulture,
-                         out value) ||
-                     double.TryParse(
-                         text,
-                         NumberStyles.Float,
-                         CultureInfo.InvariantCulture,
-                         out value);
-        return parsed && double.IsFinite(value);
     }
 }

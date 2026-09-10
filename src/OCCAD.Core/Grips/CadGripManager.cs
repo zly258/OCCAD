@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using OcctNet;
 
 namespace OCCAD;
@@ -426,24 +426,27 @@ public sealed class CadGripManager
     private static IReadOnlyDictionary<CadGripKind, byte[]> CreateMarkerSet(
         int size,
         Color color,
-        bool circular) =>
-        Enum.GetValues<CadGripKind>()
+        bool circular)
+    {
+        return Enum.GetValues<CadGripKind>()
             .ToDictionary(
                 static kind => kind,
-                _ => CreateMarker(
+                kind => CreateMarkerPixels(
+                    kind,
                     size,
                     color,
                     circular));
+    }
 
-    private static byte[] CreateMarker(
+    private static byte[] CreateMarkerPixels(
+        CadGripKind kind,
         int size,
         Color color,
         bool circular)
     {
-        var pixels =
-            new byte[checked(size * size * 4)];
+        var pixels = new byte[size * size * 4];
         var center = size / 2;
-        var radius = Math.Max(2, center - 2);
+        var radius = Math.Max(2, center - 1);
 
         for (var y = 0; y < size; y++)
         {
@@ -451,18 +454,13 @@ public sealed class CadGripManager
             {
                 var dx = x - center;
                 var dy = y - center;
-                var adx = Math.Abs(dx);
-                var ady = Math.Abs(dy);
-
                 var draw = circular
                     ? dx * dx + dy * dy <= radius * radius
-                    : adx <= radius && ady <= radius;
-
+                    : Math.Abs(dx) <= radius && Math.Abs(dy) <= radius;
                 if (!draw)
                     continue;
 
-                var offset =
-                    (y * size + x) * 4;
+                var offset = (y * size + x) * 4;
                 pixels[offset] = color.B;
                 pixels[offset + 1] = color.G;
                 pixels[offset + 2] = color.R;
@@ -472,44 +470,4 @@ public sealed class CadGripManager
 
         return pixels;
     }
-
-    private static bool IsCircleOutline(
-        int dx,
-        int dy,
-        int radius)
-    {
-        var distanceSquared =
-            dx * dx + dy * dy;
-        var outer =
-            radius * radius;
-        var inner =
-            Math.Max(1, radius - 2);
-        return distanceSquared <= outer &&
-               distanceSquared >= inner * inner;
-    }
-
-    private static bool IsTriangleOutline(
-        int dx,
-        int dy,
-        int radius)
-    {
-        // Upward hollow triangle centered on the grip point.
-        var topY = -radius;
-        var bottomY = radius;
-        if (dy < topY || dy > bottomY)
-            return false;
-
-        if (dy >= bottomY - 1)
-            return Math.Abs(dx) <= radius;
-
-        var progress =
-            (double)(dy - topY) /
-            Math.Max(1, bottomY - topY);
-        var edgeX =
-            (int)Math.Round(progress * radius);
-        return Math.Abs(
-                   Math.Abs(dx) -
-                   edgeX) <= 1;
-    }
-
 }

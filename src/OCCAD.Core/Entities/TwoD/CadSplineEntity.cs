@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Text.Json.Nodes;
 using OcctNet;
 
@@ -7,6 +7,7 @@ namespace OCCAD;
 public sealed class CadSplineEntity : CadEntity
 {
     private const double PointTolerance = 1e-12;
+    private const double PlaneTolerance = 1e-9;
     private readonly List<OcctPoint3d> _fitPoints;
 
     public CadSplineEntity(
@@ -46,6 +47,10 @@ public sealed class CadSplineEntity : CadEntity
 
     public override IReadOnlyList<CadSnapPoint> GetSnapPoints()
     {
+        CadSnapWorkPlane? plane = TryGetPlanarFrame(out var frame)
+            ? new CadSnapWorkPlane(frame.Origin, frame.XAxis, frame.YAxis)
+            : null;
+
         var result = new List<CadSnapPoint>(_fitPoints.Count + 2);
         for (var index = 0; index < _fitPoints.Count; index++)
         {
@@ -53,7 +58,12 @@ public sealed class CadSplineEntity : CadEntity
                 !Periodic && (index == 0 || index == _fitPoints.Count - 1)
                     ? CadSnapType.Endpoint
                     : CadSnapType.Vertex;
-            result.Add(new CadSnapPoint(this, _fitPoints[index], type, index));
+            result.Add(new CadSnapPoint(
+                this,
+                _fitPoints[index],
+                type,
+                index,
+                plane));
         }
 
         return result;
@@ -61,13 +71,21 @@ public sealed class CadSplineEntity : CadEntity
 
     public override IReadOnlyList<CadGripPoint> GetGripPoints()
     {
+        CadGripWorkPlane? plane = TryGetPlanarFrame(out var frame)
+            ? new CadGripWorkPlane(frame.Origin, frame.XAxis, frame.YAxis)
+            : null;
+
         var result = new CadGripPoint[_fitPoints.Count];
         for (var index = 0; index < _fitPoints.Count; index++)
+        {
             result[index] = new CadGripPoint(
                 this,
                 index,
                 _fitPoints[index],
+                plane,
                 Kind: CadGripKind.Vertex);
+        }
+
         return result;
     }
 
@@ -77,22 +95,26 @@ public sealed class CadSplineEntity : CadEntity
             throw new ArgumentOutOfRangeException(nameof(index));
         if (!targetPoint.IsFinite)
             throw new ArgumentOutOfRangeException(nameof(targetPoint));
-        if (_fitPoints[index] == targetPoint)
+
+        var candidate = TryGetPlanarFrame(out var frame)
+            ? ProjectToPlane(targetPoint, frame)
+            : targetPoint;
+        if (_fitPoints[index] == candidate)
             return;
 
-        if (index > 0 && targetPoint.DistanceTo(_fitPoints[index - 1]) <= PointTolerance)
+        if (index > 0 && candidate.DistanceTo(_fitPoints[index - 1]) <= PointTolerance)
             return;
-        if (index + 1 < _fitPoints.Count && targetPoint.DistanceTo(_fitPoints[index + 1]) <= PointTolerance)
+        if (index + 1 < _fitPoints.Count && candidate.DistanceTo(_fitPoints[index + 1]) <= PointTolerance)
             return;
         if (Periodic)
         {
-            if (index == 0 && targetPoint.DistanceTo(_fitPoints[^1]) <= PointTolerance)
+            if (index == 0 && candidate.DistanceTo(_fitPoints[^1]) <= PointTolerance)
                 return;
-            if (index == _fitPoints.Count - 1 && targetPoint.DistanceTo(_fitPoints[0]) <= PointTolerance)
+            if (index == _fitPoints.Count - 1 && candidate.DistanceTo(_fitPoints[0]) <= PointTolerance)
                 return;
         }
 
-        _fitPoints[index] = targetPoint;
+        _fitPoints[index] = candidate;
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
@@ -136,6 +158,68 @@ public sealed class CadSplineEntity : CadEntity
         RaiseGeometryChanged(nameof(Scale));
     }
 
+    private bool TryGetPlanarFrame(out PlanarFrame frame)
+    {
+        frame = default;
+        if (_fitPoints.Count < 3)
+            return false;
+
+        var origin = _fitPoints[0];
+        OcctVector3d? xAxis = null;
+        OcctVector3d? normal = null;
+
+        for (var index = 1; index < _fitPoints.Count && normal is null; index++)
+        {
+            var first = CadTransformMath.Between(origin, _fitPoints[index]);
+            if (!first.TryNormalize(out var x))
+                continue;
+
+            for (var other = index + 1; other < _fitPoints.Count; other++)
+            {
+                var second = CadTransformMath.Between(origin, _fitPoints[other]);
+                var cross = first.Cross(second);
+                if (!cross.TryNormalize(out var n))
+                    continue;
+
+                xAxis = x;
+                normal = n;
+                break;
+            }
+        }
+
+        if (xAxis is null || normal is null)
+            return false;
+
+        foreach (var point in _fitPoints)
+        {
+            var distance = Math.Abs(CadTransformMath.Dot(
+                CadTransformMath.Between(origin, point),
+                normal.Value));
+            if (distance > PlaneTolerance)
+                return false;
+        }
+
+        var yAxis = normal.Value.Cross(xAxis.Value).Normalized();
+        frame = new PlanarFrame(
+            origin,
+            xAxis.Value,
+            yAxis,
+            normal.Value);
+        return true;
+    }
+
+    private static OcctPoint3d ProjectToPlane(
+        OcctPoint3d point,
+        PlanarFrame frame)
+    {
+        var delta = CadTransformMath.Between(frame.Origin, point);
+        var distance = CadTransformMath.Dot(delta, frame.Normal);
+        return new OcctPoint3d(
+            point.X - frame.Normal.X * distance,
+            point.Y - frame.Normal.Y * distance,
+            point.Z - frame.Normal.Z * distance);
+    }
+
     private static void ValidateFitPoints(
         IReadOnlyList<OcctPoint3d> points,
         bool periodic,
@@ -150,6 +234,12 @@ public sealed class CadSplineEntity : CadEntity
         if (periodic && points[^1].DistanceTo(points[0]) <= PointTolerance)
             throw new ArgumentException("Periodic spline closing fit points must be distinct.", parameterName);
     }
+
+    private readonly record struct PlanarFrame(
+        OcctPoint3d Origin,
+        OcctVector3d XAxis,
+        OcctVector3d YAxis,
+        OcctVector3d Normal);
 
     internal static JsonObject WriteGeometry(CadSplineEntity entity) =>
         new()

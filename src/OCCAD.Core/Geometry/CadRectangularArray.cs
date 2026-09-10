@@ -26,7 +26,7 @@ internal static class CadRectangularArray
         for (var row = 0; row < rows; row++)
             for (var column = 0; column < columns; column++)
             {
-                if (column == 0 && row == 0) continue; // Source objects are the first cell.
+                if (column == 0 && row == 0) continue;
                 var displacement = columnStep * column + rowStep * row;
                 if (!displacement.IsFinite) throw new ArgumentOutOfRangeException(nameof(columnStep));
                 foreach (var source in sources)

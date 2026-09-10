@@ -96,7 +96,7 @@ internal sealed class CadColorDialog : Window
 
         var ok = CompactButton(
             CadLanguageManager.Text(
-                "Cad.Text.Ok",
+                "Cad.Text.OK",
                 "OK"));
         ok.Classes.Add("cad-primary");
         ok.Click += (_, _) => Close(_selected);

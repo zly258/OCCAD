@@ -1,154 +1,235 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
 public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTool
 {
-    private OcctPoint3d? _first;
-    private OcctVector3d _workNormal;
-    private bool _keepSource = true;
+    private OcctPoint3d? _firstPoint;
     private OcctPoint3d _initialOrigin;
+    private bool _keepSource = true;
+
     public override string Id => "mirror";
     public override string DisplayName => "Mirror";
-    public override OcctPoint3d? PrecisionReferencePoint => _first;
-    protected override bool CanCommitCurrentStageCore => State == CadToolState.Drawing;
-    protected override bool CanStepBackCore => _first is not null;
-    public override CadToolPanelDescriptor? ParameterPanel => State != CadToolState.Drawing ? null :
-        new("Mirror", [new CadBooleanToolParameterDescriptor("KeepSource", "Keep source", _keepSource)]);
+    public override OcctPoint3d? PrecisionReferencePoint => _firstPoint;
+
+    public override CadToolPanelDescriptor ParameterPanel =>
+        new(
+            "Mirror",
+            [
+                new CadBooleanToolParameterDescriptor(
+                    "KeepSource",
+                    "Keep Source",
+                    _keepSource)
+            ]);
+
+    protected override bool SuppressSourcesDuringPreview => !_keepSource;
+    protected override bool CanCommitCurrentStageCore => true;
+    protected override bool CanStepBackCore => _firstPoint is not null;
 
     protected override void OnTransformStarted()
     {
-        _initialOrigin =
-            Context.WorkPlane.Origin;
-        _workNormal = Context.WorkPlane.Normal;
-        SetStageLocalized(0, "Cad.Prompt.mirror.First", "Mirror: specify first point of mirror line [Esc cancel]");
+        _firstPoint = null;
+        _initialOrigin = Context.WorkPlane.Origin;
+        SetStageLocalized(
+            0,
+            "Cad.Prompt.mirror.First",
+            "Mirror: specify first point of mirror axis [Esc cancel]");
     }
+
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
-        if (CancelOnRightClick(input)) return true;
-        if (State != CadToolState.Drawing) return false;
-        if (input.Kind == OcctPointerInputKind.Moved && _first is not null)
-        {
-            var point = Context.ResolvePoint(input.X, input.Y, _first).Point;
-            if (TryNormal(point, out var normal))
-                ShowMirrorPreview(normal);
-            else
-                ClearReplacementPreview();
+        if (CancelOnRightClick(input))
             return true;
-        }
-        return input.Kind == OcctPointerInputKind.Pressed && input.Button == OcctPointerButton.Left &&
-            TryAcceptPoint(Context.ResolvePoint(input.X, input.Y, _first).Point);
-    }
-    public bool TryAcceptPoint(OcctPoint3d point)
-    {
-        if (!IsActive || State != CadToolState.Drawing || !point.IsFinite) return false;
-        if (_first is null)
-        {
-            _first = point;
-            Context.WorkPlane.SetOrigin(point);
-            Context.WorkPlane.SetToolPlaneFixed(true);
-            SetStageLocalized(1, "Cad.Prompt.mirror.Second", "Mirror: specify second point of mirror line [Backspace undo, Esc cancel]");
-            return true;
-        }
-        if (!TryNormal(point, out var normal))
+
+        if (State == CadToolState.WaitForSelect ||
+            Entities.Count == 0)
             return false;
 
-        if (_keepSource)
+        if (input.Kind == OcctPointerInputKind.Moved &&
+            _firstPoint is { } first)
+        {
+            var point = Context.ResolvePoint(
+                input.X,
+                input.Y,
+                first).Point;
+            UpdatePreview(point);
+            return true;
+        }
+
+        if (input.Kind != OcctPointerInputKind.Pressed ||
+            input.Button != OcctPointerButton.Left)
+            return false;
+
+        return AcceptPoint(
+            Context.ResolvePoint(
+                input.X,
+                input.Y,
+                _firstPoint).Point);
+    }
+
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (State != CadToolState.Drawing)
+            return false;
+
+        return AcceptPoint(
+            Context.ResolvePoint(
+                pointer.X,
+                pointer.Y,
+                _firstPoint).Point);
+    }
+
+    public bool TryAcceptPoint(OcctPoint3d point) =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        Entities.Count > 0 &&
+        AcceptPoint(point);
+
+    protected override bool OnSetParameter(string id, string value)
+    {
+        if (!id.Equals("KeepSource", StringComparison.OrdinalIgnoreCase) ||
+            !bool.TryParse(value, out var keepSource))
+            return false;
+
+        if (_keepSource == keepSource)
+            return true;
+
+        _keepSource = keepSource;
+        RefreshPreviewFromLastPointer();
+        NotifyUpdated();
+        return true;
+    }
+
+    protected override bool OnStepBack()
+    {
+        if (_firstPoint is null)
+            return false;
+
+        _firstPoint = null;
+        ClearTransformPreview();
+        Context.WorkPlane.SetOrigin(_initialOrigin);
+        SetStageLocalized(
+            0,
+            "Cad.Prompt.mirror.First",
+            "Mirror: specify first point of mirror axis [Esc cancel]");
+        return true;
+    }
+
+    protected internal override void RefreshPreviewFromLastPointer(
+        CadPointerPosition pointer)
+    {
+        if (_firstPoint is not { } first)
+            return;
+
+        var point = Context.ResolvePoint(
+            pointer.X,
+            pointer.Y,
+            first).Point;
+        UpdatePreview(point);
+    }
+
+    protected override void ResetTransformState()
+    {
+        _firstPoint = null;
+        _initialOrigin = default;
+    }
+
+    private bool AcceptPoint(OcctPoint3d point)
+    {
+        if (!point.IsFinite)
+            return false;
+
+        if (_firstPoint is null)
+        {
+            _firstPoint = point;
+            Context.WorkPlane.SetOrigin(point);
+            ClearTransformPreview();
+            SetStageLocalized(
+                1,
+                "Cad.Prompt.mirror.Second",
+                "Mirror: specify second point of mirror axis [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.LengthAndAngle);
+            return true;
+        }
+
+        if (!TryMirrorPlane(point, out var planeNormal))
+        {
+            ClearTransformPreview();
+            return false;
+        }
+
+        try
         {
             Context.Workspace.MirrorEntities(
                 Entities,
-                _first.Value,
-                normal,
-                keepSource: true);
+                _firstPoint.Value,
+                planeNormal,
+                _keepSource);
         }
-        else
+        catch (NotSupportedException)
         {
-            CommitReplacementPreview(
-                () => Context.Workspace.MirrorEntities(
-                    Entities,
-                    _first.Value,
-                    normal,
-                    keepSource: false));
+            ClearTransformPreview();
+            return false;
         }
 
         Context.Workspace.Tools.CompleteCurrent();
         return true;
     }
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        TryAcceptPoint(Context.ResolvePoint(pointer.X, pointer.Y, _first).Point);
-    protected override bool OnSetParameter(string id, string value)
-    {
-        if (!id.Equals(
-                "KeepSource",
-                StringComparison.OrdinalIgnoreCase) ||
-            !bool.TryParse(value, out var keep))
-            return false;
 
-        _keepSource = keep;
-        RefreshPreviewFromLastPointer();
-        NotifyUpdated();
-        return true;
-    }
-    protected override bool OnStepBack()
+    private void UpdatePreview(OcctPoint3d secondPoint)
     {
-        _first = null;
-        Context.Preview.Clear();
-        Context.WorkPlane.SetToolPlaneFixed(false);
-        Context.WorkPlane.SetOrigin(
-            _initialOrigin);
-        SetStageLocalized(0, "Cad.Prompt.mirror.First", "Mirror: specify first point of mirror line [Esc cancel]");
-        return true;
-    }
-    protected override void ResetTransformState()
-    {
-        _first = null;
-        _keepSource = true;
-        _initialOrigin = default;
-    }
-    private void RefreshPreviewFromLastPointer()
-    {
-        if (_first is null ||
-            Context.Workspace.LastPointerPosition is not { } pointer)
+        if (_firstPoint is null ||
+            !TryMirrorPlane(secondPoint, out var planeNormal))
         {
-            ClearReplacementPreview();
+            ClearTransformPreview();
             return;
         }
 
-        var point =
-            Context.ResolvePoint(
-                pointer.X,
-                pointer.Y,
-                _first).Point;
-        if (TryNormal(point, out var normal))
-            ShowMirrorPreview(normal);
-        else
-            ClearReplacementPreview();
-    }
-
-    private void ShowMirrorPreview(OcctVector3d normal)
-    {
-        var previews = Entities
-            .Select(entity =>
-                entity.MirroredCopy(
-                    _first!.Value,
-                    normal))
-            .ToArray();
+        CadEntity[] previews;
+        try
+        {
+            previews = Entities
+                .Select(entity =>
+                    entity.MirroredCopy(
+                        _firstPoint.Value,
+                        planeNormal))
+                .ToArray();
+        }
+        catch (NotSupportedException)
+        {
+            ClearTransformPreview();
+            return;
+        }
 
         if (_keepSource)
         {
-            // A copy mirror previews the final state: source + new copies.
             ClearReplacementPreview();
             Context.Preview.Show(previews);
-            return;
         }
-
-        // A replace mirror mutates the original entities in place. Suppress
-        // them while showing the mirrored result so preview matches commit.
-        ShowReplacementPreview(
-            Entities,
-            previews);
+        else
+        {
+            ShowReplacementPreview(Entities, previews);
+        }
     }
 
-    private bool TryNormal(OcctPoint3d point, out OcctVector3d normal) =>
-        (point - _first!.Value).Cross(_workNormal).TryNormalize(out normal);
+    private bool TryMirrorPlane(
+        OcctPoint3d secondPoint,
+        out OcctVector3d planeNormal)
+    {
+        planeNormal = default;
+        if (_firstPoint is not { } first ||
+            !secondPoint.IsFinite)
+            return false;
+
+        var frame = Context.WorkPlane.EffectivePlane;
+        var delta = secondPoint - first;
+        var axial = delta.Dot(frame.Normal);
+        var planar = delta - frame.Normal * axial;
+        if (!planar.TryNormalize(out var mirrorAxis))
+            return false;
+
+        return frame.Normal
+            .Cross(mirrorAxis)
+            .TryNormalize(out planeNormal);
+    }
 }

@@ -60,8 +60,7 @@ public sealed class CadToolManager
 
     public bool CanChangeDrawingPlane =>
         !_context.WorkPlane.UserPlaneLocked &&
-        !_context.WorkPlane.ToolPlaneFixed &&
-        (ActiveTool is null || ActiveTool is CadDrawingTool { Stage: 0 });
+        !_context.WorkPlane.ToolPlaneFixed;
 
     public bool TryChangeDrawingPlane(CadWorkPlanePreset preset)
     {
@@ -71,50 +70,17 @@ public sealed class CadToolManager
             return false;
 
         var tool = ActiveTool;
-        var origin = _context.WorkPlane.Origin;
-        var parameters = tool?.ParameterPanel?.Parameters
-            .Select(parameter =>
-                (parameter.Id, Value: parameter switch
-                {
-                    CadChoiceToolParameterDescriptor value => value.Value,
-                    CadBooleanToolParameterDescriptor value => value.Value.ToString(),
-                    CadIntegerToolParameterDescriptor value => value.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    CadDoubleToolParameterDescriptor value => value.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
-                    CadOptionalDoubleToolParameterDescriptor value => value.Value?.ToString("R", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
-                    _ => throw new NotSupportedException(
-                        $"Unsupported tool parameter: {parameter.Id}")
-                }))
-            .ToArray() ?? [];
-
-        if (tool is not null)
-            CancelCurrent();
+        var origin = tool?.PrecisionReferencePoint ?? _context.WorkPlane.Origin;
 
         _context.WorkPlane.SetPreset(preset, origin);
         _context.Snap.Clear();
         _context.Tracking.Clear();
 
-        if (tool is null)
-            return true;
-
-        try
+        if (tool is not null)
         {
-            Activate(tool.Id);
-            foreach (var parameter in parameters)
-            {
-                if (!ActiveTool!.TrySetParameter(parameter.Id, parameter.Value))
-                {
-                    throw new InvalidOperationException(
-                        $"Unable to restore tool parameter: {parameter.Id}");
-                }
-            }
-        }
-        catch
-        {
-            // The user work plane change is persistent, but a partially recreated
-            // Tool must never survive a restore failure. Cancel restores every
-            // transient Tool plane/lock/filter/snap/preview state.
-            CancelCurrent();
-            throw;
+            tool.OnWorkPlaneChanged();
+            if (_context.Workspace.LastPointerPosition is { } lastPtr)
+                tool.RefreshPreviewFromLastPointer(lastPtr);
         }
 
         return true;
@@ -129,7 +95,9 @@ public sealed class CadToolManager
     public void CompleteCurrent()
     {
         var tool = ActiveTool;
-        if (tool is null) return;
+        if (tool is null)
+            return;
+
         DeactivateActiveTool(tool, canceled: false);
     }
 
@@ -138,13 +106,7 @@ public sealed class CadToolManager
         var tool = ActiveTool;
         if (tool is null)
         {
-            _context.Workspace.Preview.Clear();
-            _context.Workspace.Tracking.Clear();
-            _context.Workspace.Snap.Clear();
-            _context.Workspace.Snap.Active = false;
-            _context.Workspace.Precision.ResetFactor();
-            _context.Workspace.Drafting.ResetTransientLocks();
-            _context.Workspace.WorkPlane.EndToolPlane();
+            ResetNeutralInteractionState();
             return false;
         }
 
@@ -158,7 +120,23 @@ public sealed class CadToolManager
         _context.Workspace.ObservePointer(input.X, input.Y);
 
         var tool = ActiveTool;
-        return tool?.HandlePointer(input) == true;
+        if (tool is null)
+            return false;
+
+        try
+        {
+            return tool.HandlePointer(input);
+        }
+        catch (Exception exception) when (IsRecoverablePointerFailure(exception))
+        {
+            // Invalid or temporarily unsolvable pointer geometry must not tear
+            // down the active CAD command. Drop only transient feedback so the
+            // next valid pointer sample can continue the same tool.
+            _context.Preview.Clear();
+            _context.Snap.Clear();
+            _context.Tracking.Clear();
+            return true;
+        }
     }
 
     public bool CommitPoint(OcctPoint3d point)
@@ -201,8 +179,7 @@ public sealed class CadToolManager
         if (TrySubmitCurrentStep(tool))
             return true;
 
-        return tool.CanFinish &&
-               FinishCurrent();
+        return tool.CanFinish && FinishCurrent();
     }
 
     public bool HandleSecondaryAction()
@@ -211,7 +188,17 @@ public sealed class CadToolManager
         if (tool is null)
             return false;
 
-        if (SubmitCurrent())
+        // During command-first selection, right-click has the same meaning as
+        // Enter when a valid selection exists. With no valid selection it
+        // cancels the command. Once geometry input has started, continuous
+        // tools may finish; all other tools cancel rather than implicitly
+        // committing another pointer sample.
+        if (tool.State == CadToolState.WaitForSelect)
+            return tool.CanCommitCurrentStage
+                ? CommitCurrentStage()
+                : CancelCurrent();
+
+        if (tool.CanFinish && FinishCurrent())
             return true;
 
         return CancelCurrent();
@@ -221,8 +208,7 @@ public sealed class CadToolManager
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        if (input.Kind == OcctKeyInputKind.Pressed &&
-            input.Key == OcctKey.Escape)
+        if (input.Kind == OcctKeyInputKind.Pressed && input.Key == OcctKey.Escape)
         {
             CancelCurrent();
             return true;
@@ -246,8 +232,14 @@ public sealed class CadToolManager
     {
         ArgumentNullException.ThrowIfNull(tool);
 
-        if (!tool.CanCommitCurrentStage ||
-            tool.CurrentStep.RequiresPointer)
+        // A point stage may still be committed without another mouse click
+        // when the pointer has already established the direction/location and
+        // precision locks (length/angle/factor) have produced the exact
+        // preview. CadTool.CanCommitCurrentStage already verifies that a
+        // pointer sample exists for pointer-driven stages, so do not reject
+        // those stages here. This keeps mouse, Enter/Space and ToolPanel
+        // Accept on the same Tool state-machine path.
+        if (!tool.CanCommitCurrentStage)
             return false;
 
         return CommitCurrentStage();
@@ -256,7 +248,12 @@ public sealed class CadToolManager
     private void SetActive(CadTool tool)
     {
         _transitioning = true;
-        _context.Workspace.Grips.Clear();
+
+        var workspace = _context.Workspace;
+        workspace.Preselection.Clear();
+        workspace.Subobjects.Clear();
+        workspace.Grips.Clear();
+
         try
         {
             tool.Activate(_context);
@@ -271,6 +268,15 @@ public sealed class CadToolManager
             catch (Exception exception)
             {
                 cleanupFailure = exception;
+            }
+
+            try
+            {
+                ResetNeutralInteractionState();
+            }
+            catch (Exception exception)
+            {
+                cleanupFailure ??= exception;
             }
 
             _transitioning = false;
@@ -298,24 +304,55 @@ public sealed class CadToolManager
     {
         _transitioning = true;
         tool.Updated -= ActiveToolUpdated;
+
+        Exception? failure = null;
         try
         {
             tool.Deactivate(canceled);
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
         }
         finally
         {
             ActiveTool = null;
             try
             {
-                _transitioning = false;
-                RestoreSelectionGrips();
+                ResetNeutralInteractionState();
             }
-            finally
+            catch (Exception exception)
             {
-                ToolChanged?.Invoke(
-                    this,
-                    new CadToolChangedEventArgs(null));
+                failure ??= exception;
             }
+
+            _transitioning = false;
+            RestoreSelectionGrips();
+            ToolChanged?.Invoke(this, new CadToolChangedEventArgs(null));
+        }
+
+        if (failure is not null)
+            ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    private void ResetNeutralInteractionState()
+    {
+        var workspace = _context.Workspace;
+
+        workspace.Preview.Clear();
+        workspace.Tracking.Clear();
+        workspace.Snap.Clear();
+        workspace.Snap.Active = false;
+        workspace.Preselection.Clear();
+        workspace.Precision.ResetFactor();
+        workspace.Drafting.ResetTransientLocks();
+        workspace.WorkPlane.EndToolPlane();
+        workspace.ClearPointerObservation();
+
+        if (workspace.Engine is { IsInitialized: true } engine)
+        {
+            engine.SetAutomaticHighlight(true);
+            engine.Redraw();
         }
     }
 
@@ -329,4 +366,7 @@ public sealed class CadToolManager
 
     private void RestoreSelectionGrips() =>
         _context.Workspace.RefreshSelectionGrips();
+
+    private static bool IsRecoverablePointerFailure(Exception exception) =>
+        exception is ArgumentException or InvalidOperationException or ArithmeticException;
 }

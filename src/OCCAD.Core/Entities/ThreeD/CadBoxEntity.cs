@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Text.Json.Nodes;
 using OcctNet;
 
@@ -94,12 +94,12 @@ public sealed class CadBoxEntity : CadEntity
         var negativeZ = new OcctVector3d(-_zAxis.X, -_zAxis.Y, -_zAxis.Z);
         return
         [
-            new(this, 0, corners[0], new CadGripWorkPlane(corners[0], _xAxis, _yAxis), corners[3]),
-            new(this, 1, corners[1], new CadGripWorkPlane(corners[1], _xAxis, _yAxis), corners[2]),
-            new(this, 2, corners[2], new CadGripWorkPlane(corners[2], _xAxis, _yAxis), corners[1]),
-            new(this, 3, corners[3], new CadGripWorkPlane(corners[3], _xAxis, _yAxis), corners[0]),
-            new(this, 4, bottomCenter, new CadGripWorkPlane(bottomCenter, negativeZ, _xAxis, true, 0.0), topCenter, CadPrecisionInputKind.Length),
-            new(this, 5, topCenter, new CadGripWorkPlane(topCenter, _zAxis, _xAxis, true, 0.0), bottomCenter, CadPrecisionInputKind.Length)
+            new(this, 0, corners[0], new CadGripWorkPlane(corners[0], _xAxis, _yAxis), corners[3], Kind: CadGripKind.Vertex),
+            new(this, 1, corners[1], new CadGripWorkPlane(corners[1], _xAxis, _yAxis), corners[2], Kind: CadGripKind.Vertex),
+            new(this, 2, corners[2], new CadGripWorkPlane(corners[2], _xAxis, _yAxis), corners[1], Kind: CadGripKind.Vertex),
+            new(this, 3, corners[3], new CadGripWorkPlane(corners[3], _xAxis, _yAxis), corners[0], Kind: CadGripKind.Vertex),
+            new(this, 4, bottomCenter, new CadGripWorkPlane(bottomCenter, negativeZ, _xAxis, true, 0.0), topCenter, CadPrecisionInputKind.Length, CadGripKind.Height),
+            new(this, 5, topCenter, new CadGripWorkPlane(topCenter, _zAxis, _xAxis, true, 0.0), bottomCenter, CadPrecisionInputKind.Length, CadGripKind.Height)
         ];
     }
 

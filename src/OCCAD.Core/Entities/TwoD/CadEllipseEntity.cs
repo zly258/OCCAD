@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Text.Json.Nodes;
 using OcctNet;
 
@@ -112,14 +112,7 @@ public sealed class CadEllipseEntity : CadEntity
     {
         var yAxis = _normal.Cross(_xAxis).Normalized();
         var plane = new CadSnapWorkPlane(_center, _xAxis, yAxis);
-        return
-        [
-            new(this, _center, CadSnapType.Center, 0, plane),
-            new(this, _center + _xAxis * _majorRadius, CadSnapType.Quadrant, 1, plane),
-            new(this, _center - _xAxis * _majorRadius, CadSnapType.Quadrant, 2, plane),
-            new(this, _center + yAxis * _minorRadius, CadSnapType.Quadrant, 3, plane),
-            new(this, _center - yAxis * _minorRadius, CadSnapType.Quadrant, 4, plane)
-        ];
+        return [new(this, _center, CadSnapType.Center, 0, plane)];
     }
 
     public override IReadOnlyList<CadGripPoint> GetGripPoints()
@@ -139,7 +132,8 @@ public sealed class CadEllipseEntity : CadEntity
                     true,
                     0.0),
                 _center,
-                CadPrecisionInputKind.Length),
+                CadPrecisionInputKind.Length,
+                CadGripKind.Radius),
             new(
                 this,
                 2,
@@ -151,7 +145,8 @@ public sealed class CadEllipseEntity : CadEntity
                     true,
                     180.0),
                 _center,
-                CadPrecisionInputKind.Length),
+                CadPrecisionInputKind.Length,
+                CadGripKind.Radius),
             new(
                 this,
                 3,
@@ -163,7 +158,8 @@ public sealed class CadEllipseEntity : CadEntity
                     true,
                     90.0),
                 _center,
-                CadPrecisionInputKind.Length),
+                CadPrecisionInputKind.Length,
+                CadGripKind.Radius),
             new(
                 this,
                 4,
@@ -175,7 +171,8 @@ public sealed class CadEllipseEntity : CadEntity
                     true,
                     -90.0),
                 _center,
-                CadPrecisionInputKind.Length)
+                CadPrecisionInputKind.Length,
+                CadGripKind.Radius)
         ];
     }
 

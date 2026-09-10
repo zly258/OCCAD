@@ -25,7 +25,6 @@ internal sealed class CadViewportInteractionController : IDisposable
     private bool _middleNavigating;
     private bool _selectionGesture;
     private bool _selectionRectangleVisible;
-    private bool _restoreAutomaticHighlightOnMove;
     private int _selectionStartX;
     private int _selectionStartY;
     private int _selectionCurrentX;
@@ -71,9 +70,7 @@ internal sealed class CadViewportInteractionController : IDisposable
             throw new InvalidOperationException(
                 "The OCCT engine is not initialized.");
 
-        engine.SetAutomaticHighlight(
-            _workspace.Tools.ActiveTool is null);
-
+        SynchronizeAutomaticHighlight(engine);
         RebuildSubobjectMarkers(
             _workspace.Subobjects.Selected);
     }
@@ -103,7 +100,6 @@ internal sealed class CadViewportInteractionController : IDisposable
     {
         if (_workspace.Engine is null) return;
 
-        RestoreAutomaticHighlightOnPointerMove(input);
         UpdateNavigationCursorState(input);
         RefreshCursor();
 
@@ -418,23 +414,9 @@ internal sealed class CadViewportInteractionController : IDisposable
 
         if (_workspace.Engine is { IsInitialized: true } engine)
         {
-            // Do not immediately restore automatic hover when a drawing Tool
-            // completes. The pointer is still sitting on the just-committed
-            // geometry, so OCCT can instantly draw a dynamic highlight that
-            // looks exactly like a stale final preview. Clear only dynamic
-            // (non-selection) highlight now and restore hover on the next real
-            // pointer move.
-            using var batch =
-                engine.BeginDisplayBatch();
-
+            using var batch = engine.BeginDisplayBatch();
             ClearDynamicHighlights(engine);
-            engine.SetAutomaticHighlight(false);
-            _restoreAutomaticHighlightOnMove =
-                input.Tool is null;
-        }
-        else
-        {
-            _restoreAutomaticHighlightOnMove = false;
+            SynchronizeAutomaticHighlight(engine);
         }
 
         CoordinateCleared?.Invoke(
@@ -447,28 +429,32 @@ internal sealed class CadViewportInteractionController : IDisposable
         object? sender,
         CadToolChangedEventArgs input)
     {
-        if (input.Tool is null ||
-            !input.Tool.InteractionPolicy.PreselectionEnabled)
+        var tool = input.Tool;
+        if (tool is null ||
+            !tool.InteractionPolicy.PreselectionEnabled)
         {
             _workspace.Preselection.Clear();
+        }
+
+        if (_workspace.Engine is { IsInitialized: true } engine)
+        {
+            SynchronizeAutomaticHighlight(engine);
+            if (tool is not null &&
+                !tool.InteractionPolicy.PreselectionEnabled)
+            {
+                ClearDynamicHighlights(engine);
+            }
         }
 
         RefreshCursor();
     }
 
-    private void RestoreAutomaticHighlightOnPointerMove(
-        OcctPointerInputEventArgs input)
+    private void SynchronizeAutomaticHighlight(OcctEngine engine)
     {
-        if (!_restoreAutomaticHighlightOnMove ||
-            input.Kind != OcctPointerInputKind.Moved ||
-            input.Buttons != OcctPointerButtons.None ||
-            _workspace.Tools.ActiveTool is not null ||
-            _workspace.Engine is not
-            { IsInitialized: true } engine)
-            return;
-
-        engine.SetAutomaticHighlight(true);
-        _restoreAutomaticHighlightOnMove = false;
+        var tool = _workspace.Tools.ActiveTool;
+        engine.SetAutomaticHighlight(
+            tool is null ||
+            tool.InteractionPolicy.PreselectionEnabled);
     }
 
     private static void ClearDynamicHighlights(
@@ -489,14 +475,8 @@ internal sealed class CadViewportInteractionController : IDisposable
         OcctEngineLifecycleEventArgs input)
     {
         _pointerMoves.Clear();
-        _restoreAutomaticHighlightOnMove = false;
         _selectionGesture = false;
         _selectionRectangleVisible = false;
-
-        // Presentation handles are scoped to one native engine generation.
-        // Drop old handles before Workspace.AttachEngine can stabilize
-        // subobject selections and raise selection events against the new
-        // engine.
         _subobjectMarkers.Clear();
     }
 
@@ -590,7 +570,12 @@ internal sealed class CadViewportInteractionController : IDisposable
             return;
         }
 
-        if (_workspace.Tools.ActiveTool is null &&
+        var activeTool = _workspace.Tools.ActiveTool;
+        var selectionToolActive =
+            activeTool is { State: CadToolState.WaitForSelect } &&
+            activeTool.InteractionPolicy.SelectionEnabled;
+
+        if (activeTool is null &&
             input.Kind == OcctPointerInputKind.Pressed &&
             input.Button == OcctPointerButton.Left &&
             _workspace.Grips.TryHit(input.X, input.Y, out var grip))
@@ -601,12 +586,13 @@ internal sealed class CadViewportInteractionController : IDisposable
             return;
         }
 
-        if (_workspace.Tools.ActiveTool is null &&
+        if ((activeTool is null || selectionToolActive) &&
             input.Kind == OcctPointerInputKind.Pressed &&
             input.Button == OcctPointerButton.Left)
         {
-            if (_workspace.Preselection.Current is
-                { IsSubshape: true } subobject)
+            if (activeTool is null &&
+                _workspace.Preselection.Current is
+                    { IsSubshape: true } subobject)
             {
                 _workspace.Subobjects.Select(
                     subobject,
@@ -623,8 +609,11 @@ internal sealed class CadViewportInteractionController : IDisposable
         if (input.Kind != OcctPointerInputKind.Moved)
             return;
 
-        if (_workspace.Tools.Mode == CadInteractionMode.Normal)
+        if (activeTool is null &&
+            _workspace.Tools.Mode == CadInteractionMode.Normal)
+        {
             _workspace.Grips.UpdateHot(input.X, input.Y);
+        }
 
         try
         {
@@ -633,7 +622,6 @@ internal sealed class CadViewportInteractionController : IDisposable
         }
         catch (InvalidOperationException)
         {
-            // View ray parallel to active work plane.
         }
     }
 
@@ -749,8 +737,6 @@ internal sealed class CadViewportInteractionController : IDisposable
 
         if (rectangleVisible)
         {
-            // Hide the transient rectangle before clearing the visibility
-            // state. HideSelectionRectangle() intentionally checks this flag.
             HideSelectionRectangle(engine);
             var allowOverlap = endX < startX;
             var objects = engine.QueryRectangle(
@@ -762,6 +748,7 @@ internal sealed class CadViewportInteractionController : IDisposable
             var entities = objects
                 .Select(_workspace.Document.FindByViewerObject)
                 .OfType<CadEntity>()
+                .Where(_workspace.Document.IsEntitySelectable)
                 .Distinct()
                 .ToArray();
             ApplyEntitySelection(
@@ -773,11 +760,15 @@ internal sealed class CadViewportInteractionController : IDisposable
         var entity =
             _workspace.Preselection.Current?.Entity;
         ApplyEntitySelection(
-            entity is null
+            entity is null ||
+            !_workspace.Document.IsEntitySelectable(entity)
                 ? Array.Empty<CadEntity>()
                 : [entity],
             SelectionOperation(modifiers),
-            entity);
+            entity is not null &&
+            _workspace.Document.IsEntitySelectable(entity)
+                ? entity
+                : null);
     }
 
     private void ApplyEntitySelection(
@@ -808,7 +799,6 @@ internal sealed class CadViewportInteractionController : IDisposable
 
         try
         {
-            // The Bridge overlay hide call requests its own redraw.
             engine.HideSelectionRectangle();
         }
         catch (Exception exception)

@@ -12,45 +12,45 @@ internal static class CadTheme
     public const double FontSize = 12.0;
     public const double SmallFontSize = 11.0;
     public const double CaptionFontSize = 11.0;
-    public const double ControlHeight = 26.0;
-    public const double MenuHeight = 28.0;
-    public const double PanelHeaderHeight = 28.0;
-    public const double StatusHeight = 24.0;
+    public const double ControlHeight = 23.0;
+    public const double MenuHeight = 27.0;
+    public const double PanelHeaderHeight = 25.0;
+    public const double StatusHeight = 22.0;
     public const double SplitterThickness = 4.0;
-    public const double ModelPanelWidth = 210.0;
-    public const double PropertyPanelWidth = 360.0;
-    public const double ToolPanelWidth = 304.0;
-    public const double PropertyLabelWidth = 112.0;
-    public const double PropertyTitleHeight = 30.0;
-    public const double PropertyCategoryHeaderHeight = 27.0;
-    public const double PropertyRowHeight = 28.0;
-    public const double PropertyRowIndent = 14.0;
-    public const double PropertyChevronWidth = 16.0;
-    public const double LayerHeaderHeight = 27.0;
-    public const double LayerRowHeight = 30.0;
-    public const double LayerActionButtonMinWidth = 52.0;
-    public const double ToolLabelWidth = 100.0;
-    public const double DialogButtonWidth = 80.0;
-    public const double DialogPadding = 12.0;
-    public const double DynamicHudMaxWidth = 300.0;
-    public const double DynamicHudEstimatedHeight = 34.0;
-    public const double DynamicHudOffset = 16.0;
-    public const double OverlayMargin = 8.0;
+    public const double ModelPanelWidth = 200.0;
+    public const double PropertyPanelWidth = 320.0;
+    public const double ToolPanelWidth = 288.0;
+    public const double PropertyLabelWidth = 110.0;
+    public const double PropertyTitleHeight = 24.0;
+    public const double PropertyCategoryHeaderHeight = 22.0;
+    public const double PropertyRowHeight = 22.0;
+    public const double PropertyRowIndent = 4.0;
+    public const double PropertyChevronWidth = 14.0;
+    public const double LayerHeaderHeight = 25.0;
+    public const double LayerRowHeight = 26.0;
+    public const double LayerActionButtonMinWidth = 48.0;
+    public const double ToolLabelWidth = 92.0;
+    public const double DialogButtonWidth = 78.0;
+    public const double DialogPadding = 10.0;
+    public const double DynamicHudMaxWidth = 280.0;
+    public const double DynamicHudEstimatedHeight = 32.0;
+    public const double DynamicHudOffset = 14.0;
+    public const double OverlayMargin = 7.0;
 
-    public static readonly IBrush WindowBrush = Brush("#D6DADF");
-    public static readonly IBrush Surface = Brush("#F7F8F9");
-    public static readonly IBrush Panel = Brush("#F0F2F4");
-    public static readonly IBrush PanelAlt = Brush("#E8EBEE");
-    public static readonly IBrush Toolbar = Brush("#E3E6E9");
-    public static readonly IBrush Header = Brush("#DCE1E5");
-    public static readonly IBrush HeaderHover = Brush("#D3DAE0");
+    public static readonly IBrush WindowBrush = Brush("#D5D8DB");
+    public static readonly IBrush Surface = Brush("#FFFFFF");
+    public static readonly IBrush Panel = Brush("#F2F2F2");
+    public static readonly IBrush PanelAlt = Brush("#E9E9E9");
+    public static readonly IBrush Toolbar = Brush("#E4E6E8");
+    public static readonly IBrush Header = Brush("#E5E5E5");
+    public static readonly IBrush HeaderHover = Brush("#D8E2EC");
     public static readonly IBrush Accent = Brush("#2F6FA5");
-    public static readonly IBrush AccentSoft = Brush("#D8E7F2");
-    public static readonly IBrush Border = Brush("#B5BDC4");
-    public static readonly IBrush BorderStrong = Brush("#9FA9B1");
-    public static readonly IBrush Splitter = Brush("#BEC5CB");
-    public static readonly IBrush Text = Brush("#1F252A");
-    public static readonly IBrush Muted = Brush("#5B6670");
+    public static readonly IBrush AccentSoft = Brush("#DCEAF4");
+    public static readonly IBrush Border = Brush("#C6C6C6");
+    public static readonly IBrush BorderStrong = Brush("#9E9E9E");
+    public static readonly IBrush Splitter = Brush("#B8BDC1");
+    public static readonly IBrush Text = Brush("#202020");
+    public static readonly IBrush Muted = Brush("#666666");
     public static readonly IBrush Viewport = Brush("#202326");
 
     public static void Apply(Application app)
@@ -74,10 +74,8 @@ internal static class CadTheme
             {
                 new Setter(Window.BackgroundProperty, WindowBrush),
                 new Setter(Window.FontSizeProperty, FontSize),
-                new Setter(
-                    Window.FontFamilyProperty,
-                    FontFamily.Parse(
-                        "Segoe UI, Microsoft YaHei UI, Noto Sans CJK SC, sans-serif"))
+                new Setter(Window.FontFamilyProperty,
+                    FontFamily.Parse("Segoe UI, Microsoft YaHei UI, Noto Sans CJK SC, sans-serif"))
             }
         });
 
@@ -94,12 +92,8 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(
-                    Button.VerticalContentAlignmentProperty,
-                    VerticalAlignment.Center),
-                new Setter(
-                    Button.HorizontalContentAlignmentProperty,
-                    HorizontalAlignment.Center)
+                new Setter(Button.VerticalContentAlignmentProperty, VerticalAlignment.Center),
+                new Setter(Button.HorizontalContentAlignmentProperty, HorizontalAlignment.Center)
             }
         });
 
@@ -107,12 +101,8 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(
-                    ToggleButton.VerticalContentAlignmentProperty,
-                    VerticalAlignment.Center),
-                new Setter(
-                    ToggleButton.HorizontalContentAlignmentProperty,
-                    HorizontalAlignment.Center)
+                new Setter(ToggleButton.VerticalContentAlignmentProperty, VerticalAlignment.Center),
+                new Setter(ToggleButton.HorizontalContentAlignmentProperty, HorizontalAlignment.Center)
             }
         });
 
@@ -122,8 +112,8 @@ internal static class CadTheme
             {
                 new Setter(Button.MinHeightProperty, ControlHeight),
                 new Setter(Button.FontSizeProperty, FontSize),
-                new Setter(Button.PaddingProperty, new Thickness(8, 1)),
-                new Setter(Button.MarginProperty, new Thickness(1)),
+                new Setter(Button.PaddingProperty, new Thickness(6, 0)),
+                new Setter(Button.MarginProperty, new Thickness(1, 0)),
                 new Setter(Button.BackgroundProperty, Brushes.Transparent),
                 new Setter(Button.BorderBrushProperty, Brushes.Transparent),
                 new Setter(Button.BorderThicknessProperty, new Thickness(1)),
@@ -148,12 +138,30 @@ internal static class CadTheme
             {
                 new Setter(ToggleButton.MinHeightProperty, ControlHeight),
                 new Setter(ToggleButton.FontSizeProperty, FontSize),
-                new Setter(ToggleButton.PaddingProperty, new Thickness(6, 0)),
-                new Setter(ToggleButton.MarginProperty, new Thickness(1)),
+                new Setter(ToggleButton.PaddingProperty, new Thickness(5, 0)),
+                new Setter(ToggleButton.MarginProperty, new Thickness(1, 0)),
                 new Setter(ToggleButton.BackgroundProperty, Brushes.Transparent),
                 new Setter(ToggleButton.BorderBrushProperty, Border),
                 new Setter(ToggleButton.BorderThicknessProperty, new Thickness(1)),
                 new Setter(ToggleButton.ForegroundProperty, Text)
+            }
+        });
+
+        app.Styles.Add(new Style(x => x.OfType<TextBox>())
+        {
+            Setters =
+            {
+                new Setter(TextBox.FontSizeProperty, FontSize),
+                new Setter(TextBox.ForegroundProperty, Text),
+                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center)
+            }
+        });
+
+        app.Styles.Add(new Style(x => x.OfType<TextBox>().PropertyEquals(TextBox.AcceptsReturnProperty, true))
+        {
+            Setters =
+            {
+                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Top)
             }
         });
 
@@ -163,11 +171,21 @@ internal static class CadTheme
             {
                 new Setter(TextBox.MinHeightProperty, ControlHeight),
                 new Setter(TextBox.FontSizeProperty, FontSize),
-                new Setter(TextBox.PaddingProperty, new Thickness(7, 1)),
+                new Setter(TextBox.PaddingProperty, new Thickness(4, 0)),
+                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center),
                 new Setter(TextBox.BackgroundProperty, Surface),
                 new Setter(TextBox.BorderBrushProperty, Border),
                 new Setter(TextBox.BorderThicknessProperty, new Thickness(1)),
                 new Setter(TextBox.ForegroundProperty, Text)
+            }
+        });
+
+        app.Styles.Add(new Style(x => x.OfType<TextBox>().Class("cad-input").PropertyEquals(TextBox.AcceptsReturnProperty, true))
+        {
+            Setters =
+            {
+                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Top),
+                new Setter(TextBox.PaddingProperty, new Thickness(4, 3))
             }
         });
 
@@ -190,7 +208,7 @@ internal static class CadTheme
             {
                 new Setter(MenuItem.MinHeightProperty, MenuHeight),
                 new Setter(MenuItem.FontSizeProperty, FontSize),
-                new Setter(MenuItem.PaddingProperty, new Thickness(9, 3)),
+                new Setter(MenuItem.PaddingProperty, new Thickness(8, 2)),
                 new Setter(MenuItem.ForegroundProperty, Text)
             }
         });
@@ -209,8 +227,8 @@ internal static class CadTheme
         {
             Setters =
             {
-                new Setter(TreeViewItem.MinHeightProperty, 24d),
-                new Setter(TreeViewItem.PaddingProperty, new Thickness(5, 1))
+                new Setter(TreeViewItem.MinHeightProperty, 22d),
+                new Setter(TreeViewItem.PaddingProperty, new Thickness(4, 0))
             }
         });
 
@@ -236,7 +254,7 @@ internal static class CadTheme
             Setters =
             {
                 new Setter(TabItem.MinHeightProperty, MenuHeight),
-                new Setter(TabItem.PaddingProperty, new Thickness(10, 3)),
+                new Setter(TabItem.PaddingProperty, new Thickness(8, 2)),
                 new Setter(TabItem.FontWeightProperty, FontWeight.SemiBold)
             }
         });
@@ -267,7 +285,7 @@ internal static class CadTheme
             BorderBrush = Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
             CornerRadius = new CornerRadius(0),
-            Padding = padding ?? new Thickness(6),
+            Padding = padding ?? new Thickness(5),
             Child = child
         };
 
@@ -277,9 +295,8 @@ internal static class CadTheme
             Text = text,
             FontWeight = FontWeight.SemiBold,
             Foreground = Text,
-            Margin = new Thickness(0, 0, 0, 5)
+            Margin = new Thickness(0, 0, 0, 4)
         };
 
-    private static SolidColorBrush Brush(string value) =>
-        new(Color.Parse(value));
+    private static SolidColorBrush Brush(string value) => new(Color.Parse(value));
 }

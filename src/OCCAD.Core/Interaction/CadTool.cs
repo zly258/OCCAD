@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Runtime.ExceptionServices;
 using OcctNet;
 
@@ -94,33 +94,20 @@ public abstract class CadTool
             : null;
 
     public CadToolStep CurrentStep =>
-        new(
-            Stage,
-            InputKind,
-            PrecisionInputs,
-            Prompt);
+        new(Stage, InputKind, PrecisionInputs, Prompt);
 
     public bool HasPreview =>
         IsActive &&
-        (Context.Preview.IsVisible ||
-         _replacementPreviewSources.Count > 0);
+        (Context.Preview.IsVisible || _replacementPreviewSources.Count > 0);
     public virtual bool CanCommitCurrentStage =>
         IsActive &&
         CanCommitCurrentStageCore &&
-        (!CurrentStep.RequiresPointer ||
-         Context.Workspace.LastPointerPosition is not null);
+        (!CurrentStep.RequiresPointer || Context.Workspace.LastPointerPosition is not null);
     public bool CanCancel => IsActive;
     public bool CanFinish => IsActive && CanFinishCore;
     public bool CanStepBack => IsActive && CanStepBackCore;
     public CadToolInteractionState InteractionState =>
-        new(
-            CurrentStep,
-            State,
-            HasPreview,
-            CanCommitCurrentStage,
-            CanCancel,
-            CanFinish,
-            CanStepBack);
+        new(CurrentStep, State, HasPreview, CanCommitCurrentStage, CanCancel, CanFinish, CanStepBack);
 
     public event EventHandler? Updated;
 
@@ -146,15 +133,11 @@ public abstract class CadTool
         if (canceled)
             TryCleanup(OnCanceled);
         TryCleanup(OnDeactivated);
-        TryCleanup(Context.Preview.Clear);
+
+        // Tool-local cleanup belongs here. Workspace-wide transient state is
+        // reset exactly once by CadToolManager.ResetNeutralInteractionState().
         TryCleanup(RestoreReplacementPreviewSources);
-        TryCleanup(Context.Tracking.Clear);
-        TryCleanup(Context.Snap.Clear);
-        TryCleanup(Context.Workspace.Precision.ResetFactor);
-        TryCleanup(Context.Workspace.Drafting.ResetTransientLocks);
         TryCleanup(() => Context.Selection.SetFilter(_previousSelectionFilter));
-        TryCleanup(() => Context.Snap.Active = false);
-        TryCleanup(Context.WorkPlane.EndToolPlane);
 
         Prompt = null;
         IsActive = false;
@@ -171,14 +154,8 @@ public abstract class CadTool
 
         void TryCleanup(Action cleanup)
         {
-            try
-            {
-                cleanup();
-            }
-            catch (Exception exception)
-            {
-                failure ??= exception;
-            }
+            try { cleanup(); }
+            catch (Exception exception) { failure ??= exception; }
         }
     }
 
@@ -186,67 +163,37 @@ public abstract class CadTool
     {
         if (!CanCommitCurrentStage)
             return false;
-
-        var pointer =
-            Context.Workspace.LastPointerPosition ??
-            default;
+        var pointer = Context.Workspace.LastPointerPosition ?? default;
         return OnCommitCurrentStage(pointer);
     }
 
-    internal bool Finish()
-    {
-        if (!CanFinish)
-            return false;
-
-        return OnFinish();
-    }
-
-    internal bool StepBack()
-    {
-        if (!CanStepBack)
-            return false;
-
-        return OnStepBack();
-    }
-
-    internal bool ApplyPrecisionInput(CadPrecisionInput input) =>
-        OnPrecisionInputApplied(input);
+    internal bool Finish() => CanFinish && OnFinish();
+    internal bool StepBack() => CanStepBack && OnStepBack();
+    internal bool ApplyPrecisionInput(CadPrecisionInput input) => OnPrecisionInputApplied(input);
 
     public bool TrySetParameter(string id, string value)
     {
-        if (!IsActive)
-            return false;
+        if (!IsActive) return false;
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentNullException.ThrowIfNull(value);
-
         return OnSetParameter(id.Trim(), value.Trim());
     }
 
     public virtual bool HandlePointer(OcctPointerInputEventArgs input) => false;
-
     public virtual bool HandleKey(OcctKeyInputEventArgs input) => false;
 
-    protected void SetStage(
-        int stage,
-        string message,
-        CadPrecisionInputKind precisionInputs = CadPrecisionInputKind.None)
+    protected void SetStage(int stage, string message, CadPrecisionInputKind precisionInputs = CadPrecisionInputKind.None)
     {
-        if (stage < 0)
-            throw new ArgumentOutOfRangeException(nameof(stage));
-
+        if (stage < 0) throw new ArgumentOutOfRangeException(nameof(stage));
         _stage = stage;
         ResetStageTransientState();
         SetPrompt(message, precisionInputs);
     }
 
-    protected void SetPrompt(
-        string message,
-        CadPrecisionInputKind precisionInputs = CadPrecisionInputKind.None)
+    protected void SetPrompt(string message, CadPrecisionInputKind precisionInputs = CadPrecisionInputKind.None)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-
-        var normalized = message.Trim();
-        Prompt = new CadToolPrompt(normalized, precisionInputs);
+        Prompt = new CadToolPrompt(message.Trim(), precisionInputs);
         PublishUpdated();
     }
 
@@ -257,16 +204,10 @@ public abstract class CadTool
         CadPrecisionInputKind precisionInputs = CadPrecisionInputKind.None,
         params object?[] arguments)
     {
-        if (stage < 0)
-            throw new ArgumentOutOfRangeException(nameof(stage));
-
+        if (stage < 0) throw new ArgumentOutOfRangeException(nameof(stage));
         _stage = stage;
         ResetStageTransientState();
-        SetPromptLocalized(
-            resourceKey,
-            fallback,
-            precisionInputs,
-            arguments);
+        SetPromptLocalized(resourceKey, fallback, precisionInputs, arguments);
     }
 
     protected void SetPromptLocalized(
@@ -282,10 +223,7 @@ public abstract class CadTool
         var normalizedFallback = fallback.Trim();
         var message = arguments.Length == 0
             ? normalizedFallback
-            : string.Format(
-                CultureInfo.InvariantCulture,
-                normalizedFallback,
-                arguments);
+            : string.Format(CultureInfo.InvariantCulture, normalizedFallback, arguments);
 
         Prompt = new CadToolPrompt(message, precisionInputs)
         {
@@ -308,20 +246,28 @@ public abstract class CadTool
         OcctVector3d yAxis,
         bool lockPlane = true)
     {
+        var current = Context.WorkPlane.EffectivePlane;
+        var safeOrigin = origin.IsFinite ? origin : current.Origin;
+        var safeX = xAxis.TryNormalize(out var normalizedX) ? normalizedX : current.XAxis;
+        var safeY = yAxis.TryNormalize(out var normalizedY) ? normalizedY : current.YAxis;
+        if (!safeX.Cross(safeY).TryNormalize(out _))
+        {
+            safeX = current.XAxis;
+            safeY = current.YAxis;
+        }
+
         Context.WorkPlane.SetToolPlaneFixed(false);
-        Context.WorkPlane.SetToolPlane(origin, xAxis, yAxis);
+        Context.WorkPlane.SetToolPlane(safeOrigin, safeX, safeY);
         Context.WorkPlane.SetToolPlaneFixed(lockPlane);
     }
 
-    protected void SetSelectionFilter(CadSelectionFilter? filter) =>
-        Context.Selection.SetFilter(filter);
+    protected internal virtual void OnWorkPlaneChanged() { }
+    protected internal virtual void RefreshPreviewFromLastPointer(CadPointerPosition pointer) { }
 
-    protected void NotifyUpdated() =>
-        PublishUpdated();
+    protected void SetSelectionFilter(CadSelectionFilter? filter) => Context.Selection.SetFilter(filter);
+    protected void NotifyUpdated() => PublishUpdated();
 
-    protected void ShowReplacementPreview(
-        IReadOnlyList<CadEntity> sources,
-        IReadOnlyList<CadEntity> replacements)
+    protected void ShowReplacementPreview(IReadOnlyList<CadEntity> sources, IReadOnlyList<CadEntity> replacements)
     {
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(replacements);
@@ -332,10 +278,7 @@ public abstract class CadTool
             SuppressReplacementPreviewSources(sources);
         }
 
-        try
-        {
-            Context.Preview.Show(replacements);
-        }
+        try { Context.Preview.Show(replacements); }
         catch
         {
             RestoreReplacementPreviewSources();
@@ -352,117 +295,62 @@ public abstract class CadTool
     protected void CommitReplacementPreview(Action commit)
     {
         ArgumentNullException.ThrowIfNull(commit);
-
-        // Commit while the last valid replacement preview and source
-        // suppression are still intact. If the model/history mutation fails,
-        // the Tool remains visually usable and the user can retry or cancel.
         var sources = _replacementPreviewSources.ToArray();
         commit();
-
         _replacementPreviewSources.Clear();
-        try
-        {
-            Context.Preview.Clear();
-        }
-        finally
-        {
-            // A successful model/history commit must never leave its source
-            // presentation transparent even if transient cleanup fails.
-            RestoreReplacementPreviewSources(sources);
-        }
+        try { Context.Preview.Clear(); }
+        finally { RestoreReplacementPreviewSources(sources); }
     }
 
-    private bool MatchesReplacementPreviewSources(
-        IReadOnlyList<CadEntity> sources)
+    private bool MatchesReplacementPreviewSources(IReadOnlyList<CadEntity> sources)
     {
-        if (_replacementPreviewSources.Count != sources.Count)
-            return false;
-
+        if (_replacementPreviewSources.Count != sources.Count) return false;
         for (var index = 0; index < sources.Count; index++)
-        {
-            if (!ReferenceEquals(
-                    _replacementPreviewSources[index],
-                    sources[index]))
+            if (!ReferenceEquals(_replacementPreviewSources[index], sources[index]))
                 return false;
-        }
-
         return true;
     }
 
-    private void SuppressReplacementPreviewSources(
-        IReadOnlyList<CadEntity> sources)
+    private void SuppressReplacementPreviewSources(IReadOnlyList<CadEntity> sources)
     {
-        if (sources.Count == 0 ||
-            Context.Workspace.Engine is not
-            { IsInitialized: true } engine)
+        if (sources.Count == 0 || Context.Workspace.Engine is not { IsInitialized: true } engine)
             return;
 
-        using var batch =
-            engine.BeginDisplayBatch();
-
+        using var batch = engine.BeginDisplayBatch();
         foreach (var entity in sources)
         {
-            if (_replacementPreviewSources.Contains(entity))
-                continue;
-
-            if (entity.ViewerObject is not
-                { } source ||
+            if (_replacementPreviewSources.Contains(entity)) continue;
+            if (entity.ViewerObject is not { } source ||
                 !engine.ContainsObject(source.Id) ||
-                !Context.Document
-                    .ResolveAppearance(entity)
-                    .Visible)
+                !Context.Document.ResolveAppearance(entity).Visible)
                 continue;
 
-            // Keep the source in the viewer selection structure so hover and
-            // click hit-testing stay stable while only the replacement result
-            // remains visually visible.
-            engine.SetObjectTransparency(
-                source,
-                1.0);
+            engine.SetObjectTransparency(source, 1.0);
             _replacementPreviewSources.Add(entity);
         }
     }
 
     private void RestoreReplacementPreviewSources()
     {
-        if (_replacementPreviewSources.Count == 0)
-            return;
-
-        var values =
-            _replacementPreviewSources.ToArray();
+        if (_replacementPreviewSources.Count == 0) return;
+        var values = _replacementPreviewSources.ToArray();
         _replacementPreviewSources.Clear();
         RestoreReplacementPreviewSources(values);
     }
 
-    private void RestoreReplacementPreviewSources(
-        IReadOnlyList<CadEntity> values)
+    private void RestoreReplacementPreviewSources(IReadOnlyList<CadEntity> values)
     {
-        if (values.Count == 0 ||
-            Context.Workspace.Engine is not
-            { IsInitialized: true } engine)
+        if (values.Count == 0 || Context.Workspace.Engine is not { IsInitialized: true } engine)
             return;
 
-        using var batch =
-            engine.BeginDisplayBatch();
-
+        using var batch = engine.BeginDisplayBatch();
         foreach (var entity in values)
         {
-            if (entity.ViewerObject is not
-                { } source ||
-                !engine.ContainsObject(source.Id))
+            if (entity.ViewerObject is not { } source || !engine.ContainsObject(source.Id))
                 continue;
 
-            engine.SetObjectTransparency(
-                source,
-                Math.Clamp(
-                    entity.Transparency,
-                    0.0,
-                    1.0));
-            engine.SetObjectVisible(
-                source,
-                Context.Document
-                    .ResolveAppearance(entity)
-                    .Visible);
+            engine.SetObjectTransparency(source, Math.Clamp(entity.Transparency, 0.0, 1.0));
+            engine.SetObjectVisible(source, Context.Document.ResolveAppearance(entity).Visible);
         }
     }
 
@@ -474,18 +362,14 @@ public abstract class CadTool
 
     private void SynchronizeSnapState()
     {
-        if (!IsActive)
-            return;
-
-        Context.Snap.Active =
-            CurrentStep.RequiresPointer;
+        if (!IsActive) return;
+        Context.Snap.Active = CurrentStep.RequiresPointer;
     }
 
     protected void LockStageAngle(double angleDegrees)
     {
         if (!double.IsFinite(angleDegrees))
             throw new ArgumentOutOfRangeException(nameof(angleDegrees));
-
         Context.Workspace.Drafting.LockedAngleDegrees = angleDegrees;
         Context.Workspace.Drafting.AngleLockEnabled = true;
     }
@@ -493,7 +377,6 @@ public abstract class CadTool
     protected virtual bool CanCommitCurrentStageCore => false;
     protected virtual bool CanFinishCore => false;
     protected virtual bool CanStepBackCore => false;
-
     protected virtual bool OnCommitCurrentStage(CadPointerPosition pointer) => false;
     protected virtual bool OnFinish() => false;
     protected virtual bool OnStepBack() => false;
@@ -532,23 +415,41 @@ public sealed class CadToolContext(CadWorkspace workspace)
 
     public CadDocument Document => Workspace.Document;
     public CadSelectionManager Selection => Workspace.Selection;
-    public OcctEngine Engine =>
-        Workspace.Engine ?? throw new InvalidOperationException("No OCCT engine is attached.");
+    public OcctEngine Engine => Workspace.Engine ?? throw new InvalidOperationException("No OCCT engine is attached.");
     public CadWorkPlane WorkPlane => Workspace.WorkPlane;
     public CadPreviewManager Preview => Workspace.Preview;
     public CadTrackingManager Tracking => Workspace.Tracking;
     public CadSnapManager Snap => Workspace.Snap;
 
-    public CadResolvedPoint ResolvePoint(
-        int x,
-        int y,
-        OcctPoint3d? constraintOrigin = null) =>
-        Workspace.ResolvePoint(
+    public CadResolvedPoint ResolvePoint(int x, int y, OcctPoint3d? constraintOrigin = null)
+    {
+        var resolved = Workspace.ResolvePoint(
             x,
             y,
             constraintOrigin,
-            ActiveTool?.SnapResolvePolicy ??
-            CadSnapResolvePolicy.KeepExactPoint);
+            ActiveTool?.SnapResolvePolicy ?? CadSnapResolvePolicy.KeepExactPoint);
+
+        if (ActiveTool is not CadDrawingTool || !WorkPlane.IsActive)
+            return resolved;
+
+        var frame = WorkPlane.EffectivePlane;
+        var projected = CadPlaneGeometry.ProjectToPlane(
+            frame.Origin,
+            resolved.Point,
+            frame.XAxis,
+            frame.YAxis);
+        if (!projected.IsFinite)
+            return resolved;
+
+        if (resolved.Snap is not null && projected.DistanceTo(resolved.Point) > 1e-8)
+            Snap.Clear();
+
+        return resolved with
+        {
+            Point = projected,
+            Snap = projected.DistanceTo(resolved.Point) <= 1e-8 ? resolved.Snap : null
+        };
+    }
 
     public void AddEntity(CadEntity entity)
     {

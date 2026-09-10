@@ -36,8 +36,6 @@ internal static class CadMirrorGeometry
             CadArcEntity e => new CadArcEntity(Point(e.Start), Point(e.Middle), Point(e.End)),
             CadEllipseEntity e => new CadEllipseEntity(Point(e.Center), PlaneNormal(e.Normal), Vector(e.XAxis), e.MajorRadius, e.MinorRadius),
             CadSplineEntity e => new CadSplineEntity(e.FitPoints.Select(Point), e.Periodic, e.Tolerance),
-            // Reflection reverses handedness. Swap the box's bottom/top reference
-            // and reverse its Z axis to retain a right-handed, positive-size frame.
             CadBoxEntity e => new CadBoxEntity(Point(e.Origin) + Vector(e.ZAxis) * e.Height,
                 Vector(e.XAxis), Vector(e.YAxis), Vector(e.ZAxis) * -1, e.Length, e.Width, e.Height),
             CadCylinderEntity e => new CadCylinderEntity(Point(e.Origin), Vector(e.Axis), e.Radius, e.Height),
@@ -51,9 +49,3 @@ internal static class CadMirrorGeometry
         };
     }
 }
-
-
-
-
-
-

@@ -97,21 +97,20 @@ public sealed class CadExtrudeEntity : CadFeatureEntity
 
     protected override OcctShape BuildFeatureResult(OcctEngine engine)
     {
-        var face =
-            CadPlanarProfileGeometry.BuildFace(
-                engine,
-                _profile);
+        var inputShape = CadPlanarProfileGeometry.IsClosedProfile(_profile)
+            ? CadPlanarProfileGeometry.BuildFace(engine, _profile)
+            : _profile.BuildShape(engine);
         try
         {
             return engine.Extrude(
-                face,
+                inputShape,
                 _vector,
                 hideInput: true);
         }
         finally
         {
-            if (engine.ContainsObject(face.Id))
-                engine.Delete(face);
+            if (engine.ContainsObject(inputShape.Id))
+                engine.Delete(inputShape);
         }
     }
 
@@ -132,6 +131,14 @@ public sealed class CadExtrudeEntity : CadFeatureEntity
         var center =
             CadPlanarProfileGeometry.Center(_profile);
         var top = center + _vector;
+        var direction = _vector.Normalized();
+        var axes = CadTransformMath.PerpendicularAxes(direction);
+        var heightPlane = new CadGripWorkPlane(
+            center,
+            direction,
+            axes.XAxis,
+            true,
+            0.0);
         return
         [
             new(this, 0, center, Kind: CadGripKind.Center),
@@ -139,9 +146,10 @@ public sealed class CadExtrudeEntity : CadFeatureEntity
                 this,
                 1,
                 top,
-                ConstraintOrigin: center,
-                PrecisionInputs: CadPrecisionInputKind.Length,
-                Kind: CadGripKind.Height)
+                heightPlane,
+                center,
+                CadPrecisionInputKind.Length,
+                CadGripKind.Height)
         ];
     }
 
@@ -166,14 +174,17 @@ public sealed class CadExtrudeEntity : CadFeatureEntity
                 break;
 
             case 1:
-                var vector =
-                    CadTransformMath.Between(
-                        center,
-                        targetPoint);
-                if (!vector.TryNormalize(out _))
+            {
+                var direction = _vector.Normalized();
+                var signedLength = CadTransformMath.Dot(
+                    CadTransformMath.Between(center, targetPoint),
+                    direction);
+                if (!double.IsFinite(signedLength) ||
+                    Math.Abs(signedLength) <= 1e-9)
                     return;
-                _vector = vector;
+                _vector = direction * signedLength;
                 break;
+            }
 
             default:
                 throw new ArgumentOutOfRangeException(nameof(index));

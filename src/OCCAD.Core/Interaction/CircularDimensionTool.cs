@@ -1,120 +1,339 @@
-using System.Globalization;
 using OcctNet;
 
 namespace OCCAD;
 
-public class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
+public sealed class CircularDimensionTool : CadDrawingTool, ICadPointInputTool
 {
-    private readonly CadCircularDimensionKind _kind;
-    private CadEntity? _source;
-    private OcctPoint3d _center;
-    private OcctVector3d _normal;
-    private double _radius;
-    private double _textHeight=4, _arrowSize=2.5;
+    private const string RadiusKind = "Radius";
+    private const string DiameterKind = "Diameter";
 
-    public CircularDimensionTool(CadCircularDimensionKind kind) => _kind=kind;
-    public override string Id => _kind==CadCircularDimensionKind.Radius ? "radiusdimension" : "diameterdimension";
-    public override string DisplayName => _kind==CadCircularDimensionKind.Radius ? "Radius Dimension" : "Diameter Dimension";
-    public override CadToolInputKind InputKind =>
-        _source is null
-            ? CadToolInputKind.Selection
-            : CadToolInputKind.Point;
-    public override CadToolInteractionPolicy InteractionPolicy =>
-        base.InteractionPolicy with
+    private OcctPoint3d? _center;
+    private double? _radius;
+    private string _kind = RadiusKind;
+    private double _textHeight = 4.0;
+    private double _arrowSize = 2.5;
+    private string _fontName = "Arial";
+    private WorkPlaneFrame _initialPlane;
+
+    public override string Id => "circulardimension";
+    public override string DisplayName =>
+        IsDiameter ? "Diameter Dimension" : "Radius Dimension";
+
+    public override CadToolPanelDescriptor ParameterPanel
+    {
+        get
         {
-            PreselectionEnabled = _source is null
-        };
-    protected override bool CanStepBackCore => _source is not null;
-    public override CadToolPanelDescriptor ParameterPanel => new(DisplayName,
-        [new CadDoubleToolParameterDescriptor("TextHeight","Text Height",_textHeight,1e-9,1_000_000),
-         new CadDoubleToolParameterDescriptor("ArrowSize","Arrow Size",_arrowSize,1e-9,1_000_000)]);
+            var parameters = new List<CadToolParameterDescriptor>();
+            if (Stage == 0)
+            {
+                parameters.Add(
+                    new CadChoiceToolParameterDescriptor(
+                        "Kind",
+                        "Kind",
+                        _kind,
+                        [RadiusKind, DiameterKind]));
+            }
+
+            parameters.Add(
+                new CadDoubleToolParameterDescriptor(
+                    "TextHeight",
+                    "Text Height",
+                    _textHeight,
+                    1e-9,
+                    double.MaxValue));
+            parameters.Add(
+                new CadDoubleToolParameterDescriptor(
+                    "ArrowSize",
+                    "Arrow Size",
+                    _arrowSize,
+                    1e-9,
+                    double.MaxValue));
+            parameters.Add(
+                new CadStringToolParameterDescriptor(
+                    "Font",
+                    "Font",
+                    _fontName));
+
+            return new CadToolPanelDescriptor(DisplayName, parameters);
+        }
+    }
+
+    protected override bool CanStepBackCore => _center is not null;
+
+    private bool IsDiameter =>
+        _kind.Equals(DiameterKind, StringComparison.OrdinalIgnoreCase);
 
     protected override void OnActivated()
     {
-        _source=null;
-        var selected=Context.Selection.Primary;
-        if(selected is not null) TryAcceptSource(selected);
-        UpdatePrompt();
+        _center = null;
+        _radius = null;
+        _initialPlane = CaptureWorkPlaneFrame();
+        RestorePrompt();
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
-        if(CancelOnRightClick(input)) return true;
-        if(_source is null && input.Kind==OcctPointerInputKind.Pressed && input.Button==OcctPointerButton.Left)
+        if (CancelOnRightClick(input))
+            return true;
+
+        if (input.Kind == OcctPointerInputKind.Moved &&
+            _center is { } center)
         {
-            foreach(var hit in Context.Engine.DetectAt(input.X,input.Y))
-            {
-                var entity=Context.Document.FindByViewerObject(hit.Owner);
-                if(entity is not null && TryAcceptSource(entity)) return true;
-            }
+            var point = Context.ResolvePoint(
+                input.X,
+                input.Y,
+                center).Point;
+            UpdatePreview(center, point);
             return true;
         }
-        if(_source is not null && input.Kind==OcctPointerInputKind.Moved) { Show(Resolve(input,_center)); return true; }
-        if(_source is not null && input.Kind==OcctPointerInputKind.Pressed && input.Button==OcctPointerButton.Left) return TryAcceptPoint(Resolve(input,_center));
-        return false;
+
+        if (input.Kind != OcctPointerInputKind.Pressed ||
+            input.Button != OcctPointerButton.Left)
+            return false;
+
+        return AcceptPoint(
+            Context.ResolvePoint(
+                input.X,
+                input.Y,
+                _center).Point);
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition p)
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
+        CommitResolvedPoint(pointer, _center, AcceptPoint);
+
+    public bool TryAcceptPoint(OcctPoint3d point) =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        AcceptPoint(point);
+
+    protected override bool OnSetParameter(string id, string value)
     {
-        if(_source is null)
+        if (id.Equals("Kind", StringComparison.OrdinalIgnoreCase))
         {
-            foreach(var hit in Context.Engine.DetectAt(p.X,p.Y))
-            {
-                var entity=Context.Document.FindByViewerObject(hit.Owner);
-                if(entity is not null && TryAcceptSource(entity)) return true;
-            }
+            if (Stage != 0)
+                return false;
+
+            var normalized = value.Trim();
+            if (!normalized.Equals(RadiusKind, StringComparison.OrdinalIgnoreCase) &&
+                !normalized.Equals(DiameterKind, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            _kind = normalized.Equals(DiameterKind, StringComparison.OrdinalIgnoreCase)
+                ? DiameterKind
+                : RadiusKind;
+            RestorePrompt();
+        }
+        else if (id.Equals("TextHeight", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryPositive(value, out _textHeight))
+                return false;
+        }
+        else if (id.Equals("ArrowSize", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryPositive(value, out _arrowSize))
+                return false;
+        }
+        else if (id.Equals("Font", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            _fontName = value.Trim();
+        }
+        else
+        {
             return false;
         }
-        return CommitResolvedPoint(p,_center,TryAcceptPoint);
+
+        RefreshPreviewFromLastPointer();
+        NotifyUpdated();
+        return true;
     }
 
-    public bool TryAcceptSource(CadEntity entity)
+    protected override bool OnStepBack()
     {
-        if(!IsActive || _source is not null || !Context.Document.IsEntitySelectable(entity)) return false;
-        var world=entity.CreateWorldGeometrySnapshot();
-        if(world is CadCircleEntity circle) { _center=circle.Center; _normal=circle.Normal; _radius=circle.Radius; }
-        else if(_kind==CadCircularDimensionKind.Radius && world is CadArcEntity arc) { _center=arc.Center; _normal=arc.Normal; _radius=arc.Radius; }
-        else return false;
-        _source=entity; Context.WorkPlane.SetToolPlaneFixed(true); UpdatePrompt(); return true;
-    }
-
-    public bool TryAcceptPoint(OcctPoint3d point)
-    {
-        if(!IsActive || _source is null || !point.IsFinite) return false;
-        var entity=Create(point); if(entity is null) return false;
-        CommitPreview(entity); return true;
-    }
-
-    protected override bool OnSetParameter(string id,string value)
-    {
-        if((!double.TryParse(value,NumberStyles.Float,CultureInfo.CurrentCulture,out var n) && !double.TryParse(value,NumberStyles.Float,CultureInfo.InvariantCulture,out n)) || !double.IsFinite(n) || n<=1e-9) return false;
-        if(id.Equals("TextHeight",StringComparison.OrdinalIgnoreCase)) _textHeight=n;
-        else if(id.Equals("ArrowSize",StringComparison.OrdinalIgnoreCase)) _arrowSize=n;
-        else return false;
-        NotifyUpdated(); return true;
-    }
-
-    protected override bool OnStepBack() { if(_source is null)return false; _source=null; Context.Preview.Clear(); Context.WorkPlane.SetToolPlaneFixed(false); UpdatePrompt(); return true; }
-    private CadCircularDimensionEntity? Create(OcctPoint3d point)
-    {
-        var planar=point-_center; planar-=_normal*planar.Dot(_normal);
-        if(!planar.TryNormalize(out var direction)) return null;
-        var offset=_kind==CadCircularDimensionKind.Radius ? planar.Length-_radius : 0;
-        return new(_kind,_center,_normal,direction,_radius,offset,_textHeight,_arrowSize);
-    }
-    private void Show(OcctPoint3d point)
-    {
-        var e=Create(point);
-        if(e is not null)
-            ShowPreview(e);
-        else
+        if (_radius is not null)
+        {
+            _radius = null;
             Context.Preview.Clear();
+            RestorePrompt();
+            return true;
+        }
+
+        if (_center is null)
+            return false;
+
+        _center = null;
+        Context.Preview.Clear();
+        RestoreWorkPlaneFrame(_initialPlane);
+        RestorePrompt();
+        return true;
     }
-    private void UpdatePrompt() => SetStageLocalized(_source is null?0:1,
-        _source is null ? $"Cad.Prompt.{Id}.Select" : $"Cad.Prompt.{Id}.Position",
-        _source is null ? $"{DisplayName}: select circle{(_kind==CadCircularDimensionKind.Radius ? " or arc" : "")} [Esc cancel]" : $"{DisplayName}: specify label position [Backspace undo, Esc cancel]");
+
+    protected override void OnCanceled()
+    {
+        _center = null;
+        _radius = null;
+    }
+
+    private bool AcceptPoint(OcctPoint3d point)
+    {
+        if (!point.IsFinite)
+            return false;
+
+        if (_center is null)
+        {
+            _center = point;
+            RestoreWorkPlaneFrame(_initialPlane, point);
+            RestorePrompt();
+            return true;
+        }
+
+        if (_radius is null)
+        {
+            if (!TryPlanarDirection(
+                    _center.Value,
+                    point,
+                    out _,
+                    out var radius))
+                return false;
+
+            _radius = radius;
+            Context.Preview.Clear();
+            RestorePrompt();
+            return true;
+        }
+
+        if (!TryCreateEntity(
+                _center.Value,
+                _radius.Value,
+                point,
+                out var entity))
+            return false;
+
+        CommitPreview(entity);
+        return true;
+    }
+
+    private void UpdatePreview(OcctPoint3d center, OcctPoint3d point)
+    {
+        if (_radius is null)
+        {
+            if (!TryPlanarDirection(center, point, out _, out var radius))
+            {
+                Context.Preview.Clear();
+                return;
+            }
+
+            ShowPreview(
+                new CadCircleEntity(
+                    center,
+                    Context.WorkPlane.Normal,
+                    radius));
+            return;
+        }
+
+        if (!TryCreateEntity(center, _radius.Value, point, out var entity))
+        {
+            Context.Preview.Clear();
+            return;
+        }
+
+        ShowPreview(entity);
+    }
+
+    private bool TryCreateEntity(
+        OcctPoint3d center,
+        double radius,
+        OcctPoint3d leaderPoint,
+        out CadCircularDimensionEntity entity)
+    {
+        entity = null!;
+        if (!TryPlanarDirection(
+                center,
+                leaderPoint,
+                out var direction,
+                out var leaderDistance))
+            return false;
+
+        var offset = leaderDistance - radius;
+        if (!double.IsFinite(offset))
+            return false;
+
+        try
+        {
+            entity = new CadCircularDimensionEntity(
+                IsDiameter
+                    ? CadCircularDimensionKind.Diameter
+                    : CadCircularDimensionKind.Radius,
+                center,
+                Context.WorkPlane.Normal,
+                direction,
+                radius,
+                offset,
+                _textHeight,
+                _arrowSize,
+                _fontName);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private bool TryPlanarDirection(
+        OcctPoint3d origin,
+        OcctPoint3d point,
+        out OcctVector3d direction,
+        out double distance)
+    {
+        var normal = Context.WorkPlane.Normal;
+        var delta = point - origin;
+        var axial = delta.Dot(normal);
+        var planar = delta - normal * axial;
+        distance = Math.Sqrt(planar.LengthSquared);
+        if (!double.IsFinite(distance) ||
+            distance <= 1e-9 ||
+            !planar.TryNormalize(out direction))
+        {
+            direction = default;
+            distance = 0.0;
+            return false;
+        }
+
+        return true;
+    }
+
+    private void RestorePrompt()
+    {
+        var label = DisplayName;
+        if (_center is null)
+        {
+            SetStageLocalized(
+                0,
+                "Cad.Prompt.CircularDimension.Center",
+                $"{label}: specify center [Esc cancel]");
+            return;
+        }
+
+        if (_radius is null)
+        {
+            SetStageLocalized(
+                1,
+                "Cad.Prompt.CircularDimension.Radius",
+                $"{label}: specify point on circle [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.LengthAndAngle);
+            return;
+        }
+
+        SetStageLocalized(
+            2,
+            "Cad.Prompt.CircularDimension.Position",
+            $"{label}: specify annotation position [Backspace undo, Esc cancel]",
+            CadPrecisionInputKind.LengthAndAngle);
+    }
+
+    private static bool TryPositive(string value, out double number) =>
+        CadValueTextConverter.TryParseFiniteDouble(value, out number) &&
+        number > 1e-9;
 }
-
-public sealed class RadiusDimensionTool : CircularDimensionTool { public RadiusDimensionTool() : base(CadCircularDimensionKind.Radius) { } }
-public sealed class DiameterDimensionTool : CircularDimensionTool { public DiameterDimensionTool() : base(CadCircularDimensionKind.Diameter) { } }
-

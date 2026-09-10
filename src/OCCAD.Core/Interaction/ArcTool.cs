@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -52,6 +52,14 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         _xAxis = Context.WorkPlane.XAxis;
         _yAxis = Context.WorkPlane.YAxis;
         RestorePrompt();
+    }
+
+    protected internal override void OnWorkPlaneChanged()
+    {
+        _planeOrigin = Context.WorkPlane.Origin;
+        _xAxis = Context.WorkPlane.XAxis;
+        _yAxis = Context.WorkPlane.YAxis;
+        base.OnWorkPlaneChanged();
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
@@ -255,35 +263,18 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
                 case ThreePoints:
                     arc = new CadArcEntity(first, second, third);
                     return true;
-
                 case CenterStartEnd:
                     return TryCreateCenterArc(first, second, third, out arc);
-
                 case StartCenterEnd:
                     return TryCreateCenterArc(second, first, third, out arc);
-
                 case StartEndCenter:
-                    var adjustedCenter = AdjustCenterForEndpoints(
-                        first,
-                        second,
-                        third);
-                    return TryCreateCenterArc(
-                        adjustedCenter,
-                        first,
-                        second,
-                        out arc);
-
+                    var adjustedCenter = AdjustCenterForEndpoints(first, second, third);
+                    return TryCreateCenterArc(adjustedCenter, first, second, out arc);
                 case StartEndPoint:
                     arc = new CadArcEntity(first, third, second);
                     return true;
-
                 case StartEndTangent:
-                    return TryCreateStartEndTangentArc(
-                        first,
-                        second,
-                        third,
-                        out arc);
-
+                    return TryCreateStartEndTangentArc(first, second, third, out arc);
                 default:
                     arc = null!;
                     return false;
@@ -303,87 +294,43 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         out CadArcEntity arc)
     {
         arc = null!;
-
         var chord = ToLocal(start, end);
         var tangent = ToLocal(start, tangentPoint);
-        var tangentLength =
-            Math.Sqrt(
-                tangent.X * tangent.X +
-                tangent.Y * tangent.Y);
-        var chordLengthSquared =
-            chord.X * chord.X +
-            chord.Y * chord.Y;
-
-        if (tangentLength <= 1e-9 ||
-            chordLengthSquared <= 1e-18)
-            return false;
+        var tangentLength = Math.Sqrt(tangent.X * tangent.X + tangent.Y * tangent.Y);
+        var chordLengthSquared = chord.X * chord.X + chord.Y * chord.Y;
+        if (tangentLength <= 1e-9 || chordLengthSquared <= 1e-18) return false;
 
         var tx = tangent.X / tangentLength;
         var ty = tangent.Y / tangentLength;
         var nx = -ty;
         var ny = tx;
-        var denominator =
-            chord.X * nx +
-            chord.Y * ny;
-        if (Math.Abs(denominator) <= 1e-9)
-            return false;
+        var denominator = chord.X * nx + chord.Y * ny;
+        if (Math.Abs(denominator) <= 1e-9) return false;
 
-        var signedRadius =
-            chordLengthSquared /
-            (2.0 * denominator);
-        if (!double.IsFinite(signedRadius) ||
-            Math.Abs(signedRadius) <= 1e-9)
-            return false;
+        var signedRadius = chordLengthSquared / (2.0 * denominator);
+        if (!double.IsFinite(signedRadius) || Math.Abs(signedRadius) <= 1e-9) return false;
 
-        var center =
-            start +
-            _xAxis * (nx * signedRadius) +
-            _yAxis * (ny * signedRadius);
+        var center = start + _xAxis * (nx * signedRadius) + _yAxis * (ny * signedRadius);
         var radius = Math.Abs(signedRadius);
-
         var startLocal = ToLocal(center, start);
         var endLocal = ToLocal(center, end);
-        var startAngle =
-            Math.Atan2(startLocal.Y, startLocal.X);
-        var endAngle =
-            Math.Atan2(endLocal.Y, endLocal.X);
-
-        var radial =
-            CadTransformMath.Between(center, start)
-                .Normalized();
-        var planeNormal =
-            _xAxis.Cross(_yAxis).Normalized();
-        var ccwTangent =
-            planeNormal.Cross(radial).Normalized();
-        var tangentWorld =
-            (_xAxis * tx + _yAxis * ty).Normalized();
-        var ccw =
-            CadTransformMath.Dot(
-                ccwTangent,
-                tangentWorld) >= 0.0;
-
+        var startAngle = Math.Atan2(startLocal.Y, startLocal.X);
+        var endAngle = Math.Atan2(endLocal.Y, endLocal.X);
+        var radial = CadTransformMath.Between(center, start).Normalized();
+        var planeNormal = _xAxis.Cross(_yAxis).Normalized();
+        var ccwTangent = planeNormal.Cross(radial).Normalized();
+        var tangentWorld = (_xAxis * tx + _yAxis * ty).Normalized();
+        var ccw = CadTransformMath.Dot(ccwTangent, tangentWorld) >= 0.0;
         var sweep = ccw
-            ? CadPrecisionSnapGeometry.NormalizePositive(
-                endAngle - startAngle)
-            : -CadPrecisionSnapGeometry.NormalizePositive(
-                startAngle - endAngle);
-        if (Math.Abs(sweep) <= 1e-9 ||
-            Math.Abs(Math.Abs(sweep) - Math.PI * 2.0) <= 1e-9)
-            return false;
+            ? CadPrecisionSnapGeometry.NormalizePositive(endAngle - startAngle)
+            : -CadPrecisionSnapGeometry.NormalizePositive(startAngle - endAngle);
+        if (Math.Abs(sweep) <= 1e-9 || Math.Abs(Math.Abs(sweep) - Math.PI * 2.0) <= 1e-9) return false;
 
-        var middleAngle =
-            startAngle + sweep * 0.5;
-        var middle =
-            center +
-            _xAxis * (Math.Cos(middleAngle) * radius) +
-            _yAxis * (Math.Sin(middleAngle) * radius);
-
+        var middleAngle = startAngle + sweep * 0.5;
+        var middle = center + _xAxis * (Math.Cos(middleAngle) * radius) + _yAxis * (Math.Sin(middleAngle) * radius);
         try
         {
-            arc = new CadArcEntity(
-                start,
-                middle,
-                end);
+            arc = new CadArcEntity(start, middle, end);
             return true;
         }
         catch (ArgumentException)
@@ -393,41 +340,26 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
         }
     }
 
-    private OcctPoint3d AdjustCenterForEndpoints(
-        OcctPoint3d start,
-        OcctPoint3d end,
-        OcctPoint3d centerInput)
+    private OcctPoint3d AdjustCenterForEndpoints(OcctPoint3d start, OcctPoint3d end, OcctPoint3d centerInput)
     {
         var startLocal = ToLocal(_planeOrigin, start);
         var endLocal = ToLocal(_planeOrigin, end);
         var centerLocal = ToLocal(_planeOrigin, centerInput);
-
         var midpointX = (startLocal.X + endLocal.X) * 0.5;
         var midpointY = (startLocal.Y + endLocal.Y) * 0.5;
         var chordX = endLocal.X - startLocal.X;
         var chordY = endLocal.Y - startLocal.Y;
         var chordLength = Math.Sqrt(chordX * chordX + chordY * chordY);
-        if (chordLength <= 1e-9)
-            return centerInput;
-
+        if (chordLength <= 1e-9) return centerInput;
         var perpendicularX = -chordY / chordLength;
         var perpendicularY = chordX / chordLength;
         var inputX = centerLocal.X - midpointX;
         var inputY = centerLocal.Y - midpointY;
-        var height =
-            inputX * perpendicularX +
-            inputY * perpendicularY;
-
-        return _planeOrigin +
-               _xAxis * (midpointX + perpendicularX * height) +
-               _yAxis * (midpointY + perpendicularY * height);
+        var height = inputX * perpendicularX + inputY * perpendicularY;
+        return _planeOrigin + _xAxis * (midpointX + perpendicularX * height) + _yAxis * (midpointY + perpendicularY * height);
     }
 
-    private bool TryCreateCenterArc(
-        OcctPoint3d center,
-        OcctPoint3d start,
-        OcctPoint3d endInput,
-        out CadArcEntity arc)
+    private bool TryCreateCenterArc(OcctPoint3d center, OcctPoint3d start, OcctPoint3d endInput, out CadArcEntity arc)
     {
         var startLocal = ToLocal(center, start);
         var endLocal = ToLocal(center, endInput);
@@ -438,26 +370,19 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
             arc = null!;
             return false;
         }
-
         var startAngle = Math.Atan2(startLocal.Y, startLocal.X);
         var endAngle = Math.Atan2(endLocal.Y, endLocal.X);
         var sweep = _clockwise
             ? -CadPrecisionSnapGeometry.NormalizePositive(startAngle - endAngle)
             : CadPrecisionSnapGeometry.NormalizePositive(endAngle - startAngle);
-        if (Math.Abs(sweep) <= 1e-9 ||
-            Math.Abs(Math.Abs(sweep) - Math.PI * 2.0) <= 1e-9)
+        if (Math.Abs(sweep) <= 1e-9 || Math.Abs(Math.Abs(sweep) - Math.PI * 2.0) <= 1e-9)
         {
             arc = null!;
             return false;
         }
-
-        var end = center +
-                  _xAxis * (Math.Cos(endAngle) * radius) +
-                  _yAxis * (Math.Sin(endAngle) * radius);
+        var end = center + _xAxis * (Math.Cos(endAngle) * radius) + _yAxis * (Math.Sin(endAngle) * radius);
         var middleAngle = startAngle + sweep * 0.5;
-        var middle = center +
-                     _xAxis * (Math.Cos(middleAngle) * radius) +
-                     _yAxis * (Math.Sin(middleAngle) * radius);
+        var middle = center + _xAxis * (Math.Cos(middleAngle) * radius) + _yAxis * (Math.Sin(middleAngle) * radius);
         arc = new CadArcEntity(start, middle, end);
         return true;
     }
@@ -465,9 +390,7 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
     private CadPlanePoint ToLocal(OcctPoint3d center, OcctPoint3d point)
     {
         var delta = CadTransformMath.Between(center, point);
-        return new CadPlanePoint(
-            CadTransformMath.Dot(delta, _xAxis),
-            CadTransformMath.Dot(delta, _yAxis));
+        return new CadPlanePoint(CadTransformMath.Dot(delta, _xAxis), CadTransformMath.Dot(delta, _yAxis));
     }
 
     private void RestorePrecisionFrame()
@@ -477,7 +400,6 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
             SetWorkPlane(_planeOrigin, _xAxis, _yAxis, lockPlane: false);
             return;
         }
-
         if (_method == CenterStartEnd)
         {
             var center = _points[0];
@@ -486,11 +408,9 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
                 SetWorkPlane(center, radialX, radialY);
                 return;
             }
-
             SetWorkPlane(center, _xAxis, _yAxis);
             return;
         }
-
         if (_method == StartCenterEnd && _points.Count >= 2)
         {
             var center = _points[1];
@@ -499,53 +419,33 @@ public sealed class ArcTool : CadDrawingTool, ICadPointInputTool
                 SetWorkPlane(center, radialX, radialY);
                 return;
             }
-
             SetWorkPlane(center, _xAxis, _yAxis);
             return;
         }
-
         if (_method == StartEndCenter)
         {
-            SetWorkPlane(
-                _points.Count >= 2 ? _points[1] : _points[0],
-                _xAxis,
-                _yAxis,
-                lockPlane: _points.Count >= 2);
+            SetWorkPlane(_points.Count >= 2 ? _points[1] : _points[0], _xAxis, _yAxis, lockPlane: _points.Count >= 2);
             return;
         }
-
-        if (_method == StartEndTangent &&
-            _points.Count >= 2)
+        if (_method == StartEndTangent && _points.Count >= 2)
         {
-            SetWorkPlane(
-                _points[0],
-                _xAxis,
-                _yAxis);
+            SetWorkPlane(_points[0], _xAxis, _yAxis);
             return;
         }
-
         SetWorkPlane(_points[^1], _xAxis, _yAxis);
     }
 
-    private bool TryRadialAxes(
-        OcctPoint3d center,
-        OcctPoint3d radialPoint,
-        out OcctVector3d xAxis,
-        out OcctVector3d yAxis)
+    private bool TryRadialAxes(OcctPoint3d center, OcctPoint3d radialPoint, out OcctVector3d xAxis, out OcctVector3d yAxis)
     {
         var delta = CadTransformMath.Between(center, radialPoint);
         var x = CadTransformMath.Dot(delta, _xAxis);
         var y = CadTransformMath.Dot(delta, _yAxis);
-        var planar = new OcctVector3d(
-            _xAxis.X * x + _yAxis.X * y,
-            _xAxis.Y * x + _yAxis.Y * y,
-            _xAxis.Z * x + _yAxis.Z * y);
+        var planar = new OcctVector3d(_xAxis.X * x + _yAxis.X * y, _xAxis.Y * x + _yAxis.Y * y, _xAxis.Z * x + _yAxis.Z * y);
         if (!planar.TryNormalize(out xAxis))
         {
             yAxis = default;
             return false;
         }
-
         var normal = _xAxis.Cross(_yAxis).Normalized();
         yAxis = normal.Cross(xAxis).Normalized();
         return true;

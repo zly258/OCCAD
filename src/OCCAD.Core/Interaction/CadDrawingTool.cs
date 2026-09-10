@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -50,10 +50,38 @@ public abstract class CadDrawingTool : CadTool
 
     protected void ShowPreview(CadEntity entity)
     {
+        if (!IsActive || Context.Workspace.Tools.ActiveTool != this)
+            return;
+
         ArgumentNullException.ThrowIfNull(entity);
-        entity.Layer =
-            Context.Workspace.Layers.Current.Name;
+        entity.Layer = Context.Workspace.Layers.Current.Name;
         Context.Preview.Show(entity);
+    }
+
+    protected void RefreshPreviewFromLastPointer()
+    {
+        if (!IsActive ||
+            Context.Workspace.Tools.ActiveTool != this ||
+            Context.Workspace.LastPointerPosition is not { } pointer)
+            return;
+
+        RefreshPreviewFromLastPointer(pointer);
+    }
+
+    protected internal override void RefreshPreviewFromLastPointer(CadPointerPosition pointer)
+    {
+        if (!IsActive || Context.Workspace.Tools.ActiveTool != this)
+            return;
+
+        var moveEvent = new OcctPointerInputEventArgs(
+            OcctPointerInputKind.Moved,
+            OcctPointerButton.None,
+            OcctPointerButtons.None,
+            pointer.X,
+            pointer.Y,
+            0,
+            OcctInputModifiers.None);
+        HandlePointer(moveEvent);
     }
 
     protected WorkPlaneFrame CaptureWorkPlaneFrame() =>
@@ -100,25 +128,29 @@ public abstract class CadDrawingTool : CadTool
             return;
 
         var committed = entity.Duplicate();
+        var engine = Context.Engine;
 
-        // The transient presentation must be removed before the persistent
-        // document presentation is created. Keeping both across AddEntity()
-        // can leave the last interactive frame alive in the OCCT scene even
-        // though the Tool itself has completed.
-        Context.Preview.Clear();
+        // Preview is transient and owned by the active tool.  Commit the
+        // persistent entity in the same display batch, then let the common
+        // tool-deactivation path remove every transient interaction object.
+        // Do not change AutomaticHighlight here: changing global viewer state
+        // during a tool commit was one of the causes of post-command residue.
+        using (engine.BeginDisplayBatch())
+        {
+            Context.Preview.Clear();
+            try
+            {
+                Context.AddEntity(committed);
+                Context.Workspace.Tools.CompleteCurrent();
+            }
+            catch
+            {
+                if (IsActive)
+                    ShowPreview(entity);
+                throw;
+            }
+        }
 
-        try
-        {
-            Context.AddEntity(committed);
-            Context.Workspace.Tools.CompleteCurrent();
-        }
-        catch
-        {
-            // Preserve an interactive retry state if document/history commit
-            // fails after the transient was cleared.
-            if (IsActive)
-                ShowPreview(entity);
-            throw;
-        }
+        engine.Redraw();
     }
 }

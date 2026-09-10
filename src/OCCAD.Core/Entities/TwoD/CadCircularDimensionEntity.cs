@@ -37,9 +37,14 @@ public sealed class CadCircularDimensionEntity : CadEntity
         ValidatePositive(textHeight, nameof(textHeight));
         ValidatePositive(arrowSize, nameof(arrowSize));
         ArgumentException.ThrowIfNullOrWhiteSpace(fontName);
-        Kind = kind; _center = center; _radius = radius; _offset = offset;
-        _textHeight = textHeight; _arrowSize = arrowSize; _fontName = fontName.Trim();
-        DisplayMode = OcctDisplayMode.Wireframe;
+        Kind = kind;
+        _center = center;
+        _radius = radius;
+        _offset = offset;
+        _textHeight = textHeight;
+        _arrowSize = arrowSize;
+        _fontName = fontName.Trim();
+        DisplayMode = OcctDisplayMode.Shaded;
     }
 
     [Category("Dimension"), ReadOnly(true)] public CadCircularDimensionKind Kind { get; }
@@ -66,10 +71,7 @@ public sealed class CadCircularDimensionEntity : CadEntity
 
     public override IReadOnlyList<CadSnapPoint> GetSnapPoints()
     {
-        var side = _normal.Cross(_direction).Normalized();
-        var leader = Kind == CadCircularDimensionKind.Radius
-            ? _center + _direction * (_radius + _offset)
-            : _center + side * _offset;
+        var leader = _center + _direction * (_radius + _offset);
         return
         [
             new(this, _center, CadSnapType.Center, 0),
@@ -78,26 +80,41 @@ public sealed class CadCircularDimensionEntity : CadEntity
         ];
     }
 
-    public override IReadOnlyList<CadGripPoint> GetGripPoints() =>
-        [new(this, 0, GetSnapPoints()[2].Position)];
+    public override IReadOnlyList<CadGripPoint> GetGripPoints()
+    {
+        var leader = _center + _direction * (_radius + _offset);
+        var side = _normal.Cross(_direction);
+        var plane = side.TryNormalize(out var yAxis)
+            ? new CadGripWorkPlane(_center, _direction, yAxis)
+            : null;
+        return
+        [
+            new(
+                this,
+                0,
+                leader,
+                plane,
+                _center,
+                CadPrecisionInputKind.LengthAndAngle,
+                CadGripKind.Radius)
+        ];
+    }
 
     public override void MoveGrip(int index, OcctPoint3d targetPoint)
     {
         if (index != 0) throw new ArgumentOutOfRangeException(nameof(index));
         if (!targetPoint.IsFinite) throw new ArgumentOutOfRangeException(nameof(targetPoint));
+
         var planar = targetPoint - _center;
         planar -= _normal * planar.Dot(_normal);
-        if (!planar.TryNormalize(out var direction)) return;
-        if (Kind == CadCircularDimensionKind.Radius)
-        {
-            _direction = direction;
-            _offset = planar.Length - _radius;
-        }
-        else
-        {
-            _direction = direction;
-            _offset = 0;
-        }
+        var distance = Math.Sqrt(planar.LengthSquared);
+        if (!double.IsFinite(distance) ||
+            distance <= 1e-9 ||
+            !planar.TryNormalize(out var direction))
+            return;
+
+        _direction = direction;
+        _offset = distance - _radius;
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
@@ -108,34 +125,80 @@ public sealed class CadCircularDimensionEntity : CadEntity
     {
         if (snapshot is not CadCircularDimensionEntity value || value.Kind != Kind)
             throw new ArgumentException("Snapshot type does not match.", nameof(snapshot));
-        _center=value._center; _normal=value._normal; _direction=value._direction; _radius=value._radius;
-        _offset=value._offset; _textHeight=value._textHeight; _arrowSize=value._arrowSize; _fontName=value._fontName;
+        _center = value._center;
+        _normal = value._normal;
+        _direction = value._direction;
+        _radius = value._radius;
+        _offset = value._offset;
+        _textHeight = value._textHeight;
+        _arrowSize = value._arrowSize;
+        _fontName = value._fontName;
         RaiseGeometryChanged(nameof(RestoreGeometry));
     }
 
-    public override void Translate(OcctVector3d displacement) { ValidateDisplacement(displacement); _center=Translated(_center, displacement); RaiseGeometryChanged(nameof(Translate)); }
-    public override void Rotate(OcctPoint3d center, OcctVector3d axis, double angleDegrees) { _center=CadTransformMath.RotatePoint(_center,center,axis,angleDegrees); _normal=CadTransformMath.RotateVector(_normal,axis,angleDegrees).Normalized(); _direction=CadTransformMath.RotateVector(_direction,axis,angleDegrees).Normalized(); RaiseGeometryChanged(nameof(Rotate)); }
-    public override void Scale(OcctPoint3d center, double factor) { CadTransformMath.ValidateScale(factor); _center=CadTransformMath.ScalePoint(_center,center,factor); _radius*=factor; _offset*=factor; _textHeight*=factor; _arrowSize*=factor; RaiseGeometryChanged(nameof(Scale)); }
+    public override void Translate(OcctVector3d displacement)
+    {
+        ValidateDisplacement(displacement);
+        _center = Translated(_center, displacement);
+        RaiseGeometryChanged(nameof(Translate));
+    }
+
+    public override void Rotate(OcctPoint3d center, OcctVector3d axis, double angleDegrees)
+    {
+        _center = CadTransformMath.RotatePoint(_center, center, axis, angleDegrees);
+        _normal = CadTransformMath.RotateVector(_normal, axis, angleDegrees).Normalized();
+        _direction = CadTransformMath.RotateVector(_direction, axis, angleDegrees).Normalized();
+        RaiseGeometryChanged(nameof(Rotate));
+    }
+
+    public override void Scale(OcctPoint3d center, double factor)
+    {
+        CadTransformMath.ValidateScale(factor);
+        _center = CadTransformMath.ScalePoint(_center, center, factor);
+        _radius *= factor;
+        _offset *= factor;
+        _textHeight *= factor;
+        _arrowSize *= factor;
+        RaiseGeometryChanged(nameof(Scale));
+    }
 
     private static OcctVector3d Orthogonalize(OcctVector3d direction, OcctVector3d normal)
     {
-        var projected=direction-normal*direction.Dot(normal);
-        if(!projected.TryNormalize(out var result)) throw new ArgumentOutOfRangeException(nameof(direction));
+        var projected = direction - normal * direction.Dot(normal);
+        if (!projected.TryNormalize(out var result))
+            throw new ArgumentOutOfRangeException(nameof(direction));
         return result;
     }
 
     internal static JsonObject WriteGeometry(CadCircularDimensionEntity e) => new()
     {
-        ["kind"]=e.Kind.ToString(), ["center"]=CadEntityJson.Point(e.Center), ["normal"]=CadEntityJson.Vector(e.Normal),
-        ["direction"]=CadEntityJson.Vector(e.Direction), ["radius"]=e.Radius, ["offset"]=e.Offset,
-        ["textHeight"]=e.TextHeight, ["arrowSize"]=e.ArrowSize, ["fontName"]=e.FontName
+        ["kind"] = e.Kind.ToString(),
+        ["center"] = CadEntityJson.Point(e.Center),
+        ["normal"] = CadEntityJson.Vector(e.Normal),
+        ["direction"] = CadEntityJson.Vector(e.Direction),
+        ["radius"] = e.Radius,
+        ["offset"] = e.Offset,
+        ["textHeight"] = e.TextHeight,
+        ["arrowSize"] = e.ArrowSize,
+        ["fontName"] = e.FontName
     };
+
     internal static CadCircularDimensionEntity ReadGeometry(JsonObject data)
     {
-        if(!Enum.TryParse<CadCircularDimensionKind>(data["kind"]?.GetValue<string>(), true, out var kind)) throw new InvalidDataException("Invalid circular dimension kind.");
-        var font=data["fontName"]?.GetValue<string>(); if(string.IsNullOrWhiteSpace(font)) throw new InvalidDataException("CAD dimension font cannot be empty.");
-        return new(kind, CadEntityJson.ReadPoint(data,"center"), CadEntityJson.ReadVector(data,"normal"), CadEntityJson.ReadVector(data,"direction"),
-            CadEntityJson.ReadDouble(data,"radius"), CadEntityJson.ReadDouble(data,"offset"), CadEntityJson.ReadDouble(data,"textHeight"), CadEntityJson.ReadDouble(data,"arrowSize"), font);
+        if (!Enum.TryParse<CadCircularDimensionKind>(data["kind"]?.GetValue<string>(), true, out var kind))
+            throw new InvalidDataException("Invalid circular dimension kind.");
+        var font = data["fontName"]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(font))
+            throw new InvalidDataException("CAD dimension font cannot be empty.");
+        return new(
+            kind,
+            CadEntityJson.ReadPoint(data, "center"),
+            CadEntityJson.ReadVector(data, "normal"),
+            CadEntityJson.ReadVector(data, "direction"),
+            CadEntityJson.ReadDouble(data, "radius"),
+            CadEntityJson.ReadDouble(data, "offset"),
+            CadEntityJson.ReadDouble(data, "textHeight"),
+            CadEntityJson.ReadDouble(data, "arrowSize"),
+            font);
     }
 }
-

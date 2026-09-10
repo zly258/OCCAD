@@ -1,11 +1,10 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
 public abstract class CadSelectionTransformToolBase : CadTool
 {
     private CadEntity[] _entities = [];
-    private readonly List<CadEntity> _suppressedSources = [];
 
     protected IReadOnlyList<CadEntity> Entities => _entities;
     protected virtual bool AutoCommitValidSelection => false;
@@ -17,9 +16,13 @@ public abstract class CadSelectionTransformToolBase : CadTool
 
     internal override bool CommitCurrentStage()
     {
-        if (State != CadToolState.WaitForSelect) return base.CommitCurrentStage();
+        if (State != CadToolState.WaitForSelect)
+            return base.CommitCurrentStage();
+
         var selected = CurrentSelection();
-        if (!IsActive || !IsSelectionValid(selected)) return false;
+        if (!IsActive || !IsSelectionValid(selected))
+            return false;
+
         BeginTransform(selected);
         return true;
     }
@@ -44,17 +47,8 @@ public abstract class CadSelectionTransformToolBase : CadTool
             input.Key != OcctKey.Enter)
             return false;
 
-        if (!CommitCurrentStage()) UpdateSelectionPrompt(0);
-        return true;
-    }
-
-    protected bool CancelOnRightClick(OcctPointerInputEventArgs input)
-    {
-        if (input.Kind != OcctPointerInputKind.Pressed ||
-            input.Button != OcctPointerButton.Right)
-            return false;
-
-        Context.Workspace.Tools.CancelCurrent();
+        if (!CommitCurrentStage())
+            UpdateSelectionPrompt(0);
         return true;
     }
 
@@ -63,8 +57,7 @@ public abstract class CadSelectionTransformToolBase : CadTool
 
     protected override void OnDeactivated()
     {
-        Context.Preview.Clear();
-        RestoreSourcePresentations();
+        ClearReplacementPreview();
         Context.Selection.Changed -= SelectionChanged;
         _entities = [];
         ResetTransformState();
@@ -97,74 +90,14 @@ public abstract class CadSelectionTransformToolBase : CadTool
         foreach (var entity in previews)
             transform(entity);
 
-        Context.Preview.Show(previews);
         if (SuppressSourcesDuringPreview)
-            SuppressSourcePresentations();
+            ShowReplacementPreview(_entities, previews);
+        else
+            Context.Preview.Show(previews);
     }
 
-    protected void ClearTransformPreview()
-    {
-        Context.Preview.Clear();
-        RestoreSourcePresentations();
-    }
-
-    private void SuppressSourcePresentations()
-    {
-        if (_suppressedSources.Count > 0 ||
-            Context.Workspace.Engine is not
-            { IsInitialized: true } engine)
-            return;
-
-        using var batch =
-            engine.BeginDisplayBatch();
-
-        foreach (var entity in _entities)
-        {
-            if (entity.ViewerObject is not
-                { } source ||
-                !engine.ContainsObject(source.Id) ||
-                !Context.Document
-                    .ResolveAppearance(entity)
-                    .Visible)
-                continue;
-
-            engine.SetObjectVisible(
-                source,
-                false);
-            _suppressedSources.Add(entity);
-        }
-    }
-
-    private void RestoreSourcePresentations()
-    {
-        if (_suppressedSources.Count == 0)
-            return;
-
-        var values =
-            _suppressedSources.ToArray();
-        _suppressedSources.Clear();
-
-        if (Context.Workspace.Engine is not
-            { IsInitialized: true } engine)
-            return;
-
-        using var batch =
-            engine.BeginDisplayBatch();
-
-        foreach (var entity in values)
-        {
-            if (entity.ViewerObject is not
-                { } source ||
-                !engine.ContainsObject(source.Id))
-                continue;
-
-            engine.SetObjectVisible(
-                source,
-                Context.Document
-                    .ResolveAppearance(entity)
-                    .Visible);
-        }
-    }
+    protected void ClearTransformPreview() =>
+        ClearReplacementPreview();
 
     private void BeginSelection()
     {
@@ -207,7 +140,7 @@ public abstract class CadSelectionTransformToolBase : CadTool
             return;
         }
 
-        UpdateSelectionPrompt(args.Entities.Count);
+        UpdateSelectionPrompt(selected.Length);
     }
 
     private void UpdateSelectionPrompt(int count)
@@ -217,14 +150,14 @@ public abstract class CadSelectionTransformToolBase : CadTool
             SetStageLocalized(
                 0,
                 $"Cad.Prompt.{Id}.Select",
-                $"{DisplayName}: select objects [Enter accept, Esc cancel]");
+                $"{DisplayName}: select objects [Enter/right-click accept, Esc cancel]");
             return;
         }
 
         SetStageLocalized(
             0,
             $"Cad.Prompt.{Id}.Selected",
-            $"{DisplayName}: {{0}} selected [Enter accept, Esc cancel]",
+            $"{DisplayName}: {{0}} selected [Enter/right-click accept, Esc cancel]",
             CadPrecisionInputKind.None,
             count);
     }

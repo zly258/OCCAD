@@ -33,6 +33,8 @@
     <sys:String x:Key="Cad.Settings.SnapTolerance">捕捉容差</sys:String>
     <sys:String x:Key="Cad.Settings.SelectionTolerance">选择容差</sys:String>
     <sys:String x:Key="Cad.Settings.ZoomSensitivity">鼠标缩放灵敏度</sys:String>
+    <sys:String x:Key="Cad.Settings.ParseIntError">"{0}"必须是有效整数。</sys:String>
+    <sys:String x:Key="Cad.Settings.ParseDoubleError">"{0}"必须是有效数字。</sys:String>
     <sys:String x:Key="Cad.Text.Language">语言</sys:String>
     <sys:String x:Key="Cad.Text.Finish">结束</sys:String>
     <sys:String x:Key="Cad.Text.ObjectSnap">对象捕捉</sys:String>
@@ -827,9 +829,15 @@
     <sys:String x:Key="Cad.Text.LineWidth">线宽</sys:String>
     <sys:String x:Key="Cad.Text.LineStyle">线型</sys:String>
     <sys:String x:Key="Cad.Text.Current">当前</sys:String>
-    <sys:String x:Key="Cad.Text.Ok">确定</sys:String>
     <sys:String x:Key="Cad.Text.CustomColor">自定义颜色</sys:String>
     <sys:String x:Key="Cad.Text.ColorTable">颜色表</sys:String>
+    <sys:String x:Key="Cad.Text.StandardColors">标准颜色</sys:String>
+    <sys:String x:Key="Cad.Text.IndexColors">索引颜色</sys:String>
+    <sys:String x:Key="Cad.Text.GrayColors">灰度颜色</sys:String>
+    <sys:String x:Key="Cad.Text.Error">错误</sys:String>
+    <sys:String x:Key="Cad.Text.Warning">警告</sys:String>
+    <sys:String x:Key="Cad.Text.Question">询问</sys:String>
+    <sys:String x:Key="Cad.Text.Information">信息</sys:String>
     <sys:String x:Key="Cad.Prompt.revolve.AxisStart">旋转建模：指定旋转轴起点 [Backspace 返回轮廓，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.revolve.AxisEnd">旋转建模：指定旋转轴终点 [Backspace 返回轴起点，Esc 取消]</sys:String>
     <sys:String x:Key="Cad.Prompt.revolve.Angle">旋转建模：移动鼠标设置角度，单击或按 Enter 确认 [Backspace 返回旋转轴，Esc 取消]</sys:String>

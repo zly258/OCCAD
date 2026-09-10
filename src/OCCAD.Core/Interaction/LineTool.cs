@@ -1,4 +1,4 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
@@ -72,11 +72,10 @@ public sealed class LineTool : CadDrawingTool, ICadPointInputTool
         }
         if (_start.Value.DistanceTo(point) <= 1e-9)
             return false;
-        UpdatePreview(_start.Value, point);
-        if (_preview is null)
-            return false;
-
-        CommitPreview(_preview);
+        var entity = new CadLineEntity(_start.Value, point);
+        _start = null;
+        _preview = null;
+        CommitPreview(entity);
         return true;
     }
 

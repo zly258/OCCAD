@@ -13,6 +13,7 @@ internal sealed class CadToolPanel : Border
     private const string PrecisionLengthId = "$precision.length";
     private const string PrecisionAngleId = "$precision.angle";
     private const string PrecisionFactorId = "$precision.factor";
+    private const string ExactPointId = "$point.coordinate";
 
     private readonly CadWorkspace _workspace;
     private readonly TextBlock _title;
@@ -20,8 +21,6 @@ internal sealed class CadToolPanel : Border
     private readonly Button _close;
     private readonly Button _finish;
     private readonly Button _cancel;
-    private readonly TextBlock _planeState;
-    private readonly CheckBox _planeLock;
     private readonly Dictionary<string, Control> _editors =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CheckBox> _locks =
@@ -37,12 +36,12 @@ internal sealed class CadToolPanel : Border
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
 
         Width = CadTheme.ToolPanelWidth;
-        MaxHeight = 620;
+        MaxHeight = 560;
         HorizontalAlignment = HorizontalAlignment.Left;
         VerticalAlignment = VerticalAlignment.Top;
-        Margin = new Thickness(8);
+        Margin = new Thickness(7);
         Background = CadTheme.Surface;
-        BorderBrush = CadTheme.Border;
+        BorderBrush = CadTheme.BorderStrong;
         BorderThickness = new Thickness(1);
         CornerRadius = new CornerRadius(0);
         IsVisible = false;
@@ -52,7 +51,7 @@ internal sealed class CadToolPanel : Border
             FontWeight = FontWeight.SemiBold,
             Foreground = CadTheme.Text,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(9, 0)
+            Margin = new Thickness(7, 0)
         };
 
         _close = new Button
@@ -80,8 +79,8 @@ internal sealed class CadToolPanel : Border
 
         _content = new StackPanel
         {
-            Spacing = 2,
-            Margin = new Thickness(8)
+            Spacing = 0,
+            Margin = new Thickness(5)
         };
 
         _finish = CompactButton();
@@ -89,24 +88,6 @@ internal sealed class CadToolPanel : Border
         _finish.Click += (_, _) => FinishTool();
         _cancel = CompactButton();
         _cancel.Click += (_, _) => _workspace.Tools.CancelCurrent();
-
-        _planeState = new TextBlock
-        {
-            Foreground = CadTheme.Muted,
-            FontSize = CadTheme.SmallFontSize,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        _planeLock = new CheckBox
-        {
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        _planeLock.IsCheckedChanged += (_, _) =>
-        {
-            if (_refreshing) return;
-            _workspace.WorkPlane.SetToolPlaneFixed(
-                _planeLock.IsChecked == true);
-            RefreshWorkPlaneState();
-        };
 
         var scroll = new ScrollViewer
         {
@@ -203,6 +184,7 @@ internal sealed class CadToolPanel : Border
     }
 
     private static bool CanShow(CadTool tool) =>
+        tool.CurrentStep.InputKind == CadToolInputKind.Point ||
         tool.ParameterPanel is not null ||
         tool.PrecisionInputs != CadPrecisionInputKind.None;
 
@@ -221,8 +203,6 @@ internal sealed class CadToolPanel : Border
 
     private void ClearDynamicContent()
     {
-        DetachReusableControl(_planeState);
-        DetachReusableControl(_planeLock);
         DetachReusableControl(_finish);
         DetachReusableControl(_cancel);
         _content.Children.Clear();
@@ -253,7 +233,7 @@ internal sealed class CadToolPanel : Border
             _editors.Clear();
             _locks.Clear();
 
-            AddWorkPlaneState();
+            AddExactPointEditor(tool);
             AddPrecisionEditors(tool);
 
             if (tool.ParameterPanel is { } panel)
@@ -264,20 +244,16 @@ internal sealed class CadToolPanel : Border
 
             var buttons = new Grid
             {
-                Margin = new Thickness(0, 6, 0, 0),
-                ColumnSpacing = 4
+                Margin = new Thickness(0, 5, 0, 0),
+                ColumnSpacing = 3
             };
             buttons.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
             buttons.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
-            var canAcceptStep =
-                tool.CanCommitCurrentStage &&
-                !tool.CurrentStep.RequiresPointer;
+            var canAcceptStep = tool.CanCommitCurrentStage;
             _finish.Content = canAcceptStep
                 ? CadLanguageManager.Text("Cad.Text.Accept", "Accept")
                 : CadLanguageManager.Text("Cad.Text.Finish", "Finish");
-            _finish.IsEnabled =
-                canAcceptStep ||
-                tool.CanFinish;
+            _finish.IsEnabled = canAcceptStep || tool.CanFinish;
             _cancel.Content = CadLanguageManager.Text("Cad.Text.Cancel", "Cancel");
             _cancel.IsEnabled = tool.CanCancel;
             buttons.Children.Add(_finish);
@@ -291,52 +267,74 @@ internal sealed class CadToolPanel : Border
         }
     }
 
-    private void AddWorkPlaneState()
+    private void AddExactPointEditor(CadTool tool)
     {
-        _planeLock.Content = CadLanguageManager.Text(
-            "Cad.Text.FixToolPlane",
-            "Fix tool plane");
+        if (tool.CurrentStep.InputKind != CadToolInputKind.Point)
+            return;
 
-        var row = new Grid
+        var editor = new TextBox
         {
-            Margin = new Thickness(0, 0, 0, 5),
-            ColumnSpacing = 5,
-            Background = CadTheme.Surface
+            Tag = ExactPointId,
+            Watermark = "100,200  |  @500,0  |  @1000<30"
         };
-        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
-        row.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-        _planeState.Margin = new Thickness(6, 3);
-        row.Children.Add(_planeState);
-        Grid.SetColumn(_planeLock, 1);
-        _planeLock.Margin = new Thickness(0, 2, 6, 2);
-        row.Children.Add(_planeLock);
-        _content.Children.Add(new Border
+        editor.Classes.Add("cad-input");
+        editor.KeyDown += (_, e) =>
         {
-            BorderBrush = CadTheme.Border,
-            BorderThickness = new Thickness(0, 0, 0, 1),
-            Child = row
-        });
-        RefreshWorkPlaneState();
+            if (e.Key != Key.Enter)
+                return;
+            CommitExactPoint(editor);
+            e.Handled = true;
+        };
+
+        var apply = CompactButton();
+        apply.Content = CadLanguageManager.Text("Cad.Text.SetPoint", "Set");
+        apply.MinWidth = 48;
+        apply.Click += (_, _) => CommitExactPoint(editor);
+
+        var panel = new Grid { ColumnSpacing = 3 };
+        panel.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+        panel.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+        panel.Children.Add(editor);
+        Grid.SetColumn(apply, 1);
+        panel.Children.Add(apply);
+
+        _editors[ExactPointId] = editor;
+        AddRow(
+            CadLanguageManager.Text("Cad.Text.Coordinate", "Point"),
+            panel);
     }
 
-    private void RefreshWorkPlaneState()
+    private void CommitExactPoint(TextBox editor)
     {
-        _planeState.Text =
-            _workspace.WorkPlane.ToolPlaneFixed
-                ? CadLanguageManager.Text(
-                    "Cad.Text.ToolPlaneFixed",
-                    "Tool plane fixed")
-                : _workspace.WorkPlane.UserPlaneLocked
-                    ? CadLanguageManager.Text(
-                        "Cad.Text.UserPlaneLocked",
-                        "User work plane locked")
-                    : CadLanguageManager.Text(
-                        "Cad.Text.ToolPlaneActive",
-                        "Tool plane active");
-        _planeLock.IsChecked =
-            _workspace.WorkPlane.ToolPlaneFixed;
-        _planeLock.IsEnabled =
-            _workspace.WorkPlane.ToolPlane is not null;
+        if (_refreshing ||
+            _tool is not { IsActive: true } tool ||
+            tool.CurrentStep.InputKind != CadToolInputKind.Point)
+            return;
+
+        var reference =
+            tool.PrecisionReferencePoint ??
+            _workspace.LastResolvedPoint?.Point ??
+            _workspace.WorkPlane.Origin;
+
+        if (!CadCoordinateInputParser.TryParse(
+                editor.Text,
+                reference,
+                _workspace.WorkPlane,
+                out var input))
+        {
+            editor.SelectAll();
+            return;
+        }
+
+        if (!_workspace.Tools.CommitPoint(input.Point))
+        {
+            editor.SelectAll();
+            return;
+        }
+
+        editor.Text = string.Empty;
+        SetTool(_workspace.Tools.ActiveTool);
     }
 
     private void AddPrecisionEditors(CadTool tool)
@@ -392,7 +390,7 @@ internal sealed class CadToolPanel : Border
         _editors[id] = editor;
         _locks[id] = toggle;
 
-        var panel = new Grid { ColumnSpacing = 4 };
+        var panel = new Grid { ColumnSpacing = 3 };
         panel.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
         panel.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
@@ -424,7 +422,7 @@ internal sealed class CadToolPanel : Border
             _editors[parameter.Id] = editor;
             _locks[parameter.Id] = toggle;
 
-            var panel = new Grid { ColumnSpacing = 4 };
+            var panel = new Grid { ColumnSpacing = 3 };
             panel.ColumnDefinitions.Add(
                 new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
             panel.ColumnDefinitions.Add(
@@ -578,11 +576,14 @@ internal sealed class CadToolPanel : Border
     {
         var row = new Grid
         {
-            ColumnSpacing = 5,
-            Margin = new Thickness(0)
+            ColumnSpacing = 0,
+            Margin = new Thickness(0),
+            MinHeight = CadTheme.PropertyRowHeight
         };
         row.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(CadTheme.ToolLabelWidth)));
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition(new GridLength(1)));
         row.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
 
@@ -590,13 +591,31 @@ internal sealed class CadToolPanel : Border
         {
             Text = labelText,
             Foreground = CadTheme.Text,
+            Margin = new Thickness(5, 0, 4, 0),
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
         row.Children.Add(label);
-        Grid.SetColumn(editor, 1);
+
+        var separator = new Border
+        {
+            Width = 1,
+            Background = CadTheme.Border
+        };
+        Grid.SetColumn(separator, 1);
+        row.Children.Add(separator);
+
+        editor.Margin = new Thickness(3, 0, 0, 0);
+        Grid.SetColumn(editor, 2);
         row.Children.Add(editor);
-        _content.Children.Add(row);
+
+        _content.Children.Add(new Border
+        {
+            Background = CadTheme.Surface,
+            BorderBrush = CadTheme.Border,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = row
+        });
     }
 
     private void RefreshValues(CadTool tool)
@@ -604,8 +623,6 @@ internal sealed class CadToolPanel : Border
         _refreshing = true;
         try
         {
-            RefreshWorkPlaneState();
-
             RefreshLockedEditor(
                 PrecisionLengthId,
                 _workspace.Drafting.LengthLockEnabled
@@ -683,9 +700,7 @@ internal sealed class CadToolPanel : Border
                 }
             }
 
-            var canAcceptStep =
-                tool.CanCommitCurrentStage &&
-                !tool.CurrentStep.RequiresPointer;
+            var canAcceptStep = tool.CanCommitCurrentStage;
             _finish.Content = canAcceptStep
                 ? CadLanguageManager.Text(
                     "Cad.Text.Accept",
@@ -693,9 +708,7 @@ internal sealed class CadToolPanel : Border
                 : CadLanguageManager.Text(
                     "Cad.Text.Finish",
                     "Finish");
-            _finish.IsEnabled =
-                canAcceptStep ||
-                tool.CanFinish;
+            _finish.IsEnabled = canAcceptStep || tool.CanFinish;
             _cancel.Content = CadLanguageManager.Text(
                 "Cad.Text.Cancel",
                 "Cancel");
@@ -770,20 +783,11 @@ internal sealed class CadToolPanel : Border
                 _tool,
                 kind);
 
-        if (!double.TryParse(
+        if (!CadValueTextConverter.TryParseFiniteDouble(
                 value,
-                NumberStyles.Float,
-                CultureInfo.CurrentCulture,
-                out var number) &&
-            !double.TryParse(
-                value,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out number))
+                out var number))
             return false;
 
-        if (!double.IsFinite(number))
-            return false;
         if (kind != CadPrecisionInputKind.Angle &&
             number <= 0)
             return false;
@@ -805,7 +809,6 @@ internal sealed class CadToolPanel : Border
     private void FinishTool()
     {
         if (_tool is null) return;
-
         _workspace.Tools.SubmitCurrent();
     }
 

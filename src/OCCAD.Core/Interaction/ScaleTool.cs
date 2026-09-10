@@ -1,179 +1,261 @@
-﻿using OcctNet;
+using OcctNet;
 
 namespace OCCAD;
 
 public sealed class ScaleTool : CadSelectionTransformToolBase, ICadPointInputTool
 {
-    private OcctPoint3d? _center;
-    private double? _referenceLength;
-    private OcctVector3d? _referenceDirection;
-    private CadPlaneFrame _initialPlane;
+    private const double MinimumFactor = 1e-9;
+
+    private OcctPoint3d? _basePoint;
+    private OcctPoint3d _initialOrigin;
+
     public override string Id => "scale";
     public override string DisplayName => "Scale";
+    public override string PrecisionFactorLabel => "Scale Factor";
+    public override OcctPoint3d? PrecisionReferencePoint => _basePoint;
+
     protected override bool SuppressSourcesDuringPreview => true;
-    public override OcctPoint3d? PrecisionReferencePoint => _center;
-    protected override bool CanCommitCurrentStageCore => State == CadToolState.Drawing;
-    protected override bool CanStepBackCore => _center is not null;
-    protected override bool CanFinishCore => _referenceLength is not null && Context.Workspace.Precision.Factor is not null;
+    protected override bool CanCommitCurrentStageCore => true;
+    protected override bool CanStepBackCore => _basePoint is not null;
+
+    public override bool CanCommitCurrentStage =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        _basePoint is not null &&
+        Context.Workspace.Precision.Factor is > MinimumFactor
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnTransformStarted()
     {
-        _initialPlane =
-            Context.WorkPlane.EffectivePlane;
-        RestorePrompt();
+        _basePoint = null;
+        _initialOrigin = Context.WorkPlane.Origin;
+        SetStageLocalized(
+            0,
+            "Cad.Prompt.scale.Base",
+            "Scale: specify base point [Esc cancel]");
     }
 
     public override bool HandlePointer(OcctPointerInputEventArgs input)
     {
-        if (CancelOnRightClick(input)) return true;
-        if (State != CadToolState.Drawing) return false;
-        if (input.Kind == OcctPointerInputKind.Moved && _referenceLength is not null)
+        if (CancelOnRightClick(input))
+            return true;
+
+        if (State == CadToolState.WaitForSelect ||
+            Entities.Count == 0)
+            return false;
+
+        if (input.Kind == OcctPointerInputKind.Moved &&
+            _basePoint is { } basePoint)
         {
-            Preview(Context.ResolvePoint(input.X, input.Y, _center).Point);
+            var point = Context.ResolvePoint(
+                input.X,
+                input.Y,
+                basePoint).Point;
+            UpdatePreview(point);
             return true;
         }
-        return input.Kind == OcctPointerInputKind.Pressed && input.Button == OcctPointerButton.Left &&
-            TryAcceptPoint(Context.ResolvePoint(input.X, input.Y, _center).Point);
+
+        if (input.Kind != OcctPointerInputKind.Pressed ||
+            input.Button != OcctPointerButton.Left)
+            return false;
+
+        return AcceptPoint(
+            Context.ResolvePoint(
+                input.X,
+                input.Y,
+                _basePoint).Point);
     }
 
-    public bool TryAcceptPoint(OcctPoint3d point)
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
     {
-        if (!IsActive || State != CadToolState.Drawing || !point.IsFinite) return false;
-        if (_center is null)
+        if (State != CadToolState.Drawing)
+            return false;
+
+        if (_basePoint is not null &&
+            Context.Workspace.Precision.Factor is { } factor &&
+            factor > MinimumFactor)
         {
-            _center = point;
-            Context.WorkPlane.SetOrigin(point);
-            Context.WorkPlane.SetToolPlaneFixed(true);
-            RestorePrompt();
-            return true;
+            return CommitFactor(factor);
         }
-        var length = point.DistanceTo(_center.Value);
-        if (_referenceLength is null)
-        {
-            if (length <= 1e-9) return false;
-            var vector =
-                CadTransformMath.Between(
-                    _center.Value,
-                    point);
-            if (!vector.TryNormalize(
-                    out var direction))
-                return false;
 
-            _referenceLength = length;
-            _referenceDirection = direction;
-
-            var normal =
-                _initialPlane.Normal;
-            var planarDirection =
-                new OcctVector3d(
-                    direction.X -
-                        normal.X *
-                        CadTransformMath.Dot(
-                            direction,
-                            normal),
-                    direction.Y -
-                        normal.Y *
-                        CadTransformMath.Dot(
-                            direction,
-                            normal),
-                    direction.Z -
-                        normal.Z *
-                        CadTransformMath.Dot(
-                            direction,
-                            normal));
-            if (!planarDirection.TryNormalize(
-                    out var xAxis))
-                xAxis = _initialPlane.XAxis;
-
-            var yAxis =
-                normal.Cross(xAxis).Normalized();
-            SetWorkPlane(
-                _center.Value,
-                xAxis,
-                yAxis,
-                lockPlane: true);
-            RestorePrompt();
-            LockStageAngle(0.0);
-            return true;
-        }
-        var factor = Factor(point);
-        if (!double.IsFinite(factor) || factor <= 1e-9) return false;
-        Commit(factor);
-        return true;
+        return AcceptPoint(
+            Context.ResolvePoint(
+                pointer.X,
+                pointer.Y,
+                _basePoint).Point);
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        TryAcceptPoint(Context.ResolvePoint(pointer.X, pointer.Y, _center).Point);
-
-    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
-    {
-        if (_referenceLength is null) return false;
-        if (input.Factor is { } factor)
-            ShowEntityPreview(entity => entity.ScaleFromWorld(_center!.Value, factor));
-        else ClearTransformPreview();
-        NotifyUpdated();
-        return true;
-    }
-
-    protected override bool OnFinish()
-    {
-        if (!CanFinish) return false;
-        Commit(Context.Workspace.Precision.Factor!.Value);
-        return true;
-    }
+    public bool TryAcceptPoint(OcctPoint3d point) =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        Entities.Count > 0 &&
+        AcceptPoint(point);
 
     protected override bool OnStepBack()
     {
-        if (_referenceLength is not null)
-        {
-            _referenceLength = null;
-            _referenceDirection = null;
-            SetWorkPlane(
-                _center!.Value,
-                _initialPlane.XAxis,
-                _initialPlane.YAxis,
-                lockPlane: false);
-        }
-        else
-        {
-            _center = null;
-            SetWorkPlane(
-                _initialPlane.Origin,
-                _initialPlane.XAxis,
-                _initialPlane.YAxis,
-                lockPlane: false);
-        }
+        if (_basePoint is null)
+            return false;
+
+        _basePoint = null;
         ClearTransformPreview();
-        RestorePrompt();
+        Context.WorkPlane.SetOrigin(_initialOrigin);
+        Context.Workspace.Precision.ResetFactor();
+        SetStageLocalized(
+            0,
+            "Cad.Prompt.scale.Base",
+            "Scale: specify base point [Esc cancel]");
         return true;
+    }
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (_basePoint is null)
+            return input.Factor is null;
+
+        if (Context.Workspace.Precision.Factor is { } factor)
+        {
+            if (!IsValidFactor(factor))
+                return false;
+
+            ShowScalePreview(factor);
+            return true;
+        }
+
+        RefreshPreviewFromLastPointer();
+        return true;
+    }
+
+    protected internal override void RefreshPreviewFromLastPointer(
+        CadPointerPosition pointer)
+    {
+        if (_basePoint is null)
+            return;
+
+        if (Context.Workspace.Precision.Factor is { } factor &&
+            IsValidFactor(factor))
+        {
+            ShowScalePreview(factor);
+            return;
+        }
+
+        var point = Context.ResolvePoint(
+            pointer.X,
+            pointer.Y,
+            _basePoint).Point;
+        UpdatePreview(point);
     }
 
     protected override void ResetTransformState()
     {
-        _center = null;
-        _referenceLength = null;
-        _referenceDirection = null;
-        _initialPlane = default;
-    }
-    private double Factor(OcctPoint3d point) => Context.Workspace.Precision.Factor ?? point.DistanceTo(_center!.Value) / _referenceLength!.Value;
-
-    private void Preview(OcctPoint3d point)
-    {
-        var factor = Factor(point);
-        if (double.IsFinite(factor) && factor > 1e-9)
-            ShowEntityPreview(entity => entity.ScaleFromWorld(_center!.Value, factor));
-        else ClearTransformPreview();
+        _basePoint = null;
+        _initialOrigin = default;
     }
 
-    private void Commit(double factor)
+    private bool AcceptPoint(OcctPoint3d point)
     {
-        Context.Workspace.ScaleEntities(Entities, _center!.Value, factor);
+        if (!point.IsFinite)
+            return false;
+
+        if (_basePoint is null)
+        {
+            _basePoint = point;
+            Context.WorkPlane.SetOrigin(point);
+            ClearTransformPreview();
+            SetStageLocalized(
+                1,
+                "Cad.Prompt.scale.Target",
+                "Scale: specify factor [Backspace undo, Esc cancel]",
+                CadPrecisionInputKind.Factor);
+            return true;
+        }
+
+        if (Context.Workspace.Precision.Factor is { } lockedFactor)
+            return CommitFactor(lockedFactor);
+
+        if (!TryFactorFromPoint(point, out var factor))
+        {
+            ClearTransformPreview();
+            return false;
+        }
+
+        return CommitFactor(factor);
+    }
+
+    private void UpdatePreview(OcctPoint3d point)
+    {
+        if (Context.Workspace.Precision.Factor is { } lockedFactor)
+        {
+            if (IsValidFactor(lockedFactor))
+                ShowScalePreview(lockedFactor);
+            else
+                ClearTransformPreview();
+            return;
+        }
+
+        if (!TryFactorFromPoint(point, out var factor))
+        {
+            ClearTransformPreview();
+            return;
+        }
+
+        ShowScalePreview(factor);
+    }
+
+    private void ShowScalePreview(double factor)
+    {
+        if (!IsValidFactor(factor) || _basePoint is null)
+        {
+            ClearTransformPreview();
+            return;
+        }
+
+        if (Math.Abs(factor - 1.0) <= 1e-12)
+        {
+            ClearTransformPreview();
+            return;
+        }
+
+        ShowEntityPreview(
+            entity => entity.ScaleFromWorld(
+                _basePoint.Value,
+                factor));
+    }
+
+    private bool CommitFactor(double factor)
+    {
+        if (_basePoint is null ||
+            !IsValidFactor(factor) ||
+            Math.Abs(factor - 1.0) <= 1e-12)
+        {
+            ClearTransformPreview();
+            return false;
+        }
+
+        Context.Workspace.ScaleEntities(
+            Entities,
+            _basePoint.Value,
+            factor);
         Context.Workspace.Tools.CompleteCurrent();
+        return true;
     }
 
-    private void RestorePrompt()
+    private bool TryFactorFromPoint(
+        OcctPoint3d point,
+        out double factor)
     {
-        if (_center is null) SetStageLocalized(0, "Cad.Prompt.scale.Base", "Scale: specify base point [Esc cancel]");
-        else if (_referenceLength is null) SetStageLocalized(1, "Cad.Prompt.scale.Reference", "Scale: specify reference distance [Backspace undo, Esc cancel]");
-        else SetStageLocalized(2, "Cad.Prompt.scale.Target", "Scale: specify target distance or factor [Backspace undo, Esc cancel]", CadPrecisionInputKind.Factor);
+        factor = 0.0;
+        if (_basePoint is not { } basePoint)
+            return false;
+
+        var frame = Context.WorkPlane.EffectivePlane;
+        var delta = point - basePoint;
+        var x = delta.Dot(frame.XAxis);
+        var y = delta.Dot(frame.YAxis);
+        factor = Math.Sqrt(x * x + y * y);
+        return IsValidFactor(factor);
     }
+
+    private static bool IsValidFactor(double factor) =>
+        double.IsFinite(factor) && factor > MinimumFactor;
 }

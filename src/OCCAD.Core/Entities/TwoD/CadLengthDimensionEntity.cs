@@ -35,7 +35,7 @@ public sealed class CadLengthDimensionEntity : CadEntity
         _textHeight = textHeight;
         _arrowSize = arrowSize;
         _fontName = fontName.Trim();
-        DisplayMode = OcctDisplayMode.Wireframe;
+        DisplayMode = OcctDisplayMode.Shaded;
     }
 
     [Browsable(false)] public OcctPoint3d Start => _start;
@@ -133,39 +133,103 @@ public sealed class CadLengthDimensionEntity : CadEntity
     {
         var axis = (_end - _start).Normalized();
         var offsetDirection = _normal.Cross(axis).Normalized();
-        var dimensionMiddle = _start + (_end - _start) * 0.5 + offsetDirection * _offset;
+        var middle = _start + (_end - _start) * 0.5;
+        var dimensionMiddle = middle + offsetDirection * _offset;
+        var plane = new CadGripWorkPlane(
+            _start,
+            axis,
+            offsetDirection);
+        var offsetPlane = new CadGripWorkPlane(
+            middle,
+            axis,
+            offsetDirection,
+            LockPlane: true,
+            LockedAngleDegrees: 90.0);
+
         return
         [
-            new(this, 0, _start),
-            new(this, 1, _end),
-            new(this, 2, dimensionMiddle)
+            new(
+                this,
+                0,
+                _start,
+                plane with { Origin = _end },
+                _end,
+                CadPrecisionInputKind.LengthAndAngle,
+                CadGripKind.Vertex),
+            new(
+                this,
+                1,
+                _end,
+                plane,
+                _start,
+                CadPrecisionInputKind.LengthAndAngle,
+                CadGripKind.Vertex),
+            new(
+                this,
+                2,
+                dimensionMiddle,
+                offsetPlane,
+                middle,
+                CadPrecisionInputKind.Length,
+                CadGripKind.Midpoint)
         ];
     }
 
     public override void MoveGrip(int index, OcctPoint3d targetPoint)
     {
-        if (!targetPoint.IsFinite) throw new ArgumentOutOfRangeException(nameof(targetPoint));
-        if (index == 0) _start = targetPoint;
-        else if (index == 1) _end = targetPoint;
-        else if (index == 2)
+        if (!targetPoint.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(targetPoint));
+
+        switch (index)
         {
-            var axis = (_end - _start).Normalized();
-            var middle = _start + (_end - _start) * 0.5;
-            _offset = (targetPoint - middle).Dot(_normal.Cross(axis).Normalized());
+            case 0:
+                if ((_end - targetPoint).Length <= 1e-9)
+                    return;
+                _start = targetPoint;
+                break;
+
+            case 1:
+                if ((targetPoint - _start).Length <= 1e-9)
+                    return;
+                _end = targetPoint;
+                break;
+
+            case 2:
+            {
+                var axis = (_end - _start).Normalized();
+                var middle = _start + (_end - _start) * 0.5;
+                var offsetDirection = _normal.Cross(axis).Normalized();
+                var offset = (targetPoint - middle).Dot(offsetDirection);
+                if (!double.IsFinite(offset))
+                    return;
+                _offset = offset;
+                break;
+            }
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(index));
         }
-        else throw new ArgumentOutOfRangeException(nameof(index));
+
         ValidatePoints(_start, _end);
         RaiseGeometryChanged(nameof(MoveGrip));
     }
 
     public override CadEntity Duplicate() =>
         CopyPropertiesTo(new CadLengthDimensionEntity(
-            _start, _end, _normal, _offset, _textHeight, _arrowSize, _fontName));
+            _start,
+            _end,
+            _normal,
+            _offset,
+            _textHeight,
+            _arrowSize,
+            _fontName));
 
     public override void RestoreGeometry(CadEntity snapshot)
     {
         if (snapshot is not CadLengthDimensionEntity value)
-            throw new ArgumentException("Snapshot type does not match.", nameof(snapshot));
+            throw new ArgumentException(
+                "Snapshot type does not match.",
+                nameof(snapshot));
         _start = value._start;
         _end = value._end;
         _normal = value._normal;
@@ -184,7 +248,10 @@ public sealed class CadLengthDimensionEntity : CadEntity
         RaiseGeometryChanged(nameof(Translate));
     }
 
-    public override void Rotate(OcctPoint3d center, OcctVector3d axis, double angleDegrees)
+    public override void Rotate(
+        OcctPoint3d center,
+        OcctVector3d axis,
+        double angleDegrees)
     {
         _start = CadTransformMath.RotatePoint(_start, center, axis, angleDegrees);
         _end = CadTransformMath.RotatePoint(_end, center, axis, angleDegrees);
@@ -205,7 +272,8 @@ public sealed class CadLengthDimensionEntity : CadEntity
 
     private static void ValidatePoints(OcctPoint3d start, OcctPoint3d end)
     {
-        if (!start.IsFinite) throw new ArgumentOutOfRangeException(nameof(start));
+        if (!start.IsFinite)
+            throw new ArgumentOutOfRangeException(nameof(start));
         if (!end.IsFinite || (end - start).Length <= 1e-9)
             throw new ArgumentOutOfRangeException(nameof(end));
     }
@@ -226,7 +294,8 @@ public sealed class CadLengthDimensionEntity : CadEntity
     {
         var fontName = data["fontName"]?.GetValue<string>();
         if (string.IsNullOrWhiteSpace(fontName))
-            throw new InvalidDataException("CAD dimension font cannot be empty.");
+            throw new InvalidDataException(
+                "CAD dimension font cannot be empty.");
         return new CadLengthDimensionEntity(
             CadEntityJson.ReadPoint(data, "start"),
             CadEntityJson.ReadPoint(data, "end"),

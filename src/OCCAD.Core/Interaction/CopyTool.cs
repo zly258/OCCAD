@@ -1,4 +1,4 @@
-using System.Globalization;
+using System.ComponentModel;
 using OcctNet;
 
 namespace OCCAD;
@@ -26,20 +26,22 @@ public sealed class CopyTool : CadTranslateToolBase
         string id,
         string value)
     {
-        if (!id.Equals(
-                "Count",
-                StringComparison.OrdinalIgnoreCase) ||
-            !int.TryParse(
+        if (!id.Equals("Count", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var descriptor = CadValueDescriptor.Create(
+            "Count",
+            typeof(int),
+            minimum: 1,
+            maximum: 100,
+            semantic: CadValueSemantic.Integer);
+        if (!CadValueTextConverter.TryParse(
+                descriptor,
+                typeof(int),
+                TypeDescriptor.GetConverter(typeof(int)),
                 value,
-                NumberStyles.Integer,
-                CultureInfo.CurrentCulture,
-                out var count) &&
-            !int.TryParse(
-                value,
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out count) ||
-            count is < 1 or > 100)
+                out var parsed) ||
+            parsed is not int count)
             return false;
 
         _count = count;

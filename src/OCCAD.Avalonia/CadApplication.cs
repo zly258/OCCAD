@@ -10,8 +10,7 @@ public sealed class CadApplication : Application
 {
     public override void Initialize()
     {
-        CadDiagnostics.Trace(
-            "CadApplication.Initialize entered.");
+        CadDiagnostics.Trace("CadApplication.Initialize entered.");
 
         Styles.Add(new FluentTheme
         {
@@ -24,15 +23,13 @@ public sealed class CadApplication : Application
         });
 
         CadTheme.Apply(this);
-        CadLanguageManager.Apply(
-            System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith(
-                "zh",
-                StringComparison.OrdinalIgnoreCase)
-                ? "zh-CN"
-                : "en-US");
 
-        CadDiagnostics.Trace(
-            "CadApplication.Initialize completed.");
+        // OCCAD uses English as the product default. Once the user changes
+        // language, the persisted application setting wins on the next start.
+        var settings = CadApplicationSettings.Load();
+        CadLanguageManager.Apply(settings.Language);
+
+        CadDiagnostics.Trace("CadApplication.Initialize completed.");
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -41,44 +38,38 @@ public sealed class CadApplication : Application
         CadDiagnostics.Trace(
             $"Framework initialization entered. Lifetime={ApplicationLifetime?.GetType().FullName ?? "<null>"}.");
 
-        CadDiagnostics.Trace(
-            "Configuring OCCT runtime.");
+        CadDiagnostics.Trace("Configuring OCCT runtime.");
         OcctRuntime.Configure();
         CadDiagnostics.Trace(
-            "OCCT runtime configured." +
-            Environment.NewLine +
+            "OCCT runtime configured." + Environment.NewLine +
             OcctRuntime.GetDiagnosticReport());
 
-        if (ApplicationLifetime is
-            IClassicDesktopStyleApplicationLifetime desktop)
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            CadDiagnostics.Trace(
-                "Constructing MainWindow.");
+            CadDiagnostics.Trace("Constructing MainWindow.");
 
-            var window =
-                new MainWindow();
+            var window = new MainWindow();
+            // Complete all toolbar/status-bar composition before the window is
+            // presented. Runtime OnOpened re-parenting made ordering and style
+            // dependent on lifecycle timing.
+            window.ApplyUiRefinement();
+            window.ApplyCompactUiEnhancements();
 
-            CadDiagnostics.Trace(
-                "MainWindow constructed.");
+            CadDiagnostics.Trace("MainWindow constructed.");
 
-            desktop.MainWindow =
-                window;
+            desktop.MainWindow = window;
             desktop.Exit += (_, args) =>
                 CadDiagnostics.Trace(
                     $"Desktop lifetime exit requested. ExitCode={args.ApplicationExitCode}.");
 
-            CadDiagnostics.Trace(
-                "MainWindow assigned to desktop lifetime.");
+            CadDiagnostics.Trace("MainWindow assigned to desktop lifetime.");
         }
         else
         {
-            CadDiagnostics.Trace(
-                "Classic desktop lifetime was not available.");
+            CadDiagnostics.Trace("Classic desktop lifetime was not available.");
         }
 
         base.OnFrameworkInitializationCompleted();
-
-        CadDiagnostics.Trace(
-            "Framework initialization completed.");
+        CadDiagnostics.Trace("Framework initialization completed.");
     }
 }

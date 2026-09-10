@@ -7,8 +7,8 @@ using OCCAD;
 namespace OCCAD.Avalonia;
 
 /// <summary>
-/// Deliberately compact command surface. It follows the OCCTBIM-Source command
-/// grouping but exposes only actions that actually exist in OCCAD Core.
+/// Compact command surface derived from OCCTBIM-Source ribbon semantics.
+/// Only commands backed by a real OCCAD Core action are rendered.
 /// </summary>
 internal sealed class CadCompactRibbon : Border
 {
@@ -29,8 +29,8 @@ internal sealed class CadCompactRibbon : Border
 
         Child = new TabControl
         {
-            MinHeight = 78,
-            MaxHeight = 86,
+            MinHeight = 76,
+            MaxHeight = 82,
             ItemsSource = new[]
             {
                 Tab("开始", new[]
@@ -39,7 +39,8 @@ internal sealed class CadCompactRibbon : Border
                     A("edit.redo", "重做"),
                     A("edit.delete", "删除"),
                     A("select.all", "全选"),
-                    A("select.invert", "反选")
+                    A("select.invert", "反选"),
+                    A("measure.distance", "测距")
                 }),
                 Tab("绘图", new[]
                 {
@@ -51,19 +52,16 @@ internal sealed class CadCompactRibbon : Border
                     A("draw.rectangle", "矩形"),
                     A("draw.polygon", "多边形"),
                     A("draw.regularpolygon", "正多边形"),
-                    A("draw.spline", "样条"),
-                    A("draw.centerline", "中心线")
+                    A("draw.spline", "样条")
                 }),
                 Tab("三维", new[]
                 {
                     A("solid.box", "长方体"),
                     A("solid.cylinder", "圆柱"),
                     A("solid.cone", "圆锥"),
-                    A("solid.frustum", "圆台"),
                     A("solid.sphere", "球"),
                     A("solid.ellipsoid", "椭球"),
                     A("solid.torus", "圆环"),
-                    A("curve.helix", "螺旋线"),
                     A("feature.extrude", "拉伸"),
                     A("feature.revolve", "旋转"),
                     A("feature.sweep", "扫掠"),
@@ -83,14 +81,14 @@ internal sealed class CadCompactRibbon : Border
                     A("modify.fillet", "圆角"),
                     A("modify.chamfer", "倒角")
                 }),
-                Tab("标注", new[]
+                Tab("注释", new[]
                 {
+                    A("draw.centerline", "中心线"),
                     A("annotate.text", "文字"),
                     A("annotate.length", "线性"),
                     A("annotate.angle", "角度"),
                     A("annotate.radius", "半径"),
-                    A("annotate.diameter", "直径"),
-                    A("measure.distance", "测距")
+                    A("annotate.diameter", "直径")
                 }),
                 Tab("视图", new[]
                 {
@@ -121,8 +119,7 @@ internal sealed class CadCompactRibbon : Border
         {
             Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(4, 3),
-            ItemHeight = 30
+            Margin = new Thickness(4, 3)
         };
 
         foreach (var item in actions)
@@ -133,9 +130,9 @@ internal sealed class CadCompactRibbon : Border
             var button = new Button
             {
                 Content = item.Text,
-                MinWidth = 54,
+                MinWidth = 52,
                 Height = 28,
-                Padding = new Thickness(9, 3),
+                Padding = new Thickness(8, 3),
                 Margin = new Thickness(1),
                 HorizontalContentAlignment = HorizontalAlignment.Center
             };

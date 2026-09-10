@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
@@ -121,6 +122,7 @@ internal sealed class CadInspectorPanel : Border
     private readonly Action<string> _feedback;
     private readonly StackPanel _propertyHost = new();
     private readonly StackPanel _layerHost = new();
+    private readonly TabControl _tabs;
     private bool _refreshing;
 
     public CadInspectorPanel(CadWorkspace workspace, Action<string> feedback)
@@ -144,7 +146,7 @@ internal sealed class CadInspectorPanel : Border
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
 
-        Child = new TabControl
+        _tabs = new TabControl
         {
             ItemsSource = new[]
             {
@@ -152,10 +154,14 @@ internal sealed class CadInspectorPanel : Border
                 new TabItem { Header = "图层", Content = layersScroll }
             }
         };
+        Child = _tabs;
 
         _workspace.Events.Changed += WorkspaceChanged;
         RefreshAll();
     }
+
+    public void ShowProperties() => _tabs.SelectedIndex = 0;
+    public void ShowLayers() => _tabs.SelectedIndex = 1;
 
     private void WorkspaceChanged(object? sender, CadDomainEventArgs args)
     {
@@ -205,6 +211,9 @@ internal sealed class CadInspectorPanel : Border
             string? group = null;
             foreach (var property in CadPropertyService.Describe(_workspace, entity))
             {
+                if (string.Equals(property.Name, nameof(CadEntity.Id), StringComparison.Ordinal))
+                    continue;
+
                 if (!string.Equals(group, property.Group, StringComparison.Ordinal))
                 {
                     group = property.Group;
@@ -224,7 +233,7 @@ internal sealed class CadInspectorPanel : Border
         var grid = new Grid
         {
             Margin = new Thickness(8, 1),
-            ColumnDefinitions = new ColumnDefinitions("108,*")
+            ColumnDefinitions = new ColumnDefinitions("100,*")
         };
         grid.Children.Add(new TextBlock
         {
@@ -246,20 +255,7 @@ internal sealed class CadInspectorPanel : Border
             return ValueText(property.Value);
 
         if (property.EditorType == CadPropertyEditorKind.Layer)
-        {
-            var combo = new ComboBox
-            {
-                ItemsSource = _workspace.Layers.Layers.Select(layer => layer.Name).ToArray(),
-                SelectedItem = property.Value?.ToString(),
-                MinHeight = 26
-            };
-            combo.SelectionChanged += (_, _) =>
-            {
-                if (_refreshing || combo.SelectedItem is not string value) return;
-                Apply(entity, property.Name, value);
-            };
-            return combo;
-        }
+            return LayerEditor(entity, property);
 
         if (property.EditorType == CadPropertyEditorKind.Boolean && property.Value is bool boolean)
         {
@@ -268,7 +264,7 @@ internal sealed class CadInspectorPanel : Border
                 IsChecked = boolean,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            check.IsCheckedChanged += (_, _) =>
+            check.Click += (_, _) =>
             {
                 if (_refreshing) return;
                 Apply(entity, property.Name, check.IsChecked == true);
@@ -276,6 +272,79 @@ internal sealed class CadInspectorPanel : Border
             return check;
         }
 
+        if (property.EditorType == CadPropertyEditorKind.ByLayer)
+            return ByLayerEditor(entity, property);
+
+        return DirectValueEditor(entity, property);
+    }
+
+    private Control LayerEditor(CadEntity entity, CadEntityProperty property)
+    {
+        var combo = new ComboBox
+        {
+            ItemsSource = _workspace.Layers.Layers.Select(layer => layer.Name).ToArray(),
+            SelectedItem = property.Value?.ToString(),
+            MinHeight = 26
+        };
+        combo.SelectionChanged += (_, _) =>
+        {
+            if (_refreshing || combo.SelectedItem is not string value) return;
+            Apply(entity, property.Name, value);
+        };
+        return combo;
+    }
+
+    private Control ByLayerEditor(CadEntity entity, CadEntityProperty property)
+    {
+        if (!property.EditorParams.TryGetValue("byLayerProperty", out var rawName) ||
+            rawName is not string byLayerName)
+            return DirectValueEditor(entity, property);
+
+        var descriptor = TypeDescriptor.GetProperties(entity, true)
+            .Find(byLayerName, ignoreCase: false);
+        var byLayer = descriptor?.GetValue(entity) as bool? ?? false;
+
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,*")
+        };
+        var toggle = new CheckBox
+        {
+            Content = "随层",
+            IsChecked = byLayer,
+            Margin = new Thickness(0, 0, 5, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var direct = DirectValueEditor(entity, property);
+        direct.IsEnabled = !byLayer;
+
+        toggle.Click += (_, _) =>
+        {
+            if (_refreshing) return;
+            var enabled = toggle.IsChecked == true;
+            if (CadPropertyService.TryApply(
+                    _workspace,
+                    [entity],
+                    byLayerName,
+                    enabled,
+                    out var error))
+            {
+                direct.IsEnabled = !enabled;
+            }
+            else if (!string.IsNullOrWhiteSpace(error))
+            {
+                _feedback(error);
+            }
+        };
+
+        grid.Children.Add(toggle);
+        Grid.SetColumn(direct, 1);
+        grid.Children.Add(direct);
+        return grid;
+    }
+
+    private Control DirectValueEditor(CadEntity entity, CadEntityProperty property)
+    {
         if (property.EditorType == CadPropertyEditorKind.Choice &&
             property.EditorParams.TryGetValue("choices", out var rawChoices) &&
             rawChoices is string[] choices)
@@ -295,10 +364,24 @@ internal sealed class CadInspectorPanel : Border
             return combo;
         }
 
-        // Color and ByLayer editors need an explicit CAD color/by-layer UX.
-        // Showing the canonical value is preferable to a misleading generic editor.
-        if (property.EditorType is CadPropertyEditorKind.Color or CadPropertyEditorKind.ByLayer)
-            return ValueText(property.Value);
+        if (property.EditorParams.TryGetValue("valueType", out var rawType) &&
+            rawType is Type type && type.IsEnum)
+        {
+            var values = Enum.GetNames(type);
+            var combo = new ComboBox
+            {
+                ItemsSource = values,
+                SelectedItem = property.Value?.ToString(),
+                MinHeight = 26
+            };
+            combo.SelectionChanged += (_, _) =>
+            {
+                if (_refreshing || combo.SelectedItem is not string text) return;
+                if (TryConvert(property, text, out var value))
+                    Apply(entity, property.Name, value);
+            };
+            return combo;
+        }
 
         var box = new TextBox
         {
@@ -329,7 +412,7 @@ internal sealed class CadInspectorPanel : Border
                 value,
                 out var error))
         {
-            _feedback($"已更新 {propertyName}");
+            _feedback($"已更新 {PropertyName(propertyName)}");
         }
         else if (!string.IsNullOrWhiteSpace(error))
         {
@@ -342,7 +425,7 @@ internal sealed class CadInspectorPanel : Border
         string? text,
         out object? value)
     {
-        text ??= string.Empty;
+        text = text?.Trim() ?? string.Empty;
         if (!property.EditorParams.TryGetValue("valueType", out var rawType) ||
             rawType is not Type type)
         {
@@ -354,10 +437,20 @@ internal sealed class CadInspectorPanel : Border
         {
             var target = Nullable.GetUnderlyingType(type) ?? type;
             if (target == typeof(string)) value = text;
+            else if (target == typeof(System.Drawing.Color))
+            {
+                if (!TryParseColor(text, out var color))
+                {
+                    value = null;
+                    return false;
+                }
+                value = color;
+            }
             else if (target.IsEnum) value = Enum.Parse(target, text, true);
             else if (target == typeof(double)) value = double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture);
             else if (target == typeof(float)) value = float.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture);
             else if (target == typeof(int)) value = int.Parse(text, NumberStyles.Integer, CultureInfo.InvariantCulture);
+            else if (target == typeof(long)) value = long.Parse(text, NumberStyles.Integer, CultureInfo.InvariantCulture);
             else value = Convert.ChangeType(text, target, CultureInfo.InvariantCulture);
             return true;
         }
@@ -368,42 +461,78 @@ internal sealed class CadInspectorPanel : Border
         }
     }
 
+    private static bool TryParseColor(string text, out System.Drawing.Color color)
+    {
+        color = default;
+        var hex = text.StartsWith('#') ? text[1..] : text;
+        if (hex.Length is not (6 or 8) ||
+            !uint.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var raw))
+            return false;
+
+        if (hex.Length == 6)
+        {
+            color = System.Drawing.Color.FromArgb(
+                255,
+                (int)((raw >> 16) & 0xFF),
+                (int)((raw >> 8) & 0xFF),
+                (int)(raw & 0xFF));
+        }
+        else
+        {
+            color = System.Drawing.Color.FromArgb(
+                (int)((raw >> 24) & 0xFF),
+                (int)((raw >> 16) & 0xFF),
+                (int)((raw >> 8) & 0xFF),
+                (int)(raw & 0xFF));
+        }
+        return true;
+    }
+
     private void RefreshLayers()
     {
-        _layerHost.Children.Clear();
-        _layerHost.Margin = new Thickness(8, 8, 8, 12);
+        _refreshing = true;
+        try
+        {
+            _layerHost.Children.Clear();
+            _layerHost.Margin = new Thickness(8, 8, 8, 12);
 
-        var top = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-        var current = new ComboBox
-        {
-            ItemsSource = _workspace.Layers.Layers.ToArray(),
-            SelectedItem = _workspace.Layers.Current,
-            MinHeight = 28
-        };
-        current.SelectionChanged += (_, _) =>
-        {
-            if (_refreshing || current.SelectedItem is not CadLayer layer) return;
-            _workspace.SetCurrentLayer(layer);
-        };
-        top.Children.Add(current);
-        var add = new Button
-        {
-            Content = "新建",
-            Margin = new Thickness(4, 0, 0, 0),
-            MinWidth = 54,
-            MinHeight = 28
-        };
-        add.Click += (_, _) =>
-        {
-            _workspace.AddNextLayer();
-            RefreshLayers();
-        };
-        Grid.SetColumn(add, 1);
-        top.Children.Add(add);
-        _layerHost.Children.Add(top);
+            var top = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+            var current = new ComboBox
+            {
+                ItemsSource = _workspace.Layers.Layers.ToArray(),
+                SelectedItem = _workspace.Layers.Current,
+                MinHeight = 28
+            };
+            current.SelectionChanged += (_, _) =>
+            {
+                if (_refreshing || current.SelectedItem is not CadLayer layer) return;
+                _workspace.SetCurrentLayer(layer);
+            };
+            top.Children.Add(current);
 
-        foreach (var layer in _workspace.Layers.Layers)
-            _layerHost.Children.Add(LayerRow(layer));
+            var add = new Button
+            {
+                Content = "新建",
+                Margin = new Thickness(4, 0, 0, 0),
+                MinWidth = 52,
+                MinHeight = 28
+            };
+            add.Click += (_, _) =>
+            {
+                _workspace.AddNextLayer();
+                RefreshLayers();
+            };
+            Grid.SetColumn(add, 1);
+            top.Children.Add(add);
+            _layerHost.Children.Add(top);
+
+            foreach (var layer in _workspace.Layers.Layers)
+                _layerHost.Children.Add(LayerRow(layer));
+        }
+        finally
+        {
+            _refreshing = false;
+        }
     }
 
     private Control LayerRow(CadLayer layer)
@@ -422,24 +551,26 @@ internal sealed class CadInspectorPanel : Border
                 : FontWeight.Normal
         });
 
-        var visible = new Button
+        var visible = new CheckBox
         {
-            Content = layer.Visible ? "显示" : "隐藏",
-            MinWidth = 48,
-            Padding = new Thickness(6, 2)
+            Content = "可见",
+            IsChecked = layer.Visible,
+            VerticalAlignment = VerticalAlignment.Center
         };
-        visible.Click += (_, _) => _workspace.SetLayerVisible(layer, !layer.Visible);
+        visible.Click += (_, _) =>
+            _workspace.SetLayerVisible(layer, visible.IsChecked == true);
         Grid.SetColumn(visible, 1);
         row.Children.Add(visible);
 
-        var locked = new Button
+        var locked = new CheckBox
         {
-            Content = layer.Locked ? "锁定" : "未锁",
-            MinWidth = 48,
-            Margin = new Thickness(4, 0, 0, 0),
-            Padding = new Thickness(6, 2)
+            Content = "锁定",
+            IsChecked = layer.Locked,
+            Margin = new Thickness(6, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
         };
-        locked.Click += (_, _) => _workspace.SetLayerLocked(layer, !layer.Locked);
+        locked.Click += (_, _) =>
+            _workspace.SetLayerLocked(layer, locked.IsChecked == true);
         Grid.SetColumn(locked, 2);
         row.Children.Add(locked);
         return row;
@@ -483,6 +614,7 @@ internal sealed class CadInspectorPanel : Border
             null => string.Empty,
             double number => number.ToString("0.###", CultureInfo.InvariantCulture),
             float number => number.ToString("0.###", CultureInfo.InvariantCulture),
+            System.Drawing.Color color => $"#{color.R:X2}{color.G:X2}{color.B:X2}",
             _ => value.ToString() ?? string.Empty
         };
 
@@ -498,7 +630,7 @@ internal sealed class CadInspectorPanel : Border
 
     private static string PropertyName(string name) => name switch
     {
-        "EntityType" => "类型",
+        "Type" or "EntityType" => "类型",
         "Name" => "名称",
         "Layer" or "LayerId" => "图层",
         "Visible" => "可见",
@@ -513,6 +645,9 @@ internal sealed class CadInspectorPanel : Border
         "Width" => "宽度",
         "Height" => "高度",
         "Radius" => "半径",
+        "Diameter" => "直径",
+        "Area" => "面积",
+        "Volume" => "体积",
         _ => name
     };
 }

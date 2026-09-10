@@ -20,7 +20,7 @@ public sealed record CadFeatureInputDescriptor(
 /// source references from captured geometry so dependency rebuild and standalone
 /// persistence can coexist without changing the feature result contract.
 /// </summary>
-public abstract class CadFeatureEntity : CadEntity
+public abstract class CadFeatureEntity : CadEntity, ICadSourceDependentEntity
 {
     protected CadFeatureEntity(string entityType)
         : base(entityType)
@@ -30,6 +30,16 @@ public abstract class CadFeatureEntity : CadEntity
     [Browsable(false)]
     public abstract IReadOnlyList<CadFeatureInputDescriptor>
         Inputs { get; }
+
+    [Browsable(false)]
+    public IReadOnlyCollection<Guid> SourceEntityIds =>
+        Inputs
+            .Where(static input =>
+                input.Mode == CadFeatureInputMode.SourceReference &&
+                input.SourceEntityId is not null)
+            .Select(static input => input.SourceEntityId!.Value)
+            .Distinct()
+            .ToArray();
 
     [Browsable(false)]
     public virtual IReadOnlyList<CadValueDescriptor>
@@ -56,9 +66,7 @@ public abstract class CadFeatureEntity : CadEntity
 
     [Browsable(false)]
     public bool HasSourceReferences =>
-        Inputs.Any(input =>
-            input.Mode ==
-                CadFeatureInputMode.SourceReference);
+        SourceEntityIds.Count > 0;
 
     internal sealed override OcctShape BuildShape(
         OcctEngine engine) =>
@@ -66,6 +74,12 @@ public abstract class CadFeatureEntity : CadEntity
 
     protected abstract OcctShape BuildFeatureResult(
         OcctEngine engine);
+
+    public bool RefreshFromSources(CadDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return RefreshSourceReferences(document);
+    }
 
     internal virtual bool RefreshSourceReferences(
         CadDocument document) =>

@@ -58,7 +58,7 @@ public sealed class CadDocument
     private readonly Dictionary<Guid, CadEntity> _entitiesById = [];
     private readonly Dictionary<long, CadEntity> _viewerObjects = [];
     private readonly List<CadDocumentChangedEventArgs> _pendingChanges = [];
-    private readonly HashSet<Guid> _featureRefreshStack = [];
+    private readonly HashSet<Guid> _dependencyRefreshStack = [];
     private readonly CadLayerManager _layers;
     private OcctEngine? _engine;
     private int _changeSetDepth;
@@ -212,6 +212,18 @@ public sealed class CadDocument
 
     public CadEntity? FindById(Guid id) => _entitiesById.GetValueOrDefault(id);
 
+    public IReadOnlyList<CadEntity> GetDependentEntities(Guid sourceEntityId)
+    {
+        if (sourceEntityId == Guid.Empty)
+            throw new ArgumentOutOfRangeException(nameof(sourceEntityId));
+
+        return _entities
+            .Where(entity =>
+                entity is ICadSourceDependentEntity dependency &&
+                dependency.SourceEntityIds.Contains(sourceEntityId))
+            .ToArray();
+    }
+
     public void AddRange(IEnumerable<CadEntity> entities)
     {
         ArgumentNullException.ThrowIfNull(entities);
@@ -268,6 +280,19 @@ public sealed class CadDocument
         }
         foreach (var entity in values)
             PublishChange(CadDocumentChangeKind.Added, entity);
+
+        // A persisted dependent may carry cached geometry. Once all entities in
+        // a load/import batch are present, the current source entities become
+        // authoritative and can safely regenerate that cache.
+        foreach (var entity in values)
+        {
+            if (entity is not ICadSourceDependentEntity dependency ||
+                dependency.SourceEntityIds.Count == 0 ||
+                dependency.SourceEntityIds.Any(id => !_entitiesById.ContainsKey(id)))
+                continue;
+
+            RefreshDependentEntity(entity, dependency);
+        }
     }
 
     public int RemoveRange(IEnumerable<CadEntity> entities)
@@ -410,57 +435,57 @@ public sealed class CadDocument
             args.PropertyName);
 
         if (args.Kind == CadEntityChangeKind.Geometry)
-            RefreshDependentFeatures(entity.Id);
+            RefreshDependentEntities(entity.Id);
     }
 
-    private void RefreshDependentFeatures(Guid sourceEntityId)
+    private void RefreshDependentEntities(Guid sourceEntityId)
     {
-        var dependents = _entities
-            .OfType<CadFeatureEntity>()
-            .Where(feature =>
-                feature.Inputs.Any(input =>
-                    input.Mode == CadFeatureInputMode.SourceReference &&
-                    input.SourceEntityId == sourceEntityId))
-            .ToArray();
-
-        foreach (var feature in dependents)
+        foreach (var dependent in GetDependentEntities(sourceEntityId))
         {
-            if (!_featureRefreshStack.Add(feature.Id))
-                continue;
-
-            CadEntity? before = null;
-            try
-            {
-                before = feature.Duplicate();
-                feature.RefreshSourceReferences(this);
-            }
-            catch (Exception refreshFailure)
-                when (IsRecoverableFeatureRefreshFailure(refreshFailure))
-            {
-                if (before is null)
-                    continue;
-
-                try
-                {
-                    feature.RestoreGeometrySnapshot(before);
-                }
-                catch (Exception restoreFailure)
-                    when (IsRecoverableFeatureRefreshFailure(restoreFailure))
-                {
-                    throw new AggregateException(
-                        "Feature dependency refresh and rollback both failed.",
-                        refreshFailure,
-                        restoreFailure);
-                }
-            }
-            finally
-            {
-                _featureRefreshStack.Remove(feature.Id);
-            }
+            var dependency = (ICadSourceDependentEntity)dependent;
+            RefreshDependentEntity(dependent, dependency);
         }
     }
 
-    private static bool IsRecoverableFeatureRefreshFailure(Exception exception) =>
+    private void RefreshDependentEntity(
+        CadEntity dependent,
+        ICadSourceDependentEntity dependency)
+    {
+        if (!_dependencyRefreshStack.Add(dependent.Id))
+            return;
+
+        CadEntity? before = null;
+        try
+        {
+            before = dependent.Duplicate();
+            dependency.RefreshFromSources(this);
+        }
+        catch (Exception refreshFailure)
+            when (IsRecoverableDependencyRefreshFailure(refreshFailure))
+        {
+            if (before is null)
+                return;
+
+            try
+            {
+                dependent.RestoreGeometrySnapshot(before);
+            }
+            catch (Exception restoreFailure)
+                when (IsRecoverableDependencyRefreshFailure(restoreFailure))
+            {
+                throw new AggregateException(
+                    "Entity dependency refresh and rollback both failed.",
+                    refreshFailure,
+                    restoreFailure);
+            }
+        }
+        finally
+        {
+            _dependencyRefreshStack.Remove(dependent.Id);
+        }
+    }
+
+    private static bool IsRecoverableDependencyRefreshFailure(Exception exception) =>
         exception is not OutOfMemoryException and
         not StackOverflowException and
         not AccessViolationException;

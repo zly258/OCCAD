@@ -18,6 +18,7 @@ internal static class CadCoreRegistration
 
         entities.Register("point", "Point", static () => new CadPointEntity(OcctNet.OcctPoint3d.Origin), CadPointEntity.WriteGeometry, CadPointEntity.ReadGeometry);
         entities.Register("line", "Line", static () => new CadLineEntity(OcctNet.OcctPoint3d.Origin, new OcctNet.OcctPoint3d(1, 0, 0)), CadLineEntity.WriteGeometry, CadLineEntity.ReadGeometry);
+        entities.Register("centerline", "Center Line", static () => new CadCenterLineEntity(OcctNet.OcctPoint3d.Origin, new OcctNet.OcctPoint3d(1, 0, 0)), CadCenterLineEntity.WriteGeometry, CadCenterLineEntity.ReadGeometry);
         entities.Register("polyline", "Polyline", static () => new CadPolylineEntity([OcctNet.OcctPoint3d.Origin, new OcctNet.OcctPoint3d(1, 0, 0)]), CadPolylineEntity.WriteGeometry, CadPolylineEntity.ReadGeometry);
         entities.Register("polygon", "Polygon", static () => new CadPolygonEntity([OcctNet.OcctPoint3d.Origin, new OcctNet.OcctPoint3d(1, 0, 0), new OcctNet.OcctPoint3d(0, 1, 0)]), CadPolygonEntity.WriteGeometry, CadPolygonEntity.ReadGeometry);
         entities.Register("regularpolygon", "Regular Polygon", static () => new CadRegularPolygonEntity(OcctNet.OcctPoint3d.Origin, OcctNet.OcctVector3d.UnitZ, OcctNet.OcctVector3d.UnitX, 1, 3), CadRegularPolygonEntity.WriteGeometry, CadRegularPolygonEntity.ReadGeometry);
@@ -60,6 +61,7 @@ internal static class CadCoreRegistration
 
         tools.Register<PointTool>("point");
         tools.Register<LineTool>("line");
+        tools.Register<CenterLineTool>("centerline");
         tools.Register<PolylineTool>("polyline");
         tools.Register<RectangleTool>("rectangle");
         tools.Register<PolygonTool>("polygon");
@@ -134,6 +136,7 @@ internal static class CadCoreRegistration
 
         actions.Register(new CadToolAction(workspace, "draw.point", "Point", "point"));
         actions.Register(new CadToolAction(workspace, "draw.line", "Line", "line"));
+        actions.Register(new CadToolAction(workspace, "draw.centerline", "Center Line", "centerline"));
         actions.Register(new CadToolAction(workspace, "draw.polyline", "Polyline", "polyline"));
         actions.Register(new CadToolAction(workspace, "draw.rectangle", "Rectangle", "rectangle"));
         actions.Register(new CadToolAction(workspace, "draw.polygon", "Polygon", "polygon"));

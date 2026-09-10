@@ -1,56 +1,71 @@
 # 03 Interaction Specification
 
-## Unified chain
+## Unified input chain
 
-Mouse, keyboard, command line, precision, Snap, Tracking, and Grip input flow through Workspace and the active Tool. MainWindow does not directly mutate Entity geometry.
+Mouse, keyboard, Command Line, Precision, Snap, Tracking, and Grip input all flow through Workspace and the active Tool. MainWindow forwards and presents state; it does not directly mutate Entity geometry.
 
 ```text
-Menu / Shortcut / Command Line
-              ↓
-       CadActionManager
-              ↓
-          Action / Tool
-              ↓
-Tool state + ResolvePoint + Preview
-              ↓
-      Document / History commit
+Ribbon / Shortcut / Command Line / Viewport
+                   ↓
+          CadActionManager / ToolManager
+                   ↓
+      ResolvePoint / Selection / Preview
+                   ↓
+          Document / History commit
 ```
 
 ## Tool lifecycle
 
 `Idle → Activate → Drawing/WaitForSelect → Preview → Commit Stage → Next/Complete`.
 
-Esc = Cancel. Backspace = StepBack. Enter/Space use the shared ToolManager acceptance/finish rule. Right click finishes when meaningful and otherwise cancels, unless a specialized Tool explicitly defines a different secondary action.
+- `Esc`: cancel the active Tool; when idle, clear formal selection.
+- `Backspace`: StepBack.
+- `Enter`: ToolManager accepts the current valid stage or finishes when allowed.
+- Right click: unified secondary action while a Tool is active; viewport context menu while idle.
+- Point steps never reuse stale/off-viewport pointer coordinates.
 
-Point steps never reuse stale/off-viewport pointer coordinates as implicit input.
+## Viewport navigation
+
+Navigation remains owned by the native OcctCSharpBridge viewport: middle-button navigation/pan, wheel zoom, `Shift + Middle` rotation, and middle-button double-click `FitAll`. Navigation input does not enter CAD Selection or Tool pointer processing.
+
+Drawing state uses the CAD cross cursor; navigation switches to the move cursor. Snap markers, Grips, and selection overlays must not be obscured by ordinary UI controls.
+
+## WorkPlane and drafting aids
+
+During drawing:
+
+- `T` → XY;
+- `F` → XZ;
+- `S` → YZ;
+- `F3` → Object Snap;
+- `F8` → Orthogonal Tracking;
+- `F10` → Polar Tracking;
+- `Tab / Shift+Tab` → cycle valid Snap candidates.
+
+WorkPlane changes go through `CadToolManager.TryChangeDrawingPlane`; Avalonia does not mutate the Tool Plane directly.
 
 ## Point resolution
 
-`Screen → view ray / active WorkPlane → Object Snap → Tracking → explicit axis/angle/length constraints → final world point`.
+`Screen → view ray / active WorkPlane → Object Snap → Tracking → explicit axis/angle/length constraint → final world point`.
 
-Tools do not duplicate XY projection, polar math, or lock precedence.
+Tools do not duplicate XY projection, polar math, or lock precedence. Command Line coordinate, length, angle, and Tool parameter input is routed through `CadCommandManager`.
 
-## Snap / selection
+## Selection / Preselection / Subobject
 
-Entity supplies semantic snap points/curves. SnapManager collects/ranks candidates using screen tolerance, depth, type priority, hysteresis, and temporary modes.
+Selection, Preselection, and SubobjectSelection remain independent.
 
-Selection, Preselection, and SubobjectSelection remain separate. Left-to-right box is Window; right-to-left is Crossing. Hidden/locked/non-selectable entities do not enter formal Selection.
+- Point selection: Replace by default; `Ctrl` Add; `Shift` Remove; `Ctrl+Shift` Toggle.
+- Left-to-right rectangle: Window.
+- Right-to-left rectangle: Crossing.
+- Hidden / locked / non-selectable entities do not enter formal Selection.
+- WaitForSelect Tools reuse the same selection gesture instead of creating a second temporary selection model.
+- Subobject selection uses stable references and is re-resolved after geometry regeneration.
 
 ## Grip transaction
 
-```text
-capture original
-→ duplicate preview
-→ suppress real presentation
-→ restore original into preview each frame
-→ MoveGrip(preview)
-→ Preview.Update
-→ accept
-→ apply once to real Entity
-→ one History entry
-→ clear preview
-→ restore real presentation
-```
+A normally selected single entity may expose Grips.
+
+`capture original → duplicate preview → suppress real presentation → MoveGrip(preview) → accept → apply once to real Entity → one History entry → clear preview → restore real presentation`.
 
 PointerMove never mutates the persistent Entity.
 
@@ -58,18 +73,34 @@ PointerMove never mutates the persistent Entity.
 
 Preview never belongs to Document, Selection, or History.
 
-Normal commit: validate → mutate Document/History → clear Preview → complete Tool.
+Normal commit: `Validate → Document/History mutation → Clear Preview → Complete Tool`.
 
-Replacement operations keep the last valid replacement preview and source suppression intact during the real mutation. Cleanup occurs only after success; failure keeps the Tool and last valid preview usable.
+Replacement operations such as Trim / Extend / Fillet / Chamfer retain the last valid preview and source suppression until the real mutation succeeds. Failure keeps the Tool usable and must not leave transient presentation behind.
+
+## Command Line
+
+The bottom Command Line is the only complete prompt and exact-input surface:
+
+- Action alias/ID starts a command;
+- while a Tool is active it accepts coordinates, lengths, angles, parameters, and Tool options;
+- empty input repeats the last command or accepts the current Tool stage;
+- `Up / Down` browses command history;
+- focus returns to the Viewport after execute/cancel.
+
+No second floating command editor or duplicate Tool prompt panel is retained.
 
 ## Property / Layer
 
-Entity property edits use `Capture → Validate → Apply → presentation/dependency refresh → History`. Layer edits use the same Core-owned transaction principle.
+Entity property edits use `Capture → Validate → Apply → presentation/dependency refresh → History`. Layer editing follows the same Core-owned transaction rule.
 
-Direct Color/LineStyle/LineWidth edits switch the corresponding ByLayer flag off. ByLayer changes are history-recorded edits.
+Direct Color / LineStyle / LineWidth editing must correctly update the corresponding ByLayer state. ByLayer changes are history-recorded edits. Avalonia never writes Entity or Layer fields to bypass Core transactions.
+
+## Viewport context menu
+
+The idle viewport context menu is reduced to the Source primary workflow: ShowAll, Hide, Isolate, SelectAll, SelectInvert, Move, Copy, Delete, and Properties. Unsupported actions are not rendered; unavailable real actions are disabled through `CanExecute`.
 
 ## Prompt / error boundaries
 
-The full Tool prompt is displayed by Command Line only. ToolPanel and StatusBar show complementary state.
+The complete Tool prompt is shown only in the Command Line region. Status presents only short selection, layer, drafting, WorkPlane, and coordinate state.
 
 Recoverable failures remain local to Tool/Grip/Property/Layer transactions; fatal runtime failures are not misrepresented as recovered.

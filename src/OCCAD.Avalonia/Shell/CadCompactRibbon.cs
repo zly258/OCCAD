@@ -7,115 +7,108 @@ using OCCAD;
 namespace OCCAD.Avalonia;
 
 /// <summary>
-/// Compact command surface derived from OCCTBIM-Source ribbon semantics.
-/// Only commands backed by a real OCCAD Core action are rendered.
+/// Minimal command surface. It contains no CAD state and no duplicate command
+/// handlers: every button resolves to a registered Core Action ID.
 /// </summary>
 internal sealed class CadCompactRibbon : Border
 {
     private readonly CadWorkspace _workspace;
     private readonly Action<string> _feedback;
-    private readonly Dictionary<string, Button> _buttons =
-        new(StringComparer.OrdinalIgnoreCase);
 
     public CadCompactRibbon(CadWorkspace workspace, Action<string> feedback)
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         _feedback = feedback ?? throw new ArgumentNullException(nameof(feedback));
 
-        Background = new SolidColorBrush(Color.Parse("#F7F8FA"));
-        BorderBrush = new SolidColorBrush(Color.Parse("#D3D8DE"));
+        Background = CadUi.Surface;
+        BorderBrush = CadUi.Border;
         BorderThickness = new Thickness(0, 0, 0, 1);
-        Padding = new Thickness(4, 0, 4, 2);
+        MinHeight = CadUi.RibbonHeight;
+        MaxHeight = CadUi.RibbonHeight;
+        Child = BuildTabs();
+    }
 
-        Child = new TabControl
+    private Control BuildTabs()
+    {
+        var tabs = new TabControl
         {
-            MinHeight = 76,
-            MaxHeight = 82,
+            FontSize = CadUi.UiFontSize,
             ItemsSource = new[]
             {
-                Tab("开始", new[]
-                {
-                    A("edit.undo", "撤销"),
-                    A("edit.redo", "重做"),
-                    A("edit.delete", "删除"),
-                    A("select.all", "全选"),
-                    A("select.invert", "反选"),
-                    A("measure.distance", "测距")
-                }),
-                Tab("绘图", new[]
-                {
-                    A("draw.line", "直线"),
-                    A("draw.polyline", "多段线"),
-                    A("draw.circle", "圆"),
-                    A("draw.arc", "圆弧"),
-                    A("draw.ellipse", "椭圆"),
-                    A("draw.rectangle", "矩形"),
-                    A("draw.polygon", "多边形"),
-                    A("draw.regularpolygon", "正多边形"),
-                    A("draw.spline", "样条")
-                }),
-                Tab("三维", new[]
-                {
-                    A("solid.box", "长方体"),
-                    A("solid.cylinder", "圆柱"),
-                    A("solid.cone", "圆锥"),
-                    A("solid.sphere", "球"),
-                    A("solid.ellipsoid", "椭球"),
-                    A("solid.torus", "圆环"),
-                    A("feature.extrude", "拉伸"),
-                    A("feature.revolve", "旋转"),
-                    A("feature.sweep", "扫掠"),
-                    A("feature.loft", "放样")
-                }),
-                Tab("修改", new[]
-                {
-                    A("modify.move", "移动"),
-                    A("modify.copy", "复制"),
-                    A("modify.rotate", "旋转"),
-                    A("modify.scale", "缩放"),
-                    A("modify.mirror", "镜像"),
-                    A("modify.array", "阵列"),
-                    A("modify.offset", "偏移"),
-                    A("modify.trim", "修剪"),
-                    A("modify.extend", "延伸"),
-                    A("modify.fillet", "圆角"),
-                    A("modify.chamfer", "倒角")
-                }),
-                Tab("注释", new[]
-                {
-                    A("draw.centerline", "中心线"),
-                    A("annotate.text", "文字"),
-                    A("annotate.length", "线性"),
-                    A("annotate.angle", "角度"),
-                    A("annotate.radius", "半径"),
-                    A("annotate.diameter", "直径")
-                }),
-                Tab("视图", new[]
-                {
-                    A("view.fit", "适合"),
-                    A("view.isometric", "轴测"),
-                    A("view.top", "俯视"),
-                    A("view.front", "前视"),
-                    A("view.right", "右视"),
-                    A("display.wireframe", "线框"),
-                    A("display.shaded", "着色"),
-                    A("display.hiddenline", "隐藏线"),
-                    A("view.hide", "隐藏"),
-                    A("view.isolate", "隔离"),
-                    A("view.showall", "全部显示")
-                })
+                Tab("开始",
+                    Action("新建", "file.new"),
+                    Action("撤销", "edit.undo"),
+                    Action("重做", "edit.redo"),
+                    Action("删除", "edit.delete"),
+                    Action("全选", "select.all"),
+                    Action("反选", "select.invert"),
+                    Action("测距", "measure.distance")),
+
+                Tab("绘图",
+                    Action("点", "draw.point"),
+                    Action("直线", "draw.line"),
+                    Action("多段线", "draw.polyline"),
+                    Action("圆", "draw.circle"),
+                    Action("圆弧", "draw.arc"),
+                    Action("矩形", "draw.rectangle"),
+                    Action("多边形", "draw.polygon"),
+                    Action("正多边形", "draw.regularpolygon"),
+                    Action("椭圆", "draw.ellipse"),
+                    Action("样条", "draw.spline")),
+
+                Tab("三维",
+                    Action("长方体", "solid.box"),
+                    Action("圆柱", "solid.cylinder"),
+                    Action("圆锥", "solid.cone"),
+                    Action("球", "solid.sphere"),
+                    Action("椭球", "solid.ellipsoid"),
+                    Action("圆环", "solid.torus"),
+                    Action("拉伸", "feature.extrude"),
+                    Action("旋转", "feature.revolve"),
+                    Action("扫掠", "feature.sweep"),
+                    Action("放样", "feature.loft")),
+
+                Tab("修改",
+                    Action("移动", "modify.move"),
+                    Action("复制", "modify.copy"),
+                    Action("旋转", "modify.rotate"),
+                    Action("缩放", "modify.scale"),
+                    Action("镜像", "modify.mirror"),
+                    Action("阵列", "modify.array"),
+                    Action("偏移", "modify.offset"),
+                    Action("修剪", "modify.trim"),
+                    Action("延伸", "modify.extend"),
+                    Action("圆角", "modify.fillet"),
+                    Action("倒角", "modify.chamfer")),
+
+                Tab("标注",
+                    Action("中心线", "draw.centerline"),
+                    Action("文字", "annotate.text"),
+                    Action("长度", "annotate.length"),
+                    Action("角度", "annotate.angle"),
+                    Action("半径", "annotate.radius"),
+                    Action("直径", "annotate.diameter")),
+
+                Tab("视图",
+                    Action("适合", "view.fit"),
+                    Action("等轴测", "view.isometric"),
+                    Action("顶", "view.top"),
+                    Action("前", "view.front"),
+                    Action("右", "view.right"),
+                    Action("线框", "display.wireframe"),
+                    Action("着色", "display.shaded"),
+                    Action("隐藏", "view.hide"),
+                    Action("隔离", "view.isolate"),
+                    Action("全部", "view.showall"))
             }
         };
 
-        _workspace.Events.Changed += (_, _) => RefreshState();
-        _workspace.Actions.ActionFinished += (_, _) => RefreshState();
-        _workspace.Actions.ActionFailed += (_, args) => _feedback(args.Exception.Message);
-        RefreshState();
+        return tabs;
     }
 
-    private TabItem Tab(string title, IReadOnlyList<ActionItem> actions)
+    private TabItem Tab(string title, params RibbonAction[] actions)
     {
-        var panel = new WrapPanel
+        var buttons = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
@@ -124,52 +117,49 @@ internal sealed class CadCompactRibbon : Border
 
         foreach (var item in actions)
         {
-            if (_workspace.Actions.Find(item.Id) is null)
+            var action = _workspace.Actions.Find(item.Id);
+            if (action is null)
                 continue;
 
             var button = new Button
             {
                 Content = item.Text,
-                MinWidth = 52,
-                Height = 28,
-                Padding = new Thickness(8, 3),
-                Margin = new Thickness(1),
-                HorizontalContentAlignment = HorizontalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                Foreground = CadUi.Text
             };
-            ToolTip.SetTip(button, item.Text);
+            CadUi.ConfigureCompactButton(button);
+
+            var shortcut = string.IsNullOrWhiteSpace(action.Shortcut)
+                ? string.Empty
+                : $"  {action.Shortcut}";
+            ToolTip.SetTip(button, $"{action.Description}{shortcut}");
             button.Click += (_, _) => Execute(item.Id, item.Text);
-            panel.Children.Add(button);
-            _buttons[item.Id] = button;
+            buttons.Children.Add(button);
         }
 
         return new TabItem
         {
             Header = title,
-            Content = panel
+            Content = new ScrollViewer
+            {
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = buttons
+            }
         };
     }
 
-    private void Execute(string id, string label)
+    private void Execute(string id, string text)
     {
-        if (!_workspace.Actions.Execute(id))
-        {
-            if (!_workspace.Actions.CanExecute(id))
-                _feedback($"当前不能执行：{label}");
+        if (_workspace.Actions.Execute(id))
             return;
-        }
 
-        _feedback(_workspace.Tools.ActiveTool is { } tool
-            ? tool.Prompt
-            : label);
-        RefreshState();
+        _feedback($"当前不能执行：{text}");
     }
 
-    private void RefreshState()
-    {
-        foreach (var (id, button) in _buttons)
-            button.IsEnabled = _workspace.Actions.CanExecute(id);
-    }
+    private static RibbonAction Action(string text, string id) =>
+        new(text, id);
 
-    private static ActionItem A(string id, string text) => new(id, text);
-    private sealed record ActionItem(string Id, string Text);
+    private sealed record RibbonAction(string Text, string Id);
 }

@@ -1,5 +1,9 @@
 using System.Drawing;
+using System.Runtime.InteropServices;
+using Avalonia;
 using Avalonia.Input;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using OcctNet;
 
@@ -12,12 +16,17 @@ internal sealed class CadCoordinateChangedEventArgs(CadResolvedPoint value) : Ev
 
 /// <summary>
 /// Keeps CAD interaction policy outside MainWindow. Navigation stays in the
-/// reusable OCCT viewport; this controller owns CAD selection, command input,
-/// drafting shortcuts and tool routing only.
+/// reusable OCCT viewport; this controller owns CAD selection, drafting input
+/// and tool routing only. Idle application commands remain a shell concern.
 /// </summary>
 internal sealed class CadViewportController : IDisposable
 {
-    private static readonly Cursor CrossCursor = new(StandardCursorType.Cross);
+    private const int CursorSize = 32;
+    private const int CursorCenter = CursorSize / 2;
+    private static readonly WriteableBitmap DrawingCursorBitmap = CreateDrawingCursorBitmap();
+    private static readonly Cursor DrawingCursor = new(
+        DrawingCursorBitmap,
+        new PixelPoint(CursorCenter, CursorCenter));
     private static readonly Cursor NavigationCursor = new(StandardCursorType.SizeAll);
 
     private readonly CadWorkspace _workspace;
@@ -82,7 +91,8 @@ internal sealed class CadViewportController : IDisposable
 
     private void PreviewPointerInput(object? sender, OcctPointerInputEventArgs input)
     {
-        if (_workspace.Engine is null) return;
+        if (input.Handled || _workspace.Engine is null)
+            return;
 
         UpdateNavigationCursor(input);
         if (TryFit(input) || TryRightButton(input) || TryShiftMiddleRotate(input))
@@ -124,9 +134,13 @@ internal sealed class CadViewportController : IDisposable
 
     private bool TryRightButton(OcctPointerInputEventArgs input)
     {
+        if (_workspace.Tools.ActiveTool is null)
+            return false;
+
         var right = input.Button == OcctPointerButton.Right ||
                     (input.Buttons & OcctPointerButtons.Right) != 0;
-        if (!right) return false;
+        if (!right)
+            return false;
 
         input.Handled = true;
         _pointerMoves.Flush();
@@ -202,6 +216,9 @@ internal sealed class CadViewportController : IDisposable
 
     private void PreviewKeyInput(object? sender, OcctKeyInputEventArgs input)
     {
+        if (input.Handled)
+            return;
+
         if (TryDraftingShortcut(input) || TryWorkPlaneShortcut(input))
         {
             input.Handled = true;
@@ -238,7 +255,8 @@ internal sealed class CadViewportController : IDisposable
         {
             case OcctKey.F3:
                 _workspace.Snap.Enabled = !_workspace.Snap.Enabled;
-                if (!_workspace.Snap.Enabled) _workspace.Snap.Clear();
+                if (!_workspace.Snap.Enabled)
+                    _workspace.Snap.Clear();
                 return true;
             case OcctKey.F8:
                 _workspace.Drafting.OrthogonalTrackingEnabled =
@@ -257,7 +275,8 @@ internal sealed class CadViewportController : IDisposable
 
     private bool TryWorkPlaneShortcut(OcctKeyInputEventArgs input)
     {
-        if (input.Kind != OcctKeyInputKind.Pressed || input.IsRepeat ||
+        if (_workspace.Tools.ActiveTool is not { State: CadToolState.Drawing } ||
+            input.Kind != OcctKeyInputKind.Pressed || input.IsRepeat ||
             (input.Modifiers & (OcctInputModifiers.Control | OcctInputModifiers.Alt | OcctInputModifiers.Meta)) != 0)
             return false;
 
@@ -273,7 +292,8 @@ internal sealed class CadViewportController : IDisposable
 
     private void ProcessPointer(OcctPointerInputEventArgs input)
     {
-        if (_workspace.Engine is null) return;
+        if (_workspace.Engine is null)
+            return;
 
         if (_selectionGesture && HandleSelectionGesture(input))
             return;
@@ -426,7 +446,9 @@ internal sealed class CadViewportController : IDisposable
                 foreach (var hit in hits.Distinct())
                 {
                     var entity = _workspace.Document.FindByViewerObject(hit.Owner);
-                    if (entity is null || !hit.IsSubshape) continue;
+                    if (entity is null || !hit.IsSubshape)
+                        continue;
+
                     var reference = CadSubshapeReference.Create(
                         entity,
                         hit.SubshapeType,
@@ -537,9 +559,15 @@ internal sealed class CadViewportController : IDisposable
 
     private void HideSelectionRectangle(OcctEngine engine)
     {
-        if (!_selectionRectangleVisible) return;
-        try { engine.HideSelectionRectangle(); }
-        catch (InvalidOperationException) { }
+        if (!_selectionRectangleVisible)
+            return;
+        try
+        {
+            engine.HideSelectionRectangle();
+        }
+        catch (InvalidOperationException)
+        {
+        }
         _selectionRectangleVisible = false;
     }
 
@@ -563,8 +591,52 @@ internal sealed class CadViewportController : IDisposable
             ? NavigationCursor
             : _workspace.Tools.ActiveTool is { State: CadToolState.Drawing } tool &&
               tool.CurrentStep.RequiresPointer
-                ? CrossCursor
+                ? DrawingCursor
                 : Cursor.Default;
+    }
+
+    private static WriteableBitmap CreateDrawingCursorBitmap()
+    {
+        const int bytesPerPixel = 4;
+        var pixels = new byte[CursorSize * CursorSize * bytesPerPixel];
+
+        for (var index = 2; index < CursorSize - 2; index++)
+        {
+            if (Math.Abs(index - CursorCenter) <= 4)
+                continue;
+
+            SetCursorPixel(pixels, index, CursorCenter);
+            SetCursorPixel(pixels, index, CursorCenter + 1);
+            SetCursorPixel(pixels, CursorCenter, index);
+            SetCursorPixel(pixels, CursorCenter + 1, index);
+        }
+
+        var bitmap = new WriteableBitmap(
+            new PixelSize(CursorSize, CursorSize),
+            new Vector(96, 96),
+            PixelFormat.Bgra8888,
+            AlphaFormat.Premul);
+
+        using var framebuffer = bitmap.Lock();
+        var sourceRowBytes = CursorSize * bytesPerPixel;
+        for (var y = 0; y < CursorSize; y++)
+        {
+            Marshal.Copy(
+                pixels,
+                y * sourceRowBytes,
+                IntPtr.Add(framebuffer.Address, y * framebuffer.RowBytes),
+                sourceRowBytes);
+        }
+        return bitmap;
+    }
+
+    private static void SetCursorPixel(byte[] pixels, int x, int y)
+    {
+        var offset = (y * CursorSize + x) * 4;
+        pixels[offset] = 240;
+        pixels[offset + 1] = 240;
+        pixels[offset + 2] = 240;
+        pixels[offset + 3] = 255;
     }
 
     private static CadSelectionOperation SelectionOperation(OcctInputModifiers modifiers)

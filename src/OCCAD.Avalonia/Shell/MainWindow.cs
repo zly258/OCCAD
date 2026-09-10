@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -7,18 +8,17 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using OCCAD;
 using OcctNet;
-using MediaColor = Avalonia.Media.Color;
 
 namespace OCCAD.Avalonia;
 
 /// <summary>
-/// Minimal industrial CAD shell aligned with OCCTBIM-Source: ribbon, model dock,
-/// viewport, property/layer inspector, command line and status bar. No duplicate
-/// toolbars, decorative brand bars, floating tool panels or fake document tabs.
+/// Thin Avalonia adapter around CadApplicationCore. The shell owns layout and
+/// focus only; CAD state, commands, tools, selection and transactions stay in Core.
 /// </summary>
 internal sealed class MainWindow : Window
 {
-    private readonly CadWorkspace _workspace = new();
+    private readonly CadWorkspace _workspace;
+    private readonly CadSettingsStore _settings;
     private readonly CadCommandManager _commands;
     private readonly OcctAvaloniaViewport _viewport = new();
     private readonly TextBlock _prompt = new();
@@ -35,8 +35,11 @@ internal sealed class MainWindow : Window
     private int _commandHistoryIndex = -1;
     private bool _disposed;
 
-    public MainWindow()
+    public MainWindow(CadApplicationCore application)
     {
+        ArgumentNullException.ThrowIfNull(application);
+        _workspace = application.Workspace;
+        _settings = application.Settings;
         _commands = CadCommandManager.ForWorkspace(_workspace);
         _inspector = new CadInspectorPanel(_workspace, ShowFeedback);
 
@@ -47,7 +50,7 @@ internal sealed class MainWindow : Window
         MinHeight = 640;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         WindowState = WindowState.Maximized;
-        Background = new SolidColorBrush(MediaColor.Parse("#E8EBEF"));
+        Background = CadUi.Window;
 
         ConfigureViewport();
         _viewportController = new CadViewportController(
@@ -67,7 +70,7 @@ internal sealed class MainWindow : Window
                 () => _workspace.Engine?.Redraw(),
                 DispatcherPriority.Loaded);
         };
-        Closed += (_, _) => DisposeWorkspace();
+        Closed += (_, _) => DisposeShell();
     }
 
     private Control BuildShell()
@@ -75,7 +78,7 @@ internal sealed class MainWindow : Window
         var root = new DockPanel
         {
             LastChildFill = true,
-            Background = new SolidColorBrush(MediaColor.Parse("#E8EBEF"))
+            Background = CadUi.Window
         };
 
         var ribbon = new CadCompactRibbon(_workspace, ShowFeedback);
@@ -96,68 +99,65 @@ internal sealed class MainWindow : Window
 
     private Control BuildWorkspace()
     {
-        var grid = new Grid
-        {
-            Background = new SolidColorBrush(MediaColor.Parse("#252A30"))
-        };
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(220)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(4)));
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(CadUi.ModelPanelWidth)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(CadUi.SplitterWidth)));
         grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(4)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(280)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(CadUi.SplitterWidth)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(CadUi.InspectorPanelWidth)));
 
         var model = new CadModelPanel(_workspace);
         grid.Children.Add(model);
 
-        var leftSplitter = new GridSplitter
-        {
-            ResizeDirection = GridResizeDirection.Columns,
-            Background = new SolidColorBrush(MediaColor.Parse("#D3D8DE"))
-        };
+        var leftSplitter = CreateSplitter();
         Grid.SetColumn(leftSplitter, 1);
         grid.Children.Add(leftSplitter);
 
         Grid.SetColumn(_viewport, 2);
         grid.Children.Add(_viewport);
 
-        var rightSplitter = new GridSplitter
-        {
-            ResizeDirection = GridResizeDirection.Columns,
-            Background = new SolidColorBrush(MediaColor.Parse("#D3D8DE"))
-        };
+        var rightSplitter = CreateSplitter();
         Grid.SetColumn(rightSplitter, 3);
         grid.Children.Add(rightSplitter);
 
         Grid.SetColumn(_inspector, 4);
         grid.Children.Add(_inspector);
-
         return grid;
     }
+
+    private static GridSplitter CreateSplitter() =>
+        new()
+        {
+            ResizeDirection = GridResizeDirection.Columns,
+            Background = CadUi.Border
+        };
 
     private Control BuildCommandBar()
     {
         _prompt.Text = "就绪";
         _prompt.VerticalAlignment = VerticalAlignment.Center;
-        _prompt.Foreground = new SolidColorBrush(MediaColor.Parse("#343A40"));
-        _prompt.FontSize = 12;
+        _prompt.Foreground = CadUi.Muted;
+        _prompt.FontSize = CadUi.UiFontSize;
         _prompt.TextTrimming = TextTrimming.CharacterEllipsis;
 
-        _commandInput.MinHeight = 28;
+        _commandInput.MinHeight = CadUi.CompactControlHeight;
+        _commandInput.FontSize = CadUi.UiFontSize;
         _commandInput.VerticalContentAlignment = VerticalAlignment.Center;
-        _commandInput.PlaceholderText = "输入命令、坐标或精确值";
+        _commandInput.PlaceholderText = "命令 / 坐标 / 精确值";
         _commandInput.KeyDown += CommandInputKeyDown;
 
         var grid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("Auto,*,300"),
-            Margin = new Thickness(6, 3)
+            ColumnDefinitions = new ColumnDefinitions("Auto,*,260"),
+            Margin = new Thickness(6, 2)
         };
         grid.Children.Add(new TextBlock
         {
-            Text = "命令:",
+            Text = ">",
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 6, 0),
-            FontWeight = FontWeight.SemiBold
+            FontWeight = FontWeight.SemiBold,
+            Foreground = CadUi.Accent
         });
         Grid.SetColumn(_commandInput, 1);
         grid.Children.Add(_commandInput);
@@ -167,45 +167,29 @@ internal sealed class MainWindow : Window
 
         return new Border
         {
-            Background = Brushes.White,
-            BorderBrush = new SolidColorBrush(MediaColor.Parse("#CCD2D8")),
+            Background = CadUi.Panel,
+            BorderBrush = CadUi.Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
-            MinHeight = 36,
+            MinHeight = 32,
             Child = grid
         };
     }
 
     private Control BuildStatusBar()
     {
-        StatusText(_selectionStatus);
-        StatusText(_coordinateStatus);
-        StatusText(_layerStatus);
-        StatusButton(_snapStatus, () =>
-        {
-            _workspace.Snap.Enabled = !_workspace.Snap.Enabled;
-            if (!_workspace.Snap.Enabled) _workspace.Snap.Clear();
-            RefreshStatus();
-        });
-        StatusButton(_orthoStatus, () =>
-        {
-            _workspace.Drafting.OrthogonalTrackingEnabled =
-                !_workspace.Drafting.OrthogonalTrackingEnabled;
-            _workspace.Tracking.Clear();
-            RefreshStatus();
-        });
-        StatusButton(_polarStatus, () =>
-        {
-            _workspace.Drafting.PolarTrackingEnabled =
-                !_workspace.Drafting.PolarTrackingEnabled;
-            _workspace.Tracking.Clear();
-            RefreshStatus();
-        });
-        StatusButton(_planeStatus, CyclePlane);
+        ConfigureStatusText(_selectionStatus);
+        ConfigureStatusText(_coordinateStatus);
+        ConfigureStatusText(_layerStatus);
+
+        ConfigureStatusButton(_snapStatus, ToggleSnap);
+        ConfigureStatusButton(_orthoStatus, ToggleOrtho);
+        ConfigureStatusButton(_polarStatus, TogglePolar);
+        ConfigureStatusButton(_planeStatus, CyclePlane);
 
         var panel = new DockPanel
         {
             LastChildFill = true,
-            Margin = new Thickness(6, 1)
+            Margin = new Thickness(5, 1)
         };
 
         DockPanel.SetDock(_coordinateStatus, Dock.Right);
@@ -224,10 +208,10 @@ internal sealed class MainWindow : Window
 
         return new Border
         {
-            Background = new SolidColorBrush(MediaColor.Parse("#F4F6F8")),
-            BorderBrush = new SolidColorBrush(MediaColor.Parse("#CCD2D8")),
+            Background = CadUi.Surface,
+            BorderBrush = CadUi.Border,
             BorderThickness = new Thickness(0, 1, 0, 0),
-            MinHeight = 26,
+            MinHeight = 24,
             Child = panel
         };
     }
@@ -240,12 +224,28 @@ internal sealed class MainWindow : Window
         _viewport.SynchronizeRenderDpi = true;
         _viewport.InitialOptions = new OcctViewportInitializationOptions
         {
-            BackgroundColor = Color.FromArgb(37, 42, 48),
+            BackgroundColor = ReadSceneBackground(),
             ViewOrientation = OcctViewOrientation.Isometric,
             Projection = OcctProjectionType.Orthographic,
             TriedronVisible = true,
             ViewCubeVisible = true
         };
+    }
+
+    private Color ReadSceneBackground()
+    {
+        var text = _settings.Get(CadSettingKeys.SceneBackground, "#252A30");
+        var hex = text.Trim().TrimStart('#');
+        if (hex.Length == 6 &&
+            uint.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var value))
+        {
+            return Color.FromArgb(
+                (int)((value >> 16) & 0xFF),
+                (int)((value >> 8) & 0xFF),
+                (int)(value & 0xFF));
+        }
+
+        return Color.FromArgb(37, 42, 48);
     }
 
     private void WireEvents()
@@ -256,7 +256,7 @@ internal sealed class MainWindow : Window
             {
                 _workspace.AttachEngine(args.Engine);
                 _viewportController.AttachEngine(args.Engine);
-                ShowFeedback($"就绪 - OCCT {OcctEngine.OcctVersion}");
+                ShowFeedback($"就绪 · OCCT {OcctEngine.OcctVersion}");
                 RefreshStatus();
             }
             catch (Exception exception)
@@ -281,60 +281,60 @@ internal sealed class MainWindow : Window
             RefreshStatus();
             if (args.Kind is CadDomainEventKind.ActiveToolChanged or CadDomainEventKind.ToolStageChanged)
                 RefreshPrompt();
-            if (args.Kind == CadDomainEventKind.DocumentModifiedChanged)
-                UpdateTitle();
         };
         _workspace.Actions.ActionFailed += (_, args) => ShowFeedback(args.Exception.Message);
     }
 
     private void ViewportShortcutKeyInput(object? sender, OcctKeyInputEventArgs input)
     {
-        if (input.Handled ||
-            input.Kind != OcctKeyInputKind.Pressed ||
-            input.IsRepeat ||
-            _workspace.Tools.ActiveTool is not null)
+        if (input.Handled || input.Kind != OcctKeyInputKind.Pressed || input.IsRepeat)
             return;
 
-        string? actionId = null;
-        var control = (input.Modifiers & OcctInputModifiers.Control) != 0;
-        var shift = (input.Modifiers & OcctInputModifiers.Shift) != 0;
-        var altOrMeta =
-            (input.Modifiers & (OcctInputModifiers.Alt | OcctInputModifiers.Meta)) != 0;
-
-        if (!altOrMeta && control)
+        if (_workspace.Tools.ActiveTool is null)
         {
-            actionId = input.Key switch
+            if (input.Modifiers == OcctInputModifiers.None && input.Key == OcctKey.Escape)
             {
-                OcctKey.Z when shift => "edit.redo",
-                OcctKey.Z => "edit.undo",
-                OcctKey.Y => "edit.redo",
-                OcctKey.A => "select.all",
-                _ => null
-            };
+                _workspace.Selection.Clear();
+                _workspace.Subobjects.Clear();
+                input.Handled = true;
+                return;
+            }
+
+            if (input.Modifiers == OcctInputModifiers.None && input.Key == OcctKey.Space)
+            {
+                input.Handled = true;
+                ExecuteCommand(string.Empty);
+                return;
+            }
+
+            var shortcut = ShortcutText(input);
+            if (shortcut is not null && _workspace.Actions.FindByShortcut(shortcut) is not null)
+            {
+                input.Handled = true;
+                if (!_workspace.Actions.ExecuteShortcut(shortcut))
+                    ShowFeedback("当前不能执行该命令");
+                return;
+            }
+
+            if (input.Modifiers == OcctInputModifiers.None && TryLetter(input.Key, out var letter))
+            {
+                input.Handled = true;
+                BeginCommandEntry(letter);
+            }
+            return;
         }
-        else if (!altOrMeta && !control && input.Key == OcctKey.Delete)
+
+        if (input.Modifiers == OcctInputModifiers.None && TryDigit(input.Key, out var digit))
         {
-            actionId = "edit.delete";
-        }
-        else if (!altOrMeta && !control && input.Key == OcctKey.Escape)
-        {
-            _workspace.Selection.Clear();
-            _workspace.Subobjects.Clear();
             input.Handled = true;
-            return;
+            BeginCommandEntry(digit);
         }
-
-        if (actionId is null || _workspace.Actions.Find(actionId) is null)
-            return;
-
-        input.Handled = true;
-        if (!_workspace.Actions.Execute(actionId))
-            ShowFeedback("当前不能执行该命令");
     }
 
     private void ViewportContextPointerInput(object? sender, OcctPointerInputEventArgs input)
     {
-        if (input.Kind != OcctPointerInputKind.Pressed ||
+        if (input.Handled ||
+            input.Kind != OcctPointerInputKind.Pressed ||
             input.Button != OcctPointerButton.Right ||
             _workspace.Tools.ActiveTool is not null)
             return;
@@ -358,10 +358,9 @@ internal sealed class MainWindow : Window
                 new Separator(),
                 ContextAction("移动", "modify.move"),
                 ContextAction("复制", "modify.copy"),
-                new Separator(),
                 ContextAction("删除", "edit.delete"),
                 new Separator(),
-                ContextUiAction("属性", () => _inspector.ShowProperties())
+                ContextUiAction("属性", _inspector.ShowProperties)
             }
         };
         menu.Closed += (_, _) => _viewport.Focus();
@@ -390,6 +389,13 @@ internal sealed class MainWindow : Window
         return item;
     }
 
+    private void BeginCommandEntry(string seed)
+    {
+        _commandInput.Text = seed;
+        _commandInput.CaretIndex = seed.Length;
+        _commandInput.Focus();
+    }
+
     private void CommandInputKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape)
@@ -403,7 +409,7 @@ internal sealed class MainWindow : Window
             return;
         }
 
-        if (e.Key == Key.Up || e.Key == Key.Down)
+        if (e.Key is Key.Up or Key.Down)
         {
             NavigateCommandHistory(e.Key == Key.Up ? -1 : 1);
             e.Handled = true;
@@ -413,7 +419,12 @@ internal sealed class MainWindow : Window
         if (e.Key != Key.Enter)
             return;
 
-        var text = _commandInput.Text;
+        ExecuteCommand(_commandInput.Text);
+        e.Handled = true;
+    }
+
+    private void ExecuteCommand(string? text)
+    {
         var result = _commands.Execute(text);
         _commandInput.Text = string.Empty;
         _commandHistoryIndex = -1;
@@ -421,7 +432,6 @@ internal sealed class MainWindow : Window
         RefreshPrompt();
         RefreshStatus();
         _viewport.Focus();
-        e.Handled = true;
     }
 
     private void NavigateCommandHistory(int direction)
@@ -443,11 +453,39 @@ internal sealed class MainWindow : Window
         _commandInput.CaretIndex = _commandInput.Text?.Length ?? 0;
     }
 
+    private void ToggleSnap()
+    {
+        _workspace.Snap.Enabled = !_workspace.Snap.Enabled;
+        if (!_workspace.Snap.Enabled)
+            _workspace.Snap.Clear();
+        RefreshStatus();
+        _viewport.Focus();
+    }
+
+    private void ToggleOrtho()
+    {
+        _workspace.Drafting.OrthogonalTrackingEnabled =
+            !_workspace.Drafting.OrthogonalTrackingEnabled;
+        _workspace.Tracking.Clear();
+        RefreshStatus();
+        _viewport.Focus();
+    }
+
+    private void TogglePolar()
+    {
+        _workspace.Drafting.PolarTrackingEnabled =
+            !_workspace.Drafting.PolarTrackingEnabled;
+        _workspace.Tracking.Clear();
+        RefreshStatus();
+        _viewport.Focus();
+    }
+
     private void CyclePlane()
     {
-        if (!_workspace.Tools.CanChangeDrawingPlane)
+        if (_workspace.Tools.ActiveTool is null || !_workspace.Tools.CanChangeDrawingPlane)
         {
-            ShowFeedback("当前阶段不能切换绘图平面");
+            ShowFeedback("绘图过程中可切换工作平面：T=XY / F=XZ / S=YZ");
+            _viewport.Focus();
             return;
         }
 
@@ -459,32 +497,28 @@ internal sealed class MainWindow : Window
         };
         _workspace.Tools.TryChangeDrawingPlane(next);
         RefreshStatus();
+        _viewport.Focus();
     }
 
-    private void RefreshPrompt()
-    {
+    private void RefreshPrompt() =>
         _prompt.Text = _workspace.Tools.ActiveTool?.Prompt ?? "就绪";
-    }
 
     private void RefreshStatus()
     {
         var count = _workspace.Selection.Selected.Count;
-        _selectionStatus.Text = count == 0 ? "未选择" : $"已选择 {count}";
-        _layerStatus.Text = $"图层: {_workspace.Layers.Current.Name}";
-        _snapStatus.Content = _workspace.Snap.Enabled ? "捕捉 F3" : "捕捉关";
-        _orthoStatus.Content = _workspace.Drafting.OrthogonalTrackingEnabled ? "正交 F8" : "正交关";
-        _polarStatus.Content = _workspace.Drafting.PolarTrackingEnabled ? "极轴 F10" : "极轴关";
-        _planeStatus.Content = $"平面 {_workspace.WorkPlane.Preset}";
-        UpdateTitle();
-    }
-
-    private void UpdateTitle() =>
+        _selectionStatus.Text = count == 0 ? "未选择" : $"选择 {count}";
+        _layerStatus.Text = $"层 {_workspace.Layers.Current.Name}";
+        _snapStatus.Content = _workspace.Snap.Enabled ? "SNAP F3" : "SNAP —";
+        _orthoStatus.Content = _workspace.Drafting.OrthogonalTrackingEnabled ? "ORTHO F8" : "ORTHO —";
+        _polarStatus.Content = _workspace.Drafting.PolarTrackingEnabled ? "POLAR F10" : "POLAR —";
+        _planeStatus.Content = $"{_workspace.WorkPlane.Preset}";
         Title = _workspace.IsModified ? "OCCAD *" : "OCCAD";
+    }
 
     private void ShowFeedback(string text)
     {
-        if (string.IsNullOrWhiteSpace(text)) return;
-        _prompt.Text = text;
+        if (!string.IsNullOrWhiteSpace(text))
+            _prompt.Text = text;
     }
 
     private static string ResultText(CadCommandResultKind kind) => kind switch
@@ -496,27 +530,87 @@ internal sealed class MainWindow : Window
         _ => "命令失败"
     };
 
-    private static void StatusText(TextBlock text)
+    private static void ConfigureStatusText(TextBlock text)
     {
         text.VerticalAlignment = VerticalAlignment.Center;
-        text.FontSize = 11;
-        text.Foreground = new SolidColorBrush(MediaColor.Parse("#495057"));
+        text.FontSize = CadUi.UiFontSize;
+        text.Foreground = CadUi.Muted;
         text.Margin = new Thickness(5, 0);
     }
 
-    private static void StatusButton(Button button, Action action)
+    private static void ConfigureStatusButton(Button button, Action action)
     {
-        button.MinHeight = 22;
-        button.Padding = new Thickness(6, 1);
-        button.Margin = new Thickness(1, 0);
+        CadUi.ConfigureStatusButton(button);
         button.Click += (_, _) => action();
     }
 
-    private void DisposeWorkspace()
+    private static string? ShortcutText(OcctKeyInputEventArgs input)
     {
-        if (_disposed) return;
+        var key = ShortcutKeyName(input.Key);
+        if (key is null)
+            return null;
+
+        List<string> parts = [];
+        if ((input.Modifiers & OcctInputModifiers.Control) != 0)
+            parts.Add("Ctrl");
+        if ((input.Modifiers & OcctInputModifiers.Shift) != 0)
+            parts.Add("Shift");
+        if ((input.Modifiers & OcctInputModifiers.Alt) != 0)
+            parts.Add("Alt");
+        if ((input.Modifiers & OcctInputModifiers.Meta) != 0)
+            parts.Add("Meta");
+        parts.Add(key);
+        return string.Join('+', parts);
+    }
+
+    private static string? ShortcutKeyName(OcctKey key)
+    {
+        var raw = (int)key;
+        if (raw >= (int)OcctKey.A && raw <= (int)OcctKey.Z)
+            return key.ToString();
+        if (raw >= (int)OcctKey.F1 && raw <= (int)OcctKey.F12)
+            return key.ToString();
+        return key switch
+        {
+            OcctKey.Delete => "Delete",
+            OcctKey.Insert => "Insert",
+            OcctKey.Home => "Home",
+            OcctKey.End => "End",
+            _ => null
+        };
+    }
+
+    private static bool TryLetter(OcctKey key, out string text)
+    {
+        var raw = (int)key;
+        if (raw >= (int)OcctKey.A && raw <= (int)OcctKey.Z)
+        {
+            text = key.ToString().ToLowerInvariant();
+            return true;
+        }
+
+        text = string.Empty;
+        return false;
+    }
+
+    private static bool TryDigit(OcctKey key, out string text)
+    {
+        var raw = (int)key;
+        if (raw >= (int)OcctKey.D0 && raw <= (int)OcctKey.D9)
+        {
+            text = (raw - (int)OcctKey.D0).ToString(CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        text = string.Empty;
+        return false;
+    }
+
+    private void DisposeShell()
+    {
+        if (_disposed)
+            return;
         _disposed = true;
         _viewportController.Dispose();
-        _workspace.Dispose();
     }
 }

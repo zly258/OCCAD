@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace OCCAD;
 
 public enum CadCommandResultKind
@@ -23,6 +25,9 @@ public readonly record struct CadCommandResult(
 public sealed class CadCommandManager
 {
     private const int HistoryLimit = 100;
+    private static readonly ConditionalWeakTable<CadWorkspace, CadCommandManager>
+        WorkspaceManagers = new();
+
     private readonly CadWorkspace _workspace;
     private readonly Dictionary<string, string> _aliases = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> _history = [];
@@ -31,6 +36,19 @@ public sealed class CadCommandManager
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         RegisterDefaults();
+    }
+
+    /// <summary>
+    /// Returns the shared command session for a workspace. UI, automation and
+    /// other front ends should use this entry point when command history and
+    /// repeat/completion state must be consistent across surfaces.
+    /// </summary>
+    public static CadCommandManager ForWorkspace(CadWorkspace workspace)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        return WorkspaceManagers.GetValue(
+            workspace,
+            static value => new CadCommandManager(value));
     }
 
     public IReadOnlyList<string> History => _history;

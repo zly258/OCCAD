@@ -20,6 +20,15 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     protected override bool CanCommitCurrentStageCore => true;
     protected override bool CanStepBackCore => _basePoint is not null;
 
+    public override bool CanCommitCurrentStage =>
+        _basePoint is not null &&
+        IsActive &&
+        State == CadToolState.Drawing &&
+        Entities.Count > 0 &&
+        Context.Workspace.Drafting.AngleLockEnabled
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnTransformStarted()
     {
         _basePoint = null;
@@ -68,6 +77,13 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
         if (State != CadToolState.Drawing)
             return false;
 
+        if (_basePoint is not null &&
+            Context.Workspace.Drafting.AngleLockEnabled)
+        {
+            return CommitAngle(
+                Context.Workspace.Drafting.LockedAngleDegrees);
+        }
+
         return AcceptPoint(
             Context.ResolvePoint(
                 pointer.X,
@@ -100,11 +116,18 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
 
     protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
     {
-        if (_basePoint is not null &&
-            Context.Workspace.LastPointerPosition is { } pointer)
+        if (_basePoint is null)
+            return input.AngleDegrees is null;
+
+        if (Context.Workspace.Drafting.AngleLockEnabled)
         {
-            RefreshPreviewFromLastPointer(pointer);
+            ShowAnglePreview(
+                Context.Workspace.Drafting.LockedAngleDegrees);
+            return true;
         }
+
+        if (Context.Workspace.LastPointerPosition is { } pointer)
+            RefreshPreviewFromLastPointer(pointer);
         return true;
     }
 
@@ -113,6 +136,13 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
     {
         if (_basePoint is not { } basePoint)
             return;
+
+        if (Context.Workspace.Drafting.AngleLockEnabled)
+        {
+            ShowAnglePreview(
+                Context.Workspace.Drafting.LockedAngleDegrees);
+            return;
+        }
 
         UpdatePreview(
             Context.ResolvePoint(
@@ -155,7 +185,48 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
             return true;
         }
 
-        if (!TryAngle(point, out var angleDegrees) ||
+        if (!TryAngle(point, out var angleDegrees))
+        {
+            ClearTransformPreview();
+            return false;
+        }
+
+        return CommitAngle(angleDegrees);
+    }
+
+    private void UpdatePreview(OcctPoint3d target)
+    {
+        if (_basePoint is null ||
+            !TryAngle(target, out var angleDegrees))
+        {
+            ClearTransformPreview();
+            return;
+        }
+
+        ShowAnglePreview(angleDegrees);
+    }
+
+    private void ShowAnglePreview(double angleDegrees)
+    {
+        if (_basePoint is null ||
+            !double.IsFinite(angleDegrees) ||
+            Math.Abs(NormalizeAngle(angleDegrees)) <= 1e-10)
+        {
+            ClearTransformPreview();
+            return;
+        }
+
+        ShowEntityPreview(
+            entity => entity.RotatePlacement(
+                _basePoint.Value,
+                _rotationAxis,
+                angleDegrees));
+    }
+
+    private bool CommitAngle(double angleDegrees)
+    {
+        if (_basePoint is null ||
+            !double.IsFinite(angleDegrees) ||
             Math.Abs(NormalizeAngle(angleDegrees)) <= 1e-10)
         {
             ClearTransformPreview();
@@ -169,23 +240,6 @@ public sealed class RotateTool : CadSelectionTransformToolBase, ICadPointInputTo
             angleDegrees);
         Context.Workspace.Tools.CompleteCurrent();
         return true;
-    }
-
-    private void UpdatePreview(OcctPoint3d target)
-    {
-        if (_basePoint is null ||
-            !TryAngle(target, out var angleDegrees) ||
-            Math.Abs(NormalizeAngle(angleDegrees)) <= 1e-10)
-        {
-            ClearTransformPreview();
-            return;
-        }
-
-        ShowEntityPreview(
-            entity => entity.RotatePlacement(
-                _basePoint.Value,
-                _rotationAxis,
-                angleDegrees));
     }
 
     private bool TryAngle(

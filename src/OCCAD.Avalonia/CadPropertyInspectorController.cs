@@ -32,6 +32,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         _host = host ?? throw new ArgumentNullException(nameof(host));
+        _host.Spacing = 0;
+        _host.Margin = new Thickness(0);
     }
 
     public bool IsInspectingLayer => _layer is not null;
@@ -361,7 +363,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
     private static Control CreateReadOnlyRow(string label, string value)
     {
-        var row = CreatePropertyGrid();
+        var row = CreatePropertyGrid(shadeLabelCell: true);
         row.Children.Add(new TextBlock
         {
             Text = label,
@@ -375,10 +377,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
         {
             Text = value,
             Foreground = CadTheme.Muted,
-            Margin = new Thickness(4, 0, 3, 0),
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
+        ConfigurePropertyValueControl(text);
         Grid.SetColumn(text, 2);
         row.Children.Add(text);
         return WrapPropertyRow(row);
@@ -420,7 +422,7 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
     private Control CreatePropertyRow(PropertySlot slot)
     {
-        var row = CreatePropertyGrid();
+        var row = CreatePropertyGrid(shadeLabelCell: true);
         var label = new TextBlock
         {
             Text = CadLanguageManager.Text(
@@ -443,13 +445,13 @@ internal sealed class CadPropertyInspectorController : IDisposable
 
         row.Children.Add(label);
         var editor = CreateEditor(slot);
-        editor.Margin = new Thickness(4, 0, 3, 0);
+        ConfigurePropertyValueControl(editor);
         Grid.SetColumn(editor, 2);
         row.Children.Add(editor);
         return WrapPropertyRow(row);
     }
 
-    private static Grid CreatePropertyGrid()
+    private static Grid CreatePropertyGrid(bool shadeLabelCell = false)
     {
         var row = new Grid { ColumnSpacing = 0 };
         row.ColumnDefinitions.Add(
@@ -458,6 +460,17 @@ internal sealed class CadPropertyInspectorController : IDisposable
             new ColumnDefinition(new GridLength(1)));
         row.ColumnDefinitions.Add(
             new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+
+        if (shadeLabelCell)
+        {
+            var labelCell = new Border
+            {
+                Background = CadTheme.PanelAlt,
+                IsHitTestVisible = false
+            };
+            Grid.SetColumn(labelCell, 0);
+            row.Children.Add(labelCell);
+        }
 
         var separator = new Border
         {
@@ -478,8 +491,62 @@ internal sealed class CadPropertyInspectorController : IDisposable
             BorderBrush = CadTheme.Border,
             BorderThickness = new Thickness(0, 0, 0, 1),
             Padding = new Thickness(0),
+            Margin = new Thickness(0),
             Child = content
         };
+
+    private static void ConfigurePropertyValueControl(Control control)
+    {
+        switch (control)
+        {
+            case TextBox textBox:
+                textBox.Margin = new Thickness(0);
+                textBox.MinHeight = CadTheme.ControlHeight;
+                textBox.Padding = new Thickness(5, 0);
+                textBox.Background = CadTheme.Surface;
+                textBox.BorderThickness = new Thickness(0);
+                textBox.CornerRadius = new CornerRadius(0);
+                break;
+
+            case ComboBox comboBox:
+                comboBox.Margin = new Thickness(0);
+                comboBox.MinHeight = CadTheme.ControlHeight;
+                comboBox.Background = CadTheme.Surface;
+                comboBox.BorderThickness = new Thickness(0);
+                comboBox.CornerRadius = new CornerRadius(0);
+                break;
+
+            case Button button:
+                button.Margin = new Thickness(0);
+                button.MinHeight = CadTheme.ControlHeight;
+                button.BorderThickness = new Thickness(0);
+                button.CornerRadius = new CornerRadius(0);
+                break;
+
+            case CheckBox checkBox:
+                checkBox.Margin = new Thickness(5, 0, 0, 0);
+                checkBox.MinHeight = CadTheme.ControlHeight;
+                break;
+
+            case TextBlock text:
+                text.Margin = new Thickness(5, 0, 3, 0);
+                text.VerticalAlignment = VerticalAlignment.Center;
+                break;
+
+            case Grid grid:
+                grid.Margin = new Thickness(0);
+                grid.ColumnSpacing = 4;
+                foreach (var child in grid.Children.OfType<Control>())
+                    ConfigurePropertyValueControl(child);
+                break;
+
+            case Panel panel:
+                panel.Margin = new Thickness(0);
+                foreach (var child in panel.Children.OfType<Control>())
+                    ConfigurePropertyValueControl(child);
+                break;
+        }
+    }
 
     private static Border CreateInspectorTitle(string title) =>
         new()

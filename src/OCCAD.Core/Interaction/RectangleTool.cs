@@ -29,6 +29,15 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
 
     protected override bool CanStepBackCore => _first is not null;
 
+    public override bool CanCommitCurrentStage =>
+        _first is not null &&
+        IsActive &&
+        State == CadToolState.Drawing &&
+        _width is > 1e-9 &&
+        _height is > 1e-9
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnActivated()
     {
         _first = null;
@@ -68,8 +77,19 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
         return AcceptPoint(Context.ResolvePoint(input.X, input.Y, _first).Point);
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(pointer, _first, AcceptPoint);
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (_first is { } first &&
+            _width is { } width && width > 1e-9 &&
+            _height is { } height && height > 1e-9 &&
+            Context.Workspace.LastPointerPosition is null)
+        {
+            return AcceptPoint(
+                first + _xAxis * width + _yAxis * height);
+        }
+
+        return CommitResolvedPoint(pointer, _first, AcceptPoint);
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive && State == CadToolState.Drawing && AcceptPoint(point);
@@ -92,7 +112,7 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
                 return false;
         }
 
-        RefreshPreviewFromLastPointer();
+        RefreshPreviewFromInput();
         NotifyUpdated();
         return true;
     }
@@ -118,6 +138,7 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
             _first = point;
             Context.WorkPlane.SetOrigin(point);
             RestorePrompt();
+            RefreshPreviewFromInput();
             return true;
         }
 
@@ -194,13 +215,25 @@ public sealed class RectangleTool : CadDrawingTool, ICadPointInputTool
         return center.IsFinite;
     }
 
-    private void RefreshPreviewFromLastPointer()
+    private void RefreshPreviewFromInput()
     {
-        if (_first is not { } first || Context.Workspace.LastPointerPosition is not { } pointer)
+        if (_first is not { } first)
             return;
 
-        var point = Context.ResolvePoint(pointer.X, pointer.Y, first).Point;
-        UpdatePreview(first, point);
+        if (Context.Workspace.LastPointerPosition is { } pointer)
+        {
+            var point = Context.ResolvePoint(pointer.X, pointer.Y, first).Point;
+            UpdatePreview(first, point);
+            return;
+        }
+
+        if (_width is { } width && width > 1e-9 &&
+            _height is { } height && height > 1e-9)
+        {
+            UpdatePreview(
+                first,
+                first + _xAxis * width + _yAxis * height);
+        }
     }
 
     private void UpdateAxes()

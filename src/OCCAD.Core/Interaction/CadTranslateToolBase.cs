@@ -11,6 +11,18 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
         _basePoint ??
         throw new InvalidOperationException("Base point is not set.");
 
+    public override bool CanCommitCurrentStage =>
+        _basePoint is { } basePoint &&
+        IsActive &&
+        State == CadToolState.Drawing &&
+        Entities.Count > 0 &&
+        CadExactInputGeometry.TryResolveLengthAnglePoint(
+            Context.Workspace,
+            basePoint,
+            out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnTransformStarted()
     {
         _basePoint = null;
@@ -62,6 +74,15 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
     {
         if (State != CadToolState.Drawing)
             return false;
+
+        if (_basePoint is { } basePoint &&
+            CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                basePoint,
+                out var exactPoint))
+        {
+            return AcceptPoint(exactPoint);
+        }
 
         var point = Context.ResolvePoint(
             pointer.X,
@@ -144,8 +165,19 @@ public abstract class CadTranslateToolBase : CadSelectionTransformToolBase, ICad
 
     protected void RefreshTranslatedPreview()
     {
-        if (_basePoint is not { } basePoint ||
-            Context.Workspace.LastPointerPosition is not { } pointer)
+        if (_basePoint is not { } basePoint)
+            return;
+
+        if (CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                basePoint,
+                out var exactPoint))
+        {
+            UpdateTranslatedPreview(exactPoint);
+            return;
+        }
+
+        if (Context.Workspace.LastPointerPosition is not { } pointer)
             return;
 
         var target =

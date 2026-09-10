@@ -30,7 +30,7 @@ internal sealed class CadCommandLineController : IDisposable
         Panel host)
     {
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
-        _commands = new CadCommandManager(_workspace);
+        _commands = CadCommandManager.ForWorkspace(_workspace);
         _host = host ?? throw new ArgumentNullException(nameof(host));
 
         BuildUi();
@@ -258,9 +258,10 @@ internal sealed class CadCommandLineController : IDisposable
             .ToArray();
         if (matches.Length == 0)
         {
-            ShowFeedback(CadLanguageManager.Text(
-                "Cad.Text.NoMatchingCommand",
-                "No matching command"));
+            ShowFeedback(
+                CadLanguageManager.Text(
+                    "Cad.Text.NoMatchingCommand",
+                    "No matching command"));
             return;
         }
 
@@ -323,32 +324,35 @@ internal sealed class CadCommandLineController : IDisposable
         if (!string.IsNullOrWhiteSpace(result.ActionId) &&
             _workspace.Actions.Find(result.ActionId) is { } action)
         {
-            ShowFeedback(CadLanguageManager.Text(
-                $"Cad.Action.{action.Id}",
-                action.DisplayName));
+            ShowFeedback(
+                CadLanguageManager.Text(
+                    $"Cad.Action.{action.Id}",
+                    action.DisplayName));
             return;
         }
 
-        ShowFeedback(result.Kind switch
-        {
-            CadCommandResultKind.Repeated => CadLanguageManager.Text(
-                "Cad.Text.CommandRepeated",
-                "Repeated last command"),
-            CadCommandResultKind.Canceled => CadLanguageManager.Text(
-                "Cad.Text.CommandCanceled",
-                "Canceled"),
-            _ => string.Empty
-        });
+        ShowFeedback(
+            result.Kind switch
+            {
+                CadCommandResultKind.Repeated => CadLanguageManager.Text(
+                    "Cad.Text.CommandRepeated",
+                    "Repeated last command"),
+                CadCommandResultKind.Canceled => CadLanguageManager.Text(
+                    "Cad.Text.CommandCanceled",
+                    "Canceled"),
+                _ => string.Empty
+            });
     }
 
     private void ActionFailed(object? sender, CadActionFailedEventArgs e)
     {
-        ShowFeedback(string.Format(
-            CadLanguageManager.Text(
-                "Cad.Text.CommandFailed",
-                "{0} failed"),
-            CadLanguageManager.Text(
-                $"Cad.Action.{e.Action.Id}",
-                e.Action.DisplayName)));
+        ShowFeedback(
+            string.Format(
+                CadLanguageManager.Text(
+                    "Cad.Text.CommandFailed",
+                    "{0} failed"),
+                CadLanguageManager.Text(
+                    $"Cad.Action.{e.Action.Id}",
+                    e.Action.DisplayName)));
     }
 }

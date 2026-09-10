@@ -57,6 +57,13 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
 
     protected override bool CanStepBackCore => _points.Count > 0;
 
+    public override bool CanCommitCurrentStage =>
+        IsActive &&
+        State == CadToolState.Drawing &&
+        TryResolveExactInputPoint(out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnActivated()
     {
         _points.Clear();
@@ -93,9 +100,16 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         return AcceptPoint(ProjectToDrawingPlane(Resolve(input, _points.Count == 0 ? null : _points[^1])));
     }
 
-    protected override bool OnCommitCurrentStage(CadPointerPosition pointer) =>
-        CommitResolvedPoint(pointer, _points.Count == 0 ? null : _points[^1],
+    protected override bool OnCommitCurrentStage(CadPointerPosition pointer)
+    {
+        if (TryResolveExactInputPoint(out var exactPoint))
+            return AcceptPoint(ProjectToDrawingPlane(exactPoint));
+
+        return CommitResolvedPoint(
+            pointer,
+            _points.Count == 0 ? null : _points[^1],
             point => AcceptPoint(ProjectToDrawingPlane(point)));
+    }
 
     public bool TryAcceptPoint(OcctPoint3d point) =>
         IsActive && State == CadToolState.Drawing && AcceptPoint(ProjectToDrawingPlane(point));
@@ -121,7 +135,7 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         if (id.Equals("Radius", StringComparison.OrdinalIgnoreCase) && _method == CenterRadius)
         {
             if (!TryOptionalPositive(value, out _radius)) return false;
-            RefreshPreviewFromLastPointer();
+            RefreshPreviewFromInput();
             NotifyUpdated();
             return true;
         }
@@ -129,12 +143,23 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         if (id.Equals("Diameter", StringComparison.OrdinalIgnoreCase) && _method == CenterDiameter)
         {
             if (!TryOptionalPositive(value, out _diameter)) return false;
-            RefreshPreviewFromLastPointer();
+            RefreshPreviewFromInput();
             NotifyUpdated();
             return true;
         }
 
         return false;
+    }
+
+    protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
+    {
+        if (TryResolveExactInputPoint(out var exactPoint))
+        {
+            UpdatePreview(ProjectToDrawingPlane(exactPoint));
+            return true;
+        }
+
+        return base.OnPrecisionInputApplied(input);
     }
 
     protected override bool OnStepBack()
@@ -163,13 +188,13 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         {
             case CenterRadius:
             case CenterDiameter:
-                if (_points.Count == 1) { RestorePrompt(); return true; }
+                if (_points.Count == 1) { RestorePrompt(); RefreshPreviewFromInput(); return true; }
                 return CommitCenterCircle(point);
             case TwoPoints:
                 if (_points.Count == 1) { RestorePrompt(); return true; }
                 return CommitTwoPointCircle();
             case ThreePoints:
-                if (_points.Count < 3) { RestorePrompt(); return true; }
+                if (_points.Count < 3) { RestorePrompt(); RefreshPreviewFromInput(); return true; }
                 return CommitThreePointCircle();
             case PointCenter:
                 if (_points.Count == 1) { RestorePrompt(); return true; }
@@ -291,11 +316,60 @@ public sealed class CircleTool : CadDrawingTool, ICadPointInputTool
         ShowPreview(entity);
     }
 
-    private void RefreshPreviewFromLastPointer()
+    private void RefreshPreviewFromInput()
     {
-        if (_points.Count == 0 || Context.Workspace.LastPointerPosition is not { } pointer) return;
+        if (_points.Count == 0)
+            return;
+
+        if (TryResolveExactInputPoint(out var exactPoint))
+        {
+            UpdatePreview(ProjectToDrawingPlane(exactPoint));
+            return;
+        }
+
+        if (Context.Workspace.LastPointerPosition is not { } pointer)
+            return;
+
         var point = Context.ResolvePoint(pointer.X, pointer.Y, _points[^1]).Point;
         UpdatePreview(ProjectToDrawingPlane(point));
+    }
+
+    private bool TryResolveExactInputPoint(out OcctPoint3d point)
+    {
+        point = default;
+        if (_points.Count == 0)
+            return false;
+
+        var reference = _points[^1];
+        if (_points.Count == 1)
+        {
+            if (_method == CenterRadius && _radius is { } radius && radius > 1e-9)
+            {
+                point = _points[0] + _xAxis * radius;
+                return point.IsFinite;
+            }
+
+            if (_method == CenterDiameter && _diameter is { } diameter && diameter > 2e-9)
+            {
+                point = _points[0] + _xAxis * diameter;
+                return point.IsFinite;
+            }
+
+            if (_method is CenterRadius or CenterDiameter &&
+                Context.Workspace.Drafting.LengthLockEnabled &&
+                Context.Workspace.Drafting.LockedLength > 1e-9)
+            {
+                point = _points[0] +
+                        _xAxis * Context.Workspace.Drafting.LockedLength;
+                return point.IsFinite;
+            }
+        }
+
+        return _method == ThreePoints &&
+               CadExactInputGeometry.TryResolveLengthAnglePoint(
+                   Context.Workspace,
+                   reference,
+                   out point);
     }
 
     private void RestorePrompt()

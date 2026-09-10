@@ -26,6 +26,18 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
     protected override bool CanCommitCurrentStageCore => true;
     protected override bool CanStepBackCore => _firstPoint is not null;
 
+    public override bool CanCommitCurrentStage =>
+        _firstPoint is { } first &&
+        IsActive &&
+        State == CadToolState.Drawing &&
+        Entities.Count > 0 &&
+        CadExactInputGeometry.TryResolveLengthAnglePoint(
+            Context.Workspace,
+            first,
+            out _)
+            ? true
+            : base.CanCommitCurrentStage;
+
     protected override void OnTransformStarted()
     {
         _firstPoint = null;
@@ -72,6 +84,15 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
         if (State != CadToolState.Drawing)
             return false;
 
+        if (_firstPoint is { } first &&
+            CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                first,
+                out var exactPoint))
+        {
+            return AcceptPoint(exactPoint);
+        }
+
         return AcceptPoint(
             Context.ResolvePoint(
                 pointer.X,
@@ -95,19 +116,14 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
             return true;
 
         _keepSource = keepSource;
-        if (Context.Workspace.LastPointerPosition is { } pointer)
-            RefreshPreviewFromLastPointer(pointer);
+        RefreshExactOrPointerPreview();
         NotifyUpdated();
         return true;
     }
 
     protected override bool OnPrecisionInputApplied(CadPrecisionInput input)
     {
-        if (_firstPoint is not null &&
-            Context.Workspace.LastPointerPosition is { } pointer)
-        {
-            RefreshPreviewFromLastPointer(pointer);
-        }
+        RefreshExactOrPointerPreview();
         return true;
     }
 
@@ -131,6 +147,15 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
     {
         if (_firstPoint is not { } first)
             return;
+
+        if (CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                first,
+                out var exactPoint))
+        {
+            UpdatePreview(exactPoint);
+            return;
+        }
 
         var point = Context.ResolvePoint(
             pointer.X,
@@ -185,6 +210,24 @@ public sealed class MirrorTool : CadSelectionTransformToolBase, ICadPointInputTo
 
         Context.Workspace.Tools.CompleteCurrent();
         return true;
+    }
+
+    private void RefreshExactOrPointerPreview()
+    {
+        if (_firstPoint is not { } first)
+            return;
+
+        if (CadExactInputGeometry.TryResolveLengthAnglePoint(
+                Context.Workspace,
+                first,
+                out var exactPoint))
+        {
+            UpdatePreview(exactPoint);
+            return;
+        }
+
+        if (Context.Workspace.LastPointerPosition is { } pointer)
+            RefreshPreviewFromLastPointer(pointer);
     }
 
     private void UpdatePreview(OcctPoint3d secondPoint)

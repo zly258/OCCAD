@@ -26,6 +26,7 @@ public sealed partial class MainWindow
         UpdateSelectionStatus();
         UpdateHistoryUi();
         RefreshInteractionUi();
+        RefreshCommandStatusLanguage();
         RefreshActionUi();
         RefreshPanelMenuState();
     }
@@ -44,6 +45,7 @@ public sealed partial class MainWindow
         _commandLine.RefreshLanguage();
         ModelPanel.RefreshLanguage();
         RefreshRefinementLanguage();
+        RefreshCommandStatusLanguage();
 
         UpdateToolUi(_workspace.Tools.ActiveTool);
         UpdateSelectionStatus();

@@ -689,6 +689,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                 CreateEnumEditor(slot, value, isMixed),
             CadPropertyEditorKind.Color =>
                 CreateColorEditor(slot, value, isMixed: isMixed),
+            CadPropertyEditorKind.Numeric =>
+                CreateNumericEditor(slot, value, isMixed),
             CadPropertyEditorKind.Text =>
                 CreateTextEditor(slot, value, isMixed),
             _ => ReadOnlyValue(descriptor, value, isMixed)
@@ -762,6 +764,8 @@ internal sealed class CadPropertyInspectorController : IDisposable
                     editorValue,
                     showByLayerText: false,
                     isMixed: editorMixed),
+            CadPropertyEditorKind.Numeric =>
+                CreateNumericEditor(slot, editorValue, editorMixed),
             CadPropertyEditorKind.Text =>
                 CreateTextEditor(slot, editorValue, editorMixed),
             _ => ReadOnlyValue(slot.Descriptor, editorValue, editorMixed)
@@ -904,6 +908,73 @@ internal sealed class CadPropertyInspectorController : IDisposable
         return button;
     }
 
+    private Control CreateNumericEditor(
+        PropertySlot slot,
+        object? value,
+        bool isMixed)
+    {
+        var descriptor = slot.Descriptor;
+        var initialText = isMixed
+            ? string.Empty
+            : CadPropertyEditorFactory.FormatValue(descriptor, value);
+        var lastSubmittedText = initialText;
+        var editor = new TextBox
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center,
+            Text = initialText,
+            PlaceholderText = isMixed ? "—" : null,
+            TextAlignment = TextAlignment.Right
+        };
+        editor.Classes.Add("cad-input");
+
+        var rangeHint = NumericRangeHint(descriptor.Value);
+        if (rangeHint is not null)
+            ToolTip.SetTip(editor, rangeHint);
+
+        void Commit(bool revertOnInvalid)
+        {
+            if (_refreshing || _disposed)
+                return;
+
+            var text = editor.Text ?? string.Empty;
+            if (string.Equals(text, lastSubmittedText, StringComparison.Ordinal))
+                return;
+
+            if (!CadPropertyEditorFactory.TryParseValue(
+                    descriptor,
+                    text,
+                    out var converted))
+            {
+                ToolTip.SetTip(
+                    editor,
+                    CombineHint(
+                        CadLanguageManager.Text(
+                            "Cad.Text.InvalidNumericValue",
+                            "Enter a valid numeric value."),
+                        rangeHint));
+                if (revertOnInvalid)
+                    editor.Text = initialText;
+                else
+                    editor.SelectAll();
+                return;
+            }
+
+            lastSubmittedText = text;
+            ApplyValue(slot, converted);
+        }
+
+        editor.KeyDown += (_, e) =>
+        {
+            if (e.Key != global::Avalonia.Input.Key.Enter)
+                return;
+            Commit(revertOnInvalid: false);
+            e.Handled = true;
+        };
+        editor.LostFocus += (_, _) => Commit(revertOnInvalid: true);
+        return editor;
+    }
+
     private Control CreateTextEditor(
         PropertySlot slot,
         object? value,
@@ -917,29 +988,41 @@ internal sealed class CadPropertyInspectorController : IDisposable
             return CreatePointVectorEditor(slot, value, isMixed);
         }
 
+        var initialText = isMixed
+            ? string.Empty
+            : CadPropertyEditorFactory.FormatValue(descriptor, value);
+        var lastSubmittedText = initialText;
         var editor = new TextBox
         {
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Center,
-            Text = isMixed
-                ? string.Empty
-                : CadPropertyEditorFactory.FormatValue(descriptor, value),
+            Text = initialText,
             PlaceholderText = isMixed ? "—" : null
         };
         editor.Classes.Add("cad-input");
 
-        void Commit()
+        void Commit(bool revertOnInvalid)
         {
-            if (_refreshing)
+            if (_refreshing || _disposed)
                 return;
+
+            var text = editor.Text ?? string.Empty;
+            if (string.Equals(text, lastSubmittedText, StringComparison.Ordinal))
+                return;
+
             if (!CadPropertyEditorFactory.TryParseValue(
                     descriptor,
-                    editor.Text ?? string.Empty,
+                    text,
                     out var converted))
             {
-                Rebuild();
+                if (revertOnInvalid)
+                    editor.Text = initialText;
+                else
+                    editor.SelectAll();
                 return;
             }
+
+            lastSubmittedText = text;
             ApplyValue(slot, converted);
         }
 
@@ -947,10 +1030,10 @@ internal sealed class CadPropertyInspectorController : IDisposable
         {
             if (e.Key != global::Avalonia.Input.Key.Enter)
                 return;
-            Commit();
+            Commit(revertOnInvalid: false);
             e.Handled = true;
         };
-        editor.LostFocus += (_, _) => Commit();
+        editor.LostFocus += (_, _) => Commit(revertOnInvalid: true);
         return editor;
     }
 
@@ -1087,6 +1170,25 @@ internal sealed class CadPropertyInspectorController : IDisposable
             return editor;
         }
     }
+
+    private static string? NumericRangeHint(CadValueDescriptor descriptor)
+    {
+        var minimum = descriptor.Minimum;
+        var maximum = descriptor.Maximum;
+        if (minimum is null && maximum is null)
+            return null;
+
+        if (minimum is { } min && maximum is { } max)
+            return $"{min:0.######} ≤ value ≤ {max:0.######}";
+        if (minimum is { } lower)
+            return $"value ≥ {lower:0.######}";
+        return $"value ≤ {maximum!.Value:0.######}";
+    }
+
+    private static string CombineHint(string message, string? rangeHint) =>
+        string.IsNullOrWhiteSpace(rangeHint)
+            ? message
+            : $"{message} {rangeHint}";
 
     private static Control ReadOnlyValue(
         CadPropertyDescriptor descriptor,

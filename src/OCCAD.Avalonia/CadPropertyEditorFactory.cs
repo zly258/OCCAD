@@ -10,6 +10,7 @@ internal enum CadPropertyEditorKind
     Boolean,
     Choice,
     Color,
+    Numeric,
     Text
 }
 
@@ -52,6 +53,11 @@ internal static class CadPropertyEditorFactory
                 context.Descriptor.Value.Semantic is
                     CadValueSemantic.Point or CadValueSemantic.Vector,
             CadPropertyEditorKind.Text),
+        new(
+            static context =>
+                CadValueTextConverter.IsNumericType(
+                    context.Descriptor.PropertyType),
+            CadPropertyEditorKind.Numeric),
         new(
             static context => CanEditAsText(context.Descriptor),
             CadPropertyEditorKind.Text)

@@ -65,6 +65,21 @@ public sealed partial class MainWindow
                 e.Handled = true;
                 return;
             }
+
+            if (e.Key == Key.D1)
+            {
+                SetPropertyPanelVisible(!_propertyPanelBorder.IsVisible);
+                e.Handled = true;
+                return;
+            }
+        }
+
+        // F3/F8/F10 belong exclusively to CadViewportInteractionController.
+        if (e.Key == Key.Home)
+        {
+            ExecuteAction("view.fit");
+            e.Handled = true;
+            return;
         }
 
         if (e.Key is Key.Enter or Key.Space &&

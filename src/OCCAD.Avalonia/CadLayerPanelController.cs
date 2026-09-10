@@ -101,14 +101,17 @@ internal sealed class CadLayerPanelController : IDisposable
             Grid.SetColumn(add, 1);
             toolbar.Children.Add(add);
 
+            var currentLayerIsDefault = _workspace.Layers.Current.IsDefault;
             var rename = CompactButton(
                 CadLanguageManager.Text("Cad.Text.Rename", "Rename"));
+            rename.IsEnabled = !currentLayerIsDefault;
             rename.Click += async (_, _) => await RenameLayerAsync();
             Grid.SetColumn(rename, 2);
             toolbar.Children.Add(rename);
 
             var remove = CompactButton(
                 CadLanguageManager.Text("Cad.Text.Remove", "Remove"));
+            remove.IsEnabled = !currentLayerIsDefault;
             remove.Click += (_, _) => RemoveLayer();
             Grid.SetColumn(remove, 3);
             toolbar.Children.Add(remove);

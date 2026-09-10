@@ -49,15 +49,13 @@ public sealed class CadApplication : Application
             CadDiagnostics.Trace("Constructing MainWindow.");
 
             var window = new MainWindow();
-            // The shell is Ribbon-first. Refinement passes attach status,
-            // floating-tool and property surfaces to the same workspace state;
-            // no legacy Menu/toolbar is constructed before the window is shown.
+            // The shell is Ribbon-first. Remaining passes attach only behavior
+            // that has its own lifetime; final status/property surfaces are
+            // constructed directly by MainWindow.
             window.ApplyRibbon();
             window.ApplyUiRefinement();
             window.ApplyFloatingToolPanel();
             window.ApplyRibbonSynchronization();
-            window.ApplyPropertyGridRefinement();
-            window.ApplyCommandStatusRefinement();
 
             CadDiagnostics.Trace("MainWindow constructed.");
 

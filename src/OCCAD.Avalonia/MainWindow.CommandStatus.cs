@@ -7,23 +7,7 @@ namespace OCCAD.Avalonia;
 
 public sealed partial class MainWindow
 {
-    private bool _commandStatusRefinementApplied;
     private TextBlock? _draftingStatusLabel;
-
-    internal void ApplyCommandStatusRefinement()
-    {
-        if (_commandStatusRefinementApplied)
-            return;
-
-        _commandStatusRefinementApplied = true;
-
-        // The status bar is built in its final shape by MainWindow. This pass
-        // only attaches localized drafting menus/tooltips and language updates.
-        RefreshCommandStatusLanguage();
-
-        CadLanguageManager.Changed += CommandStatusLanguageChanged;
-        Closed += CommandStatusClosed;
-    }
 
     private static void ConfigureStatusDraftingToggle(
         global::Avalonia.Controls.Primitives.ToggleButton button)
@@ -151,14 +135,5 @@ public sealed partial class MainWindow
             }
         };
         return menu;
-    }
-
-    private void CommandStatusLanguageChanged(object? sender, EventArgs e) =>
-        Ui(RefreshCommandStatusLanguage);
-
-    private void CommandStatusClosed(object? sender, EventArgs e)
-    {
-        CadLanguageManager.Changed -= CommandStatusLanguageChanged;
-        Closed -= CommandStatusClosed;
     }
 }

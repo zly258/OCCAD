@@ -4,6 +4,10 @@ OCCAD 是基于 **OcctCSharpBridge / Open CASCADE Technology (OCCT)** 构建的 
 
 [English](README.md) · [文档索引](docs/README.md) · [用户指南](docs/zh-CN/13-USER-GUIDE.md) · [功能矩阵](docs/zh-CN/14-FEATURE-MATRIX.md) · [命令参考](docs/zh-CN/15-COMMAND-REFERENCE.md) · [发布指南](docs/zh-CN/16-RELEASE-GUIDE.md)
 
+## 预览图
+
+![OCCAD 界面](docs/screenshots/OCCAD_zh.png)
+
 ## 项目定位
 
 OCCAD 初版不追求堆功能数量，而是优先形成完整 CAD 交互闭环：

@@ -4,6 +4,10 @@ OCCAD is an Avalonia desktop CAD application and extensible CAD core built on **
 
 [中文说明](README.zh-CN.md) · [Documentation](docs/README.md) · [User Guide](docs/en-US/13-USER-GUIDE.md) · [Feature Matrix](docs/en-US/14-FEATURE-MATRIX.md) · [Command Reference](docs/en-US/15-COMMAND-REFERENCE.md) · [Release Guide](docs/en-US/16-RELEASE-GUIDE.md)
 
+## Preview
+
+![OCCAD UI](docs/screenshots/OCCAD_en.png)
+
 ## Product scope
 
 The initial OCCAD baseline focuses on a complete CAD interaction loop rather than broad feature count:

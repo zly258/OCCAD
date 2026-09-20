@@ -91,7 +91,6 @@ Makefile
 *.ply
 *.gltf
 *.glb
-*.png
 *.bmp
 
 # Keep canonical Demo preview screenshots tracked
